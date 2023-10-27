@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "nova-lang",
+    "lexer",
+    "vm",
+    "assembler",
+    "disassembler",
+    "compiler",
+    "common",
+    "optimizer",
+    "parser"
+]
+
+[profile.release]
+opt-level = 3
