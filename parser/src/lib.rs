@@ -692,7 +692,7 @@ impl Parser {
                 }
                 if !found {
                     return Err(common::error::parser_error(
-                        format!("No field '{}' found for {}", name, identifier),
+                        format!("No field '{}' found for {}", identifier, name),
                         format!("cannot retrieve field"),
                         pos.line,
                         pos.row,
@@ -702,7 +702,7 @@ impl Parser {
                 }
             } else {
                 return Err(common::error::parser_error(
-                    format!("No field '{}' found for {}", name, identifier),
+                    format!("No field '{}' found for {}", identifier, name),
                     format!("cannot retrieve field"),
                     pos.line,
                     pos.row,
@@ -724,14 +724,32 @@ impl Parser {
     }
 
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
-        let (mut identifier, pos) = self.identifier()?;
+        let mut direct = false;
+        let pos = self.get_pos();
+        let field_id: String;
+        let mut identifier = match self.current_token().expect_id() {
+            Some(id) => {
+                if &id == "super" {
+                    direct = true;
+                };
+                field_id = id.clone();
+                id
+            }
+            None => {
+                return Err(self.generate_error(
+                    "Expected identifier".to_string(),
+                    format!("Cannot assign a value to {:?}", self.current_token()),
+                ));
+            }
+        };
+        self.advance();
         while self.current_token().is_op(Operator::DoubleColon) {
             self.advance();
             let next = match self.current_token().expect_id() {
                 Some(id) => format!("::{}", id),
                 None => {
                     return Err(self.generate_error(
-                        "Expected identifier".to_string(),
+                        "1 Expected identifier".to_string(),
                         format!("Cannot assign a value to {:?}", self.current_token()),
                     ));
                 }
@@ -739,16 +757,20 @@ impl Parser {
             identifier.push_str(&next);
             self.advance();
         }
+        if !direct {
+                identifier = generate_module_string(&identifier, &self.module)
+        }
+
         match self.current_token() {
             Token::Symbol('(', _) => {
-                lhs = self.method(generate_module_string(&identifier, &self.module),  lhs, pos)?;
+                lhs = self.method(identifier.clone(),  lhs, pos)?;
             }
             Token::Symbol('[', _) => {
                 lhs = self.field(identifier.clone(), lhs, pos)?;
                 lhs = self.index(identifier.clone(), lhs.clone(), lhs.get_type())?;
             }
             _ => {
-                lhs = self.field(identifier.clone(), lhs, pos)?;
+                lhs = self.field(field_id.clone(), lhs, pos)?;
             }
         }
         Ok(lhs)
