@@ -1036,6 +1036,7 @@ impl Parser {
                     let ta = self.ttype()?;
                     type_annotation.push(ta);
                     while self.current_token().is_symbol(',') {
+                        self.advance();
                         let ta = self.ttype()?;
                         type_annotation.push(ta);
                     }
