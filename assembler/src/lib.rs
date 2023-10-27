@@ -55,7 +55,7 @@ impl Assembler {
                     self.output.push(Code::OFFSET);
                     let allocations = (locals).to_le_bytes();
                     self.output.extend_from_slice(&allocations);
-                    let allocations = (varaibles - locals).to_le_bytes();
+                    let allocations = (varaibles).to_le_bytes();
                     self.output.extend_from_slice(&allocations);
                 }
                 Asm::BOOL(bool) => {
