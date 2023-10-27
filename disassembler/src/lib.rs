@@ -22,7 +22,7 @@ impl Disassembler {
             match instruction {
                 Asm::ALLOCGLOBBALS(v) => println!("    Globals: {v}"),
                 Asm::ALLOCLOCALS(v) => println!("    Locals: {v}"),
-                Asm::OFFSET(v, l) => println!("    Offset: {v} ~ {}", l - v),
+                Asm::OFFSET(v, l) => println!("    Offset: {v} ~ {l}"),
                 Asm::STORE(v, id) => println!("    Sto L {id}: @{v}"),
                 Asm::STOREGLOBAL(v, id) => println!("    Sto G {id}: @{v}"),
                 Asm::GET(v, id) => println!("    Get L {id}: @{v}"),
