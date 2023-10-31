@@ -244,11 +244,12 @@ fn main() {
                                         assembler.assemble();
                                         let encoded: Vec<u8> =
                                             bincode::serialize(&assembler.output.clone()).unwrap();
-                                            if let Some(outputname) = std::env::args().nth(4) {
-                                                std::fs::write(format!("{}.nvb", outputname), encoded).unwrap();
-                                            } else {
-                                                println!("Error: No output name specified");
-                                            }
+                                        if let Some(outputname) = std::env::args().nth(4) {
+                                            std::fs::write(format!("{}.nvb", outputname), encoded)
+                                                .unwrap();
+                                        } else {
+                                            println!("Error: No output name specified");
+                                        }
 
                                         vm.state.program(assembler.output)
                                     }
@@ -261,8 +262,7 @@ fn main() {
                                 println!("Error: No file path specified");
                             }
                         }
-                       
-                      
+
                         _ => {
                             println!("Error: Unrecognized option {}", option);
                         }
@@ -388,7 +388,7 @@ fn main() {
                             }
                         }
                         _ => {}
-                    }
+                    },
                     None => todo!(),
                 }
             }

@@ -60,13 +60,11 @@ impl Compiler {
                 common::nodes::Statement::Let(_, identifier, expr) => {
                     self.compile_expr(expr.clone())?;
                     if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                        self.asm
-                            .push(Asm::STORE(index as u32, identifier.to_string()))
+                        self.asm.push(Asm::STORE(index as u32))
                     } else {
                         self.variables.insert(identifier.to_string());
                         let index = self.variables.len() - 1;
-                        self.asm
-                            .push(Asm::STORE(index as u32, identifier.to_string()))
+                        self.asm.push(Asm::STORE(index as u32))
                     }
                 }
                 common::nodes::Statement::Function(_, identifier, parameters, input) => {
@@ -80,8 +78,7 @@ impl Compiler {
                             .insert(args.identifier.to_string());
                     }
                     let functionjump = function_compile.gen.generate();
-                    self.asm
-                        .push(Asm::FUNCTION(functionjump, identifier.to_string()));
+                    self.asm.push(Asm::FUNCTION(functionjump));
 
                     let function_body = Ast {
                         program: input.clone(),
@@ -102,15 +99,13 @@ impl Compiler {
                     self.asm.extend_from_slice(&function_compile.asm);
                     self.asm.push(Asm::LABEL(functionjump));
                     let index = self.global.len() - 1;
-                    self.asm
-                        .push(Asm::STOREGLOBAL(index as u32, identifier.to_string()));
+                    self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
                 common::nodes::Statement::Struct(_, identifier, fields) => {
                     self.global.insert(identifier.to_string());
                     let structjump = self.gen.generate();
-                    self.asm
-                        .push(Asm::FUNCTION(structjump, identifier.to_string()));
+                    self.asm.push(Asm::FUNCTION(structjump));
                     self.asm
                         .push(Asm::OFFSET((fields.len() - 1) as u32, 0 as u32));
                     self.asm.push(Asm::STRING(identifier.clone()));
@@ -118,8 +113,7 @@ impl Compiler {
                     self.asm.push(Asm::RET(true));
                     self.asm.push(Asm::LABEL(structjump));
                     let index = self.global.len() - 1;
-                    self.asm
-                        .push(Asm::STOREGLOBAL(index as u32, identifier.to_string()));
+                    self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
                 common::nodes::Statement::Return(ttype, expr, _, _) => {
@@ -235,7 +229,7 @@ impl Compiler {
             Expr::Field(_, _, index, from) => {
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.getref_expr(*from)?;
-                self.asm.push(Asm::PINDEX);
+                self.asm.push(Asm::PIN);
             }
             Expr::Indexed(_, _, index, from) => {
                 dbg!(&index);
@@ -243,7 +237,7 @@ impl Compiler {
                     Expr::Literal(_, atom) => match atom {
                         Atom::Id(id) => {
                             if let Some(index) = self.variables.get_index(id.to_string()) {
-                                self.asm.push(Asm::STACKREF(index as u32, id.to_string()));
+                                self.asm.push(Asm::STACKREF(index as u32));
                             }
                         }
                         Atom::Integer(int) => self.asm.push(Asm::INTEGER(*int)),
@@ -254,7 +248,7 @@ impl Compiler {
                     _ => {}
                 }
                 self.getref_expr(*from)?;
-                self.asm.push(Asm::PINDEX);
+                self.asm.push(Asm::PIN);
             }
             Expr::Call(_, _, _, _) => todo!(),
             Expr::Unary(_, _, _) => todo!(),
@@ -278,8 +272,7 @@ impl Compiler {
             }
             Atom::Id(identifier) => {
                 if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                    self.asm
-                        .push(Asm::STACKREF(index as u32, identifier.to_string()));
+                    self.asm.push(Asm::STACKREF(index as u32));
                 } else {
                     dbg!(identifier);
                     todo!()
@@ -304,12 +297,10 @@ impl Compiler {
                     "clone" => self.asm.push(Asm::CLONE),
                     identifier => {
                         if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                            self.asm
-                                .push(Asm::GET(index as u32, identifier.to_string()));
+                            self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
                         } else if let Some(index) = self.global.get_index(identifier.to_string()) {
-                            self.asm
-                                .push(Asm::DIRECTCALL(index as u32, identifier.to_string()));
+                            self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             dbg!(identifier);
                             todo!()
@@ -337,13 +328,13 @@ impl Compiler {
             Expr::Field(_, _, index, field) => {
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.compile_expr(*field)?;
-                self.asm.push(Asm::LINDEX);
+                self.asm.push(Asm::LIN);
                 Ok(())
             }
             Expr::Indexed(_, _, index, from) => {
                 self.compile_expr(*index)?;
                 self.compile_expr(*from)?;
-                self.asm.push(Asm::LINDEX);
+                self.asm.push(Asm::LIN);
                 Ok(())
             }
             Expr::Call(_, _, from, arg) => {
@@ -486,7 +477,7 @@ impl Compiler {
                 }
                 for x in captured.iter().cloned() {
                     if let Some(index) = self.variables.get_index(x.to_string()) {
-                        self.asm.push(Asm::GET(index as u32, x.to_string()));
+                        self.asm.push(Asm::GET(index as u32));
                     } else {
                         panic!()
                     }
@@ -529,11 +520,9 @@ impl Compiler {
             }
             Atom::Id(identifier) => {
                 if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                    self.asm
-                        .push(Asm::GET(index as u32, identifier.to_string()));
+                    self.asm.push(Asm::GET(index as u32));
                 } else if let Some(index) = self.global.get_index(identifier.to_string()) {
-                    self.asm
-                        .push(Asm::GETGLOBAL(index as u32, identifier.to_string()));
+                    self.asm.push(Asm::GETGLOBAL(index as u32));
                 }
             }
             Atom::Float(float) => {
@@ -558,12 +547,10 @@ impl Compiler {
                     }
                     identifier => {
                         if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                            self.asm
-                                .push(Asm::GET(index as u32, identifier.to_string()));
+                            self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
                         } else if let Some(index) = self.global.get_index(identifier.to_string()) {
-                            self.asm
-                                .push(Asm::DIRECTCALL(index as u32, identifier.to_string()));
+                            self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             dbg!(identifier);
                             todo!()
