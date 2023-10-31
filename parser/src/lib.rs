@@ -348,10 +348,8 @@ impl Parser {
             TType::Function(function_parameters, mut function_output),
             function_id,
             function_kind,
-        )) = self.environment.get_function_type(
-            &identifier,
-            &inputtypes,
-        ) {
+        )) = self.environment.get_function_type(&identifier, &inputtypes)
+        {
             match function_kind {
                 SymbolKind::GenericFunction => {
                     let mut map = self.check_and_map_types(
@@ -758,12 +756,12 @@ impl Parser {
             self.advance();
         }
         if !direct {
-                identifier = generate_module_string(&identifier, &self.module)
+            identifier = generate_module_string(&identifier, &self.module)
         }
 
         match self.current_token() {
             Token::Symbol('(', _) => {
-                lhs = self.method(identifier.clone(),  lhs, pos)?;
+                lhs = self.method(identifier.clone(), lhs, pos)?;
             }
             Token::Symbol('[', _) => {
                 lhs = self.field(identifier.clone(), lhs, pos)?;

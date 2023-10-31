@@ -95,7 +95,7 @@ impl Compiler {
                     )?;
                     self.asm.push(Asm::OFFSET(
                         parameters.len() as u32,
-                        (function_compile.variables.len() - parameters.len()) as u32 ,
+                        (function_compile.variables.len() - parameters.len()) as u32,
                     ));
                     self.gen = function_compile.gen;
                     function_compile.asm.pop();
@@ -111,10 +111,8 @@ impl Compiler {
                     let structjump = self.gen.generate();
                     self.asm
                         .push(Asm::FUNCTION(structjump, identifier.to_string()));
-                    self.asm.push(Asm::OFFSET(
-                        (fields.len() - 1) as u32,
-                        0 as u32,
-                    ));
+                    self.asm
+                        .push(Asm::OFFSET((fields.len() - 1) as u32, 0 as u32));
                     self.asm.push(Asm::STRING(identifier.clone()));
                     self.asm.push(Asm::LIST(fields.len()));
                     self.asm.push(Asm::RET(true));
@@ -509,7 +507,7 @@ impl Compiler {
                 )?;
                 self.asm.push(Asm::OFFSET(
                     (parameters.len() + captured.len()) as u32,
-                    ( (parameters.len() + captured.len()) - function_compile.variables.len()) as u32,
+                    ((parameters.len() + captured.len()) - function_compile.variables.len()) as u32,
                 ));
                 self.gen = function_compile.gen;
                 function_compile.asm.pop();
