@@ -141,8 +141,7 @@ impl Env {
     ) -> Option<(TType, String, SymbolKind)> {
         if let Some(s) = self.values.last().unwrap().get(symbol) {
             if let TType::Function(_, _) = s.ttype {
-                Some
-                ((s.ttype.clone(), s.id.clone(), s.kind.clone()))
+                Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
             } else {
                 None
             }

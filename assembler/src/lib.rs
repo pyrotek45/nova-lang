@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
-use common::code::{Asm, Code};
+use common::{
+    code::{Asm, Code},
+    tokens::{self, TokenList},
+};
 
 pub struct Assembler {
     pub input: Vec<Asm>,
+    pub nva: Vec<Asm>,
     pub output: Vec<u8>,
     labels: HashMap<usize, usize>,
     forwardjumps: Vec<(usize, usize)>,
@@ -15,10 +19,146 @@ pub fn new(input: Vec<Asm>) -> Assembler {
         output: vec![],
         labels: HashMap::default(),
         forwardjumps: vec![],
+        nva: vec![],
+    }
+}
+
+pub fn new_empty() -> Assembler {
+    Assembler {
+        input: vec![],
+        output: vec![],
+        labels: HashMap::default(),
+        forwardjumps: vec![],
+        nva: vec![],
     }
 }
 
 impl Assembler {
+    pub fn assemble_from_nva(&mut self, fileinput: TokenList) {
+        let asmfile = fileinput.clone();
+        let mut ci = 0;
+        while ci < asmfile.len() {
+            match &asmfile[ci] {
+                tokens::Token::None(_, _) => todo!(),
+                tokens::Token::Type(_, _) => todo!(),
+                tokens::Token::Identifier(command, _) => {
+                    match command.as_str() {
+                        "lbl" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::LABEL(asmfile[ci].clone().get_int().unwrap() as usize));
+                            ci += 1;
+                        }
+                        "globals" => {
+                            ci += 2;
+                            self.nva.push(Asm::ALLOCGLOBBALS(
+                                asmfile[ci].clone().get_int().unwrap() as u32,
+                            ));
+                            ci += 1;
+                        }
+                        "locals" => {
+                            ci += 2;
+                            self.nva.push(Asm::ALLOCLOCALS(
+                                asmfile[ci].clone().get_int().unwrap() as u32
+                            ));
+                            ci += 1;
+                        }
+                        "pushi" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::INTEGER(asmfile[ci].clone().get_int().unwrap()));
+                            ci += 1;
+                        }
+                        "pushf" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::FLOAT(asmfile[ci].clone().get_float().unwrap()));
+                            ci += 1;
+                        }
+
+                        "jmp" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::JMP(asmfile[ci].clone().get_int().unwrap() as usize));
+                            ci += 1;
+                        }
+                        "bjmp" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::BJMP(asmfile[ci].clone().get_int().unwrap() as usize));
+                            ci += 1;
+                        }
+                        "print" => {
+                            ci += 1;
+                            self.nva.push(Asm::PRINT);
+                        }
+                        // ints
+                        "iadd" => {
+                            ci += 1;
+                            self.nva.push(Asm::IADD);
+                        }
+                        "imul" => {
+                            ci += 1;
+                            self.nva.push(Asm::IMUL);
+                        }
+                        "isub" => {
+                            ci += 1;
+                            self.nva.push(Asm::ISUB);
+                        }
+                        "idiv" => {
+                            ci += 1;
+                            self.nva.push(Asm::IDIV);
+                        }
+                        "imod" => {
+                            ci += 1;
+                            self.nva.push(Asm::IMODULO);
+                        }
+                        // floats
+                        "fadd" => {
+                            ci += 1;
+                            self.nva.push(Asm::FADD);
+                        }
+                        "fmul" => {
+                            ci += 1;
+                            self.nva.push(Asm::FMUL);
+                        }
+                        "fsub" => {
+                            ci += 1;
+                            self.nva.push(Asm::FSUB);
+                        }
+                        "fdiv" => {
+                            ci += 1;
+                            self.nva.push(Asm::FDIV);
+                        }
+                        "ret" => {
+                            ci += 2;
+                            if asmfile[ci].clone().get_int().unwrap() == 0 {
+                                self.nva.push(Asm::RET(false))
+                            } else if asmfile[ci].clone().get_int().unwrap() == 1 {
+                                self.nva.push(Asm::RET(true))
+                            } else {
+                                panic!()
+                            }
+                            ci += 1;
+                        }
+                        _ => {
+                            todo!()
+                        }
+                    }
+                }
+                tokens::Token::Integer(_, _) => todo!(),
+                tokens::Token::Float(_, _) => todo!(),
+                tokens::Token::String(_, _) => todo!(),
+                tokens::Token::Char(_, _) => todo!(),
+                tokens::Token::Symbol(_, _) => todo!(),
+                tokens::Token::Bool(_, _) => todo!(),
+                tokens::Token::Operator(_, _) => todo!(),
+                tokens::Token::NewLine(_) => ci += 1,
+                tokens::Token::EOF(_) => ci += 1,
+            }
+        }
+    }
+
     pub fn assemble(&mut self) {
         for instruction in self.input.iter().cloned() {
             match instruction {
@@ -220,8 +360,8 @@ impl Assembler {
                 self.output[replace + 2] = t[2];
                 self.output[replace + 3] = t[3];
             } else {
-                dbg!(target);
-                panic!()
+                println!("Assembly ERROR: No label {target} exist, exiting");
+                std::process::exit(1);
             }
         }
     }
