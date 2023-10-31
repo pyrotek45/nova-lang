@@ -43,25 +43,80 @@ impl Assembler {
                 tokens::Token::Type(_, _) => todo!(),
                 tokens::Token::Identifier(command, _) => {
                     match command.as_str() {
+                        "function" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::FUNCTION(asmfile[ci].clone().get_int().unwrap() as usize, "".to_string()));
+                            ci += 2;
+                        }
+                        "getg" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::GETGLOBAL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
+                        }
+                        "getl" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::GET(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
+                        }
+                        "offset" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::OFFSET(asmfile[ci].clone().get_int().unwrap() as u32, asmfile[ci + 1].clone().get_int().unwrap() as u32));
+                            ci += 2;
+                        }
                         "lbl" => {
                             ci += 2;
                             self.nva
                                 .push(Asm::LABEL(asmfile[ci].clone().get_int().unwrap() as usize));
                             ci += 1;
                         }
-                        "globals" => {
+                        "dcall" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::DIRECTCALL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
+                        }
+                        "tcall" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::TAILCALL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
+                        }
+                        "global" => {
                             ci += 2;
                             self.nva.push(Asm::ALLOCGLOBBALS(
                                 asmfile[ci].clone().get_int().unwrap() as u32,
                             ));
                             ci += 1;
                         }
-                        "locals" => {
+                        "local" => {
                             ci += 2;
                             self.nva.push(Asm::ALLOCLOCALS(
                                 asmfile[ci].clone().get_int().unwrap() as u32
                             ));
                             ci += 1;
+                        }
+                        "list" => {
+                            ci += 2;
+                            self.nva.push(Asm::LIST(
+                                asmfile[ci].clone().get_int().unwrap() as usize
+                            ));
+                            ci += 1;
+                        }
+                        "storeg" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::STOREGLOBAL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
+                        }
+                        "storel" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::STORE(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                            ci += 2;
                         }
                         "pushi" => {
                             ci += 2;
@@ -91,6 +146,22 @@ impl Assembler {
                         "print" => {
                             ci += 1;
                             self.nva.push(Asm::PRINT);
+                        }
+                        "call" => {
+                            ci += 1;
+                            self.nva.push(Asm::CALL);
+                        }
+                        "not" => {
+                            ci += 1;
+                            self.nva.push(Asm::NOT);
+                        }
+                        "neg" => {
+                            ci += 1;
+                            self.nva.push(Asm::NEG);
+                        }
+                        "assign" => {
+                            ci += 1;
+                            self.nva.push(Asm::ASSIGN);
                         }
                         // ints
                         "iadd" => {
@@ -141,7 +212,8 @@ impl Assembler {
                             }
                             ci += 1;
                         }
-                        _ => {
+                        a => {
+                            dbg!(a);
                             todo!()
                         }
                     }
