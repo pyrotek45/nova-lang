@@ -131,6 +131,14 @@ pub enum Token {
 }
 
 impl Token {
+    pub fn get_id(self) -> Option<String> {
+        if let Token::Identifier(v, _) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     pub fn get_int(self) -> Option<i64> {
         if let Token::Integer(v, _) = self {
             Some(v)
