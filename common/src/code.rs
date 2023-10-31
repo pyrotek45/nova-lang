@@ -121,13 +121,13 @@ pub enum Asm {
     ALLOCLOCALS(u32),
     OFFSET(u32, u32),
 
-    STORE(u32, String),
-    STOREGLOBAL(u32, String),
+    STORE(u32),
+    STOREGLOBAL(u32),
 
-    GET(u32, String),
-    GETGLOBAL(u32, String),
+    GET(u32),
+    GETGLOBAL(u32),
 
-    STACKREF(u32, String),
+    STACKREF(u32),
     ASSIGN,
 
     FREE,
@@ -174,14 +174,14 @@ pub enum Asm {
     PRINT,
 
     // functions
-    FUNCTION(usize, String),
+    FUNCTION(usize),
     CLOSURE(usize),
     RET(bool),
-    DIRECTCALL(u32, String),
-    TAILCALL(u32, String),
+    DCALL(u32),
+    TCALL(u32),
     CALL,
 
     // list operations
-    PINDEX,
-    LINDEX,
+    PIN,
+    LIN,
 }

@@ -43,28 +43,42 @@ impl Assembler {
                 tokens::Token::Type(_, _) => todo!(),
                 tokens::Token::Identifier(command, _) => {
                     match command.as_str() {
+                        "main" => {
+                            ci += 2;
+                        }
                         "function" => {
                             ci += 2;
-                            self.nva
-                                .push(Asm::FUNCTION(asmfile[ci].clone().get_int().unwrap() as usize, "".to_string()));
+                            self.nva.push(Asm::FUNCTION(
+                                asmfile[ci].clone().get_int().unwrap() as usize
+                            ));
+                            ci += 1;
+                        }
+                        "closure" => {
                             ci += 2;
+                            self.nva.push(Asm::CLOSURE(
+                                asmfile[ci].clone().get_int().unwrap() as usize
+                            ));
+                            ci += 1;
                         }
                         "getg" => {
                             ci += 2;
-                            self.nva
-                                .push(Asm::GETGLOBAL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
-                            ci += 2;
+                            self.nva.push(Asm::GETGLOBAL(
+                                asmfile[ci].clone().get_int().unwrap() as u32
+                            ));
+                            ci += 1;
                         }
                         "getl" => {
                             ci += 2;
                             self.nva
-                                .push(Asm::GET(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
-                            ci += 2;
+                                .push(Asm::GET(asmfile[ci].clone().get_int().unwrap() as u32));
+                            ci += 1;
                         }
                         "offset" => {
                             ci += 2;
-                            self.nva
-                                .push(Asm::OFFSET(asmfile[ci].clone().get_int().unwrap() as u32, asmfile[ci + 1].clone().get_int().unwrap() as u32));
+                            self.nva.push(Asm::OFFSET(
+                                asmfile[ci].clone().get_int().unwrap() as u32,
+                                asmfile[ci + 1].clone().get_int().unwrap() as u32,
+                            ));
                             ci += 2;
                         }
                         "lbl" => {
@@ -76,14 +90,14 @@ impl Assembler {
                         "dcall" => {
                             ci += 2;
                             self.nva
-                                .push(Asm::DIRECTCALL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
+                                .push(Asm::DCALL(asmfile[ci].clone().get_int().unwrap() as u32));
                             ci += 2;
                         }
                         "tcall" => {
                             ci += 2;
                             self.nva
-                                .push(Asm::TAILCALL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
-                            ci += 2;
+                                .push(Asm::TCALL(asmfile[ci].clone().get_int().unwrap() as u32));
+                            ci += 1;
                         }
                         "global" => {
                             ci += 2;
@@ -101,27 +115,33 @@ impl Assembler {
                         }
                         "list" => {
                             ci += 2;
-                            self.nva.push(Asm::LIST(
-                                asmfile[ci].clone().get_int().unwrap() as usize
-                            ));
+                            self.nva
+                                .push(Asm::LIST(asmfile[ci].clone().get_int().unwrap() as usize));
                             ci += 1;
                         }
                         "storeg" => {
                             ci += 2;
-                            self.nva
-                                .push(Asm::STOREGLOBAL(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
-                            ci += 2;
+                            self.nva.push(Asm::STOREGLOBAL(
+                                asmfile[ci].clone().get_int().unwrap() as u32
+                            ));
+                            ci += 1;
                         }
                         "storel" => {
                             ci += 2;
                             self.nva
-                                .push(Asm::STORE(asmfile[ci].clone().get_int().unwrap() as u32, "".to_string()));
-                            ci += 2;
+                                .push(Asm::STORE(asmfile[ci].clone().get_int().unwrap() as u32));
+                            ci += 1;
                         }
                         "pushi" => {
                             ci += 2;
                             self.nva
                                 .push(Asm::INTEGER(asmfile[ci].clone().get_int().unwrap()));
+                            ci += 1;
+                        }
+                        "pushs" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::STRING(asmfile[ci].clone().get_str().unwrap()));
                             ci += 1;
                         }
                         "pushf" => {
@@ -130,17 +150,40 @@ impl Assembler {
                                 .push(Asm::FLOAT(asmfile[ci].clone().get_float().unwrap()));
                             ci += 1;
                         }
-
+                        "ref" => {
+                            ci += 2;
+                            self.nva
+                                .push(Asm::STACKREF(asmfile[ci].clone().get_int().unwrap() as u32));
+                            ci += 1;
+                        }
                         "jmp" => {
                             ci += 2;
                             self.nva
                                 .push(Asm::JMP(asmfile[ci].clone().get_int().unwrap() as usize));
                             ci += 1;
                         }
+                        "jif" => {
+                            ci += 2;
+                            self.nva.push(Asm::JUMPIFFALSE(
+                                asmfile[ci].clone().get_int().unwrap() as usize
+                            ));
+                            ci += 1;
+                        }
                         "bjmp" => {
                             ci += 2;
                             self.nva
                                 .push(Asm::BJMP(asmfile[ci].clone().get_int().unwrap() as usize));
+                            ci += 1;
+                        }
+                        "pushb" => {
+                            ci += 2;
+                            if asmfile[ci].clone().get_int().unwrap() == 0 {
+                                self.nva.push(Asm::BOOL(false))
+                            } else if asmfile[ci].clone().get_int().unwrap() == 1 {
+                                self.nva.push(Asm::BOOL(true))
+                            } else {
+                                panic!()
+                            }
                             ci += 1;
                         }
                         "print" => {
@@ -201,15 +244,38 @@ impl Assembler {
                             ci += 1;
                             self.nva.push(Asm::FDIV);
                         }
+                        "equ" => {
+                            ci += 1;
+                            self.nva.push(Asm::EQUALS);
+                        }
+                        "ilss" => {
+                            ci += 1;
+                            self.nva.push(Asm::ILSS);
+                        }
+                        "igtr" => {
+                            ci += 1;
+                            self.nva.push(Asm::IGTR);
+                        }
+                        "flss" => {
+                            ci += 1;
+                            self.nva.push(Asm::FLSS);
+                        }
+                        "fgtr" => {
+                            ci += 1;
+                            self.nva.push(Asm::FGTR);
+                        }
+                        "pin" => {
+                            ci += 1;
+                            self.nva.push(Asm::PIN);
+                        }
+                        "lin" => {
+                            ci += 1;
+                            self.nva.push(Asm::LIN);
+                        }
                         "ret" => {
                             ci += 2;
-                            if asmfile[ci].clone().get_int().unwrap() == 0 {
-                                self.nva.push(Asm::RET(false))
-                            } else if asmfile[ci].clone().get_int().unwrap() == 1 {
-                                self.nva.push(Asm::RET(true))
-                            } else {
-                                panic!()
-                            }
+                            self.nva
+                                .push(Asm::RET(asmfile[ci].clone().get_bool().unwrap()));
                             ci += 1;
                         }
                         a => {
@@ -319,7 +385,7 @@ impl Assembler {
                 Asm::FSUB => self.output.push(Code::FSUB),
                 Asm::FDIV => self.output.push(Code::FDIV),
                 Asm::FMUL => self.output.push(Code::FMUL),
-                Asm::FUNCTION(target, _) => {
+                Asm::FUNCTION(target) => {
                     if let Some(destination) = self.labels.get(&target) {
                         self.output.push(Code::FUNCTION);
                         let t = (*destination as u32).to_le_bytes();
@@ -332,26 +398,26 @@ impl Assembler {
                     }
                 }
                 Asm::ASSIGN => self.output.push(Code::ASSIGN),
-                Asm::STORE(index, _) => {
+                Asm::STORE(index) => {
                     self.output.push(Code::STORE);
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
-                Asm::STOREGLOBAL(index, _) => {
+                Asm::STOREGLOBAL(index) => {
                     self.output.push(Code::STOREGLOBAL);
                     self.output.extend_from_slice(&(index as u32).to_le_bytes());
                 }
-                Asm::GET(index, _) => {
+                Asm::GET(index) => {
                     self.output.push(Code::GET);
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
-                Asm::GETGLOBAL(index, _) => {
+                Asm::GETGLOBAL(index) => {
                     self.output.push(Code::GETGLOBAL);
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
-                Asm::DIRECTCALL(index, _) => {
+                Asm::DCALL(index) => {
                     self.output.push(Code::DIRECTCALL);
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
@@ -359,7 +425,7 @@ impl Assembler {
                 Asm::CALL => {
                     self.output.push(Code::CALL);
                 }
-                Asm::STACKREF(index, _) => {
+                Asm::STACKREF(index) => {
                     self.output.push(Code::STACKREF);
                     let i = (index).to_le_bytes();
                     self.output.extend_from_slice(&i);
@@ -412,9 +478,9 @@ impl Assembler {
                         self.output.extend_from_slice(&t);
                     }
                 }
-                Asm::PINDEX => self.output.push(Code::PINDEX),
-                Asm::LINDEX => self.output.push(Code::LINDEX),
-                Asm::TAILCALL(index, _) => {
+                Asm::PIN => self.output.push(Code::PINDEX),
+                Asm::LIN => self.output.push(Code::LINDEX),
+                Asm::TCALL(index) => {
                     self.output.push(Code::TAILCALL);
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
