@@ -498,6 +498,34 @@ impl Compiler {
                         self.compile_expr(*rhs)?;
                         self.asm.push(Asm::OR);
                     }
+                    common::tokens::Operator::AdditionAssignment => {
+                        self.compile_expr(*rhs.clone())?;
+                        self.compile_expr(*lhs.clone())?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::IADD);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FADD);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.getref_expr(*lhs.clone())?;
+
+                        self.asm.push(Asm::ASSIGN)
+                    },
+                    common::tokens::Operator::SubtractionAssignment => {
+                        self.compile_expr(*rhs.clone())?;
+                        self.compile_expr(*lhs.clone())?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::ISUB);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FSUB);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.getref_expr(*lhs.clone())?;
+
+                        self.asm.push(Asm::ASSIGN)
+                    },
                 }
                 Ok(())
             }

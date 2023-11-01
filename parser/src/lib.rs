@@ -1213,7 +1213,7 @@ impl Parser {
 
     fn expr(&mut self) -> Result<Expr, NovaError> {
         let mut left = self.top_expr()?;
-        while self.current_token().is_op(Operator::Assignment) {
+        while self.current_token().is_assign() {
             let oline = self.current_token().line();
             let orow = self.current_token().row();
             let operation = self.current_token().get_operator();
