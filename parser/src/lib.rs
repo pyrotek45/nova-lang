@@ -15,7 +15,7 @@ pub struct Parser {
     pub input: TokenList,
     index: usize,
     pub ast: Ast,
-    environment: Env,
+    pub environment: Env,
     module: Vec<String>,
 }
 

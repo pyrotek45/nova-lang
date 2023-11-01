@@ -272,6 +272,14 @@ impl Assembler {
                             ci += 1;
                             self.nva.push(Asm::LIN);
                         }
+                        "and" => {
+                            ci += 1;
+                            self.nva.push(Asm::AND);
+                        }
+                        "or" => {
+                            ci += 1;
+                            self.nva.push(Asm::OR);
+                        }
                         "ret" => {
                             ci += 2;
                             self.nva
@@ -487,6 +495,11 @@ impl Assembler {
                 }
                 Asm::AND => self.output.push(Code::AND),
                 Asm::OR => self.output.push(Code::OR),
+                Asm::NATIVE(v) => {
+                    self.output.push(Code::NATIVE);
+                    let bytes = v.to_le_bytes();
+                    self.output.extend_from_slice(&bytes);
+                }
             }
         }
 

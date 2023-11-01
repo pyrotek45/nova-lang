@@ -1,4 +1,5 @@
 pub mod state;
+pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 
 use std::io;
 
@@ -13,11 +14,13 @@ use crate::state::VmData;
 
 #[derive(Debug, Clone)]
 pub struct Vm {
+    pub native_functions: Vec<CallBack>,
     pub state: state::State,
 }
 
 pub fn new() -> Vm {
     Vm {
+        native_functions: vec![],
         state: state::new(),
     }
 }
@@ -28,6 +31,24 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
+                Code::NATIVE => {
+                    let index = usize::from_le_bytes([
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                    ]);
+
+                    match self.native_functions[index](&mut self.state) {
+                        Ok(_) => {}
+                        Err(error) => return Err(error),
+                    }
+                }
+
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCATEGLOBAL => {
                     let allocations = u32::from_le_bytes([

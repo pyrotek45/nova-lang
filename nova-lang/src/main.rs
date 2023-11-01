@@ -1,5 +1,7 @@
 use std::{process::exit, time::Instant};
 
+use common::tokens::TType;
+
 fn main() {
     match std::env::args().nth(1) {
         Some(option) => match option.as_str() {
@@ -31,6 +33,24 @@ fn main() {
                                 };
 
                                 let mut parser = parser::new(&filepath);
+                                let mut compiler = compiler::new();
+                                let mut vm = vm::new();
+
+                                // adding native functions
+                                parser.environment.insert_symbol(
+                                    "super::len",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::len".to_string());
+                                vm.native_functions.insert(0, native::list::len);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
@@ -41,8 +61,7 @@ fn main() {
                                         exit(1)
                                     }
                                 }
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
+
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -101,7 +120,26 @@ fn main() {
                                         exit(1)
                                     }
                                 };
+
                                 let mut parser = parser::new(&filepath);
+                                let mut compiler = compiler::new();
+                                let mut vm = vm::new();
+
+                                // adding native functions
+                                parser.environment.insert_symbol(
+                                    "super::len",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::len".to_string());
+                                vm.native_functions.insert(0, native::list::len);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
@@ -112,8 +150,8 @@ fn main() {
                                         exit(1)
                                     }
                                 }
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
+
+                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -170,7 +208,26 @@ fn main() {
                                         exit(1)
                                     }
                                 };
+
                                 let mut parser = parser::new(&filepath);
+                                let mut compiler = compiler::new();
+                                let mut vm = vm::new();
+
+                                // adding native functions
+                                parser.environment.insert_symbol(
+                                    "super::len",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::len".to_string());
+                                vm.native_functions.insert(0, native::list::len);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
@@ -181,8 +238,8 @@ fn main() {
                                         exit(1)
                                     }
                                 }
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
+
+                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -196,7 +253,6 @@ fn main() {
                                         //println!("After optimization: {}", optimizer.optimizations);
                                         // dis.dis_asm(asm.clone());
                                         //println!("{}", rhexdump::hexdump(&assembler.output));
-
                                         let mut assembler = assembler::new(asm);
                                         assembler.assemble();
                                         vm.state.program(assembler.output)
@@ -242,6 +298,24 @@ fn main() {
                                 };
 
                                 let mut parser = parser::new(&filepath);
+                                let mut compiler = compiler::new();
+                                let mut vm = vm::new();
+
+                                // adding native functions
+                                parser.environment.insert_symbol(
+                                    "super::len",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::len".to_string());
+                                vm.native_functions.insert(0, native::list::len);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
@@ -252,14 +326,25 @@ fn main() {
                                         exit(1)
                                     }
                                 }
-                                let mut compiler = compiler::new();
-                                let mut dis = disassembler::new();
+
+                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
                                 match program {
                                     Ok(_) => {
+                                        // println!("Before optimization");
+                                        let mut dis = disassembler::new();
+                                        // dis.dis_asm(asm.clone());
+                                        // println!();
+                                        // let mut optimizer = optimizer::new();
+                                        // let optimized = optimizer.Optimize(asm.clone());
+                                        //println!("After optimization: {}", optimizer.optimizations);
                                         dis.dis_asm(asm.clone());
+                                        //println!("{}", rhexdump::hexdump(&assembler.output));
+                                        let mut assembler = assembler::new(asm);
+                                        assembler.assemble();
+                                        vm.state.program(assembler.output)
                                     }
                                     Err(error) => {
                                         error.show();
@@ -292,7 +377,26 @@ fn main() {
                                         exit(1)
                                     }
                                 };
+
                                 let mut parser = parser::new(&filepath);
+                                let mut compiler = compiler::new();
+                                let mut vm = vm::new();
+
+                                // adding native functions
+                                parser.environment.insert_symbol(
+                                    "super::len",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::len".to_string());
+                                vm.native_functions.insert(0, native::list::len);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
@@ -303,8 +407,8 @@ fn main() {
                                         exit(1)
                                     }
                                 }
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
+
+                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -320,30 +424,6 @@ fn main() {
                                         } else {
                                             println!("Error: No output name specified");
                                         }
-
-                                        vm.state.program(assembler.output)
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-                            } else {
-                                println!("Error: No file path specified");
-                            }
-                        }
-
-                        "runbin" => {
-                            if let Some(filepath) = std::env::args().nth(2) {
-                                let encoded = std::fs::read(filepath).unwrap();
-                                let program = bincode::deserialize(&encoded).unwrap();
-
-                                let mut vm = vm::new();
-                                vm.state.program(program);
-
-                                match vm.run() {
-                                    Ok(()) => {
-                                        //dbg!(vm.state.stack);
                                     }
                                     Err(error) => {
                                         error.show();
@@ -361,7 +441,58 @@ fn main() {
                     None => todo!(),
                 }
             }
+            "bin" => {
+                match std::env::args().nth(2) {
+                    Some(option) => match option.as_str() {
+                        "run" => {
+                            if let Some(filepath) = std::env::args().nth(3) {
+                                let encoded = std::fs::read(filepath).unwrap();
+                                let program = bincode::deserialize(&encoded).unwrap();
 
+                                let mut vm = vm::new();
+                                vm.native_functions.insert(0, native::list::len);
+                                vm.state.program(program);
+
+                                match vm.run() {
+                                    Ok(()) => {
+                                        //dbg!(vm.state.stack);
+                                    }
+                                    Err(error) => {
+                                        error.show();
+                                        exit(1)
+                                    }
+                                }
+                            } else {
+                                println!("Error: No file path specified");
+                            }
+                        }
+                        "dbg" => {
+                            if let Some(filepath) = std::env::args().nth(3) {
+                                let encoded = std::fs::read(filepath).unwrap();
+                                let program : Vec<u8> = bincode::deserialize(&encoded).unwrap();
+                                println!("{}",rhexdump::hexdump(&program.clone()));
+                                let mut vm = vm::new();
+                                vm.native_functions.insert(0, native::list::len);
+                                vm.state.program(program);
+
+                                match vm.run_debug() {
+                                    Ok(()) => {
+                                        //dbg!(vm.state.stack);
+                                    }
+                                    Err(error) => {
+                                        error.show();
+                                        exit(1)
+                                    }
+                                }
+                            } else {
+                                println!("Error: No file path specified");
+                            }
+                        }
+                        _ => {}
+                    }
+                    None => todo!(),
+                }
+            }
             "asm" => {
                 match std::env::args().nth(2) {
                     Some(option) => match option.as_str() {
