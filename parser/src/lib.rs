@@ -1277,7 +1277,25 @@ impl Parser {
             let operation = self.current_token().get_operator();
             self.advance();
             let right = self.mid_expr()?;
-            left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+
+            match operation {
+                Operator::And | Operator::Or => {
+                    if (left.get_type() != TType::Bool) || (right.get_type() != TType::Bool) {
+                        return Err(self.generate_error(
+                            format!("Logical operation expects bool"),
+                            format!(
+                                "got {:?} {:?}",
+                                left.get_type().clone(),
+                                right.get_type().clone()
+                            ),
+                        ));
+                    }
+                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                }
+                _ => {
+                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                }
+            }
         }
         Ok(left)
     }

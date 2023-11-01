@@ -305,7 +305,7 @@ impl Lexer {
                 ' ' => {
                     self.check_token()?;
                 }
-                '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' => {
+                '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' | '&' | '|' => {
                     self.check_token()?;
                     match c {
                         ':' => {
@@ -336,20 +336,48 @@ impl Lexer {
                                 row: self.row,
                             },
                         )),
-                        '>' => self.output.push(Token::Operator(
-                            Operator::GreaterThan,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                            },
-                        )),
-                        '<' => self.output.push(Token::Operator(
-                            Operator::LessThan,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                            },
-                        )),
+                        '>' => {
+                            if let Some('=') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::GtrOrEqu,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else {
+                                self.output.push(Token::Operator(
+                                    Operator::GreaterThan,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                    },
+                                ))
+                            }
+                        }
+                        '<' => {
+                            if let Some('=') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::LssOrEqu,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else {
+                                self.output.push(Token::Operator(
+                                    Operator::LessThan,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                    },
+                                ))
+                            }
+                        }
                         '+' => self.output.push(Token::Operator(
                             Operator::Addition,
                             Position {
@@ -440,6 +468,48 @@ impl Lexer {
                                         row: self.row,
                                     },
                                 ))
+                            }
+                        }
+                        '&' => {
+                            if let Some(&'&') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::And,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else {
+                                self.output.push(Token::Symbol(
+                                    c,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                    },
+                                ));
+                            }
+                        }
+                        '|' => {
+                            if let Some(&'|') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::Or,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else {
+                                self.output.push(Token::Symbol(
+                                    c,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                    },
+                                ));
                             }
                         }
                         _ => {}

@@ -112,6 +112,9 @@ impl Code {
 
     pub const OFFSET: u8 = 69;
     pub const TAILCALL: u8 = 70;
+
+    pub const AND: u8 = 71;
+    pub const OR: u8 = 72;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -186,6 +189,8 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::FLSS => "FLSS",
         Code::OFFSET => "OFFSET",
         Code::TAILCALL => "TAILCALL",
+        Code::AND => "AND",
+        Code::OR => "OR",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -247,6 +252,8 @@ pub enum Asm {
     NOT,
     NEG,
 
+    AND,
+    OR,
     // built ins
     PRINT,
 

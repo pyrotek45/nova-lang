@@ -64,6 +64,8 @@ impl Disassembler {
                 Asm::PIN => println!("    pin"),
                 Asm::LIN => println!("    lin"),
                 Asm::TCALL(v) => println!("    tcall: {v}"),
+                Asm::AND => println!("    and"),
+                Asm::OR => println!("    or"),
             }
         }
         println!();

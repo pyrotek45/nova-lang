@@ -485,6 +485,8 @@ impl Assembler {
                     let bytes = (index as u32).to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
+                Asm::AND => self.output.push(Code::AND),
+                Asm::OR => self.output.push(Code::OR),
             }
         }
 

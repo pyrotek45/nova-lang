@@ -366,7 +366,6 @@ impl Compiler {
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::IGTR);
                         } else if lhs.get_type() == TType::Float {
-                            self.output.push(Code::FGTR);
                             self.asm.push(Asm::FGTR);
                         } else {
                             dbg!(&ttype);
@@ -459,6 +458,46 @@ impl Compiler {
                     }
                     common::tokens::Operator::DoubleColon => todo!(),
                     common::tokens::Operator::Colon => todo!(),
+                    common::tokens::Operator::GtrOrEqu => {
+                        self.compile_expr(*lhs.clone())?;
+                        self.compile_expr(*rhs.clone())?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::IGTR);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FGTR);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.compile_expr(*lhs)?;
+                        self.compile_expr(*rhs)?;
+                        self.asm.push(Asm::EQUALS);
+                        self.asm.push(Asm::OR);
+                    }
+                    common::tokens::Operator::LssOrEqu => {
+                        self.compile_expr(*lhs.clone())?;
+                        self.compile_expr(*rhs.clone())?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::ILSS);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FLSS);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.compile_expr(*lhs)?;
+                        self.compile_expr(*rhs)?;
+                        self.asm.push(Asm::EQUALS);
+                        self.asm.push(Asm::OR);
+                    }
+                    common::tokens::Operator::And => {
+                        self.compile_expr(*lhs)?;
+                        self.compile_expr(*rhs)?;
+                        self.asm.push(Asm::AND);
+                    }
+                    common::tokens::Operator::Or => {
+                        self.compile_expr(*lhs)?;
+                        self.compile_expr(*rhs)?;
+                        self.asm.push(Asm::OR);
+                    }
                 }
                 Ok(())
             }
