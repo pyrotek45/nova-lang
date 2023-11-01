@@ -7,6 +7,7 @@ use common::{
     code::{byte_to_string, Code},
     error::NovaError,
 };
+
 use modulo::Mod;
 use state::Heap;
 
@@ -31,9 +32,10 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
-                Code::DUP => {
-                    self.state.stack.push(self.state.stack.last().unwrap().clone())
-                }
+                Code::DUP => self
+                    .state
+                    .stack
+                    .push(self.state.stack.last().unwrap().clone()),
                 Code::POP => {
                     self.state.stack.pop();
                 }
@@ -872,15 +874,21 @@ impl Vm {
                 byte_to_string(self.state.program[self.state.current_instruction]),
                 tick
             );
-
+            println!("Stack: {:?}", &self.state.stack);
             // Read a line from the standard input and discard it.
             io::stdin()
                 .read_line(&mut input)
                 .expect("Failed to read line");
+
+            // Attempt to clear the terminal screen
+            // if let Err(e) = execute!(std::io::stdout(), Clear(ClearType::All)) {
+            //     eprintln!("Failed to clear the terminal screen: {}", e);
+            // }
             match self.state.next() {
-                Code::DUP => {
-                    self.state.stack.push(self.state.stack.last().unwrap().clone())
-                }
+                Code::DUP => self
+                    .state
+                    .stack
+                    .push(self.state.stack.last().unwrap().clone()),
                 Code::POP => {
                     self.state.stack.pop();
                 }
@@ -1681,7 +1689,7 @@ impl Vm {
 
             // dbg!(&self.state.stack);
             // dbg!(&self.state.program[self.state.current_instruction]);
-            println!("Stack: {:?}", &self.state.stack);
+
             tick += 1;
         }
         //dbg!(&self.state.heap, self.state.heap.len(), self.state.threshold, self.state.gc_count);
