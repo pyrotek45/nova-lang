@@ -378,19 +378,43 @@ impl Lexer {
                                 ))
                             }
                         }
-                        '+' => self.output.push(Token::Operator(
-                            Operator::Addition,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                            },
-                        )),
+                        '+' => {
+                            if let Some('=') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::AdditionAssignment,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else {
+                                self.output.push(Token::Operator(
+                                    Operator::Addition,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                    },
+                                ))
+                            }
+                        }
                         '-' => {
                             if let Some('>') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
                                 self.output.push(Token::Operator(
                                     Operator::RightArrow,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
+                            } else if let Some('=') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.output.push(Token::Operator(
+                                    Operator::SubtractionAssignment,
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,

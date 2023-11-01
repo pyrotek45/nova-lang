@@ -15,6 +15,8 @@ pub enum Unary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operator {
+    AdditionAssignment,
+    SubtractionAssignment,
     And,
     Or,
     Colon,
@@ -283,6 +285,16 @@ impl Token {
     pub fn is_multi_op(&self) -> bool {
         if let Token::Operator(op, _) = self {
             *op == Operator::Multiplication || *op == Operator::Division || *op == Operator::Modulo
+        } else {
+            false
+        }
+    }
+
+    pub fn is_assign(&self) -> bool {
+        if let Token::Operator(op, _) = self {
+            *op == Operator::Assignment
+                || *op == Operator::AdditionAssignment
+                || *op == Operator::SubtractionAssignment
         } else {
             false
         }
