@@ -503,7 +503,6 @@ impl Compiler {
                         self.compile_expr(*rhs)?;
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::LABEL(sc))
-
                     }
                     common::tokens::Operator::And => {
                         let sc = self.gen.generate();

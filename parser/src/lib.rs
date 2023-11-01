@@ -1012,9 +1012,14 @@ impl Parser {
                 }
 
                 if output == TType::Void {
-                    if let Some(Statement::Return(_ ,_,_,_)) = statements.last() {
+                    if let Some(Statement::Return(_, _, _, _)) = statements.last() {
                     } else {
-                        statements.push(Statement::Return(output.clone(), Expr::None, self.current_token().line(), self.current_token().row()));
+                        statements.push(Statement::Return(
+                            output.clone(),
+                            Expr::None,
+                            self.current_token().line(),
+                            self.current_token().row(),
+                        ));
                     }
                 }
 
@@ -1938,9 +1943,14 @@ impl Parser {
         }
 
         if output == TType::Void {
-            if let Some(Statement::Return(_ ,_,_,_)) = statements.last() {
+            if let Some(Statement::Return(_, _, _, _)) = statements.last() {
             } else {
-                statements.push(Statement::Return(output.clone(), Expr::None, self.current_token().line(), self.current_token().row()));
+                statements.push(Statement::Return(
+                    output.clone(),
+                    Expr::None,
+                    self.current_token().line(),
+                    self.current_token().row(),
+                ));
             }
         }
         Ok(Some(Statement::Function(

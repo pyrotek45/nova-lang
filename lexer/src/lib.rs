@@ -3,6 +3,7 @@ use common::{
     tokens::{Operator, Position, TType, Token, TokenList},
 };
 
+
 #[derive(Debug, PartialEq, Eq)]
 enum ParsingState {
     Token,
@@ -211,16 +212,37 @@ impl Lexer {
                     continue;
                 } else {
                     self.parsing = ParsingState::Token;
-                    self.output.push(Token::String(
-                        self.buffer.clone(),
-                        Position {
-                            line: self.line,
-                            row: self.row,
-                        },
-                    ));
-                    self.row += 1;
-                    self.row += self.buffer.len();
-                    self.buffer.clear();
+
+                    match self.output.last() {
+                        Some(Token::Identifier(id, _)) => {
+                            if id == "import" {
+                                let mut ilex = match new(&self.buffer) {
+                                    Ok(lexer) => lexer,
+                                    Err(error) => panic!("{}", error),
+                                };
+                                ilex.tokenize()?;
+                                ilex.output.pop();
+                                self.output.pop();
+                                self.output.append(&mut ilex.output);
+                                self.row += 1;
+                                self.row += self.buffer.len();
+                                self.buffer.clear();
+       
+                            }
+                        }
+                        _ => {
+                            self.output.push(Token::String(
+                                self.buffer.clone(),
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                },
+                            ));
+                            self.row += 1;
+                            self.row += self.buffer.len();
+                            self.buffer.clear();
+                        }
+                    }
                     continue;
                 }
             }

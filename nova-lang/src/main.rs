@@ -151,7 +151,6 @@ fn main() {
                                     }
                                 }
 
-                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -239,7 +238,6 @@ fn main() {
                                     }
                                 }
 
-                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -327,7 +325,6 @@ fn main() {
                                     }
                                 }
 
-                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -408,7 +405,6 @@ fn main() {
                                     }
                                 }
 
-                                
                                 let program = compiler
                                     .compile_program(parser.ast, filepath, true, true, false);
                                 let asm = compiler.asm.clone();
@@ -469,8 +465,8 @@ fn main() {
                         "dbg" => {
                             if let Some(filepath) = std::env::args().nth(3) {
                                 let encoded = std::fs::read(filepath).unwrap();
-                                let program : Vec<u8> = bincode::deserialize(&encoded).unwrap();
-                                println!("{}",rhexdump::hexdump(&program.clone()));
+                                let program: Vec<u8> = bincode::deserialize(&encoded).unwrap();
+                                println!("{}", rhexdump::hexdump(&program.clone()));
                                 let mut vm = vm::new();
                                 vm.native_functions.insert(0, native::list::len);
                                 vm.state.program(program);
@@ -489,7 +485,7 @@ fn main() {
                             }
                         }
                         _ => {}
-                    }
+                    },
                     None => todo!(),
                 }
             }
