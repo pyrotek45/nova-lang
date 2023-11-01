@@ -268,4 +268,5 @@ pub enum Asm {
     // list operations
     PIN,
     LIN,
+    NATIVE(usize),
 }

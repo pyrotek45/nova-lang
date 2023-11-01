@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "nova-lang",
+    "native",
     "lexer",
     "vm",
     "assembler",

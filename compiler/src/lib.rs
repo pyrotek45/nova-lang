@@ -511,7 +511,7 @@ impl Compiler {
                         self.getref_expr(*lhs.clone())?;
 
                         self.asm.push(Asm::ASSIGN)
-                    },
+                    }
                     common::tokens::Operator::SubtractionAssignment => {
                         self.compile_expr(*rhs.clone())?;
                         self.compile_expr(*lhs.clone())?;
@@ -525,7 +525,7 @@ impl Compiler {
                         self.getref_expr(*lhs.clone())?;
 
                         self.asm.push(Asm::ASSIGN)
-                    },
+                    }
                 }
                 Ok(())
             }
@@ -613,14 +613,21 @@ impl Compiler {
                         self.output.push(Code::PRINT)
                     }
                     identifier => {
-                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                            self.asm.push(Asm::GET(index as u32));
-                            self.asm.push(Asm::CALL);
-                        } else if let Some(index) = self.global.get_index(identifier.to_string()) {
-                            self.asm.push(Asm::DCALL(index as u32));
+                        if let Some(index) = self.native_functions.get_index(identifier.to_string())
+                        {
+                            self.asm.push(Asm::NATIVE(index))
                         } else {
-                            dbg!(identifier);
-                            todo!()
+                            if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                                self.asm.push(Asm::GET(index as u32));
+                                self.asm.push(Asm::CALL);
+                            } else if let Some(index) =
+                                self.global.get_index(identifier.to_string())
+                            {
+                                self.asm.push(Asm::DCALL(index as u32));
+                            } else {
+                                dbg!(identifier);
+                                todo!()
+                            }
                         }
                     }
                 }

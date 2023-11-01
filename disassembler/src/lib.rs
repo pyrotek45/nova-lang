@@ -66,6 +66,7 @@ impl Disassembler {
                 Asm::TCALL(v) => println!("    tcall: {v}"),
                 Asm::AND => println!("    and"),
                 Asm::OR => println!("    or"),
+                Asm::NATIVE(v) => println!("    native: {v}"),
             }
         }
         println!();
