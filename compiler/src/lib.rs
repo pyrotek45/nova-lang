@@ -232,7 +232,6 @@ impl Compiler {
                 self.asm.push(Asm::PIN);
             }
             Expr::Indexed(_, _, index, from) => {
-                dbg!(&index);
                 match &*index {
                     Expr::Literal(_, atom) => match atom {
                         Atom::Id(id) => {
