@@ -15,7 +15,11 @@ pub enum Unary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operator {
+    And,
+    Or,
     Colon,
+    GtrOrEqu,
+    LssOrEqu,
     DoubleColon,
     RightArrow,
     GreaterThan,
@@ -246,6 +250,10 @@ impl Token {
         if let Token::Operator(op, _) = self {
             match op {
                 Operator::Equality
+                | Operator::And
+                | Operator::Or
+                | Operator::GtrOrEqu
+                | Operator::LssOrEqu
                 | Operator::GreaterThan
                 | Operator::LessThan
                 | Operator::NotEqual => true,

@@ -481,6 +481,22 @@ impl Vm {
                     }
                 }
 
+                Code::AND => {
+                    if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    {
+                        self.state.stack.push(VmData::Bool(v1 && v2))
+                    }
+                }
+
+                Code::OR => {
+                    if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    {
+                        self.state.stack.push(VmData::Bool(v1 || v2))
+                    }
+                }
+
                 Code::NEG => {
                     if let Some(value) = self.state.stack.pop() {
                         match value {
@@ -829,7 +845,6 @@ impl Vm {
                 byte_to_string(self.state.program[self.state.current_instruction]),
                 tick
             );
-
 
             // Read a line from the standard input and discard it.
             io::stdin()
@@ -1267,6 +1282,22 @@ impl Vm {
                         return Err(common::error::runtime_error(
                             "Not enough arguments for EQ".to_string(),
                         ));
+                    }
+                }
+
+                Code::AND => {
+                    if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    {
+                        self.state.stack.push(VmData::Bool(v1 && v2))
+                    }
+                }
+
+                Code::OR => {
+                    if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    {
+                        self.state.stack.push(VmData::Bool(v1 || v2))
                     }
                 }
 
