@@ -3,7 +3,7 @@ pub mod state;
 use std::io;
 
 use common::{
-    code::{byte_to_string, Asm, Code},
+    code::{byte_to_string, Code},
     error::NovaError,
 };
 use modulo::Mod;
