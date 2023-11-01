@@ -1,2 +1,5 @@
 # nova-lang
-programming language
+
+![Screenshot](nova-logo.png)
+
+Programming lang WIP
