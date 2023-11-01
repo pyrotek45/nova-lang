@@ -982,7 +982,7 @@ impl Parser {
                         ),
                     };
                 }
-                let statements = self.block()?;
+                let mut statements = self.block()?;
                 let captured = self
                     .environment
                     .captured
@@ -1000,7 +1000,7 @@ impl Parser {
                     pos.row,
                     &self.filepath,
                 )?;
-                if !has_return {
+                if !has_return && output != TType::Void {
                     return Err(common::error::parser_error(
                         "Function is missing a return statement in a branch".to_string(),
                         "Function missing return".to_string(),
@@ -1010,6 +1010,14 @@ impl Parser {
                         None,
                     ));
                 }
+
+                if output == TType::Void {
+                    if let Some(Statement::Return(_ ,_,_,_)) = statements.last() {
+                    } else {
+                        statements.push(Statement::Return(output.clone(), Expr::None, self.current_token().line(), self.current_token().row()));
+                    }
+                }
+
                 left = Expr::Closure(
                     TType::Function(typeinput, Box::new(output)),
                     input,
@@ -1908,7 +1916,7 @@ impl Parser {
                 ),
             };
         }
-        let statements = self.block()?;
+        let mut statements = self.block()?;
         self.environment.pop_scope();
         // check return types
         let (_, has_return) = self.check_returns(
@@ -1918,7 +1926,7 @@ impl Parser {
             pos.row,
             &self.filepath,
         )?;
-        if !has_return {
+        if !has_return && output != TType::Void {
             return Err(common::error::parser_error(
                 "Function is missing a return statement in a branch".to_string(),
                 "Function missing return".to_string(),
@@ -1927,6 +1935,13 @@ impl Parser {
                 self.filepath.to_owned(),
                 None,
             ));
+        }
+
+        if output == TType::Void {
+            if let Some(Statement::Return(_ ,_,_,_)) = statements.last() {
+            } else {
+                statements.push(Statement::Return(output.clone(), Expr::None, self.current_token().line(), self.current_token().row()));
+            }
         }
         Ok(Some(Statement::Function(
             output, identifier, input, statements,
