@@ -1,6 +1,6 @@
 use common::code::{Asm, Code};
 use common::error::NovaError;
-use common::gen::{Gen, self};
+use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};
 use common::tokens::TType;
 
