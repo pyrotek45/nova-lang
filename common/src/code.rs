@@ -115,6 +115,7 @@ impl Code {
 
     pub const AND: u8 = 71;
     pub const OR: u8 = 72;
+    pub const DUP: u8 = 73;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -191,6 +192,7 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::TAILCALL => "TAILCALL",
         Code::AND => "AND",
         Code::OR => "OR",
+        Code::DUP => "DUP",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -254,6 +256,9 @@ pub enum Asm {
 
     AND,
     OR,
+
+    DUP,
+    POP,
     // built ins
     PRINT,
 

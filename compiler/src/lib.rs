@@ -1,6 +1,6 @@
 use common::code::{Asm, Code};
 use common::error::NovaError;
-use common::gen::Gen;
+use common::gen::{Gen, self};
 use common::nodes::{Ast, Atom, Expr};
 use common::tokens::TType;
 
@@ -459,6 +459,10 @@ impl Compiler {
                     common::tokens::Operator::DoubleColon => todo!(),
                     common::tokens::Operator::Colon => todo!(),
                     common::tokens::Operator::GtrOrEqu => {
+                        let sc = self.gen.generate();
+
+                        // if lhs is true, return its value
+                        // else return the other value
                         self.compile_expr(*lhs.clone())?;
                         self.compile_expr(*rhs.clone())?;
                         if lhs.get_type() == TType::Int {
@@ -468,12 +472,20 @@ impl Compiler {
                         } else {
                             dbg!(&ttype);
                         }
+                        self.asm.push(Asm::DUP);
+                        self.asm.push(Asm::NOT);
+                        self.asm.push(Asm::JUMPIFFALSE(sc));
+                        self.asm.push(Asm::POP);
                         self.compile_expr(*lhs)?;
                         self.compile_expr(*rhs)?;
                         self.asm.push(Asm::EQUALS);
-                        self.asm.push(Asm::OR);
+                        self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::LssOrEqu => {
+                        let sc = self.gen.generate();
+
+                        // if lhs is true, return its value
+                        // else return the other value
                         self.compile_expr(*lhs.clone())?;
                         self.compile_expr(*rhs.clone())?;
                         if lhs.get_type() == TType::Int {
@@ -483,20 +495,40 @@ impl Compiler {
                         } else {
                             dbg!(&ttype);
                         }
+                        self.asm.push(Asm::DUP);
+                        self.asm.push(Asm::NOT);
+                        self.asm.push(Asm::JUMPIFFALSE(sc));
+                        self.asm.push(Asm::POP);
                         self.compile_expr(*lhs)?;
                         self.compile_expr(*rhs)?;
                         self.asm.push(Asm::EQUALS);
-                        self.asm.push(Asm::OR);
+                        self.asm.push(Asm::LABEL(sc))
+
                     }
                     common::tokens::Operator::And => {
+                        let sc = self.gen.generate();
+
+                        // if lhs is false, return its value
+                        // else return other value
                         self.compile_expr(*lhs)?;
+                        self.asm.push(Asm::DUP);
+                        self.asm.push(Asm::JUMPIFFALSE(sc));
+                        self.asm.push(Asm::POP);
                         self.compile_expr(*rhs)?;
-                        self.asm.push(Asm::AND);
+                        self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::Or => {
+                        let sc = self.gen.generate();
+
+                        // if lhs is true, return its value
+                        // else return the other value
                         self.compile_expr(*lhs)?;
+                        self.asm.push(Asm::DUP);
+                        self.asm.push(Asm::NOT);
+                        self.asm.push(Asm::JUMPIFFALSE(sc));
+                        self.asm.push(Asm::POP);
                         self.compile_expr(*rhs)?;
-                        self.asm.push(Asm::OR);
+                        self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::AdditionAssignment => {
                         self.compile_expr(*rhs.clone())?;

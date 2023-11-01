@@ -67,6 +67,8 @@ impl Disassembler {
                 Asm::AND => println!("    and"),
                 Asm::OR => println!("    or"),
                 Asm::NATIVE(v) => println!("    native: {v}"),
+                Asm::DUP => println!("    dup"),
+                Asm::POP => println!("    pop"),
             }
         }
         println!();

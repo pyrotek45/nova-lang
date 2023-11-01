@@ -31,6 +31,12 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
+                Code::DUP => {
+                    self.state.stack.push(self.state.stack.last().unwrap().clone())
+                }
+                Code::POP => {
+                    self.state.stack.pop();
+                }
                 Code::NATIVE => {
                     let index = usize::from_le_bytes([
                         self.state.next(),
@@ -872,6 +878,12 @@ impl Vm {
                 .read_line(&mut input)
                 .expect("Failed to read line");
             match self.state.next() {
+                Code::DUP => {
+                    self.state.stack.push(self.state.stack.last().unwrap().clone())
+                }
+                Code::POP => {
+                    self.state.stack.pop();
+                }
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCATEGLOBAL => {
                     let allocations = u32::from_le_bytes([

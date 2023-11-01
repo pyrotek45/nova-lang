@@ -280,6 +280,14 @@ impl Assembler {
                             ci += 1;
                             self.nva.push(Asm::OR);
                         }
+                        "dup" => {
+                            ci += 1;
+                            self.nva.push(Asm::DUP);
+                        }
+                        "pop" => {
+                            ci += 1;
+                            self.nva.push(Asm::POP);
+                        }
                         "ret" => {
                             ci += 2;
                             self.nva
@@ -500,6 +508,8 @@ impl Assembler {
                     let bytes = v.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
+                Asm::DUP => self.output.push(Code::DUP),
+                Asm::POP => self.output.push(Code::POP),
             }
         }
 
