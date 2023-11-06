@@ -1,7 +1,7 @@
 pub mod state;
 pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 
-use std::{io, os};
+use std::io;
 
 use common::{
     code::{byte_to_string, Code},
