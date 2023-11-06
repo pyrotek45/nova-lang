@@ -1,7 +1,7 @@
 pub mod state;
 pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 
-use std::io;
+use std::{io, os};
 
 use common::{
     code::{byte_to_string, Code},
@@ -32,6 +32,43 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
+                Code::CONCAT => {
+                    if let (Some(VmData::String(s1)), Some(VmData::String(s2))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    {
+                        if let (Heap::String(str2), Heap::String(mut str1)) =
+                            (self.state.deref(s1), self.state.deref(s2))
+                        {
+                            str1.push_str(&str2);
+                            let index = self.state.allocate_string(str1);
+                            self.state.stack.push(VmData::String(index));
+                        } else {
+                            panic!()
+                        }
+                    } else {
+                        panic!()
+                    }
+                }
+                Code::ISSOME => {
+                    if let Some(value) = self.state.stack.pop() {
+                        match value {
+                            VmData::None => self.state.stack.push(VmData::Bool(false)),
+                            _ => self.state.stack.push(VmData::Bool(true)),
+                        }
+                    }
+                }
+                Code::UNWRAP => {
+                    if let Some(value) = self.state.stack.last() {
+                        match value {
+                            VmData::None => {
+                                println!("ERROR: Tried to unwrap a none value");
+                                println!("ERROR: exiting program");
+                                std::process::exit(1)
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 Code::DUP => self
                     .state
                     .stack
@@ -179,7 +216,9 @@ impl Vm {
                         VmData::Bool(v) => {
                             println!("{v}")
                         }
-                        VmData::None => todo!(),
+                        VmData::None => {
+                            println!("None")
+                        }
                         VmData::List(index) => {
                             if let Heap::List(array) = self.state.deref(index) {
                                 print!("[");
@@ -885,6 +924,22 @@ impl Vm {
             //     eprintln!("Failed to clear the terminal screen: {}", e);
             // }
             match self.state.next() {
+                Code::ISSOME => {
+                    if let Some(value) = self.state.stack.pop() {
+                        match value {
+                            VmData::None => self.state.stack.push(VmData::Bool(false)),
+                            _ => self.state.stack.push(VmData::Bool(true)),
+                        }
+                    }
+                }
+                Code::UNWRAP => {
+                    if let Some(value) = self.state.stack.last() {
+                        match value {
+                            VmData::None => panic!(),
+                            _ => {}
+                        }
+                    }
+                }
                 Code::DUP => self
                     .state
                     .stack
@@ -1014,7 +1069,9 @@ impl Vm {
                         VmData::Bool(v) => {
                             println!("{v}")
                         }
-                        VmData::None => todo!(),
+                        VmData::None => {
+                            println!("None")
+                        }
                         VmData::List(index) => {
                             if let Heap::List(array) = self.state.deref(index) {
                                 print!("[");
@@ -1681,6 +1738,23 @@ impl Vm {
                 }
                 Code::NONE => {
                     self.state.stack.push(VmData::None);
+                }
+                Code::NATIVE => {
+                    let index = usize::from_le_bytes([
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                        self.state.next(),
+                    ]);
+
+                    match self.native_functions[index](&mut self.state) {
+                        Ok(_) => {}
+                        Err(error) => return Err(error),
+                    }
                 }
                 error => {
                     dbg!(error);

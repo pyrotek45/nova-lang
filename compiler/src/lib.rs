@@ -394,6 +394,8 @@ impl Compiler {
                             self.asm.push(Asm::IADD);
                         } else if lhs.get_type() == TType::Float {
                             self.asm.push(Asm::FADD);
+                        } else if lhs.get_type() == TType::Str {
+                            self.asm.push(Asm::CONCAT)
                         } else {
                             dbg!(&ttype);
                         }
@@ -556,6 +558,15 @@ impl Compiler {
 
                         self.asm.push(Asm::ASSIGN)
                     }
+                    common::tokens::Operator::Concat => {
+                        self.compile_expr(*lhs.clone())?;
+                        self.compile_expr(*rhs)?;
+                        if lhs.get_type() == TType::Str {
+                            self.asm.push(Asm::CONCAT);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                    }
                 }
                 Ok(())
             }
@@ -595,7 +606,7 @@ impl Compiler {
                 )?;
                 self.asm.push(Asm::OFFSET(
                     (parameters.len() + captured.len()) as u32,
-                    ((parameters.len() + captured.len()) - function_compile.variables.len()) as u32,
+                    (function_compile.variables.len() - (parameters.len() + captured.len())) as u32,
                 ));
                 self.gen = function_compile.gen;
                 function_compile.asm.pop();
@@ -636,6 +647,10 @@ impl Compiler {
                     self.compile_expr(expr.clone())?
                 }
                 match caller.as_str() {
+                    "super::none" => self.asm.push(Asm::NONE),
+                    "super::unwrap" => self.asm.push(Asm::UNWRAP),
+                    "super::some" => {}
+                    "super::is_some" => self.asm.push(Asm::ISSOME),
                     "super::free" => self.asm.push(Asm::FREE),
                     "super::clone" => self.asm.push(Asm::CLONE),
                     "super::print" => {

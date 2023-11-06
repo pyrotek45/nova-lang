@@ -69,6 +69,10 @@ impl Disassembler {
                 Asm::NATIVE(v) => println!("    native: {v}"),
                 Asm::DUP => println!("    dup"),
                 Asm::POP => println!("    pop"),
+                Asm::NONE => println!("    none"),
+                Asm::ISSOME => println!("    issome"),
+                Asm::UNWRAP => println!("    unwrap"),
+                Asm::CONCAT => println!("    concat"),
             }
         }
         println!();

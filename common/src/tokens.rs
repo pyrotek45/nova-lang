@@ -15,6 +15,7 @@ pub enum Unary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operator {
+    Concat,
     AdditionAssignment,
     SubtractionAssignment,
     And,
@@ -42,6 +43,7 @@ pub enum Operator {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TType {
+    EmptyList,
     None,
     Any,
     Int,
@@ -54,6 +56,7 @@ pub enum TType {
     List(Box<TType>),
     Function(Vec<TType>, Box<TType>),
     Generic(String),
+    Option(Box<TType>),
 }
 
 pub fn generate_unique_string(input: &str, types: &[TType]) -> String {
@@ -94,6 +97,8 @@ pub fn type_to_string(ttype: &TType) -> String {
         }
         TType::Generic(name) => format!("generic_{}", name),
         TType::None => "none".to_string(),
+        TType::Option(name) => format!("option_{}", type_to_string(name)),
+        TType::EmptyList => format!("empty_list"),
     }
 }
 
@@ -122,7 +127,6 @@ impl TType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    None(TType, Position),
     Type(TType, Position),
     Identifier(String, Position),
     Integer(i64, Position),
@@ -212,7 +216,6 @@ impl Token {
             | Token::Bool(_, pos)
             | Token::Operator(_, pos)
             | Token::EOF(pos) => pos.line,
-            Token::None(_, pos) => pos.line,
             Token::NewLine(pos) => pos.line,
         }
     }
@@ -228,7 +231,6 @@ impl Token {
             | Token::Symbol(_, pos)
             | Token::Bool(_, pos)
             | Token::Operator(_, pos)
-            | Token::None(_, pos)
             | Token::EOF(pos) => pos.row,
             Token::NewLine(pos) => pos.row,
         }
@@ -276,7 +278,7 @@ impl Token {
 
     pub fn is_adding_op(&self) -> bool {
         if let Token::Operator(op, _) = self {
-            *op == Operator::Addition || *op == Operator::Subtraction
+            *op == Operator::Addition || *op == Operator::Subtraction || *op == Operator::Concat
         } else {
             false
         }

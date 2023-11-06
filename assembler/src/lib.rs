@@ -39,7 +39,6 @@ impl Assembler {
         let mut ci = 0;
         while ci < asmfile.len() {
             match &asmfile[ci] {
-                tokens::Token::None(_, _) => todo!(),
                 tokens::Token::Type(_, _) => todo!(),
                 tokens::Token::Identifier(command, _) => {
                     match command.as_str() {
@@ -288,6 +287,22 @@ impl Assembler {
                             ci += 1;
                             self.nva.push(Asm::POP);
                         }
+                        "none" => {
+                            ci += 1;
+                            self.nva.push(Asm::NONE);
+                        }
+                        "issome" => {
+                            ci += 1;
+                            self.nva.push(Asm::ISSOME);
+                        }
+                        "unwrap" => {
+                            ci += 1;
+                            self.nva.push(Asm::UNWRAP);
+                        }
+                        "concat" => {
+                            ci += 1;
+                            self.nva.push(Asm::CONCAT);
+                        }
                         "ret" => {
                             ci += 2;
                             self.nva
@@ -510,6 +525,10 @@ impl Assembler {
                 }
                 Asm::DUP => self.output.push(Code::DUP),
                 Asm::POP => self.output.push(Code::POP),
+                Asm::NONE => self.output.push(Code::NONE),
+                Asm::ISSOME => self.output.push(Code::ISSOME),
+                Asm::UNWRAP => self.output.push(Code::UNWRAP),
+                Asm::CONCAT => self.output.push(Code::CONCAT),
             }
         }
 

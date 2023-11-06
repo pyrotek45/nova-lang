@@ -116,6 +116,11 @@ impl Code {
     pub const AND: u8 = 71;
     pub const OR: u8 = 72;
     pub const DUP: u8 = 73;
+
+    pub const ISSOME: u8 = 74;
+    pub const UNWRAP: u8 = 75;
+
+    pub const CONCAT: u8 = 76;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -193,6 +198,8 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::AND => "AND",
         Code::OR => "OR",
         Code::DUP => "DUP",
+        Code::ISSOME => "ISSOME",
+        Code::UNWRAP => "UNWRAP",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -214,6 +221,9 @@ pub enum Asm {
     STACKREF(u32),
     ASSIGN,
 
+    NONE,
+    ISSOME,
+    UNWRAP,
     FREE,
     CLONE,
 
@@ -256,6 +266,8 @@ pub enum Asm {
 
     AND,
     OR,
+
+    CONCAT,
 
     DUP,
     POP,

@@ -3,7 +3,6 @@ use common::{
     tokens::{Operator, Position, TType, Token, TokenList},
 };
 
-
 #[derive(Debug, PartialEq, Eq)]
 enum ParsingState {
     Token,
@@ -100,8 +99,8 @@ impl Lexer {
                 return None;
             }
             match self.buffer.to_lowercase().as_str() {
-                "none" => {
-                    return Some(Token::None(
+                "null" => {
+                    return Some(Token::Type(
                         TType::None,
                         Position {
                             line: self.line,
@@ -212,7 +211,6 @@ impl Lexer {
                     continue;
                 } else {
                     self.parsing = ParsingState::Token;
-
                     match self.output.last() {
                         Some(Token::Identifier(id, _)) => {
                             if id == "import" {
@@ -224,25 +222,22 @@ impl Lexer {
                                 ilex.output.pop();
                                 self.output.pop();
                                 self.output.append(&mut ilex.output);
-                                self.row += 1;
-                                self.row += self.buffer.len();
                                 self.buffer.clear();
-       
+                                continue;
                             }
                         }
-                        _ => {
-                            self.output.push(Token::String(
-                                self.buffer.clone(),
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                },
-                            ));
-                            self.row += 1;
-                            self.row += self.buffer.len();
-                            self.buffer.clear();
-                        }
+                        _ => {}
                     }
+                    self.output.push(Token::String(
+                        self.buffer.clone(),
+                        Position {
+                            line: self.line,
+                            row: self.row,
+                        },
+                    ));
+                    self.row += 1;
+                    self.row += self.buffer.len();
+                    self.buffer.clear();
                     continue;
                 }
             }
@@ -302,6 +297,12 @@ impl Lexer {
                             self.buffer.push(c);
                         } else {
                             self.check_token()?;
+                            match self.output.last() {
+                                Some(Token::NewLine(_)) => {
+                                    self.output.pop();
+                                }
+                                _ => {}
+                            }
                             self.output.push(Token::Symbol(
                                 c,
                                 Position {
@@ -312,6 +313,12 @@ impl Lexer {
                         }
                     } else {
                         self.check_token()?;
+                        match self.output.last() {
+                            Some(Token::NewLine(_)) => {
+                                self.output.pop();
+                            }
+                            _ => {}
+                        }
                         self.output.push(Token::Symbol(
                             c,
                             Position {
@@ -561,7 +568,7 @@ impl Lexer {
                         _ => {}
                     }
                 }
-                ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' => {
+                ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' | '?' => {
                     self.check_token()?;
                     self.output.push(Token::Symbol(
                         c,
