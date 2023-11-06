@@ -1018,13 +1018,17 @@ impl Parser {
             }
             Token::Symbol('(', _) => self.call(identifier.clone(), pos)?,
             _ => {
-                if self.current_token().is_symbol('{') &&  self.environment.custom_types.contains_key(&identifier) {
+                if self.current_token().is_symbol('{')
+                    && self.environment.custom_types.contains_key(&identifier)
+                {
                     self.call(identifier.clone(), pos.clone())?
                 } else {
                     if let Some(ttype) = self.environment.get_type(&identifier) {
                         Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                     } else {
-                        if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+                        if let Some((ttype, _, kind)) =
+                            self.environment.get_type_capture(&identifier)
+                        {
                             self.environment
                                 .captured
                                 .last_mut()
@@ -1049,8 +1053,6 @@ impl Parser {
                         }
                     }
                 }
-
-
             }
         };
 
