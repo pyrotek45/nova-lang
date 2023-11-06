@@ -137,8 +137,56 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
+
                                 compiler.native_functions.insert("super::len".to_string());
-                                vm.native_functions.insert(0, native::list::len);
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::len);
+
+                                parser.environment.insert_symbol(
+                                    "super::readline",
+                                    common::tokens::TType::Function(
+                                        vec![TType::None],
+                                        Box::new(TType::Str),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler
+                                    .native_functions
+                                    .insert("super::readline".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::io::read_line);
+
+                                parser.environment.insert_symbol(
+                                    "super::push",
+                                    common::tokens::TType::Function(
+                                        vec![
+                                            TType::List(Box::new(TType::Generic("a".to_string()))),
+                                            TType::Generic("a".to_string()),
+                                        ],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::push".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::push);
+
+                                parser.environment.insert_symbol(
+                                    "super::pop",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::pop".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::pop);
 
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
@@ -224,8 +272,56 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
+
                                 compiler.native_functions.insert("super::len".to_string());
-                                vm.native_functions.insert(0, native::list::len);
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::len);
+
+                                parser.environment.insert_symbol(
+                                    "super::readline",
+                                    common::tokens::TType::Function(
+                                        vec![TType::None],
+                                        Box::new(TType::Str),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler
+                                    .native_functions
+                                    .insert("super::readline".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::io::read_line);
+
+                                parser.environment.insert_symbol(
+                                    "super::push",
+                                    common::tokens::TType::Function(
+                                        vec![
+                                            TType::List(Box::new(TType::Generic("a".to_string()))),
+                                            TType::Generic("a".to_string()),
+                                        ],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::push".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::push);
+
+                                parser.environment.insert_symbol(
+                                    "super::pop",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::pop".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::pop);
 
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
@@ -311,8 +407,56 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
+
                                 compiler.native_functions.insert("super::len".to_string());
-                                vm.native_functions.insert(0, native::list::len);
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::len);
+
+                                parser.environment.insert_symbol(
+                                    "super::readline",
+                                    common::tokens::TType::Function(
+                                        vec![TType::None],
+                                        Box::new(TType::Str),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler
+                                    .native_functions
+                                    .insert("super::readline".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::io::read_line);
+
+                                parser.environment.insert_symbol(
+                                    "super::push",
+                                    common::tokens::TType::Function(
+                                        vec![
+                                            TType::List(Box::new(TType::Generic("a".to_string()))),
+                                            TType::Generic("a".to_string()),
+                                        ],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::push".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::push);
+
+                                parser.environment.insert_symbol(
+                                    "super::pop",
+                                    common::tokens::TType::Function(
+                                        vec![TType::List(Box::new(TType::Generic(
+                                            "a".to_string(),
+                                        )))],
+                                        Box::new(TType::Void),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler.native_functions.insert("super::pop".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::list::pop);
 
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {

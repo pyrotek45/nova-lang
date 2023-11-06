@@ -129,8 +129,39 @@ impl Env {
         if let Some(s) = self.values.get(self.values.len() - 2).unwrap().get(symbol) {
             Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
         } else {
-            dbg!(&self.values);
             None
+        }
+    }
+
+    pub fn get_function_type_capture(
+        &mut self,
+        symbol: &str,
+        arguments: &[TType],
+    ) -> Option<(TType, String, SymbolKind)> {
+        if self.values.len() <= 1 {
+            return None;
+        }
+        if let Some(s) = self.values.get(self.values.len() - 2).unwrap().get(symbol) {
+            if let TType::Function(_, _) = s.ttype {
+                Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
+            } else {
+                None
+            }
+        } else {
+            if let Some(s) = self
+                .values
+                .last()
+                .unwrap()
+                .get(&generate_unique_string(symbol, arguments))
+            {
+                if let TType::Function(_, _) = s.ttype {
+                    Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
     }
 
@@ -182,11 +213,18 @@ impl Env {
         }
         self.values.push(scope)
     }
-    pub fn push_block(&mut self) {
-        self.values.push(self.values.last().unwrap().clone())
-    }
 
     pub fn pop_scope(&mut self) {
+        self.values.pop();
+        self.captured.pop();
+    }
+
+    pub fn push_block(&mut self) {
+        self.values.push(self.values.last().unwrap().clone());
+        self.captured.push(self.captured.last().unwrap().clone())
+    }
+
+    pub fn pop_block(&mut self) {
         self.values.pop();
         self.captured.pop();
     }
@@ -250,7 +288,7 @@ impl Expr {
             Expr::Field(t, _, _, _) => t.clone(),
             Expr::ListConstructor(t, _) => t.clone(),
             Expr::Indexed(t, _, _, _) => t.clone(),
-            Expr::None => TType::Void,
+            Expr::None => TType::None,
             Expr::Call(t, _, _, _) => t.clone(),
             Expr::Closure(t, _, _, _) => t.clone(),
         }

@@ -22,19 +22,55 @@ pub struct Parser {
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_env();
     env.insert_symbol(
-        "free",
+        "super::is_some",
+        TType::Function(
+            vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
+            Box::new(TType::Bool),
+        ),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "super::unwrap",
+        TType::Function(
+            vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
+            Box::new(TType::Generic("a".to_string())),
+        ),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "super::none",
+        TType::Function(
+            vec![TType::None],
+            Box::new(TType::Option(Box::new(TType::None))),
+        ),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "super::some",
+        TType::Function(
+            vec![TType::Generic("a".to_string())],
+            Box::new(TType::Option(Box::new(TType::Generic("a".to_string())))),
+        ),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "super::free",
         TType::Function(vec![TType::Any], Box::new(TType::Void)),
         None,
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
         "super::print",
-        TType::Function(vec![TType::Any], Box::new(TType::Void)),
+        TType::Function(vec![TType::Generic("a".to_string())], Box::new(TType::Void)),
         None,
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "clone",
+        "super::clone",
         TType::Function(
             vec![TType::Generic("a".to_string())],
             Box::new(TType::Generic("a".to_string())),
@@ -152,7 +188,6 @@ impl Parser {
         type_list2: &[TType],
         type_map: &mut HashMap<String, TType>,
     ) -> Result<HashMap<String, TType>, NovaError> {
-        //dbg!(type_list1,type_list2);
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error(
                 "length error".to_owned(),
@@ -199,7 +234,18 @@ impl Parser {
                     }
                 }
                 (TType::List(inner1), TType::List(inner2)) => {
-                    self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
+                    if **inner1 == TType::EmptyList || **inner2 == TType::EmptyList {
+                        continue;
+                    } else {
+                        self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
+                    }
+                }
+                (TType::Option(inner1), TType::Option(inner2)) => {
+                    if **inner1 == TType::None || **inner2 == TType::None {
+                        continue;
+                    } else {
+                        self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
+                    }
                 }
                 (TType::Function(params1, ret1), TType::Function(params2, ret2)) => {
                     if params1.len() != params2.len() {
@@ -240,6 +286,10 @@ impl Parser {
             TType::List(inner) => {
                 let mapped_inner = self.get_output(*inner.clone(), type_map)?;
                 Ok(TType::List(Box::new(mapped_inner)))
+            }
+            TType::Option(inner) => {
+                let mapped_inner = self.get_output(*inner.clone(), type_map)?;
+                Ok(TType::Option(Box::new(mapped_inner)))
             }
             TType::Function(params, ret) => {
                 let mut mapped_params = Vec::new();
@@ -327,6 +377,112 @@ impl Parser {
         }
         self.consume_symbol(')')?;
         Ok(exprs)
+    }
+
+    fn field_list(
+        &mut self,
+        constructor: &str,
+        fields: Vec<(String, TType)>,
+        conpos: Position,
+    ) -> Result<Vec<Expr>, NovaError> {
+        let mut exprs: HashMap<String, Expr> = HashMap::default();
+
+        self.consume_symbol('{')?;
+        self.eat_if_newline();
+        let (id, pos) = self.identifier()?;
+        self.consume_operator(Operator::Assignment)?;
+        exprs.insert(id.clone(), self.expr()?);
+
+        while self.current_token().is_symbol(',') {
+            self.eat_if_newline();
+            self.advance();
+            if self.current_token().is_symbol('}') {
+                break;
+            }
+            self.eat_if_newline();
+            if self.current_token().is_symbol('}') {
+                break;
+            }
+            let (id, _) = self.identifier()?;
+            self.consume_operator(Operator::Assignment)?;
+            exprs.insert(id.clone(), self.expr()?);
+            if self.current_token().is_symbol('}') {
+                break;
+            }
+        }
+        self.eat_if_newline();
+        self.consume_symbol('}')?;
+
+        let mut new_exprs = vec![];
+
+        for (fieldname, fieldtype) in fields.iter() {
+            if fieldname == "type" {
+                continue;
+            }
+            if let Some(innerexpr) = exprs.get(fieldname) {
+                if innerexpr.get_type() != *fieldtype {
+                    return Err(common::error::parser_error(
+                        format!(
+                            "{} field type does not match {:?}",
+                            fieldname.clone(),
+                            innerexpr.get_type()
+                        ),
+                        format!("Exptecting type {:?}", fieldtype.clone()),
+                        pos.line,
+                        pos.row,
+                        self.filepath.clone(),
+                        None,
+                    ));
+                }
+                new_exprs.push(innerexpr.clone())
+            } else {
+                return Err(common::error::parser_error(
+                    format!(
+                        "{} is missing field {} ",
+                        constructor.clone(),
+                        fieldname.clone()
+                    ),
+                    format!(""),
+                    conpos.line,
+                    conpos.row,
+                    self.filepath.clone(),
+                    None,
+                ));
+            }
+        }
+
+        if exprs.len() != fields.len() - 1 {
+            return Err(common::error::parser_error(
+                format!(
+                    "{} has {} fields, you have {} ",
+                    constructor.clone(),
+                    fields.len() - 1,
+                    exprs.len()
+                ),
+                format!(""),
+                conpos.line,
+                conpos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        }
+
+        if new_exprs.len() != fields.len() - 1 {
+            return Err(common::error::parser_error(
+                format!(
+                    "{} has {} fields, not all of them are covered",
+                    constructor.clone(),
+                    fields.len() - 1
+                ),
+                format!(""),
+                conpos.line,
+                conpos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        }
+
+        Ok(new_exprs)
     }
 
     fn method(
@@ -502,8 +658,19 @@ impl Parser {
     }
 
     fn call(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
+        let arguments: Vec<Expr>;
+        // constructor
+        if let Some(fields) = self.environment.custom_types.get(&identifier) {
+            if self.current_token().is_symbol('{') {
+                arguments = self.field_list(&identifier, fields.to_vec(), pos.clone())?;
+            } else {
+                arguments = self.argument_list()?;
+            }
+        } else {
+            arguments = self.argument_list()?;
+        }
+
         // normal function call <func(args)>
-        let arguments = self.argument_list()?;
         // get list of types from arguments
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
         // if no arguments, push none
@@ -587,7 +754,9 @@ impl Parser {
                 TType::Function(function_parameters, mut function_output),
                 function_id,
                 function_kind,
-            )) = self.environment.get_type_capture(&identifier)
+            )) = self
+                .environment
+                .get_function_type_capture(&identifier, &argument_types)
             {
                 self.environment.captured.last_mut().unwrap().insert(
                     identifier.clone(),
@@ -660,7 +829,7 @@ impl Parser {
                 return Err(common::error::parser_error(
                     format!("Not a valid call: {}", identifier),
                     format!(
-                        "No function signature '{}' with {:?} as arguments",
+                        "E1 No function signature '{}' with {:?} as arguments",
                         identifier, argument_types
                     ),
                     pos.line,
@@ -837,7 +1006,7 @@ impl Parser {
                         )?
                     } else {
                         return Err(common::error::parser_error(
-                            format!("Not a valid symbol: {}", identifier),
+                            format!("E1 Not a valid symbol: {}", identifier),
                             format!("Unknown identifier"),
                             pos.line,
                             pos.row,
@@ -849,33 +1018,39 @@ impl Parser {
             }
             Token::Symbol('(', _) => self.call(identifier.clone(), pos)?,
             _ => {
-                if let Some(ttype) = self.environment.get_type(&identifier) {
-                    Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
+                if self.current_token().is_symbol('{') &&  self.environment.custom_types.contains_key(&identifier) {
+                    self.call(identifier.clone(), pos.clone())?
                 } else {
-                    if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
-                        self.environment
-                            .captured
-                            .last_mut()
-                            .unwrap()
-                            .insert(identifier.clone(), ttype.clone());
-                        self.environment.insert_symbol(
-                            &identifier,
-                            ttype.clone(),
-                            Some(pos.clone()),
-                            kind,
-                        );
+                    if let Some(ttype) = self.environment.get_type(&identifier) {
                         Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                     } else {
-                        return Err(common::error::parser_error(
-                            format!("Not a valid symbol: {}", identifier),
-                            format!("Unknown identifier"),
-                            pos.line,
-                            pos.row,
-                            self.filepath.clone(),
-                            None,
-                        ));
+                        if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+                            self.environment
+                                .captured
+                                .last_mut()
+                                .unwrap()
+                                .insert(identifier.clone(), ttype.clone());
+                            self.environment.insert_symbol(
+                                &identifier,
+                                ttype.clone(),
+                                Some(pos.clone()),
+                                kind,
+                            );
+                            Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
+                        } else {
+                            return Err(common::error::parser_error(
+                                format!("E2 Not a valid symbol: {}", identifier),
+                                format!("Unknown identifier"),
+                                pos.line,
+                                pos.row,
+                                self.filepath.clone(),
+                                None,
+                            ));
+                        }
                     }
                 }
+
+
             }
         };
 
@@ -891,10 +1066,6 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
-            Token::None(_, _) => {
-                self.advance();
-                left = Expr::None
-            }
             Token::Identifier(id, _) if id.as_str() == "fn" => {
                 let pos = self.get_pos();
                 self.advance();
@@ -1032,7 +1203,10 @@ impl Parser {
             }
             Token::Symbol('[', _) => {
                 let expr_list = self.expr_list()?;
-                let ttype = expr_list[0].get_type();
+                let mut ttype = TType::EmptyList;
+                if !expr_list.is_empty() {
+                    ttype = expr_list[0].get_type()
+                }
                 for elem in expr_list.clone() {
                     if elem.get_type() != ttype {
                         return Err(self.generate_error(
@@ -1305,6 +1479,26 @@ impl Parser {
                     }
                     left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
                 }
+                Operator::GreaterThan
+                | Operator::GtrOrEqu
+                | Operator::LssOrEqu
+                | Operator::LessThan => {
+                    match (left.get_type(), right.get_type()) {
+                        (TType::Int, TType::Int) => {}
+                        (TType::Float, TType::Float) => {}
+                        _ => {
+                            return Err(self.generate_error(
+                                format!("Comparison operation expects int or float"),
+                                format!(
+                                    "got {:?} {:?}",
+                                    left.get_type().clone(),
+                                    right.get_type().clone()
+                                ),
+                            ));
+                        }
+                    }
+                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                }
                 _ => {
                     left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
                 }
@@ -1322,32 +1516,33 @@ impl Parser {
 
             self.advance();
             let right = self.term()?;
-            if left.clone().get_type() == right.clone().get_type()
-                && (left.clone().get_type() == TType::Int
-                    || left.clone().get_type() == TType::Float)
-                && (right.clone().get_type() == TType::Int
-                    || right.clone().get_type() == TType::Float)
-            {
-                left = Expr::Binop(
-                    left.clone().get_type(),
-                    operation,
-                    Box::new(left),
-                    Box::new(right),
-                );
-            } else {
-                return Err(common::error::parser_error(
-                    format!(
-                        "Type error, cannot apply operation {:?} to {:?} and {:?}",
-                        operation.clone(),
-                        left.clone(),
-                        right.clone()
-                    ),
-                    format!("type mismatch"),
-                    line,
-                    row,
-                    self.filepath.clone(),
-                    None,
-                ));
+
+            match (left.get_type(), right.get_type()) {
+                (TType::Int, TType::Int)
+                | (TType::Float, TType::Float)
+                | (TType::Str, TType::Str) => {
+                    left = Expr::Binop(
+                        left.clone().get_type(),
+                        operation,
+                        Box::new(left),
+                        Box::new(right),
+                    );
+                }
+                (_, _) => {
+                    return Err(common::error::parser_error(
+                        format!(
+                            "Type error, cannot apply operation {:?} to {:?} and {:?}",
+                            operation.clone(),
+                            left.clone(),
+                            right.clone()
+                        ),
+                        format!("type mismatch"),
+                        line,
+                        row,
+                        self.filepath.clone(),
+                        None,
+                    ));
+                }
             }
         }
         Ok(left)
@@ -1391,6 +1586,11 @@ impl Parser {
                 let (generictype, _) = self.identifier()?;
                 Ok(TType::Generic(generictype))
             }
+            Token::Symbol('?', _) => {
+                self.consume_symbol('?')?;
+                let ttype = self.ttype()?;
+                Ok(TType::Option(Box::new(ttype)))
+            }
             Token::Symbol('[', _) => {
                 self.consume_symbol('[')?;
                 let inner = self.ttype()?;
@@ -1403,7 +1603,6 @@ impl Parser {
             }
             Token::Identifier(_, _) => {
                 let (identifier, _) = self.module_identifier()?;
-
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
                     Ok(TType::Custom(identifier))
                 } else {
@@ -1673,20 +1872,20 @@ impl Parser {
                 format!("got {:?}", test.get_type().clone()),
             ));
         }
-        self.environment.push_block();
+        //self.environment.push_block();
         let statements = self.block()?;
-        self.environment.pop_scope();
+        //self.environment.pop_block();
         let mut alternative: Option<Vec<Statement>> = None;
         if self.current_token().is_id("elif") {
             self.advance();
-            self.environment.push_block();
+            //self.environment.push_block();
             alternative = Some(self.alternative()?);
-            self.environment.pop_scope();
+            //self.environment.pop_block();
         } else if self.current_token().is_id("else") {
             self.advance();
-            self.environment.push_block();
+            //self.environment.push_block();
             alternative = Some(self.block()?);
-            self.environment.pop_scope();
+            //self.environment.pop_block();
         }
         Ok(Some(Statement::If(
             TType::Void,
@@ -1705,20 +1904,11 @@ impl Parser {
         let ttype = self.ttype()?;
         self.consume_operator(Operator::Assignment)?;
         let expr = self.expr()?;
-        if ttype != expr.get_type() {
-            return Err(common::error::parser_error(
-                format!("Type mismatch: expression does not match the type annotation"),
-                format!(
-                    "Cannot assign expression {:?} to {:?}",
-                    expr.get_type(),
-                    ttype
-                ),
-                pos.line,
-                pos.row,
-                self.filepath.clone(),
-                None,
-            ));
-        }
+        self.check_and_map_types(
+            &vec![ttype.clone()],
+            &vec![expr.get_type()],
+            &mut HashMap::default(),
+        )?;
         // cant assing a void
         if expr.get_type() == TType::Void {
             return Err(common::error::parser_error(
@@ -1799,12 +1989,21 @@ impl Parser {
                         if let TType::Generic(_) = **output {
                             return true;
                         }
-                        return is_generic(&input.clone());
+                        if is_generic(&input.clone()) || is_generic(&vec![*output.clone()]) {
+                            return true;
+                        }
                     }
                     TType::List(list) => {
                         if let TType::Generic(_) = **list {
                             return true;
                         }
+                        return is_generic(&vec![*list.clone()]);
+                    }
+                    TType::Option(option) => {
+                        if let TType::Generic(_) = **option {
+                            return true;
+                        }
+                        return is_generic(&vec![*option.clone()]);
                     }
                     _ => {}
                 }
@@ -1970,23 +2169,13 @@ impl Parser {
         for statement in statements {
             match statement {
                 Statement::Pass => has_return = true,
-                Statement::Return(ttype, _, l, r) => {
-                    if return_type != *ttype {
-                        return Err(common::error::parser_error(
-                            "Mismatched return types".to_string(),
-                            format!(
-                                "Function signature returns {:?}, got {:?} instead",
-                                return_type,
-                                ttype.clone()
-                            ),
-                            line,
-                            row,
-                            filepath.to_owned(),
-                            Some(vec![(format!("returned type is {:?}", ttype), *l, *r)]),
-                        ));
-                    } else {
-                        has_return = true
-                    }
+                Statement::Return(ttype, _, _, _) => {
+                    self.check_and_map_types(
+                        &vec![return_type.clone()],
+                        &vec![ttype.clone()],
+                        &mut HashMap::default(),
+                    )?;
+                    has_return = true
                 }
                 Statement::If(_, _, if_body, else_body) => {
                     let (bodytype, bhr) =
@@ -2041,6 +2230,7 @@ impl Parser {
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
         self.consume_symbol('{')?;
+        self.eat_if_newline();
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
         Ok(statements)
@@ -2048,6 +2238,7 @@ impl Parser {
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {
         let mut statements = vec![];
+        self.eat_if_newline();
         if let Some(statement) = self.statement()? {
             statements.push(statement);
         }
@@ -2055,6 +2246,9 @@ impl Parser {
             self.advance();
             if self.current_token().is_symbol('}') {
                 break;
+            }
+            if self.current_token().is_newline() {
+                continue;
             }
             if let Some(statement) = self.statement()? {
                 statements.push(statement);
