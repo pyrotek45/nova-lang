@@ -1,5 +1,5 @@
 use common::{
-    error::NovaError,
+    error::{lexer_error, NovaError},
     tokens::{Operator, Position, TType, Token, TokenList},
 };
 
@@ -23,7 +23,7 @@ pub struct Lexer {
     parsing: ParsingState,
 }
 
-pub fn new(filepath: &str) -> Result<Lexer, String> {
+pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
     match std::fs::read_to_string(filepath.clone()) {
         Ok(content) => Ok(Lexer {
             line: 1,
@@ -34,7 +34,13 @@ pub fn new(filepath: &str) -> Result<Lexer, String> {
             parsing: ParsingState::Token,
             filepath: filepath.to_owned(),
         }),
-        Err(_) => Err(format!("file: {} could not be opened", filepath)),
+        Err(_) => Err(lexer_error(
+            format!("{} could not opened ", &filepath),
+            format!(""),
+            0,
+            0,
+            filepath.to_owned(),
+        )),
     }
 }
 
@@ -171,6 +177,15 @@ impl Lexer {
                         },
                     ))
                 }
+                "any" => {
+                    return Some(Token::Type(
+                        TType::Any,
+                        Position {
+                            line: self.line,
+                            row: self.row - self.buffer.len(),
+                        },
+                    ))
+                }
                 _ => {
                     return Some(Token::Identifier(
                         self.buffer.to_lowercase(),
@@ -266,23 +281,23 @@ impl Lexer {
                     continue;
                 } else {
                     self.parsing = ParsingState::Token;
-                    match self.output.last() {
-                        Some(Token::Identifier(id, _)) => {
-                            if id == "import" {
-                                let mut ilex = match new(&self.buffer) {
-                                    Ok(lexer) => lexer,
-                                    Err(error) => panic!("{}", error),
-                                };
-                                ilex.tokenize()?;
-                                ilex.output.pop();
-                                self.output.pop();
-                                self.output.append(&mut ilex.output);
-                                self.buffer.clear();
-                                continue;
-                            }
-                        }
-                        _ => {}
-                    }
+                    // match self.output.last() {
+                    //     Some(Token::Identifier(id, _)) => {
+                    //         if id == "import" {
+                    //             let mut ilex = match new(&self.buffer) {
+                    //                 Ok(lexer) => lexer,
+                    //                 Err(error) => panic!("{}", error),
+                    //             };
+                    //             ilex.tokenize()?;
+                    //             ilex.output.pop();
+                    //             self.output.pop();
+                    //             self.output.append(&mut ilex.output);
+                    //             self.buffer.clear();
+                    //             continue;
+                    //         }
+                    //     }
+                    //     _ => {}
+                    // }
                     self.output.push(Token::String(
                         self.buffer.clone(),
                         Position {

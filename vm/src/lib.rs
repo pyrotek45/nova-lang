@@ -745,9 +745,9 @@ impl Vm {
                                             Heap::ListRef(v) => {
                                                 self.state.stack.push(VmData::List(v))
                                             }
-                                            Heap::List(_) => todo!(),
-                                            Heap::String(_) => todo!(),
-                                            Heap::None => todo!(),
+                                            Heap::List(_) => panic!(),
+                                            Heap::String(_) => panic!(),
+                                            Heap::None => self.state.stack.push(VmData::None),
                                             Heap::StringRef(v) => {
                                                 self.state.stack.push(VmData::String(v))
                                             }

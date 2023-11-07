@@ -191,11 +191,11 @@ impl Compiler {
                     }
                 }
                 common::nodes::Statement::Continue => todo!(),
-                common::nodes::Statement::Block(body) => {
+                common::nodes::Statement::Block(body, filepath) => {
                     let body = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(body, filepath.clone(), false, false, false)?;
                     self.asm.pop();
                 }
             }
@@ -647,13 +647,13 @@ impl Compiler {
                     self.compile_expr(expr.clone())?
                 }
                 match caller.as_str() {
-                    "super::none" => self.asm.push(Asm::NONE),
-                    "super::unwrap" => self.asm.push(Asm::UNWRAP),
-                    "super::some" => {}
-                    "super::is_some" => self.asm.push(Asm::ISSOME),
-                    "super::free" => self.asm.push(Asm::FREE),
-                    "super::clone" => self.asm.push(Asm::CLONE),
-                    "super::print" => {
+                    "none" => self.asm.push(Asm::NONE),
+                    "unwrap" => self.asm.push(Asm::UNWRAP),
+                    "some" => {}
+                    "is_some" => self.asm.push(Asm::ISSOME),
+                    "free" => self.asm.push(Asm::FREE),
+                    "clone" => self.asm.push(Asm::CLONE),
+                    "print" => {
                         self.asm.push(Asm::PRINT);
                         self.output.push(Code::PRINT)
                     }
@@ -670,6 +670,7 @@ impl Compiler {
                             {
                                 self.asm.push(Asm::DCALL(index as u32));
                             } else {
+                                dbg!(&self.variables);
                                 dbg!(identifier);
                                 todo!()
                             }

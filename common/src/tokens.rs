@@ -68,13 +68,13 @@ pub fn generate_unique_string(input: &str, types: &[TType]) -> String {
     format!("{}_{}", input, types_concatenated)
 }
 
-pub fn generate_module_string(input: &str, modules: &[String]) -> String {
-    if modules.is_empty() {
-        return input.to_owned();
-    }
-    let modules_concatenated = modules.join("::");
-    format!("{}::{}", modules_concatenated, input)
-}
+// pub fn generate_module_string(input: &str, modules: &[String]) -> String {
+//     if modules.is_empty() {
+//         return input.to_owned();
+//     }
+//     let modules_concatenated = modules.join("::");
+//     format!("{}::{}", modules_concatenated, input)
+// }
 
 pub fn type_to_string(ttype: &TType) -> String {
     match ttype {
