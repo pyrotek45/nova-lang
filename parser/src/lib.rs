@@ -190,8 +190,8 @@ impl Parser {
     ) -> Result<HashMap<String, TType>, NovaError> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error(
-                "length error".to_owned(),
-                format!("{} != {}", type_list1.len(), type_list2.len()),
+                "Incorrect amount of arguments".to_owned(),
+                format!("Got {:?} , but expexting {:?}", type_list2, type_list1),
             ));
         }
         for (t1, t2) in type_list1.iter().zip(type_list2.iter()) {

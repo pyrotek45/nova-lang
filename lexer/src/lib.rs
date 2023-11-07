@@ -206,6 +206,61 @@ impl Lexer {
                 }
             }
             if self.parsing == ParsingState::String {
+                if c == '\\' {
+                    match chars.peek() {
+                        Some('n') => {
+                            chars.next();
+                            self.buffer.push('\n');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('t') => {
+                            chars.next();
+                            self.buffer.push('\t');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('r') => {
+                            chars.next();
+                            self.buffer.push('\r');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('\'') => {
+                            chars.next();
+                            self.buffer.push('\'');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('\"') => {
+                            chars.next();
+                            self.buffer.push('\"');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('0') => {
+                            chars.next();
+                            self.buffer.push('\0');
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('\\') => {
+                            chars.next();
+                            self.buffer.push('\\');
+                            self.row += 1;
+                            continue;
+                        }
+                        _ => {
+                            return Err(common::error::lexer_error(
+                                "Expecting valid escape char".to_string(),
+                                "".to_string(),
+                                self.line,
+                                self.row - self.buffer.len(),
+                                self.filepath.clone(),
+                            ));
+                        }
+                    }
+                }
                 if c != '"' {
                     self.buffer.push(c);
                     continue;

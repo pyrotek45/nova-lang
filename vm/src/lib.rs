@@ -1,7 +1,7 @@
 pub mod state;
 pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 
-use std::io;
+use std::io::{self, Write};
 
 use common::{
     code::{byte_to_string, Code},
@@ -205,19 +205,24 @@ impl Vm {
                     let item = self.state.stack.pop().unwrap();
                     match item {
                         VmData::Function(v) => {
-                            println!("function pointer: {v}")
+                            print!("function pointer: {v}");
+                            io::stdout().flush().expect("");
                         }
                         VmData::Int(v) => {
-                            println!("{v}")
+                            print!("{v}");
+                            io::stdout().flush().expect("");
                         }
                         VmData::Float(v) => {
-                            println!("{v}")
+                            print!("{v}");
+                            io::stdout().flush().expect("");
                         }
                         VmData::Bool(v) => {
-                            println!("{v}")
+                            print!("{v}");
+                            io::stdout().flush().expect("");
                         }
                         VmData::None => {
-                            println!("None")
+                            print!("None");
+                            io::stdout().flush().expect("");
                         }
                         VmData::List(index) => {
                             if let Heap::List(array) = self.state.deref(index) {
@@ -229,11 +234,13 @@ impl Vm {
                                     print!("{:?}", self.state.deref(*item));
                                 }
                                 print!("]\n");
+                                io::stdout().flush().expect("");
                             }
                         }
                         VmData::String(index) => {
                             if let Heap::String(str) = self.state.deref(index) {
-                                println!("{str}")
+                                print!("{str}");
+                                io::stdout().flush().expect("");
                             }
                         }
                         VmData::Closure(_) => todo!(),
