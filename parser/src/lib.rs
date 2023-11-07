@@ -17,7 +17,7 @@ pub struct Parser {
     index: usize,
     pub ast: Ast,
     pub environment: Env,
-    module: Vec<String>,
+    //module: Vec<String>,
 }
 
 pub fn new(filepath: &str) -> Parser {
@@ -86,7 +86,7 @@ pub fn new(filepath: &str) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        module: vec!["".to_string()],
+        //module: vec!["".to_string()],
     }
 }
 
