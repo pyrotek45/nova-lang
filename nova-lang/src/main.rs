@@ -188,6 +188,21 @@ fn main() {
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::list::pop);
 
+                                parser.environment.insert_symbol(
+                                    "super::random_int",
+                                    common::tokens::TType::Function(
+                                        vec![TType::Int, TType::Int],
+                                        Box::new(TType::Int),
+                                    ),
+                                    None,
+                                    common::nodes::SymbolKind::GenericFunction,
+                                );
+                                compiler
+                                    .native_functions
+                                    .insert("super::random_int".to_string());
+                                vm.native_functions
+                                    .insert(vm.native_functions.len(), native::rand::random_int);
+
                                 parser.input = lexer_output.clone();
                                 match parser.parse() {
                                     Ok(()) => {
