@@ -222,7 +222,15 @@ impl State {
                     return self.heap.len() - 1;
                 }
             }
-            VmData::None => todo!(),
+            VmData::None => {
+                if let Some(space) = self.free_space.pop() {
+                    self.heap[space] = Heap::None;
+                    return space;
+                } else {
+                    self.heap.push(Heap::None);
+                    return self.heap.len() - 1;
+                }
+            }
             VmData::String(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::StringRef(v);

@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use common::{
     error::{self, NovaError},
     nodes::{new_env, Arg, Ast, Atom, Env, Expr, Statement, SymbolKind},
     table::{self, Table},
     tokens::{
-        generate_module_string, generate_unique_string, Operator, Position, TType, Token,
+        generate_unique_string, Operator, Position, TType, Token,
         TokenList, Unary,
     },
 };
 
+#[derive(Clone)]
 pub struct Parser {
     filepath: String,
     pub input: TokenList,
@@ -22,7 +23,7 @@ pub struct Parser {
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_env();
     env.insert_symbol(
-        "super::is_some",
+        "is_some",
         TType::Function(
             vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
             Box::new(TType::Bool),
@@ -31,7 +32,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::unwrap",
+        "unwrap",
         TType::Function(
             vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
             Box::new(TType::Generic("a".to_string())),
@@ -40,7 +41,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::none",
+        "none",
         TType::Function(
             vec![TType::None],
             Box::new(TType::Option(Box::new(TType::None))),
@@ -49,7 +50,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::some",
+        "some",
         TType::Function(
             vec![TType::Generic("a".to_string())],
             Box::new(TType::Option(Box::new(TType::Generic("a".to_string())))),
@@ -58,19 +59,19 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::free",
+        "free",
         TType::Function(vec![TType::Any], Box::new(TType::Void)),
         None,
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::print",
+        "print",
         TType::Function(vec![TType::Generic("a".to_string())], Box::new(TType::Void)),
         None,
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "super::clone",
+        "clone",
         TType::Function(
             vec![TType::Generic("a".to_string())],
             Box::new(TType::Generic("a".to_string())),
@@ -85,7 +86,7 @@ pub fn new(filepath: &str) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        module: vec!["super".to_string()],
+        module: vec!["".to_string()],
     }
 }
 
@@ -389,7 +390,7 @@ impl Parser {
 
         self.consume_symbol('{')?;
         self.eat_if_newline();
-        let (id, pos) = self.identifier()?;
+        let (id, _) = self.identifier()?;
         self.consume_operator(Operator::Assignment)?;
         exprs.insert(id.clone(), self.expr()?);
 
@@ -420,20 +421,25 @@ impl Parser {
                 continue;
             }
             if let Some(innerexpr) = exprs.get(fieldname) {
-                if innerexpr.get_type() != *fieldtype {
-                    return Err(common::error::parser_error(
-                        format!(
-                            "{} field type does not match {:?}",
-                            fieldname.clone(),
-                            innerexpr.get_type()
-                        ),
-                        format!("Exptecting type {:?}", fieldtype.clone()),
-                        pos.line,
-                        pos.row,
-                        self.filepath.clone(),
-                        None,
-                    ));
-                }
+                self.check_and_map_types(
+                    &vec![innerexpr.get_type()],
+                    &vec![fieldtype.clone()],
+                    &mut HashMap::default(),
+                )?;
+                // if innerexpr.get_type() != *fieldtype {
+                //     return Err(common::error::parser_error(
+                //         format!(
+                //             "{} field type does not match {:?}",
+                //             fieldname.clone(),
+                //             innerexpr.get_type()
+                //         ),
+                //         format!("E1 Exptecting type {:?}", fieldtype.clone()),
+                //         pos.line,
+                //         pos.row,
+                //         self.filepath.clone(),
+                //         None,
+                //     ));
+                // }
                 new_exprs.push(innerexpr.clone())
             } else {
                 return Err(common::error::parser_error(
@@ -891,42 +897,8 @@ impl Parser {
     }
 
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
-        let mut direct = false;
-        let pos = self.get_pos();
-        let field_id: String;
-        let mut identifier = match self.current_token().expect_id() {
-            Some(id) => {
-                if &id == "super" {
-                    direct = true;
-                };
-                field_id = id.clone();
-                id
-            }
-            None => {
-                return Err(self.generate_error(
-                    "Expected identifier".to_string(),
-                    format!("Cannot assign a value to {:?}", self.current_token()),
-                ));
-            }
-        };
-        self.advance();
-        while self.current_token().is_op(Operator::DoubleColon) {
-            self.advance();
-            let next = match self.current_token().expect_id() {
-                Some(id) => format!("::{}", id),
-                None => {
-                    return Err(self.generate_error(
-                        "1 Expected identifier".to_string(),
-                        format!("Cannot assign a value to {:?}", self.current_token()),
-                    ));
-                }
-            };
-            identifier.push_str(&next);
-            self.advance();
-        }
-        if !direct {
-            identifier = generate_module_string(&identifier, &self.module)
-        }
+
+        let (identifier, pos) = self.identifier()?;
 
         match self.current_token() {
             Token::Symbol('(', _) => {
@@ -937,7 +909,7 @@ impl Parser {
                 lhs = self.index(identifier.clone(), lhs.clone(), lhs.get_type())?;
             }
             _ => {
-                lhs = self.field(field_id.clone(), lhs, pos)?;
+                lhs = self.field(identifier.clone(), lhs, pos)?;
             }
         }
         Ok(lhs)
@@ -1095,12 +1067,12 @@ impl Parser {
                         // check if generic function exist
                         if self
                             .environment
-                            .has(&generate_module_string(&identifier, &self.module))
+                            .has(&identifier)
                         {
                             return Err(self.generate_error(
                                 format!(
                                     "Generic Function {} already defined",
-                                    generate_module_string(&identifier, &self.module)
+                                    &identifier
                                 ),
                                 "Cannot redefine a generic function".to_string(),
                             ));
@@ -1108,24 +1080,24 @@ impl Parser {
                         // check if normal function exist
                         if self
                             .environment
-                            .has(&generate_module_string(&identifier, &self.module))
+                            .has(&identifier)
                         {
                             return Err(self.generate_error(
                                 format!(
                                     "Function {} already defined",
-                                    generate_module_string(&identifier, &self.module),
+                                    &identifier,
                                 ),
                                 "Cannot redefine a generic function".to_string(),
                             ));
                         }
                         // build argument list
                         input.push(Arg {
-                            identifier: generate_module_string(&identifier, &self.module),
+                            identifier: identifier,
                             ttype: ttype.clone(),
                         });
                     } else {
                         input.push(Arg {
-                            identifier: generate_module_string(&identifier, &self.module),
+                            identifier: identifier,
                             ttype: ttype.clone(),
                         });
                     }
@@ -1141,14 +1113,14 @@ impl Parser {
                     match ttype.clone() {
                         TType::Function(paraminput, output) => {
                             self.environment.insert_symbol(
-                                &generate_module_string(&id, &self.module),
+                                &id,
                                 TType::Function(paraminput.clone(), Box::new(*output.clone())),
                                 Some(pos.clone()),
                                 SymbolKind::Parameter,
                             );
                         }
                         _ => self.environment.insert_symbol(
-                            &generate_module_string(&id, &self.module),
+                            &id,
                             ttype.clone(),
                             Some(pos.clone()),
                             SymbolKind::Parameter,
@@ -1674,7 +1646,7 @@ impl Parser {
             Ok((id, Position { line, row }))
         } else {
             Ok((
-                generate_module_string(&id, &self.module),
+                id,
                 Position { line, row },
             ))
         }
@@ -1739,11 +1711,36 @@ impl Parser {
         )]);
     }
 
+    fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("with"))?;
+
+        let ifilepath = match self.current_token() {
+            Token::String(filepath, _) => filepath,
+            _ => {
+                panic!()
+            }
+        };
+        self.advance();
+
+        let mut ilexer = lexer::new(&ifilepath)?;
+        let mut iparser = self.clone();
+        iparser.index = 0;
+        iparser.filepath = ifilepath.clone();
+        iparser.input = ilexer.tokenize()?.to_vec();
+        iparser.parse()?;
+        self.environment = iparser.environment.clone();
+
+        Ok(Some(Statement::Block(iparser.ast.program.clone(), ifilepath)))
+    }
+
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         let (line, row) = self.get_line_and_row();
 
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
+                "with" => {
+                    self.import_file()
+                }
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
                 "if" => self.if_statement(),
@@ -1754,7 +1751,7 @@ impl Parser {
                 "for" => self.for_statement(),
                 "module" => {
                     let module = self.module()?;
-                    Ok(Some(Statement::Block(module)))
+                    Ok(Some(Statement::Block(module, self.filepath.clone())))
                 }
                 "break" => {
                     self.consume_identifier(Some("break"))?;
@@ -1790,7 +1787,10 @@ impl Parser {
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("struct"))?;
         let (identifier, pos) = self.module_identifier()?;
-
+        // will overwrite, just needed for recursive types.
+        self.environment
+            .custom_types
+            .insert(identifier.clone(), vec![]);
         self.consume_symbol('{')?;
         self.eat_if_newline();
         let parameters = self.parameter_list()?;
@@ -1821,6 +1821,15 @@ impl Parser {
             self.environment
                 .custom_types
                 .insert(identifier.clone(), fields);
+        } else {
+            return Err(common::error::parser_error(
+                format!("Struct '{}' is already instantiated", identifier),
+                "Cannot reinstantiate the same type".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
         }
 
         Ok(Some(Statement::Struct(
@@ -1984,6 +1993,9 @@ impl Parser {
         fn is_generic(params: &[TType]) -> bool {
             for t in params.clone() {
                 match t {
+                    TType::Any => {
+                        return true;
+                    }
                     TType::Generic(_) => {
                         return true;
                     }
@@ -2020,12 +2032,12 @@ impl Parser {
                 // check if generic function exist
                 if self
                     .environment
-                    .has(&generate_module_string(&identifier, &self.module))
+                    .has(&identifier)
                 {
                     return Err(self.generate_error(
                         format!(
                             "Generic Function {} already defined",
-                            generate_module_string(&identifier, &self.module)
+                            &identifier
                         ),
                         "Cannot redefine a generic function".to_string(),
                     ));
@@ -2033,24 +2045,24 @@ impl Parser {
                 // check if normal function exist
                 if self
                     .environment
-                    .has(&generate_module_string(&identifier, &self.module))
+                    .has(&identifier)
                 {
                     return Err(self.generate_error(
                         format!(
                             "Function {} already defined",
-                            generate_module_string(&identifier, &self.module),
+                            &identifier,
                         ),
                         "Cannot redefine a generic function".to_string(),
                     ));
                 }
                 // build argument list
                 input.push(Arg {
-                    identifier: generate_module_string(&identifier, &self.module),
+                    identifier: identifier,
                     ttype: ttype.clone(),
                 });
             } else {
                 input.push(Arg {
-                    identifier: generate_module_string(&identifier, &self.module),
+                    identifier: identifier,
                     ttype: ttype.clone(),
                 });
             }
@@ -2108,14 +2120,14 @@ impl Parser {
             match ttype.clone() {
                 TType::Function(paraminput, output) => {
                     self.environment.insert_symbol(
-                        &generate_module_string(&id, &self.module),
+                        &id,
                         TType::Function(paraminput.clone(), Box::new(*output.clone())),
                         Some(pos.clone()),
                         SymbolKind::Parameter,
                     );
                 }
                 _ => self.environment.insert_symbol(
-                    &generate_module_string(&id, &self.module),
+                    &id,
                     ttype.clone(),
                     Some(pos.clone()),
                     SymbolKind::Parameter,
@@ -2143,6 +2155,7 @@ impl Parser {
             ));
         }
 
+        // if output void, insert return as last statement if one wasnt added
         if output == TType::Void {
             if let Some(Statement::Return(_, _, _, _)) = statements.last() {
             } else {
@@ -2154,6 +2167,20 @@ impl Parser {
                 ));
             }
         }
+
+        // if last statement isnt a return error
+        if let Some(Statement::Return(_, _, _, _)) = statements.last() {
+        } else {
+            return Err(common::error::parser_error(
+                "Function is missing a return statement in a branch".to_string(),
+                "Function missing return".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.to_owned(),
+                None,
+            ));
+        }
+        
         Ok(Some(Statement::Function(
             output, identifier, input, statements,
         )))

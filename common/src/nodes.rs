@@ -253,7 +253,7 @@ pub enum Statement {
     If(TType, Expr, Vec<Statement>, Option<Vec<Statement>>),
     While(Expr, Vec<Statement>),
     For(Expr, Expr, Expr, Vec<Statement>),
-    Block(Vec<Statement>),
+    Block(Vec<Statement>, String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
