@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use common::{
     error::{self, NovaError},
@@ -1209,7 +1209,7 @@ impl Parser {
                 }
             }
             Token::Identifier(_, _) => {
-                let (mut identifier, pos) = self.module_identifier()?;
+                let (mut identifier, pos) = self.identifier()?;
                 if self.current_token().is_symbol('@') {
                     self.consume_symbol('@')?;
                     self.consume_symbol('(')?;
@@ -1576,7 +1576,7 @@ impl Parser {
                 Ok(ttype)
             }
             Token::Identifier(_, _) => {
-                let (identifier, _) = self.module_identifier()?;
+                let (identifier, _) = self.identifier()?;
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
                     Ok(TType::Custom(identifier))
                 } else {
@@ -1608,48 +1608,6 @@ impl Parser {
         let (line, row) = self.get_line_and_row();
         self.advance();
         Ok((id, Position { line, row }))
-    }
-
-    fn module_identifier(&mut self) -> Result<(String, Position), NovaError> {
-        let mut direct = false;
-        let mut id = match self.current_token().expect_id() {
-            Some(id) => {
-                if &id == "super" {
-                    direct = true;
-                };
-                id
-            }
-            None => {
-                return Err(self.generate_error(
-                    "Expected identifier".to_string(),
-                    format!("Cannot assign a value to {:?}", self.current_token()),
-                ));
-            }
-        };
-        let (line, row) = self.get_line_and_row();
-        self.advance();
-        while self.current_token().is_op(Operator::DoubleColon) {
-            self.advance();
-            let next = match self.current_token().expect_id() {
-                Some(id) => format!("::{}", id),
-                None => {
-                    return Err(self.generate_error(
-                        "1 Expected identifier".to_string(),
-                        format!("Cannot assign a value to {:?}", self.current_token()),
-                    ));
-                }
-            };
-            id.push_str(&next);
-            self.advance();
-        }
-        if direct {
-            Ok((id, Position { line, row }))
-        } else {
-            Ok((
-                id,
-                Position { line, row },
-            ))
-        }
     }
 
     fn parameter_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
@@ -1712,7 +1670,7 @@ impl Parser {
     }
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("with"))?;
+        self.consume_identifier(Some("using"))?;
 
         let ifilepath = match self.current_token() {
             Token::String(filepath, _) => filepath,
@@ -1738,7 +1696,7 @@ impl Parser {
 
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
-                "with" => {
+                "using" => {
                     self.import_file()
                 }
                 "pass" => self.pass_statement(),
@@ -1749,10 +1707,10 @@ impl Parser {
                 "return" => self.return_statement(line, row),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
-                "module" => {
-                    let module = self.module()?;
-                    Ok(Some(Statement::Block(module, self.filepath.clone())))
-                }
+                // "module" => {
+                //     let module = self.module()?;
+                //     Ok(Some(Statement::Block(module, self.filepath.clone())))
+                // }
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -1768,16 +1726,16 @@ impl Parser {
         }
     }
 
-    fn module(&mut self) -> Result<Vec<Statement>, NovaError> {
-        self.consume_identifier(Some("module"))?;
-        let (module_id, _) = self.identifier()?;
-        self.module.push(module_id);
-        self.consume_symbol('{')?;
-        let statements = self.compound_statement()?;
-        self.consume_symbol('}')?;
-        self.module.pop();
-        Ok(statements)
-    }
+    // fn module(&mut self) -> Result<Vec<Statement>, NovaError> {
+    //     self.consume_identifier(Some("module"))?;
+    //     let (module_id, _) = self.identifier()?;
+    //     self.module.push(module_id);
+    //     self.consume_symbol('{')?;
+    //     let statements = self.compound_statement()?;
+    //     self.consume_symbol('}')?;
+    //     self.module.pop();
+    //     Ok(statements)
+    // }
 
     fn pass_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("pass"))?;
@@ -1786,7 +1744,7 @@ impl Parser {
 
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("struct"))?;
-        let (identifier, pos) = self.module_identifier()?;
+        let (identifier, pos) = self.identifier()?;
         // will overwrite, just needed for recursive types.
         self.environment
             .custom_types
@@ -1910,7 +1868,7 @@ impl Parser {
         // let
         self.consume_identifier(Some("let"))?;
         // refactor out into two parsing ways for ident. one with module and one without
-        let (identifier, pos) = self.module_identifier()?;
+        let (identifier, pos) = self.identifier()?;
         self.consume_operator(Operator::Colon)?;
         let ttype = self.ttype()?;
         self.consume_operator(Operator::Assignment)?;
@@ -1964,7 +1922,7 @@ impl Parser {
 
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("fn"))?;
-        let (mut identifier, pos) = self.module_identifier()?;
+        let (mut identifier, pos) = self.identifier()?;
 
         // check to see if its already defined
         if self.environment.has(&identifier) {
