@@ -57,14 +57,25 @@ impl Compiler {
         for statements in input.program.iter() {
             match statements {
                 common::nodes::Statement::Pass => {}
-                common::nodes::Statement::Let(_, identifier, expr) => {
+                common::nodes::Statement::Let(_, identifier, expr, global) => {
                     self.compile_expr(expr.clone())?;
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                        self.asm.push(Asm::STORE(index as u32))
+
+                    if *global {
+                        if let Some(index) = self.global.get_index(identifier.to_string()) {
+                            self.asm.push(Asm::STOREGLOBAL(index as u32))
+                        } else {
+                            self.global.insert(identifier.to_string());
+                            let index = self.variables.len() - 1;
+                            self.asm.push(Asm::STOREGLOBAL(index as u32))
+                        }
                     } else {
-                        self.variables.insert(identifier.to_string());
-                        let index = self.variables.len() - 1;
-                        self.asm.push(Asm::STORE(index as u32))
+                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                            self.asm.push(Asm::STORE(index as u32))
+                        } else {
+                            self.variables.insert(identifier.to_string());
+                            let index = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(index as u32))
+                        }
                     }
                 }
                 common::nodes::Statement::Function(_, identifier, parameters, input) => {
@@ -340,7 +351,7 @@ impl Compiler {
                 for e in arg.iter().cloned() {
                     self.compile_expr(e)?;
                 }
-                self.getref_expr(*from)?;
+                self.compile_expr(*from)?;
                 self.asm.push(Asm::CALL);
                 Ok(())
             }
@@ -590,9 +601,14 @@ impl Compiler {
                         panic!()
                     }
                 }
-                self.asm.push(Asm::LIST(captured.len()));
+
                 let closurejump = function_compile.gen.generate();
-                self.asm.push(Asm::CLOSURE(closurejump));
+                if captured.len() == 0 {
+                    self.asm.push(Asm::FUNCTION(closurejump));
+                } else {
+                    self.asm.push(Asm::LIST(captured.len()));
+                    self.asm.push(Asm::CLOSURE(closurejump));
+                }
 
                 let function_body = Ast {
                     program: input.clone(),

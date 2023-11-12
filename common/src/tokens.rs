@@ -119,6 +119,7 @@ impl TType {
 
     pub fn custom_to_string(&self) -> Option<String> {
         match self {
+            TType::Function(_, out) => out.custom_to_string(),
             TType::Custom(v) => Some(v.clone()),
             _ => None,
         }

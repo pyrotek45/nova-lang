@@ -2,13 +2,17 @@ use std::collections::HashMap;
 
 use common::{
     error::{self, NovaError},
-    nodes::{new_env, Arg, Ast, Atom, Env, Expr, Statement, SymbolKind},
+    nodes::{new_env, Arg, Ast, Atom, Env, Expr, Field, Statement, SymbolKind},
     table::{self, Table},
-    tokens::{
-        generate_unique_string, Operator, Position, TType, Token,
-        TokenList, Unary,
-    },
+    tokens::{generate_unique_string, Operator, Position, TType, Token, TokenList, Unary},
 };
+
+fn extract_current_directory(path: &str) -> Option<String> {
+    if let Some(last_slash_index) = path.rfind('/') {
+        return Some(path[..last_slash_index + 1].to_string());
+    }
+    None
+}
 
 #[derive(Clone)]
 pub struct Parser {
@@ -17,7 +21,7 @@ pub struct Parser {
     index: usize,
     pub ast: Ast,
     pub environment: Env,
-    //module: Vec<String>,
+    modules: table::Table<String>,
 }
 
 pub fn new(filepath: &str) -> Parser {
@@ -86,7 +90,7 @@ pub fn new(filepath: &str) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        //module: vec!["".to_string()],
+        modules: table::new(),
     }
 }
 
@@ -426,20 +430,6 @@ impl Parser {
                     &vec![fieldtype.clone()],
                     &mut HashMap::default(),
                 )?;
-                // if innerexpr.get_type() != *fieldtype {
-                //     return Err(common::error::parser_error(
-                //         format!(
-                //             "{} field type does not match {:?}",
-                //             fieldname.clone(),
-                //             innerexpr.get_type()
-                //         ),
-                //         format!("E1 Exptecting type {:?}", fieldtype.clone()),
-                //         pos.line,
-                //         pos.row,
-                //         self.filepath.clone(),
-                //         None,
-                //     ));
-                // }
                 new_exprs.push(innerexpr.clone())
             } else {
                 return Err(common::error::parser_error(
@@ -897,10 +887,45 @@ impl Parser {
     }
 
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
-
         let (identifier, pos) = self.identifier()?;
-
         match self.current_token() {
+            Token::Operator(Operator::DoubleColon, _) => {
+                let mut rhs  = lhs.clone();
+                while self.current_token().is_op(Operator::DoubleColon) {
+                    self.consume_operator(Operator::DoubleColon)?;
+                    let (field, pos) = self.identifier()?;
+                    if let Some(ctype) = self.environment.get_type(&identifier) {
+                        rhs = self.field(field.clone(), Expr::Literal(ctype, Atom::Id(identifier.clone())), pos)?;
+                    } else {
+                        dbg!(&lhs,&rhs);
+                        panic!()
+                    }
+                }
+                // function pointer return call <func()(args)>
+                let mut arguments = vec![lhs.clone()];
+                arguments.extend(self.argument_list()?);
+                if let TType::Function(argtypes, mut output) = rhs.get_type() {
+                    if arguments.len() != argtypes.len() {
+                        return Err(self.generate_error(
+                            format!("Inccorrect number of arguments"),
+                            format!("Got {:?}, expected {:?}", arguments.len(), argtypes.len()),
+                        ));
+                    }
+                    let mut inputtypes = vec![];
+                    for t in arguments.iter() {
+                        inputtypes.push(t.get_type())
+                    }
+                    let mut map: HashMap<String, TType> = HashMap::default();
+                    map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
+                    output = Box::new(self.get_output(*output.clone(), &mut map)?);
+                    lhs = Expr::Call(*output, "anon".to_string(), Box::new(rhs), arguments);
+                } else {
+                    return Err(self.generate_error(
+                        format!("Cant call {:?}", lhs.get_type()),
+                        format!("not a function"),
+                    ));
+                }
+            }
             Token::Symbol('(', _) => {
                 lhs = self.method(identifier.clone(), lhs, pos)?;
             }
@@ -912,6 +937,7 @@ impl Parser {
                 lhs = self.field(identifier.clone(), lhs, pos)?;
             }
         }
+
         Ok(lhs)
     }
 
@@ -1065,28 +1091,16 @@ impl Parser {
                 for (ttype, identifier) in parameters.clone() {
                     if let TType::Function(_, _) = ttype.clone() {
                         // check if generic function exist
-                        if self
-                            .environment
-                            .has(&identifier)
-                        {
+                        if self.environment.has(&identifier) {
                             return Err(self.generate_error(
-                                format!(
-                                    "Generic Function {} already defined",
-                                    &identifier
-                                ),
+                                format!("Generic Function {} already defined", &identifier),
                                 "Cannot redefine a generic function".to_string(),
                             ));
                         }
                         // check if normal function exist
-                        if self
-                            .environment
-                            .has(&identifier)
-                        {
+                        if self.environment.has(&identifier) {
                             return Err(self.generate_error(
-                                format!(
-                                    "Function {} already defined",
-                                    &identifier,
-                                ),
+                                format!("Function {} already defined", &identifier,),
                                 "Cannot redefine a generic function".to_string(),
                             ));
                         }
@@ -1210,7 +1224,9 @@ impl Parser {
             }
             Token::Identifier(_, _) => {
                 let (mut identifier, pos) = self.identifier()?;
-                if self.current_token().is_symbol('@') {
+
+                match self.current_token() {
+                    Token::Symbol('@',_) => {
                     self.consume_symbol('@')?;
                     self.consume_symbol('(')?;
                     let mut type_annotation = vec![];
@@ -1223,7 +1239,14 @@ impl Parser {
                     }
                     self.consume_symbol(')')?;
                     identifier = generate_unique_string(&identifier, &type_annotation);
+                    }
+                    _ => {}
                 }
+
+                if self.current_token().is_symbol('@') {
+
+                }
+
                 let leftt = self.anchor(identifier, pos)?;
                 left = leftt;
                 if let Some(sign) = sign {
@@ -1292,6 +1315,11 @@ impl Parser {
 
         loop {
             match self.current_token() {
+                Token::Operator(Operator::DoubleColon, _) => {
+                    self.consume_operator(Operator::DoubleColon)?;
+                    let (field, pos) = self.identifier()?;
+                    left = self.field(field.clone(), left, pos)?;
+                }
                 Token::Symbol('.', _) => {
                     self.consume_symbol('.')?;
                     left = self.chain(left)?;
@@ -1679,16 +1707,28 @@ impl Parser {
             }
         };
         self.advance();
+        let file = ifilepath.clone();
 
-        let mut ilexer = lexer::new(&ifilepath)?;
+        let newfilepath: String = match extract_current_directory(&self.filepath) {
+            Some(mut current_dir) => {
+                current_dir.push_str(&file);
+                current_dir
+            }
+            _ => file.clone(),
+        };
+
+        let mut ilexer = lexer::new(&newfilepath)?;
         let mut iparser = self.clone();
         iparser.index = 0;
-        iparser.filepath = ifilepath.clone();
+        iparser.filepath = newfilepath.clone();
         iparser.input = ilexer.tokenize()?.to_vec();
         iparser.parse()?;
         self.environment = iparser.environment.clone();
 
-        Ok(Some(Statement::Block(iparser.ast.program.clone(), ifilepath)))
+        Ok(Some(Statement::Block(
+            iparser.ast.program.clone(),
+            newfilepath,
+        )))
     }
 
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -1696,9 +1736,7 @@ impl Parser {
 
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
-                "using" => {
-                    self.import_file()
-                }
+                "using" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
                 "if" => self.if_statement(),
@@ -1707,10 +1745,7 @@ impl Parser {
                 "return" => self.return_statement(line, row),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
-                // "module" => {
-                //     let module = self.module()?;
-                //     Ok(Some(Statement::Block(module, self.filepath.clone())))
-                // }
+                "module" => self.module(),
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -1726,15 +1761,72 @@ impl Parser {
         }
     }
 
-    // fn module(&mut self) -> Result<Vec<Statement>, NovaError> {
+    fn module(&mut self) -> Result<Option<Statement>, NovaError> {
+        // let
+        self.consume_identifier(Some("module"))?;
+        // refactor out into two parsing ways for ident. one with module and one without
+        let (identifier, pos) = self.identifier()?;
+        let anchor = self.anchor(identifier.clone(), pos.clone())?;
+        if self.modules.has(&identifier) {
+            return Err(common::error::parser_error(
+                format!("Module '{}' is already instantiated", identifier),
+                "Cannot reinstantiate the same symbol in the same scope".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        } else {
+            self.modules.insert(identifier.clone());
+        }
+        if !self.environment.custom_types.contains_key(&identifier) {
+            return Err(common::error::parser_error(
+                format!("Module '{}' type does not exist", identifier),
+                "cannot create module without type".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        } else {
+            Ok(Some(Statement::Let(
+                TType::Custom(identifier.clone()),
+                identifier,
+                anchor,
+                true,
+            )))
+        }
+    }
+
+    // fn module(&mut self) -> Result<Option<Statement>, NovaError> {
     //     self.consume_identifier(Some("module"))?;
     //     let (module_id, _) = self.identifier()?;
-    //     self.module.push(module_id);
     //     self.consume_symbol('{')?;
-    //     let statements = self.compound_statement()?;
+    //     self.eat_if_newline();
+    //     let mut fields = vec![];
+    //     let mut modules = vec![];
+
+    //     while let Some(field) = self.function_declaration()? {
+    //         self.eat_if_newline();
+    //         if let Statement::Function(_,field_id,parameters,block) = field {
+    //             modules.push(field.clone());
+    //             // retrieve types for input
+    //             let mut typeinput = vec![];
+    //             for arg in parameters.iter() {
+    //                 typeinput.push(arg.ttype.clone())
+    //             }
+
+    //         } else {
+    //             // error
+    //             todo!()
+    //         }
+    //     }
+    //     self.eat_if_newline();
     //     self.consume_symbol('}')?;
-    //     self.module.pop();
-    //     Ok(statements)
+    //     // create type
+    //     // create struct
+    //     // create instance
+    //     todo!()
     // }
 
     fn pass_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -1765,7 +1857,7 @@ impl Parser {
 
         let mut input = vec![];
         for (identifier, ttype) in fields.clone() {
-            input.push(Arg { identifier, ttype })
+            input.push(Field { identifier, ttype })
         }
 
         if !self.environment.has(&identifier) {
@@ -1906,7 +1998,7 @@ impl Parser {
                 Some(pos),
                 SymbolKind::Variable,
             );
-            Ok(Some(Statement::Let(ttype, identifier, expr)))
+            Ok(Some(Statement::Let(ttype, identifier, expr, false)))
         }
     }
 
@@ -1988,28 +2080,16 @@ impl Parser {
         for (ttype, identifier) in parameters.clone() {
             if let TType::Function(_, _) = ttype.clone() {
                 // check if generic function exist
-                if self
-                    .environment
-                    .has(&identifier)
-                {
+                if self.environment.has(&identifier) {
                     return Err(self.generate_error(
-                        format!(
-                            "Generic Function {} already defined",
-                            &identifier
-                        ),
+                        format!("Generic Function {} already defined", &identifier),
                         "Cannot redefine a generic function".to_string(),
                     ));
                 }
                 // check if normal function exist
-                if self
-                    .environment
-                    .has(&identifier)
-                {
+                if self.environment.has(&identifier) {
                     return Err(self.generate_error(
-                        format!(
-                            "Function {} already defined",
-                            &identifier,
-                        ),
+                        format!("Function {} already defined", &identifier,),
                         "Cannot redefine a generic function".to_string(),
                     ));
                 }
@@ -2138,7 +2218,7 @@ impl Parser {
                 None,
             ));
         }
-        
+
         Ok(Some(Statement::Function(
             output, identifier, input, statements,
         )))
@@ -2158,8 +2238,8 @@ impl Parser {
                 Statement::Pass => has_return = true,
                 Statement::Return(ttype, _, _, _) => {
                     self.check_and_map_types(
-                        &vec![return_type.clone()],
                         &vec![ttype.clone()],
+                        &vec![return_type.clone()],
                         &mut HashMap::default(),
                     )?;
                     has_return = true

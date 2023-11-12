@@ -1,3 +1,5 @@
+use std::usize::MAX;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -53,6 +55,7 @@ pub struct State {
     pub threshold: usize,
     pub gc_count: usize,
     pub garbage_collected: usize,
+    pub gclock: bool
 }
 
 pub fn new() -> State {
@@ -66,9 +69,10 @@ pub fn new() -> State {
         heap: vec![],
         free_space: vec![],
         used_data: common::table::new(),
-        threshold: 50,
+        threshold: 0,
         gc_count: 0,
         garbage_collected: 0,
+        gclock: false,
     }
 }
 
@@ -129,11 +133,15 @@ impl State {
 
     #[inline(always)]
     pub fn collect_garbage(&mut self) {
-        // only run when out of free space and over threshold
-        if !(self.heap.len() >= self.threshold) {
+        if self.gclock {
             return;
+        }
+        // only run when out of free space and over threshold
+        if self.threshold <= self.heap.len() {
+            self.threshold = ((self.heap.len() as f64 ) * 1.1) as usize;
+            //dbg!(&self.threshold);
         } else {
-            self.threshold += self.threshold / 55;
+            return
         }
 
         self.gc_count += 1;
@@ -162,6 +170,7 @@ impl State {
                 }
             }
         }
+        //dbg!(&self.garbage_collected);
     }
 
     #[inline(always)]

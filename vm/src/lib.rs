@@ -379,12 +379,16 @@ impl Vm {
                 }
 
                 Code::CLOSURE => {
+                    
                     if let Some(VmData::List(list)) = self.state.stack.pop() {
+                        self.state.gclock = true;
                         let closure = self.state.allocate_new_heap();
                         self.state.heap[closure] =
                             Heap::Closure(self.state.current_instruction + 4, list);
+                        
                         self.state.stack.push(VmData::Closure(closure));
-
+                        self.state.gclock = false;
+                        self.state.collect_garbage();
                         let jump = u32::from_le_bytes([
                             self.state.next(),
                             self.state.next(),
@@ -392,9 +396,11 @@ impl Vm {
                             self.state.next(),
                         ]);
                         self.state.current_instruction += jump as usize;
+
                     } else {
                         todo!()
                     }
+
                 }
 
                 Code::DIRECTCALL => {
@@ -647,6 +653,7 @@ impl Vm {
                         self.state.next(),
                         self.state.next(),
                     ]);
+
                     let mut myarray = vec![];
                     for _ in 0..size {
                         if let Some(value) = self.state.stack.pop() {
@@ -658,6 +665,7 @@ impl Vm {
                     myarray.reverse();
                     let index = self.state.allocate_array(myarray);
                     self.state.stack.push(VmData::List(index));
+
                 }
 
                 Code::PINDEX => {
@@ -752,7 +760,9 @@ impl Vm {
                                                 self.state.stack.push(VmData::String(v))
                                             }
                                             Heap::Closure(_, _) => todo!(),
-                                            Heap::ClosureRef(_) => todo!(),
+                                            Heap::ClosureRef(v) => {
+                                                self.state.stack.push(VmData::Closure(v))
+                                            }
                                         }
                                     }
                                     Heap::String(_) => todo!(),
@@ -804,6 +814,7 @@ impl Vm {
                                 if let Some(Heap::Closure(target, captured)) =
                                     self.state.heap.get(index)
                                 {
+                                    //dbg!(&self.state.heap[*captured]);
                                     if let Heap::List(list) = &self.state.heap[*captured] {
                                         for i in list {
                                             self.state.stack.push(self.state.to_vmdata(*i))
@@ -811,6 +822,7 @@ impl Vm {
                                         self.state.callstack.push(self.state.current_instruction);
                                         self.state.goto(*target);
                                     } else {
+                                        dbg!(target, callee,captured);
                                         todo!()
                                     }
                                 } else {
@@ -843,6 +855,7 @@ impl Vm {
                         self.state.next(),
                         self.state.next(),
                     ]);
+
                     for _ in 0..size {
                         string.push(self.state.next());
                     }
@@ -906,7 +919,8 @@ impl Vm {
         // dbg!(&self.state.heap.len());
         // dbg!(&self.state.gc_count);
         // dbg!(&self.state.garbage_collected);
-        //dbg!(&self.state.used_data);
+        // dbg!(&self.state.threshold);
+        // dbg!(&self.state.used_data);
         Ok(())
     }
 
@@ -1233,11 +1247,13 @@ impl Vm {
 
                 Code::CLOSURE => {
                     if let Some(VmData::List(list)) = self.state.stack.pop() {
+                        self.state.gclock = true;
                         let closure = self.state.allocate_new_heap();
                         self.state.heap[closure] =
                             Heap::Closure(self.state.current_instruction + 4, list);
                         self.state.stack.push(VmData::Closure(closure));
-
+                        self.state.gclock = false;
+                        self.state.collect_garbage();
                         let jump = u32::from_le_bytes([
                             self.state.next(),
                             self.state.next(),
@@ -1501,6 +1517,7 @@ impl Vm {
                         self.state.next(),
                     ]);
                     let mut myarray = vec![];
+                    self.state.gclock = true;
                     for _ in 0..size {
                         if let Some(value) = self.state.stack.pop() {
                             myarray.push(self.state.allocate_vmdata_to_heap(value))
@@ -1511,6 +1528,7 @@ impl Vm {
                     myarray.reverse();
                     let index = self.state.allocate_array(myarray);
                     self.state.stack.push(VmData::List(index));
+                    self.state.gclock = false;
                 }
 
                 Code::PINDEX => {
@@ -1600,12 +1618,14 @@ impl Vm {
                                             }
                                             Heap::List(_) => todo!(),
                                             Heap::String(_) => todo!(),
-                                            Heap::None => todo!(),
+                                            Heap::None => self.state.stack.push(VmData::None),
                                             Heap::StringRef(v) => {
                                                 self.state.stack.push(VmData::String(v))
                                             }
                                             Heap::Closure(_, _) => todo!(),
-                                            Heap::ClosureRef(_) => todo!(),
+                                            Heap::ClosureRef(v) => {
+                                                self.state.stack.push(VmData::Closure(v))
+                                            }
                                         }
                                     }
                                     Heap::String(_) => todo!(),
@@ -1657,6 +1677,7 @@ impl Vm {
                                 if let Some(Heap::Closure(target, captured)) =
                                     self.state.heap.get(index)
                                 {
+                                    dbg!(&self.state.heap[*captured]);
                                     if let Heap::List(list) = &self.state.heap[*captured] {
                                         for i in list {
                                             self.state.stack.push(self.state.to_vmdata(*i))
@@ -1664,6 +1685,7 @@ impl Vm {
                                         self.state.callstack.push(self.state.current_instruction);
                                         self.state.goto(*target);
                                     } else {
+                                        dbg!(target,callee,captured);
                                         todo!()
                                     }
                                 } else {
