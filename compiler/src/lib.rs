@@ -556,8 +556,8 @@ impl Compiler {
                         self.asm.push(Asm::ASSIGN)
                     }
                     common::tokens::Operator::SubtractionAssignment => {
-                        self.compile_expr(*rhs.clone())?;
                         self.compile_expr(*lhs.clone())?;
+                        self.compile_expr(*rhs.clone())?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::ISUB);
                         } else if lhs.get_type() == TType::Float {
