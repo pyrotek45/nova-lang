@@ -151,9 +151,7 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
-                                compiler
-                                    .native_functions
-                                    .insert("readline".to_string());
+                                compiler.native_functions.insert("readline".to_string());
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::io::read_line);
 
@@ -197,9 +195,7 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
-                                compiler
-                                    .native_functions
-                                    .insert("random_int".to_string());
+                                compiler.native_functions.insert("random_int".to_string());
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::rand::random_int);
 
@@ -301,9 +297,7 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
-                                compiler
-                                    .native_functions
-                                    .insert("readline".to_string());
+                                compiler.native_functions.insert("readline".to_string());
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::io::read_line);
 
@@ -436,9 +430,7 @@ fn main() {
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
                                 );
-                                compiler
-                                    .native_functions
-                                    .insert("readline".to_string());
+                                compiler.native_functions.insert("readline".to_string());
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::io::read_line);
 

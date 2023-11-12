@@ -241,11 +241,11 @@ pub enum Statement {
     Break,
     Pass,
     // type id value
-    Let(TType, String, Expr),
+    Let(TType, String, Expr, bool),
     // type id input output
     Function(TType, String, Vec<Arg>, Vec<Statement>),
     // type id fields
-    Struct(TType, String, Vec<Arg>),
+    Struct(TType, String, Vec<Field>),
     // type exression
     Return(TType, Expr, usize, usize),
     Expression(TType, Expr),
