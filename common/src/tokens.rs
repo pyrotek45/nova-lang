@@ -49,7 +49,8 @@ pub enum TType {
     Int,
     Float,
     Bool,
-    Str,
+    String,
+    Char,
     Void,
     Auto,
     Custom(String),
@@ -78,27 +79,28 @@ pub fn generate_unique_string(input: &str, types: &[TType]) -> String {
 
 pub fn type_to_string(ttype: &TType) -> String {
     match ttype {
-        TType::Any => "any".to_string(),
-        TType::Int => "int".to_string(),
-        TType::Float => "float".to_string(),
-        TType::Bool => "bool".to_string(),
-        TType::Str => "str".to_string(),
-        TType::Void => "void".to_string(),
-        TType::Auto => "auto".to_string(),
+        TType::Any => "Any".to_string(),
+        TType::Int => "Int".to_string(),
+        TType::Float => "Float".to_string(),
+        TType::Bool => "Bool".to_string(),
+        TType::String => "String".to_string(),
+        TType::Void => "Void".to_string(),
+        TType::Auto => "Auto".to_string(),
         TType::Custom(name) => name.clone(),
-        TType::List(inner) => format!("list_{}", type_to_string(inner)),
+        TType::List(inner) => format!("List_{}", type_to_string(inner)),
         TType::Function(args, ret) => {
             let args_str = args
                 .iter()
                 .map(|t| type_to_string(t))
                 .collect::<Vec<String>>()
                 .join("_");
-            format!("function_{}_{}", args_str, type_to_string(ret))
+            format!("Function_{}_{}", args_str, type_to_string(ret))
         }
-        TType::Generic(name) => format!("generic_{}", name),
-        TType::None => "none".to_string(),
-        TType::Option(name) => format!("option_{}", type_to_string(name)),
-        TType::EmptyList => format!("empty_list"),
+        TType::Generic(name) => format!("Generic_{}", name),
+        TType::None => "None".to_string(),
+        TType::Option(name) => format!("Option_{}", type_to_string(name)),
+        TType::EmptyList => format!("Empty_list"),
+        TType::Char => "Char".to_string(),
     }
 }
 

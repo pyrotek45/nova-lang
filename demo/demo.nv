@@ -3,8 +3,8 @@ using "../std/Io.nv"
 
 // type declaratIon
 struct Person {
-    name: str,
-    age: int,
+    name: String,
+    age: Int,
 }
 
 // hello world
@@ -25,14 +25,16 @@ person.display()
 display(person2)
 
 // for loop
-let i : int = 0
+let i : Int = 0
 for i = 0; i < 10; i += 1 {
     Io::println(i)
 }
 
 // array
-let arr : [int] = [1,2,3]
+let arr : [Int] = [1,2,3]
 Io::println(arr)
 
 arr[1] = 4
 Io::println(arr)
+
+let c : Char = 'm'

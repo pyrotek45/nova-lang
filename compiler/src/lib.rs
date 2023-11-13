@@ -405,7 +405,7 @@ impl Compiler {
                             self.asm.push(Asm::IADD);
                         } else if lhs.get_type() == TType::Float {
                             self.asm.push(Asm::FADD);
-                        } else if lhs.get_type() == TType::Str {
+                        } else if lhs.get_type() == TType::String {
                             self.asm.push(Asm::CONCAT)
                         } else {
                             dbg!(&ttype);
@@ -572,7 +572,7 @@ impl Compiler {
                     common::tokens::Operator::Concat => {
                         self.compile_expr(*lhs.clone())?;
                         self.compile_expr(*rhs)?;
-                        if lhs.get_type() == TType::Str {
+                        if lhs.get_type() == TType::String {
                             self.asm.push(Asm::CONCAT);
                         } else {
                             dbg!(&ttype);

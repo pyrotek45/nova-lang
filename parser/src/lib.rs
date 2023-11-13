@@ -1320,7 +1320,7 @@ impl Parser {
             }
             Token::String(v, _) => {
                 self.advance();
-                left = Expr::Literal(TType::Str, Atom::String(v))
+                left = Expr::Literal(TType::String, Atom::String(v))
             }
 
             Token::Bool(v, _) => {
@@ -1577,7 +1577,7 @@ impl Parser {
             match (left.get_type(), right.get_type()) {
                 (TType::Int, TType::Int)
                 | (TType::Float, TType::Float)
-                | (TType::Str, TType::Str) => {
+                | (TType::String, TType::String) => {
                     left = Expr::Binop(
                         left.clone().get_type(),
                         operation,
@@ -1908,7 +1908,7 @@ impl Parser {
             typeinput.push(ttype.clone());
             fields.push((identifier, ttype));
         }
-        fields.push(("type".to_string(), TType::Str));
+        fields.push(("type".to_string(), TType::String));
 
         let mut input = vec![];
         for (identifier, ttype) in fields.clone() {

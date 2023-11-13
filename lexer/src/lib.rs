@@ -105,7 +105,7 @@ impl Lexer {
                 return None;
             }
             match self.buffer.as_str() {
-                "null" => {
+                "Null" => {
                     return Some(Token::Type(
                         TType::None,
                         Position {
@@ -114,7 +114,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "false" => {
+                "False" => {
                     return Some(Token::Bool(
                         false,
                         Position {
@@ -123,7 +123,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "true" => {
+                "True" => {
                     return Some(Token::Bool(
                         true,
                         Position {
@@ -132,7 +132,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "int" => {
+                "Int" => {
                     return Some(Token::Type(
                         TType::Int,
                         Position {
@@ -141,7 +141,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "float" => {
+                "Float" => {
                     return Some(Token::Type(
                         TType::Float,
                         Position {
@@ -150,7 +150,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "bool" => {
+                "Bool" => {
                     return Some(Token::Type(
                         TType::Bool,
                         Position {
@@ -159,16 +159,16 @@ impl Lexer {
                         },
                     ))
                 }
-                "str" => {
+                "String" => {
                     return Some(Token::Type(
-                        TType::Str,
+                        TType::String,
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
                         },
                     ))
                 }
-                "void" => {
+                "Void" => {
                     return Some(Token::Type(
                         TType::Void,
                         Position {
@@ -177,7 +177,16 @@ impl Lexer {
                         },
                     ))
                 }
-                "any" => {
+                "Any" => {
+                    return Some(Token::Type(
+                        TType::Any,
+                        Position {
+                            line: self.line,
+                            row: self.row - self.buffer.len(),
+                        },
+                    ))
+                }
+                "Char" => {
                     return Some(Token::Type(
                         TType::Any,
                         Position {
