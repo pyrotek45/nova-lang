@@ -1,0 +1,17 @@
+struct io {
+    println : (any),
+    prompt : (str) -> str,
+}
+
+module io {
+    println = fn(input:any) {
+        print(input)
+        print("\n")
+    },
+    prompt = fn(input:str) -> str {
+        print(input + "\n")
+        return readline()
+    }
+}
+
+
