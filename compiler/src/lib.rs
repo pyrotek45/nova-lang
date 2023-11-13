@@ -664,6 +664,11 @@ impl Compiler {
                     self.compile_expr(expr.clone())?
                 }
                 match caller.as_str() {
+                    "println" => {
+                        self.asm.push(Asm::PRINT);
+                        self.asm.push(Asm::STRING("\n".to_string()));
+                        self.asm.push(Asm::PRINT);
+                    }
                     "none" => self.asm.push(Asm::NONE),
                     "unwrap" => self.asm.push(Asm::UNWRAP),
                     "some" => {}
