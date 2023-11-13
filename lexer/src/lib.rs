@@ -84,7 +84,7 @@ impl Lexer {
                         ));
                     } else {
                         self.output.push(Token::Identifier(
-                            id.to_lowercase(),
+                            id.to_string(),
                             Position {
                                 line: self.line,
                                 row: preset + offset,
@@ -104,7 +104,7 @@ impl Lexer {
                 self.output.pop();
                 return None;
             }
-            match self.buffer.to_lowercase().as_str() {
+            match self.buffer.as_str() {
                 "null" => {
                     return Some(Token::Type(
                         TType::None,
@@ -188,7 +188,7 @@ impl Lexer {
                 }
                 _ => {
                     return Some(Token::Identifier(
-                        self.buffer.to_lowercase(),
+                        self.buffer.to_string(),
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),

@@ -233,7 +233,7 @@ impl Vm {
                                     }
                                     print!("{:?}", self.state.deref(*item));
                                 }
-                                print!("]\n");
+                                print!("]");
                                 io::stdout().flush().expect("");
                             }
                         }
@@ -245,6 +245,7 @@ impl Vm {
                         }
                         VmData::Closure(_) => todo!(),
                         VmData::StackRef(_) => todo!(),
+                        VmData::Struct(_) => todo!(),
                     }
                 }
 
@@ -379,13 +380,12 @@ impl Vm {
                 }
 
                 Code::CLOSURE => {
-                    
                     if let Some(VmData::List(list)) = self.state.stack.pop() {
                         self.state.gclock = true;
                         let closure = self.state.allocate_new_heap();
                         self.state.heap[closure] =
                             Heap::Closure(self.state.current_instruction + 4, list);
-                        
+
                         self.state.stack.push(VmData::Closure(closure));
                         self.state.gclock = false;
                         self.state.collect_garbage();
@@ -396,11 +396,9 @@ impl Vm {
                             self.state.next(),
                         ]);
                         self.state.current_instruction += jump as usize;
-
                     } else {
                         todo!()
                     }
-
                 }
 
                 Code::DIRECTCALL => {
@@ -628,6 +626,7 @@ impl Vm {
                                     VmData::String(_) => todo!(),
                                     VmData::Closure(_) => todo!(),
                                     VmData::StackRef(_) => todo!(),
+                                    VmData::Struct(_) => todo!(),
                                 };
                             }
                             (a, b) => {
@@ -665,7 +664,6 @@ impl Vm {
                     myarray.reverse();
                     let index = self.state.allocate_array(myarray);
                     self.state.stack.push(VmData::List(index));
-
                 }
 
                 Code::PINDEX => {
@@ -763,12 +761,16 @@ impl Vm {
                                             Heap::ClosureRef(v) => {
                                                 self.state.stack.push(VmData::Closure(v))
                                             }
+                                            Heap::Struct(_, _) => todo!(),
+                                            Heap::StructRef(_) => todo!(),
                                         }
                                     }
                                     Heap::String(_) => todo!(),
                                     Heap::None => todo!(),
                                     Heap::Closure(_, _) => todo!(),
                                     Heap::ClosureRef(_) => todo!(),
+                                    Heap::Struct(_, _) => todo!(),
+                                    Heap::StructRef(_) => todo!(),
                                 }
                             }
                             (a, b) => {
@@ -822,7 +824,7 @@ impl Vm {
                                         self.state.callstack.push(self.state.current_instruction);
                                         self.state.goto(*target);
                                     } else {
-                                        dbg!(target, callee,captured);
+                                        dbg!(target, callee, captured);
                                         todo!()
                                     }
                                 } else {
@@ -1102,7 +1104,8 @@ impl Vm {
                                     }
                                     print!("{:?}", self.state.deref(*item));
                                 }
-                                print!("]\n");
+                                print!("]");
+                                io::stdout().flush().expect("");
                             }
                         }
                         VmData::String(index) => {
@@ -1112,6 +1115,7 @@ impl Vm {
                         }
                         VmData::Closure(_) => todo!(),
                         VmData::StackRef(_) => todo!(),
+                        VmData::Struct(_) => todo!(),
                     }
                 }
 
@@ -1491,6 +1495,7 @@ impl Vm {
                                     VmData::String(_) => todo!(),
                                     VmData::Closure(_) => todo!(),
                                     VmData::StackRef(_) => todo!(),
+                                    VmData::Struct(_) => todo!(),
                                 };
                             }
                             (a, b) => {
@@ -1626,12 +1631,16 @@ impl Vm {
                                             Heap::ClosureRef(v) => {
                                                 self.state.stack.push(VmData::Closure(v))
                                             }
+                                            Heap::Struct(_, _) => todo!(),
+                                            Heap::StructRef(_) => todo!(),
                                         }
                                     }
                                     Heap::String(_) => todo!(),
                                     Heap::None => todo!(),
                                     Heap::Closure(_, _) => todo!(),
                                     Heap::ClosureRef(_) => todo!(),
+                                    Heap::Struct(_, _) => todo!(),
+                                    Heap::StructRef(_) => todo!(),
                                 }
                             }
                             (a, b) => {
@@ -1685,7 +1694,7 @@ impl Vm {
                                         self.state.callstack.push(self.state.current_instruction);
                                         self.state.goto(*target);
                                     } else {
-                                        dbg!(target,callee,captured);
+                                        dbg!(target, callee, captured);
                                         todo!()
                                     }
                                 } else {
