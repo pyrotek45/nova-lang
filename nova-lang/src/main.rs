@@ -146,7 +146,7 @@ fn main() {
                                     "readline",
                                     common::tokens::TType::Function(
                                         vec![TType::None],
-                                        Box::new(TType::Str),
+                                        Box::new(TType::String),
                                     ),
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
@@ -292,7 +292,7 @@ fn main() {
                                     "readline",
                                     common::tokens::TType::Function(
                                         vec![TType::None],
-                                        Box::new(TType::Str),
+                                        Box::new(TType::String),
                                     ),
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,
@@ -425,7 +425,7 @@ fn main() {
                                     "readline",
                                     common::tokens::TType::Function(
                                         vec![TType::None],
-                                        Box::new(TType::Str),
+                                        Box::new(TType::String),
                                     ),
                                     None,
                                     common::nodes::SymbolKind::GenericFunction,

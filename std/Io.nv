@@ -1,14 +1,14 @@
 struct Io {
-    println : (any),
-    prompt : (str) -> str,
+    println : (Any),
+    prompt : (String) -> String,
 }
 
 module Io {
-    println = fn(input:any) {
+    println = fn(input: Any) {
         print(input)
         print("\n")
     },
-    prompt = fn(input:str) -> str {
+    prompt = fn(input: String) -> String {
         print(input + "\n")
         return readline()
     }
