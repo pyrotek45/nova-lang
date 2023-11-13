@@ -318,6 +318,7 @@ impl Compiler {
                     }
                 }
             }
+            Atom::Char(_) => todo!(),
         }
         Ok(())
     }
@@ -666,7 +667,7 @@ impl Compiler {
                     "none" => self.asm.push(Asm::NONE),
                     "unwrap" => self.asm.push(Asm::UNWRAP),
                     "some" => {}
-                    "is_some" => self.asm.push(Asm::ISSOME),
+                    "isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "print" => {
@@ -694,6 +695,7 @@ impl Compiler {
                     }
                 }
             }
+            Atom::Char(_) => todo!(),
         }
         Ok(())
     }

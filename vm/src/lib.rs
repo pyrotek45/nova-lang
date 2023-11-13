@@ -152,7 +152,7 @@ impl Vm {
                         self.state.next(),
                         self.state.next(),
                     ]);
-                    self.state.stack.push(VmData::StackRef(index as usize));
+                    self.state.stack.push(VmData::StackAddress(index as usize));
                 }
 
                 // takes item and stores it into stack at location
@@ -244,8 +244,9 @@ impl Vm {
                             }
                         }
                         VmData::Closure(_) => todo!(),
-                        VmData::StackRef(_) => todo!(),
+                        VmData::StackAddress(_) => todo!(),
                         VmData::Struct(_) => todo!(),
+                        VmData::Char(_) => todo!(),
                     }
                 }
 
@@ -608,7 +609,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (value, destination) {
-                            (item, VmData::StackRef(index)) => {
+                            (item, VmData::StackAddress(index)) => {
                                 self.state.stack[self.state.offset + index as usize] = item
                             }
                             (item, VmData::List(index)) => {
@@ -620,13 +621,16 @@ impl Vm {
                                     VmData::Float(_) => todo!(),
                                     VmData::Bool(_) => todo!(),
                                     VmData::List(v) => {
-                                        self.state.heap[index as usize] = Heap::ListRef(v)
+                                        self.state.heap[index as usize] = Heap::ListAddress(v)
                                     }
                                     VmData::None => todo!(),
-                                    VmData::String(_) => todo!(),
+                                    VmData::String(v) => {
+                                        self.state.heap[index as usize] = Heap::StringAddress(v)
+                                    }
                                     VmData::Closure(_) => todo!(),
-                                    VmData::StackRef(_) => todo!(),
+                                    VmData::StackAddress(_) => todo!(),
                                     VmData::Struct(_) => todo!(),
+                                    VmData::Char(_) => todo!(),
                                 };
                             }
                             (a, b) => {
@@ -671,7 +675,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            (VmData::StackRef(array_index), VmData::StackRef(index_to_get)) => {
+                            (VmData::StackAddress(array_index), VmData::StackAddress(index_to_get)) => {
                                 if let VmData::Int(index_to_get) =
                                     self.state.stack[self.state.offset + index_to_get as usize]
                                 {
@@ -688,7 +692,7 @@ impl Vm {
                                     todo!()
                                 }
                             }
-                            (VmData::StackRef(array_index), VmData::Int(index_to_get)) => {
+                            (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
                                 if let VmData::List(newindex) =
                                     &self.state.stack[self.state.offset + array_index as usize]
                                 {
@@ -700,7 +704,7 @@ impl Vm {
                                 }
                             }
                             (VmData::List(array_index), VmData::Int(index_to_get)) => {
-                                if let Heap::ListRef(newindex) =
+                                if let Heap::ListAddress(newindex) =
                                     self.state.deref(array_index as usize)
                                 {
                                     if let Heap::List(array) = self.state.deref(newindex) {
@@ -735,8 +739,8 @@ impl Vm {
                                     Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
                                     Heap::Float(_) => todo!(),
                                     Heap::Bool(_) => todo!(),
-                                    Heap::ListRef(_) => todo!(),
-                                    Heap::StringRef(_) => todo!(),
+                                    Heap::ListAddress(_) => todo!(),
+                                    Heap::StringAddress(_) => todo!(),
                                     Heap::List(array) => {
                                         let item = self.state.deref(array[index_to as usize]);
                                         match item {
@@ -748,29 +752,31 @@ impl Vm {
                                                 self.state.stack.push(VmData::Float(v))
                                             }
                                             Heap::Bool(v) => self.state.stack.push(VmData::Bool(v)),
-                                            Heap::ListRef(v) => {
+                                            Heap::ListAddress(v) => {
                                                 self.state.stack.push(VmData::List(v))
                                             }
                                             Heap::List(_) => panic!(),
                                             Heap::String(_) => panic!(),
                                             Heap::None => self.state.stack.push(VmData::None),
-                                            Heap::StringRef(v) => {
+                                            Heap::StringAddress(v) => {
                                                 self.state.stack.push(VmData::String(v))
                                             }
                                             Heap::Closure(_, _) => todo!(),
-                                            Heap::ClosureRef(v) => {
+                                            Heap::ClosureAddress(v) => {
                                                 self.state.stack.push(VmData::Closure(v))
                                             }
                                             Heap::Struct(_, _) => todo!(),
-                                            Heap::StructRef(_) => todo!(),
+                                            Heap::StructAddress(_) => todo!(),
+                                            Heap::Char(_) => todo!(),
                                         }
                                     }
                                     Heap::String(_) => todo!(),
                                     Heap::None => todo!(),
                                     Heap::Closure(_, _) => todo!(),
-                                    Heap::ClosureRef(_) => todo!(),
+                                    Heap::ClosureAddress(_) => todo!(),
                                     Heap::Struct(_, _) => todo!(),
-                                    Heap::StructRef(_) => todo!(),
+                                    Heap::StructAddress(_) => todo!(),
+                                    Heap::Char(_) => todo!(),
                                 }
                             }
                             (a, b) => {
@@ -1028,7 +1034,7 @@ impl Vm {
                         self.state.next(),
                         self.state.next(),
                     ]);
-                    self.state.stack.push(VmData::StackRef(index as usize));
+                    self.state.stack.push(VmData::StackAddress(index as usize));
                 }
 
                 // takes item and stores it into stack at location
@@ -1114,8 +1120,9 @@ impl Vm {
                             }
                         }
                         VmData::Closure(_) => todo!(),
-                        VmData::StackRef(_) => todo!(),
+                        VmData::StackAddress(_) => todo!(),
                         VmData::Struct(_) => todo!(),
+                        VmData::Char(_) => todo!(),
                     }
                 }
 
@@ -1477,7 +1484,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (value, destination) {
-                            (item, VmData::StackRef(index)) => {
+                            (item, VmData::StackAddress(index)) => {
                                 self.state.stack[self.state.offset + index as usize] = item
                             }
                             (item, VmData::List(index)) => {
@@ -1489,13 +1496,14 @@ impl Vm {
                                     VmData::Float(_) => todo!(),
                                     VmData::Bool(_) => todo!(),
                                     VmData::List(v) => {
-                                        self.state.heap[index as usize] = Heap::ListRef(v)
+                                        self.state.heap[index as usize] = Heap::ListAddress(v)
                                     }
                                     VmData::None => todo!(),
                                     VmData::String(_) => todo!(),
                                     VmData::Closure(_) => todo!(),
-                                    VmData::StackRef(_) => todo!(),
+                                    VmData::StackAddress(_) => todo!(),
                                     VmData::Struct(_) => todo!(),
+                                    VmData::Char(_) => todo!(),
                                 };
                             }
                             (a, b) => {
@@ -1541,7 +1549,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            (VmData::StackRef(array_index), VmData::StackRef(index_to_get)) => {
+                            (VmData::StackAddress(array_index), VmData::StackAddress(index_to_get)) => {
                                 if let VmData::Int(index_to_get) =
                                     self.state.stack[self.state.offset + index_to_get as usize]
                                 {
@@ -1558,7 +1566,7 @@ impl Vm {
                                     todo!()
                                 }
                             }
-                            (VmData::StackRef(array_index), VmData::Int(index_to_get)) => {
+                            (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
                                 if let VmData::List(newindex) =
                                     &self.state.stack[self.state.offset + array_index as usize]
                                 {
@@ -1570,7 +1578,7 @@ impl Vm {
                                 }
                             }
                             (VmData::List(array_index), VmData::Int(index_to_get)) => {
-                                if let Heap::ListRef(newindex) =
+                                if let Heap::ListAddress(newindex) =
                                     self.state.deref(array_index as usize)
                                 {
                                     if let Heap::List(array) = self.state.deref(newindex) {
@@ -1605,8 +1613,8 @@ impl Vm {
                                     Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
                                     Heap::Float(_) => todo!(),
                                     Heap::Bool(_) => todo!(),
-                                    Heap::ListRef(_) => todo!(),
-                                    Heap::StringRef(_) => todo!(),
+                                    Heap::ListAddress(_) => todo!(),
+                                    Heap::StringAddress(_) => todo!(),
                                     Heap::List(array) => {
                                         let item = self.state.deref(array[index_to as usize]);
                                         match item {
@@ -1618,29 +1626,31 @@ impl Vm {
                                                 self.state.stack.push(VmData::Float(v))
                                             }
                                             Heap::Bool(v) => self.state.stack.push(VmData::Bool(v)),
-                                            Heap::ListRef(v) => {
+                                            Heap::ListAddress(v) => {
                                                 self.state.stack.push(VmData::List(v))
                                             }
                                             Heap::List(_) => todo!(),
                                             Heap::String(_) => todo!(),
                                             Heap::None => self.state.stack.push(VmData::None),
-                                            Heap::StringRef(v) => {
+                                            Heap::StringAddress(v) => {
                                                 self.state.stack.push(VmData::String(v))
                                             }
                                             Heap::Closure(_, _) => todo!(),
-                                            Heap::ClosureRef(v) => {
+                                            Heap::ClosureAddress(v) => {
                                                 self.state.stack.push(VmData::Closure(v))
                                             }
                                             Heap::Struct(_, _) => todo!(),
-                                            Heap::StructRef(_) => todo!(),
+                                            Heap::StructAddress(_) => todo!(),
+                                            Heap::Char(_) => todo!(),
                                         }
                                     }
                                     Heap::String(_) => todo!(),
                                     Heap::None => todo!(),
                                     Heap::Closure(_, _) => todo!(),
-                                    Heap::ClosureRef(_) => todo!(),
+                                    Heap::ClosureAddress(_) => todo!(),
                                     Heap::Struct(_, _) => todo!(),
-                                    Heap::StructRef(_) => todo!(),
+                                    Heap::StructAddress(_) => todo!(),
+                                    Heap::Char(_) => todo!(),
                                 }
                             }
                             (a, b) => {

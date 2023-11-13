@@ -1,7 +1,7 @@
-// import from another file
+// Importing from another file
 using "../std/Io.nv"
 
-// type declaratIon
+// Type declaratIon
 struct Person {
     name: String,
     age: Int,
@@ -10,31 +10,78 @@ struct Person {
 // hello world
 Io::println("hello world!")
 
-// creating instance of type
+// Creating instance of type
 let person : Person = Person {name = "bob", age = 42}
 let person2 : Person = Person("joe", 50)
 
-// functIon for type
-fn display(self:Person) {
+// Function for type
+fn display(self: Person) {
     Io::println(self.name)
     Io::println(self.age)
 }
 
-// using functIon
+// Using functIon
 person.display()
 display(person2)
 
-// for loop
+// For loop
 let i : Int = 0
 for i = 0; i < 10; i += 1 {
     Io::println(i)
 }
 
-// array
+// Array
 let arr : [Int] = [1,2,3]
 Io::println(arr)
 
 arr[1] = 4
 Io::println(arr)
 
-let c : Char = 'm'
+// Changing struct value
+person.name = "bingo"
+person.display()
+
+
+struct Zed {
+    test: ()
+}
+
+// Creating a module from a type
+module Zed {
+    test = fn() {
+        print("wow\n")
+    }
+}
+
+// now we can access its namespace 
+Zed::test()
+
+// Using iterators
+using "../std/Iter.nv"
+
+let myIter : () -> ?Int = [1,2,3,4,5].Iter::create()
+    .Iter::map(fn(x:Int)->Int{return x * x})
+
+myIter.Iter::printIter()
+
+// Function pointers
+struct SomeFunction {
+    function: (Int,Int) -> Int
+}
+
+let myMul : SomeFunction = SomeFunction(fn(x:Int,y:Int)->Int {
+    return x * y
+})
+
+let myOtherFunc : (Int,Int) -> Int = myMul.function
+let simpleSquare : (Int) -> Int = fn(x: Int) -> Int {return x * x}
+
+(myMul.function)(4,7).Io::println()
+myOtherFunc(4,7).Io::println()
+
+let myIterTwo : [Int] = [1,2,3,4,5]
+    .Iter::create()
+    .Iter::map(simpleSquare)
+    .Iter::collect()
+
+Io::println(myIterTwo)

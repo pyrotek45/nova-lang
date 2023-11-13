@@ -241,6 +241,7 @@ pub enum Asm {
     INTEGER(i64),
     FLOAT(f64),
     BOOL(bool),
+    Char(char),
 
     // operations
     IADD,

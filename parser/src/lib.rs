@@ -27,7 +27,7 @@ pub struct Parser {
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_env();
     env.insert_symbol(
-        "is_some",
+        "isSome",
         TType::Function(
             vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
             Box::new(TType::Bool),
@@ -195,7 +195,7 @@ impl Parser {
     ) -> Result<HashMap<String, TType>, NovaError> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error(
-                "Incorrect amount of arguments".to_owned(),
+                "E2 Incorrect amount of arguments".to_owned(),
                 format!("Got {:?} , but expexting {:?}", type_list2, type_list1),
             ));
         }
@@ -886,34 +886,15 @@ impl Parser {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
             Token::Operator(Operator::DoubleColon, _) => {
-                match self.current_token() {
-                    Token::Operator(Operator::DoubleColon, _) => {
-                        match lhs.get_type().custom_to_string() {
-                            Some(name) => {
-                                if !self.modules.has(&name) {
-                                    return Err(common::error::parser_error(
-                                        format!("{name} is not a module"),
-                                        format!(""),
-                                        self.current_token().line(),
-                                        self.current_token().row(),
-                                        self.filepath.clone(),
-                                        None,
-                                    ));
-                                }
-                            }
-                            None => {
-                                return Err(common::error::parser_error(
-                                    format!("type {:?} is not a valid module", &lhs.get_type()),
-                                    format!(""),
-                                    self.current_token().line(),
-                                    self.current_token().row(),
-                                    self.filepath.clone(),
-                                    None,
-                                ));
-                            }
-                        };
-                    }
-                    _ => {}
+                if !self.modules.has(&identifier) {
+                    return Err(common::error::parser_error(
+                        format!("{identifier} is not a module"),
+                        format!(""),
+                        self.current_token().line(),
+                        self.current_token().row(),
+                        self.filepath.clone(),
+                        None,
+                    ));
                 }
                 let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
@@ -936,7 +917,7 @@ impl Parser {
                 if let TType::Function(argtypes, mut output) = rhs.get_type() {
                     if arguments.len() != argtypes.len() {
                         return Err(self.generate_error(
-                            format!("Inccorrect number of arguments"),
+                            format!("E1 Inccorrect number of arguments"),
                             format!("Got {:?}, expected {:?}", arguments.len(), argtypes.len()),
                         ));
                     }
@@ -1050,6 +1031,12 @@ impl Parser {
                 {
                     self.call(identifier.clone(), pos.clone())?
                 } else {
+                    if self.environment.custom_types.contains_key(&identifier) && !self.modules.has(&identifier){
+                        return Err(self.generate_error(
+                            "Cant use type as identifier".to_string(),
+                            "".to_string(),
+                        ));
+                    }
                     if let Some(ttype) = self.environment.get_type(&identifier) {
                         Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                     } else {
@@ -1095,6 +1082,10 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
+            Token::Char(char,_) => {
+                self.advance();
+                left = Expr::Literal(TType::Char, Atom::Char(char))
+            }
             Token::Identifier(id, _) if id.as_str() == "fn" => {
                 let pos = self.get_pos();
                 self.advance();
@@ -1355,6 +1346,7 @@ impl Parser {
                         }
                     }
                     None => {
+                        dbg!(&left);
                         return Err(common::error::parser_error(
                             format!("type {:?} is not a valid module", &left.get_type()),
                             format!(""),
@@ -1381,11 +1373,14 @@ impl Parser {
                 }
                 Token::Symbol('(', _) => {
                     // function pointer return call <func()(args)>
-                    let arguments = self.argument_list()?;
+                    let mut arguments = self.argument_list()?;
+                    if arguments.is_empty() {
+                        arguments.push(Expr::None)
+                    }
                     if let TType::Function(argtypes, mut output) = left.get_type() {
                         if arguments.len() != argtypes.len() {
                             return Err(self.generate_error(
-                                format!("Inccorrect number of arguments"),
+                                format!("E3 Inccorrect number of arguments"),
                                 format!("Got {:?}, expected {:?}", arguments.len(), argtypes.len()),
                             ));
                         }

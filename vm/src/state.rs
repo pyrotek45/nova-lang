@@ -2,18 +2,30 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Heap {
+    // pointer and instance
+    ClosureAddress(usize),
     Closure(usize, usize),
-    ClosureRef(usize),
+    // function target
     Function(usize),
+
+    // basic types
     Int(i64),
     Float(f64),
     Bool(bool),
-    ListRef(usize),
-    StringRef(usize),
-    Struct(String, Vec<usize>),
-    StructRef(usize),
+    Char(char),
+    
+    // pointer and instance
+    ListAddress(usize),
     List(Vec<usize>),
+
+    // pointer and instance
+    StringAddress(usize),
     String(String),
+
+    // pointer and instance
+    StructAddress(usize),
+    Struct(String, Vec<usize>),
+
     None,
 }
 
@@ -30,15 +42,24 @@ impl Heap {
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VmData {
-    StackRef(usize),
+    // pointer to stack 
+    StackAddress(usize),
+
+    // jump target
     Function(usize),
     Closure(usize),
+
+    // basic types
     Int(i64),
     Float(f64),
     Bool(bool),
+    Char(char),
+
+    // pointer to heap
     List(usize),
     Struct(usize),
     String(usize),
+
     None,
 }
 
@@ -81,19 +102,20 @@ impl State {
     #[inline(always)]
     pub fn to_vmdata(&self, index: usize) -> VmData {
         match self.heap[index] {
-            Heap::ClosureRef(v) => VmData::Closure(v),
+            Heap::ClosureAddress(v) => VmData::Closure(v),
             Heap::Function(v) => VmData::Function(v),
             Heap::Int(v) => VmData::Int(v),
             Heap::Float(v) => VmData::Float(v),
             Heap::Bool(v) => VmData::Bool(v),
-            Heap::ListRef(v) => VmData::List(v),
-            Heap::StringRef(v) => VmData::String(v),
+            Heap::ListAddress(v) => VmData::List(v),
+            Heap::StringAddress(v) => VmData::String(v),
             Heap::None => VmData::None,
             Heap::Closure(_, _) => todo!(),
             Heap::List(_) => todo!(),
             Heap::String(_) => todo!(),
             Heap::Struct(_, _) => todo!(),
-            Heap::StructRef(v) => VmData::Struct(v),
+            Heap::StructAddress(v) => VmData::Struct(v),
+            Heap::Char(_) => todo!(),
         }
     }
 
@@ -125,9 +147,9 @@ impl State {
                         self.check_useage(*i)
                     }
                 }
-                Heap::ListRef(index) => self.check_useage(index),
-                Heap::StringRef(index) => self.check_useage(index),
-                Heap::ClosureRef(index) => self.check_useage(index),
+                Heap::ListAddress(index) => self.check_useage(index),
+                Heap::StringAddress(index) => self.check_useage(index),
+                Heap::ClosureAddress(index) => self.check_useage(index),
                 Heap::Closure(_, indextwo) => self.check_useage(indextwo),
                 _ => {}
             }
@@ -227,10 +249,10 @@ impl State {
             }
             VmData::List(v) => {
                 if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::ListRef(v);
+                    self.heap[space] = Heap::ListAddress(v);
                     return space;
                 } else {
-                    self.heap.push(Heap::ListRef(v));
+                    self.heap.push(Heap::ListAddress(v));
                     return self.heap.len() - 1;
                 }
             }
@@ -245,32 +267,33 @@ impl State {
             }
             VmData::String(v) => {
                 if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::StringRef(v);
+                    self.heap[space] = Heap::StringAddress(v);
                     return space;
                 } else {
-                    self.heap.push(Heap::StringRef(v));
+                    self.heap.push(Heap::StringAddress(v));
                     return self.heap.len() - 1;
                 }
             }
             VmData::Closure(v) => {
                 if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::ClosureRef(v);
+                    self.heap[space] = Heap::ClosureAddress(v);
                     return space;
                 } else {
-                    self.heap.push(Heap::ClosureRef(v));
+                    self.heap.push(Heap::ClosureAddress(v));
                     return self.heap.len() - 1;
                 }
             }
-            VmData::StackRef(_) => todo!(),
+            VmData::StackAddress(_) => todo!(),
             VmData::Struct(v) => {
                 if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::StructRef(v);
+                    self.heap[space] = Heap::StructAddress(v);
                     return space;
                 } else {
-                    self.heap.push(Heap::StructRef(v));
+                    self.heap.push(Heap::StructAddress(v));
                     return self.heap.len() - 1;
                 }
             }
+            VmData::Char(_) => todo!(),
         }
     }
 
