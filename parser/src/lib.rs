@@ -2295,6 +2295,7 @@ impl Parser {
                 _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
             }
         } else {
+            self.advance();
             Ok(None)
         }
 
