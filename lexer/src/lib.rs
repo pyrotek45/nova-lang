@@ -188,7 +188,7 @@ impl Lexer {
                 }
                 "Char" => {
                     return Some(Token::Type(
-                        TType::Any,
+                        TType::Char,
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),

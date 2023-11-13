@@ -303,6 +303,7 @@ impl Assembler {
                             ci += 1;
                             self.nva.push(Asm::CONCAT);
                         }
+                        "char" | "pushc" => todo!(),
                         "ret" => {
                             ci += 2;
                             self.nva
@@ -529,6 +530,7 @@ impl Assembler {
                 Asm::ISSOME => self.output.push(Code::ISSOME),
                 Asm::UNWRAP => self.output.push(Code::UNWRAP),
                 Asm::CONCAT => self.output.push(Code::CONCAT),
+                Asm::Char(v) => todo!(),
             }
         }
 
