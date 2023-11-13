@@ -2282,17 +2282,22 @@ impl Parser {
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {
-        let expr = self.expr()?;
-        if expr.get_type() != TType::Void {
-            return Err(self.generate_error(
-                "Expression returns value, but does nothing with it".to_string(),
-                "Remove the expression or assign it to a variable".to_string(),
-            ));
+        if !self.current_token().is_newline() {
+            let expr = self.expr()?;
+            if expr.get_type() != TType::Void {
+                return Err(self.generate_error(
+                    "Expression returns value, but does nothing with it".to_string(),
+                    "Remove the expression or assign it to a variable".to_string(),
+                ));
+            }
+            match expr {
+                Expr::None => Ok(None),
+                _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
+            }
+        } else {
+            Ok(None)
         }
-        match expr {
-            Expr::None => Ok(None),
-            _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
-        }
+
     }
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {

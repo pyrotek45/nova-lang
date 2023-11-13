@@ -215,9 +215,13 @@ impl Lexer {
         while let Some(c) = chars.next() {
             if self.parsing == ParsingState::Comment {
                 if c != '\n' {
+                    self.row += 1;
                     continue;
                 } else {
-                    self.parsing = ParsingState::Token
+                    self.parsing = ParsingState::Token;
+                    self.line += 1;
+                    self.row = 0;
+                    continue;
                 }
             }
             if self.parsing == ParsingState::String {
