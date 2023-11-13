@@ -1,0 +1,50 @@
+using "types.nv"
+
+struct Iter {
+    create: ([$a]) -> () -> ?$a,
+    map: (() -> ?$a, ($a) -> $a) -> () -> ?$a,
+    printIter: (() -> ?$a),
+    collect: (() -> ?$a) -> [$a]
+}
+
+module Iter {
+    create = fn(input:[$a]) -> () -> ?$a {
+        let index : Int_box = Int_box {value = 0}    
+        return fn() -> ?$a {
+            if index.value >= input.len() {
+                return none()
+            } else {
+                let result : ?$a = some(input[index.value])
+                index.value = index.value + 1
+                return result
+            }
+        }
+    },
+    map = fn(t: () -> ?$a, f:($a) -> $a) -> () -> ?$a {
+        return fn() -> ?$a {
+            let result: ?$a = t()
+            if result.isSome() {
+                return some(f(result.unwrap()))
+            } else {
+                return none()
+            }
+        }
+    },
+    printIter = fn(it: () -> ?$a) {
+        let t: ?$a = it()
+        while t.isSome() {
+            print(t.unwrap())
+            print("\n")
+            t = it()
+        }
+    },
+    collect = fn(it: () -> ?$a) -> [$a] {
+        let t: ?$a = it()
+        let list: [$a] = []
+        while t.isSome() {
+            list.push(t.unwrap())
+            t = it()
+        }
+        return list
+    }
+}
