@@ -435,7 +435,7 @@ impl Parser {
                 return Err(common::error::parser_error(
                     format!(
                         "{} is missing field {} ",
-                        constructor.clone(),
+                        constructor,
                         fieldname.clone()
                     ),
                     format!(""),
@@ -451,7 +451,7 @@ impl Parser {
             return Err(common::error::parser_error(
                 format!(
                     "{} has {} fields, you have {} ",
-                    constructor.clone(),
+                    constructor,
                     fields.len() - 1,
                     exprs.len()
                 ),
@@ -467,7 +467,7 @@ impl Parser {
             return Err(common::error::parser_error(
                 format!(
                     "{} has {} fields, not all of them are covered",
-                    constructor.clone(),
+                    constructor,
                     fields.len() - 1
                 ),
                 format!(""),
@@ -2041,7 +2041,7 @@ impl Parser {
         }
         // is function using generics?
         fn is_generic(params: &[TType]) -> bool {
-            for t in params.clone() {
+            for t in params {
                 match t {
                     TType::Any => {
                         return true;
