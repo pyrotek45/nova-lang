@@ -24,7 +24,7 @@ pub struct Lexer {
 }
 
 pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
-    match std::fs::read_to_string(filepath.clone()) {
+    match std::fs::read_to_string(filepath) {
         Ok(content) => Ok(Lexer {
             line: 1,
             row: 1,
@@ -285,23 +285,6 @@ impl Lexer {
                     continue;
                 } else {
                     self.parsing = ParsingState::Token;
-                    // match self.output.last() {
-                    //     Some(Token::Identifier(id, _)) => {
-                    //         if id == "import" {
-                    //             let mut ilex = match new(&self.buffer) {
-                    //                 Ok(lexer) => lexer,
-                    //                 Err(error) => panic!("{}", error),
-                    //             };
-                    //             ilex.tokenize()?;
-                    //             ilex.output.pop();
-                    //             self.output.pop();
-                    //             self.output.append(&mut ilex.output);
-                    //             self.buffer.clear();
-                    //             continue;
-                    //         }
-                    //     }
-                    //     _ => {}
-                    // }
                     self.output.push(Token::String(
                         self.buffer.clone(),
                         Position {
