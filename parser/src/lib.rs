@@ -433,11 +433,7 @@ impl Parser {
                 new_exprs.push(innerexpr.clone())
             } else {
                 return Err(common::error::parser_error(
-                    format!(
-                        "{} is missing field {} ",
-                        constructor,
-                        fieldname.clone()
-                    ),
+                    format!("{} is missing field {} ", constructor, fieldname.clone()),
                     format!(""),
                     conpos.line,
                     conpos.row,
@@ -890,14 +886,47 @@ impl Parser {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
             Token::Operator(Operator::DoubleColon, _) => {
-                let mut rhs  = lhs.clone();
+                match self.current_token() {
+                    Token::Operator(Operator::DoubleColon, _) => {
+                        match lhs.get_type().custom_to_string() {
+                            Some(name) => {
+                                if !self.modules.has(&name) {
+                                    return Err(common::error::parser_error(
+                                        format!("{name} is not a module"),
+                                        format!(""),
+                                        self.current_token().line(),
+                                        self.current_token().row(),
+                                        self.filepath.clone(),
+                                        None,
+                                    ));
+                                }
+                            }
+                            None => {
+                                return Err(common::error::parser_error(
+                                    format!("type {:?} is not a valid module", &lhs.get_type()),
+                                    format!(""),
+                                    self.current_token().line(),
+                                    self.current_token().row(),
+                                    self.filepath.clone(),
+                                    None,
+                                ));
+                            }
+                        };
+                    }
+                    _ => {}
+                }
+                let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.identifier()?;
                     if let Some(ctype) = self.environment.get_type(&identifier) {
-                        rhs = self.field(field.clone(), Expr::Literal(ctype, Atom::Id(identifier.clone())), pos)?;
+                        rhs = self.field(
+                            field.clone(),
+                            Expr::Literal(ctype, Atom::Id(identifier.clone())),
+                            pos,
+                        )?;
                     } else {
-                        dbg!(&lhs,&rhs);
+                        dbg!(&lhs, &rhs);
                         panic!()
                     }
                 }
@@ -1226,26 +1255,24 @@ impl Parser {
                 let (mut identifier, pos) = self.identifier()?;
 
                 match self.current_token() {
-                    Token::Symbol('@',_) => {
-                    self.consume_symbol('@')?;
-                    self.consume_symbol('(')?;
-                    let mut type_annotation = vec![];
-                    let ta = self.ttype()?;
-                    type_annotation.push(ta);
-                    while self.current_token().is_symbol(',') {
-                        self.advance();
+                    Token::Symbol('@', _) => {
+                        self.consume_symbol('@')?;
+                        self.consume_symbol('(')?;
+                        let mut type_annotation = vec![];
                         let ta = self.ttype()?;
                         type_annotation.push(ta);
-                    }
-                    self.consume_symbol(')')?;
-                    identifier = generate_unique_string(&identifier, &type_annotation);
+                        while self.current_token().is_symbol(',') {
+                            self.advance();
+                            let ta = self.ttype()?;
+                            type_annotation.push(ta);
+                        }
+                        self.consume_symbol(')')?;
+                        identifier = generate_unique_string(&identifier, &type_annotation);
                     }
                     _ => {}
                 }
 
-                if self.current_token().is_symbol('@') {
-
-                }
+                if self.current_token().is_symbol('@') {}
 
                 let leftt = self.anchor(identifier, pos)?;
                 left = leftt;
@@ -1312,7 +1339,35 @@ impl Parser {
             }
             _ => left = Expr::None,
         }
-
+        match self.current_token() {
+            Token::Operator(Operator::DoubleColon, _) => {
+                match left.get_type().custom_to_string() {
+                    Some(name) => {
+                        if !self.modules.has(&name) {
+                            return Err(common::error::parser_error(
+                                format!("{name} is not a module"),
+                                format!(""),
+                                self.current_token().line(),
+                                self.current_token().row(),
+                                self.filepath.clone(),
+                                None,
+                            ));
+                        }
+                    }
+                    None => {
+                        return Err(common::error::parser_error(
+                            format!("type {:?} is not a valid module", &left.get_type()),
+                            format!(""),
+                            self.current_token().line(),
+                            self.current_token().row(),
+                            self.filepath.clone(),
+                            None,
+                        ));
+                    }
+                };
+            }
+            _ => {}
+        }
         loop {
             match self.current_token() {
                 Token::Operator(Operator::DoubleColon, _) => {
@@ -1724,7 +1779,7 @@ impl Parser {
         iparser.input = ilexer.tokenize()?.to_vec();
         iparser.parse()?;
         self.environment = iparser.environment.clone();
-
+        self.modules = iparser.modules;
         Ok(Some(Statement::Block(
             iparser.ast.program.clone(),
             newfilepath,
@@ -1959,8 +2014,14 @@ impl Parser {
     fn let_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         // let
         self.consume_identifier(Some("let"))?;
+        let mut global = false;
         // refactor out into two parsing ways for ident. one with module and one without
-        let (identifier, pos) = self.identifier()?;
+        let (mut identifier, mut pos) = self.identifier()?;
+        if identifier == "global" {
+            (identifier, pos) = self.identifier()?;
+            self.modules.insert(identifier.clone());
+            global = true
+        }
         self.consume_operator(Operator::Colon)?;
         let ttype = self.ttype()?;
         self.consume_operator(Operator::Assignment)?;
@@ -1998,7 +2059,7 @@ impl Parser {
                 Some(pos),
                 SymbolKind::Variable,
             );
-            Ok(Some(Statement::Let(ttype, identifier, expr, false)))
+            Ok(Some(Statement::Let(ttype, identifier, expr, global)))
         }
     }
 
@@ -2298,7 +2359,6 @@ impl Parser {
             self.advance();
             Ok(None)
         }
-
     }
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {

@@ -1,9 +1,9 @@
-struct io {
+struct Io {
     println : (any),
     prompt : (str) -> str,
 }
 
-module io {
+module Io {
     println = fn(input:any) {
         print(input)
         print("\n")
@@ -13,5 +13,3 @@ module io {
         return readline()
     }
 }
-
-

@@ -10,6 +10,8 @@ pub enum Heap {
     Bool(bool),
     ListRef(usize),
     StringRef(usize),
+    Struct(String, Vec<usize>),
+    StructRef(usize),
     List(Vec<usize>),
     String(String),
     None,
@@ -35,6 +37,7 @@ pub enum VmData {
     Float(f64),
     Bool(bool),
     List(usize),
+    Struct(usize),
     String(usize),
     None,
 }
@@ -53,7 +56,7 @@ pub struct State {
     pub threshold: usize,
     pub gc_count: usize,
     pub garbage_collected: usize,
-    pub gclock: bool
+    pub gclock: bool,
 }
 
 pub fn new() -> State {
@@ -89,6 +92,8 @@ impl State {
             Heap::Closure(_, _) => todo!(),
             Heap::List(_) => todo!(),
             Heap::String(_) => todo!(),
+            Heap::Struct(_, _) => todo!(),
+            Heap::StructRef(v) => VmData::Struct(v),
         }
     }
 
@@ -136,10 +141,10 @@ impl State {
         }
         // only run when out of free space and over threshold
         if self.threshold <= self.heap.len() {
-            self.threshold = ((self.heap.len() as f64 ) * 1.1) as usize;
+            self.threshold = ((self.heap.len() as f64) * 1.1) as usize;
             //dbg!(&self.threshold);
         } else {
-            return
+            return;
         }
 
         self.gc_count += 1;
@@ -257,6 +262,15 @@ impl State {
                 }
             }
             VmData::StackRef(_) => todo!(),
+            VmData::Struct(v) => {
+                if let Some(space) = self.free_space.pop() {
+                    self.heap[space] = Heap::StructRef(v);
+                    return space;
+                } else {
+                    self.heap.push(Heap::StructRef(v));
+                    return self.heap.len() - 1;
+                }
+            }
         }
     }
 
