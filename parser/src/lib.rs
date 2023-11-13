@@ -75,6 +75,12 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
+        "println",
+        TType::Function(vec![TType::Generic("a".to_string())], Box::new(TType::Void)),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
         "clone",
         TType::Function(
             vec![TType::Generic("a".to_string())],
