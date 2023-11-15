@@ -1,5 +1,4 @@
-use std::{process::exit, time::Instant, f32::consts::E};
-
+use std::{process::exit, time::Instant};
 use common::tokens::TType;
 use lexer::Lexer;
 
