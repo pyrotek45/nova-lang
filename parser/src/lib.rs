@@ -1669,7 +1669,7 @@ impl Parser {
                 } else {
                     return Err(self.generate_error(
                         "Expected type annotation".to_string(),
-                        format!("Unknown type value {:?}", self.current_token()),
+                        format!("Unknown type '{identifier}' "),
                     ));
                 }
             }

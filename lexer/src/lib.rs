@@ -38,6 +38,7 @@ impl Default for Lexer {
 }
 
 impl Lexer {
+    
     pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
         let source = match std::fs::read_to_string(filepath) {
             Ok(content) => content,
@@ -53,6 +54,7 @@ impl Lexer {
             parsing: ParsingState::Token,
         })
     }
+
     fn check_token_buffer(&mut self) -> Option<Token> {
         if !self.buffer.is_empty() {
             if let Ok(v) = self.buffer.parse() {
@@ -198,6 +200,7 @@ impl Lexer {
         }
         None
     }
+
     fn check_token(&mut self) -> Result<(), NovaError> {
         if let Some(token) = self.check_token_buffer() {
             self.tokens.push(token);
