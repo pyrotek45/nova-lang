@@ -5,6 +5,7 @@ use common::{
     tokens::{self, TokenList},
 };
 
+#[derive(Debug)]
 pub struct Assembler {
     pub input: Vec<Asm>,
     pub nva: Vec<Asm>,
@@ -530,7 +531,7 @@ impl Assembler {
                 Asm::ISSOME => self.output.push(Code::ISSOME),
                 Asm::UNWRAP => self.output.push(Code::UNWRAP),
                 Asm::CONCAT => self.output.push(Code::CONCAT),
-                Asm::Char(v) => todo!(),
+                Asm::Char(_v) => todo!(),
             }
         }
 

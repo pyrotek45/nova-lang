@@ -1,5 +1,5 @@
 use common::{
-    error::{lexer_error, NovaError},
+    error::{file_error, lexer_error, NovaError},
     tokens::{Operator, Position, TType, Token, TokenList},
 };
 
@@ -17,34 +17,42 @@ pub struct Lexer {
     line: usize,
     row: usize,
     filepath: String,
-    input: String,
-    output: TokenList,
+    source: String,
+    tokens: TokenList,
     buffer: String,
     parsing: ParsingState,
 }
 
-pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
-    match std::fs::read_to_string(filepath) {
-        Ok(content) => Ok(Lexer {
+impl Default for Lexer {
+    fn default() -> Self {
+        Self {
             line: 1,
             row: 1,
-            input: content,
-            output: vec![],
-            buffer: String::new(),
+            filepath: Default::default(),
+            source: Default::default(),
+            tokens: Default::default(),
+            buffer: Default::default(),
             parsing: ParsingState::Token,
-            filepath: filepath.to_owned(),
-        }),
-        Err(_) => Err(lexer_error(
-            format!("{} could not opened ", &filepath),
-            format!(""),
-            0,
-            0,
-            filepath.to_owned(),
-        )),
+        }
     }
 }
 
 impl Lexer {
+    pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
+        let source = match std::fs::read_to_string(filepath) {
+            Ok(content) => content,
+            Err(_) => return Err(file_error(format!(" '{filepath}' is not a valid filepath"))),
+        };
+        Ok(Lexer {
+            line: 1,
+            row: 1,
+            filepath: filepath.to_string(),
+            source,
+            tokens: Default::default(),
+            buffer: Default::default(),
+            parsing: ParsingState::Token,
+        })
+    }
     fn check_token_buffer(&mut self) -> Option<Token> {
         if !self.buffer.is_empty() {
             if let Ok(v) = self.buffer.parse() {
@@ -75,7 +83,7 @@ impl Lexer {
                 for id in split {
                     if let Ok(v) = id.parse::<i64>() {
                         self.parsing = ParsingState::Token;
-                        self.output.push(Token::Integer(
+                        self.tokens.push(Token::Integer(
                             v as i64,
                             Position {
                                 line: self.line,
@@ -83,7 +91,7 @@ impl Lexer {
                             },
                         ));
                     } else {
-                        self.output.push(Token::Identifier(
+                        self.tokens.push(Token::Identifier(
                             id.to_string(),
                             Position {
                                 line: self.line,
@@ -92,7 +100,7 @@ impl Lexer {
                         ));
                     }
                     offset += id.len();
-                    self.output.push(Token::Symbol(
+                    self.tokens.push(Token::Symbol(
                         '.',
                         Position {
                             line: self.line,
@@ -101,19 +109,10 @@ impl Lexer {
                     ));
                     offset += 1;
                 }
-                self.output.pop();
+                self.tokens.pop();
                 return None;
             }
             match self.buffer.as_str() {
-                "Null" => {
-                    return Some(Token::Type(
-                        TType::None,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                        },
-                    ))
-                }
                 "False" => {
                     return Some(Token::Bool(
                         false,
@@ -168,15 +167,6 @@ impl Lexer {
                         },
                     ))
                 }
-                "Void" => {
-                    return Some(Token::Type(
-                        TType::Void,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                        },
-                    ))
-                }
                 "Any" => {
                     return Some(Token::Type(
                         TType::Any,
@@ -208,17 +198,26 @@ impl Lexer {
         }
         None
     }
-
-    pub fn check_token(&mut self) -> Result<(), NovaError> {
+    fn check_token(&mut self) -> Result<(), NovaError> {
         if let Some(token) = self.check_token_buffer() {
-            self.output.push(token);
+            self.tokens.push(token);
         }
         self.buffer.clear();
         Ok(())
     }
 
-    pub fn tokenize(&mut self) -> Result<&TokenList, NovaError> {
-        let tempstr = self.input.clone();
+    pub fn tokenize(mut self) -> Result<TokenList, NovaError> {
+        if self.filepath.is_empty() {
+            return Err(lexer_error(
+                format!("Missing filepath "),
+                format!(""),
+                0,
+                0,
+                "".to_string(),
+            ));
+        }
+
+        let tempstr = self.source.clone();
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
@@ -294,7 +293,7 @@ impl Lexer {
                     continue;
                 } else {
                     self.parsing = ParsingState::Token;
-                    self.output.push(Token::String(
+                    self.tokens.push(Token::String(
                         self.buffer.clone(),
                         Position {
                             line: self.line,
@@ -323,7 +322,7 @@ impl Lexer {
                         ));
                     }
                     if let Some(ch) = self.buffer.chars().next() {
-                        self.output.push(Token::Char(
+                        self.tokens.push(Token::Char(
                             ch,
                             Position {
                                 line: self.line,
@@ -348,7 +347,7 @@ impl Lexer {
                 }
                 '\n' => {
                     self.check_token()?;
-                    self.output.push(Token::NewLine(Position {
+                    self.tokens.push(Token::NewLine(Position {
                         line: self.line,
                         row: self.row,
                     }));
@@ -363,13 +362,13 @@ impl Lexer {
                             self.buffer.push(c);
                         } else {
                             self.check_token()?;
-                            match self.output.last() {
+                            match self.tokens.last() {
                                 Some(Token::NewLine(_)) => {
-                                    self.output.pop();
+                                    self.tokens.pop();
                                 }
                                 _ => {}
                             }
-                            self.output.push(Token::Symbol(
+                            self.tokens.push(Token::Symbol(
                                 c,
                                 Position {
                                     line: self.line,
@@ -379,13 +378,13 @@ impl Lexer {
                         }
                     } else {
                         self.check_token()?;
-                        match self.output.last() {
+                        match self.tokens.last() {
                             Some(Token::NewLine(_)) => {
-                                self.output.pop();
+                                self.tokens.pop();
                             }
                             _ => {}
                         }
-                        self.output.push(Token::Symbol(
+                        self.tokens.push(Token::Symbol(
                             c,
                             Position {
                                 line: self.line,
@@ -407,7 +406,7 @@ impl Lexer {
                             if let Some(':') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::DoubleColon,
                                     Position {
                                         line: self.line,
@@ -415,7 +414,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Colon,
                                     Position {
                                         line: self.line,
@@ -424,7 +423,7 @@ impl Lexer {
                                 ))
                             }
                         }
-                        '%' => self.output.push(Token::Operator(
+                        '%' => self.tokens.push(Token::Operator(
                             Operator::Modulo,
                             Position {
                                 line: self.line,
@@ -435,7 +434,7 @@ impl Lexer {
                             if let Some('=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::GtrOrEqu,
                                     Position {
                                         line: self.line,
@@ -443,7 +442,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::GreaterThan,
                                     Position {
                                         line: self.line,
@@ -456,7 +455,7 @@ impl Lexer {
                             if let Some('=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::LssOrEqu,
                                     Position {
                                         line: self.line,
@@ -464,7 +463,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::LessThan,
                                     Position {
                                         line: self.line,
@@ -477,7 +476,7 @@ impl Lexer {
                             if let Some('=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::AdditionAssignment,
                                     Position {
                                         line: self.line,
@@ -485,7 +484,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Addition,
                                     Position {
                                         line: self.line,
@@ -498,7 +497,7 @@ impl Lexer {
                             if let Some('>') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::RightArrow,
                                     Position {
                                         line: self.line,
@@ -508,7 +507,7 @@ impl Lexer {
                             } else if let Some('=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::SubtractionAssignment,
                                     Position {
                                         line: self.line,
@@ -516,7 +515,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Subtraction,
                                     Position {
                                         line: self.line,
@@ -525,7 +524,7 @@ impl Lexer {
                                 ))
                             }
                         }
-                        '*' => self.output.push(Token::Operator(
+                        '*' => self.tokens.push(Token::Operator(
                             Operator::Multiplication,
                             Position {
                                 line: self.line,
@@ -538,7 +537,7 @@ impl Lexer {
                                 self.row += 1;
                                 self.parsing = ParsingState::Comment;
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Division,
                                     Position {
                                         line: self.line,
@@ -551,7 +550,7 @@ impl Lexer {
                             if let Some(&'=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Equality,
                                     Position {
                                         line: self.line,
@@ -559,7 +558,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Assignment,
                                     Position {
                                         line: self.line,
@@ -572,7 +571,7 @@ impl Lexer {
                             if let Some(&'=') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::NotEqual,
                                     Position {
                                         line: self.line,
@@ -580,7 +579,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Not,
                                     Position {
                                         line: self.line,
@@ -593,7 +592,7 @@ impl Lexer {
                             if let Some(&'&') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::And,
                                     Position {
                                         line: self.line,
@@ -601,7 +600,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Symbol(
+                                self.tokens.push(Token::Symbol(
                                     c,
                                     Position {
                                         line: self.line,
@@ -614,7 +613,7 @@ impl Lexer {
                             if let Some(&'|') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.output.push(Token::Operator(
+                                self.tokens.push(Token::Operator(
                                     Operator::Or,
                                     Position {
                                         line: self.line,
@@ -622,7 +621,7 @@ impl Lexer {
                                     },
                                 ))
                             } else {
-                                self.output.push(Token::Symbol(
+                                self.tokens.push(Token::Symbol(
                                     c,
                                     Position {
                                         line: self.line,
@@ -636,7 +635,7 @@ impl Lexer {
                 }
                 ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' | '?' | '#' => {
                     self.check_token()?;
-                    self.output.push(Token::Symbol(
+                    self.tokens.push(Token::Symbol(
                         c,
                         Position {
                             line: self.line,
@@ -657,10 +656,10 @@ impl Lexer {
             self.row += 1;
         }
         self.check_token()?;
-        self.output.push(Token::EOF(Position {
+        self.tokens.push(Token::EOF(Position {
             line: self.line,
             row: self.row,
         }));
-        Ok(&self.output)
+        Ok(self.tokens)
     }
 }

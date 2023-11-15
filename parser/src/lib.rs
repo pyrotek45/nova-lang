@@ -6,6 +6,7 @@ use common::{
     table::{self, Table},
     tokens::{generate_unique_string, Operator, Position, TType, Token, TokenList, Unary},
 };
+use lexer::Lexer;
 
 fn extract_current_directory(path: &str) -> Option<String> {
     if let Some(last_slash_index) = path.rfind('/') {
@@ -14,7 +15,7 @@ fn extract_current_directory(path: &str) -> Option<String> {
     None
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Parser {
     filepath: String,
     pub input: TokenList,
@@ -1037,7 +1038,9 @@ impl Parser {
                 {
                     self.call(identifier.clone(), pos.clone())?
                 } else {
-                    if self.environment.custom_types.contains_key(&identifier) && !self.modules.has(&identifier){
+                    if self.environment.custom_types.contains_key(&identifier)
+                        && !self.modules.has(&identifier)
+                    {
                         return Err(self.generate_error(
                             "Cant use type as identifier".to_string(),
                             "".to_string(),
@@ -1088,7 +1091,7 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
-            Token::Char(char,_) => {
+            Token::Char(char, _) => {
                 self.advance();
                 left = Expr::Literal(TType::Char, Atom::Char(char))
             }
@@ -1773,11 +1776,12 @@ impl Parser {
             _ => file.clone(),
         };
 
-        let mut ilexer = lexer::new(&newfilepath)?;
+        let tokenlist = Lexer::new(&newfilepath)?.tokenize()?;
+
         let mut iparser = self.clone();
         iparser.index = 0;
         iparser.filepath = newfilepath.clone();
-        iparser.input = ilexer.tokenize()?.to_vec();
+        iparser.input = tokenlist;
         iparser.parse()?;
         self.environment = iparser.environment.clone();
         self.modules = iparser.modules;

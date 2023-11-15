@@ -73,7 +73,7 @@ impl Disassembler {
                 Asm::ISSOME => println!("    issome"),
                 Asm::UNWRAP => println!("    unwrap"),
                 Asm::CONCAT => println!("    concat"),
-                Asm::Char(v) =>  println!("    char: {v}"),
+                Asm::Char(v) => println!("    char: {v}"),
             }
         }
         println!();

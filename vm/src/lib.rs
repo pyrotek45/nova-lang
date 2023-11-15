@@ -675,7 +675,10 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            (VmData::StackAddress(array_index), VmData::StackAddress(index_to_get)) => {
+                            (
+                                VmData::StackAddress(array_index),
+                                VmData::StackAddress(index_to_get),
+                            ) => {
                                 if let VmData::Int(index_to_get) =
                                     self.state.stack[self.state.offset + index_to_get as usize]
                                 {
@@ -1549,7 +1552,10 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            (VmData::StackAddress(array_index), VmData::StackAddress(index_to_get)) => {
+                            (
+                                VmData::StackAddress(array_index),
+                                VmData::StackAddress(index_to_get),
+                            ) => {
                                 if let VmData::Int(index_to_get) =
                                     self.state.stack[self.state.offset + index_to_get as usize]
                                 {
