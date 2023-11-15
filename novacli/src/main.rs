@@ -1,4 +1,4 @@
-use std::{process::exit, time::Instant};
+use std::{process::exit, time::Instant, f32::consts::E};
 
 use common::tokens::TType;
 use lexer::Lexer;
@@ -13,7 +13,13 @@ fn main() {
                         "run" => {
                             if let Some(filepath) = std::env::args().nth(3) {
                                 let _ = match novacore::NovaCore::new(&filepath) {
-                                    Ok(novacore) => novacore.run(),
+                                    Ok(novacore) => match novacore.run() {
+                                        Ok(()) => {}
+                                        Err(error) => {
+                                            error.show();
+                                            exit(1)
+                                        }
+                                    },
                                     Err(error) => {
                                         error.show();
                                         exit(1)
