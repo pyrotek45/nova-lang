@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "nova-lang",
+    "novacli",
+    "novacore",
     "native",
     "lexer",
     "vm",

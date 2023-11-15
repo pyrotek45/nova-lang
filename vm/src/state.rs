@@ -13,7 +13,7 @@ pub enum Heap {
     Float(f64),
     Bool(bool),
     Char(char),
-    
+
     // pointer and instance
     ListAddress(usize),
     List(Vec<usize>),
@@ -42,7 +42,7 @@ impl Heap {
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VmData {
-    // pointer to stack 
+    // pointer to stack
     StackAddress(usize),
 
     // jump target

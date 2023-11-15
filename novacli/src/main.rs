@@ -1,6 +1,7 @@
 use std::{process::exit, time::Instant};
 
 use common::tokens::TType;
+use lexer::Lexer;
 
 fn main() {
     match std::env::args().nth(1) {
@@ -8,259 +9,30 @@ fn main() {
             "file" => {
                 match std::env::args().nth(2) {
                     Some(option) => match option.as_str() {
-                        "time" => {
-                            let start = Instant::now();
-                            if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
-                                    Ok(lexer) => lexer,
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                };
-
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
-                                        output
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                };
-
-                                let mut parser = parser::new(&filepath);
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
-
-                                // adding native functions
-                                parser.environment.insert_symbol(
-                                    "len",
-                                    common::tokens::TType::Function(
-                                        vec![TType::List(Box::new(TType::Generic(
-                                            "a".to_string(),
-                                        )))],
-                                        Box::new(TType::Int),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-                                compiler.native_functions.insert("len".to_string());
-                                vm.native_functions.insert(0, native::list::len);
-
-                                parser.input = lexer_output.clone();
-                                match parser.parse() {
-                                    Ok(()) => {
-                                        //dbg!(parser.ast.clone());
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-
-                                let program = compiler
-                                    .compile_program(parser.ast, filepath, true, true, false);
-                                let asm = compiler.asm.clone();
-                                match program {
-                                    Ok(_) => {
-                                        // println!("Before optimization");
-                                        // dis.dis_asm(asm.clone());
-                                        // println!();
-                                        // let mut optimizer = optimizer::new();
-                                        // let optimized = optimizer.Optimize(asm.clone());
-                                        //println!("After optimization: {}", optimizer.optimizations);
-                                        // dis.dis_asm(asm.clone());
-                                        //println!("{}", rhexdump::hexdump(&assembler.output));
-                                        let mut assembler = assembler::new(asm);
-                                        assembler.assemble();
-                                        vm.state.program(assembler.output)
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-                                match vm.run() {
-                                    Ok(()) => {
-                                        //dbg!(vm.state.stack);
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-                                let duration = start.elapsed();
-                                println!("Lexer & Parser Execution & Runtime >> {:?}", duration);
-                            } else {
-                                println!("Error: No file path specified");
-                            }
-                        }
+                        "time" => {}
                         "run" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
-                                    Ok(lexer) => lexer,
+                                let _ = match novacore::NovaCore::new(&filepath) {
+                                    Ok(novacore) => novacore.run(),
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
-                                        output
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                };
-
-                                let mut parser = parser::new(&filepath);
-                                let mut compiler = compiler::new();
-                                let mut vm = vm::new();
-
-                                // adding native functions
-                                parser.environment.insert_symbol(
-                                    "len",
-                                    common::tokens::TType::Function(
-                                        vec![TType::List(Box::new(TType::Generic(
-                                            "a".to_string(),
-                                        )))],
-                                        Box::new(TType::Int),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-
-                                compiler.native_functions.insert("len".to_string());
-                                vm.native_functions
-                                    .insert(vm.native_functions.len(), native::list::len);
-
-                                parser.environment.insert_symbol(
-                                    "readline",
-                                    common::tokens::TType::Function(
-                                        vec![TType::None],
-                                        Box::new(TType::String),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-                                compiler.native_functions.insert("readline".to_string());
-                                vm.native_functions
-                                    .insert(vm.native_functions.len(), native::io::read_line);
-
-                                parser.environment.insert_symbol(
-                                    "push",
-                                    common::tokens::TType::Function(
-                                        vec![
-                                            TType::List(Box::new(TType::Generic("a".to_string()))),
-                                            TType::Generic("a".to_string()),
-                                        ],
-                                        Box::new(TType::Void),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-                                compiler.native_functions.insert("push".to_string());
-                                vm.native_functions
-                                    .insert(vm.native_functions.len(), native::list::push);
-
-                                parser.environment.insert_symbol(
-                                    "pop",
-                                    common::tokens::TType::Function(
-                                        vec![TType::List(Box::new(TType::Generic(
-                                            "a".to_string(),
-                                        )))],
-                                        Box::new(TType::Void),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-                                compiler.native_functions.insert("pop".to_string());
-                                vm.native_functions
-                                    .insert(vm.native_functions.len(), native::list::pop);
-
-                                parser.environment.insert_symbol(
-                                    "random_int",
-                                    common::tokens::TType::Function(
-                                        vec![TType::Int, TType::Int],
-                                        Box::new(TType::Int),
-                                    ),
-                                    None,
-                                    common::nodes::SymbolKind::GenericFunction,
-                                );
-                                compiler.native_functions.insert("random_int".to_string());
-                                vm.native_functions
-                                    .insert(vm.native_functions.len(), native::rand::random_int);
-
-                                parser.input = lexer_output.clone();
-                                match parser.parse() {
-                                    Ok(()) => {
-                                        //dbg!(parser.ast.clone());
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-
-                                let program = compiler
-                                    .compile_program(parser.ast, filepath, true, true, false);
-                                let asm = compiler.asm.clone();
-                                match program {
-                                    Ok(_) => {
-                                        // println!("Before optimization");
-                                        // dis.dis_asm(asm.clone());
-                                        // println!();
-                                        // let mut optimizer = optimizer::new();
-                                        // let optimized = optimizer.Optimize(asm.clone());
-                                        //println!("After optimization: {}", optimizer.optimizations);
-                                        // dis.dis_asm(asm.clone());
-                                        //println!("{}", rhexdump::hexdump(&assembler.output));
-                                        let mut assembler = assembler::new(asm);
-                                        assembler.assemble();
-                                        vm.state.program(assembler.output)
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-                                match vm.run() {
-                                    Ok(()) => {
-                                        //dbg!(vm.state.stack);
-                                    }
-                                    Err(error) => {
-                                        error.show();
-                                        exit(1)
-                                    }
-                                }
-                            } else {
-                                println!("Error: No file path specified");
                             }
                         }
                         "dbg" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
+                                let lexer = match Lexer::new(&filepath) {
                                     Ok(lexer) => lexer,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
-                                        output
-                                    }
+
+                                let tokenlist = match lexer.tokenize() {
+                                    Ok(tokenlist) => tokenlist,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
@@ -332,7 +104,7 @@ fn main() {
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::list::pop);
 
-                                parser.input = lexer_output.clone();
+                                parser.input = tokenlist;
                                 match parser.parse() {
                                     Ok(()) => {
                                         //dbg!(parser.ast.clone());
@@ -380,20 +152,16 @@ fn main() {
                         }
                         "dis" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
+                                let lexer = match Lexer::new(&filepath) {
                                     Ok(lexer) => lexer,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
-                                        output
-                                    }
+
+                                let tokenlist = match lexer.tokenize() {
+                                    Ok(tokenlist) => tokenlist,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
@@ -465,7 +233,7 @@ fn main() {
                                 vm.native_functions
                                     .insert(vm.native_functions.len(), native::list::pop);
 
-                                parser.input = lexer_output.clone();
+                                parser.input = tokenlist;
                                 match parser.parse() {
                                     Ok(()) => {
                                         //dbg!(parser.ast.clone());
@@ -506,20 +274,16 @@ fn main() {
 
                         "compile" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
+                                let lexer = match Lexer::new(&filepath) {
                                     Ok(lexer) => lexer,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
-                                        output
-                                    }
+
+                                let tokenlist = match lexer.tokenize() {
+                                    Ok(tokenlist) => tokenlist,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
@@ -545,7 +309,7 @@ fn main() {
                                 compiler.native_functions.insert("len".to_string());
                                 vm.native_functions.insert(0, native::list::len);
 
-                                parser.input = lexer_output.clone();
+                                parser.input = tokenlist;
                                 match parser.parse() {
                                     Ok(()) => {
                                         //dbg!(parser.ast.clone());
@@ -617,7 +381,7 @@ fn main() {
                             if let Some(filepath) = std::env::args().nth(3) {
                                 let encoded = std::fs::read(filepath).unwrap();
                                 let program: Vec<u8> = bincode::deserialize(&encoded).unwrap();
-                                println!("{}", rhexdump::hexdump(&program.clone()));
+                                //println!("{}", rhexdump::hexdump(&program.clone()));
                                 let mut vm = vm::new();
                                 vm.native_functions.insert(0, native::list::len);
                                 vm.state.program(program);
@@ -645,21 +409,16 @@ fn main() {
                     Some(option) => match option.as_str() {
                         "run" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
+                                let lexer = match Lexer::new(&filepath) {
                                     Ok(lexer) => lexer,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
 
-                                        output
-                                    }
+                                let tokenlist = match lexer.tokenize() {
+                                    Ok(tokenlist) => tokenlist,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
@@ -667,7 +426,7 @@ fn main() {
                                 };
 
                                 let mut assembler = assembler::new_empty();
-                                assembler.assemble_from_nva(lexer_output.clone());
+                                assembler.assemble_from_nva(tokenlist);
                                 assembler.input = assembler.nva.clone();
                                 assembler.assemble();
 
@@ -692,21 +451,16 @@ fn main() {
                         }
                         "compile" => {
                             if let Some(filepath) = std::env::args().nth(3) {
-                                let mut lexer = match lexer::new(&filepath) {
+                                let lexer = match Lexer::new(&filepath) {
                                     Ok(lexer) => lexer,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
                                     }
                                 };
-                                let lexer_output = match lexer.tokenize() {
-                                    Ok(output) => {
-                                        // for t in output.clone().iter() {
-                                        //     println!("{:?}", t)
-                                        // }
 
-                                        output
-                                    }
+                                let tokenlist = match lexer.tokenize() {
+                                    Ok(tokenlist) => tokenlist,
                                     Err(error) => {
                                         error.show();
                                         exit(1)
@@ -714,7 +468,7 @@ fn main() {
                                 };
 
                                 let mut assembler = assembler::new_empty();
-                                assembler.assemble_from_nva(lexer_output.clone());
+                                assembler.assemble_from_nva(tokenlist);
                                 assembler.input = assembler.nva.clone();
                                 assembler.assemble();
                                 let encoded: Vec<u8> =

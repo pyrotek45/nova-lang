@@ -80,7 +80,7 @@ impl NovaError {
     pub fn show(&self) {
         match self.error {
             ErrorType::File => {
-                println!("File Error: {}", self.msg)
+                println!("{}: {}", "File Error".red(), self.msg)
             }
             ErrorType::Lexing => {
                 println!(

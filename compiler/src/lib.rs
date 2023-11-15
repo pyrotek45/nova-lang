@@ -4,7 +4,7 @@ use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};
 use common::tokens::TType;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Compiler {
     pub bindings: common::table::Table<String>,
     pub global: common::table::Table<String>,
@@ -52,7 +52,7 @@ impl Compiler {
         alloc: bool,
         global: bool,
         function: bool,
-    ) -> Result<Vec<u8>, NovaError> {
+    ) -> Result<Vec<Asm>, NovaError> {
         self.filepath = filepath;
         for statements in input.program.iter() {
             match statements {
@@ -228,7 +228,7 @@ impl Compiler {
         // self.output.push(Code::RET);
         // self.output.push(0);
         self.asm.push(Asm::RET(false));
-        Ok(self.output.to_owned())
+        Ok(self.asm.to_owned())
     }
 
     pub fn getref_expr(&mut self, expr: Expr) -> Result<(), NovaError> {
