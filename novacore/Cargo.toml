@@ -1,0 +1,17 @@
+[package]
+name = "novacore"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "../common" }
+lexer = { path = "../lexer" }
+parser ={ path = "../parser" }
+vm ={ path = "../vm" }
+compiler ={ path = "../compiler" }
+disassembler ={ path = "../disassembler" }
+assembler ={ path = "../assembler" }
+optimizer ={ path = "../optimizer" }
+native ={ path = "../native" }
