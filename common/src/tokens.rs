@@ -43,7 +43,6 @@ pub enum Operator {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TType {
-    EmptyList,
     None,
     Any,
     Int,
@@ -99,7 +98,6 @@ pub fn type_to_string(ttype: &TType) -> String {
         TType::Generic(name) => format!("Generic_{}", name),
         TType::None => "None".to_string(),
         TType::Option(name) => format!("Option_{}", type_to_string(name)),
-        TType::EmptyList => format!("Empty_list"),
         TType::Char => "Char".to_string(),
     }
 }

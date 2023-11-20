@@ -246,7 +246,7 @@ impl Parser {
                     }
                 }
                 (TType::List(inner1), TType::List(inner2)) => {
-                    if **inner1 == TType::EmptyList || **inner2 == TType::EmptyList {
+                    if **inner1 == TType::None || **inner2 == TType::None {
                         continue;
                     } else {
                         self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
@@ -1220,7 +1220,7 @@ impl Parser {
             }
             Token::Symbol('[', _) => {
                 let expr_list = self.expr_list()?;
-                let mut ttype = TType::EmptyList;
+                let mut ttype = TType::None;
                 if !expr_list.is_empty() {
                     ttype = expr_list[0].get_type()
                 }
@@ -1594,8 +1594,8 @@ impl Parser {
                         format!(
                             "Type error, cannot apply operation {:?} to {:?} and {:?}",
                             operation.clone(),
-                            left.clone(),
-                            right.clone()
+                            left.get_type(),
+                            right.get_type()
                         ),
                         format!("type mismatch"),
                         line,
@@ -2027,15 +2027,24 @@ impl Parser {
             self.modules.insert(identifier.clone());
             global = true
         }
-        self.consume_operator(Operator::Colon)?;
-        let ttype = self.ttype()?;
-        self.consume_operator(Operator::Assignment)?;
-        let expr = self.expr()?;
-        self.check_and_map_types(
-            &vec![ttype.clone()],
-            &vec![expr.get_type()],
-            &mut HashMap::default(),
-        )?;
+        let mut ttype = TType::None;
+        let mut expr = Expr::None;
+        if self.current_token().is_op(Operator::Colon) {
+            self.consume_operator(Operator::Colon)?;
+            ttype = self.ttype()?;
+            self.consume_operator(Operator::Assignment)?;
+            expr = self.expr()?;
+            self.check_and_map_types(
+                &vec![ttype.clone()],
+                &vec![expr.get_type()],
+                &mut HashMap::default(),
+            )?;
+        } else {
+            self.consume_operator(Operator::Assignment)?;
+            expr = self.expr()?;
+            ttype = expr.get_type();
+        }
+
         // cant assing a void
         if expr.get_type() == TType::Void {
             return Err(common::error::parser_error(
