@@ -1768,26 +1768,26 @@ impl Parser {
         self.advance();
         let file = ifilepath.clone();
 
-        let newfilepath: String = match extract_current_directory(&self.filepath) {
-            Some(mut current_dir) => {
-                current_dir.push_str(&file);
-                current_dir
-            }
-            _ => file.clone(),
-        };
-
-        let tokenlist = Lexer::new(&newfilepath)?.tokenize()?;
+        // let newfilepath: String = match extract_current_directory(&self.filepath) {
+        //     Some(mut current_dir) => {
+        //         current_dir.push_str(&file);
+        //         current_dir
+        //     }
+        //     _ => file.clone(),
+        // };
+        // dbg!(&newfilepath);
+        let tokenlist = Lexer::new(&ifilepath)?.tokenize()?;
 
         let mut iparser = self.clone();
         iparser.index = 0;
-        iparser.filepath = newfilepath.clone();
+        iparser.filepath = ifilepath.clone();
         iparser.input = tokenlist;
         iparser.parse()?;
         self.environment = iparser.environment.clone();
         self.modules = iparser.modules;
         Ok(Some(Statement::Block(
             iparser.ast.program.clone(),
-            newfilepath,
+            ifilepath,
         )))
     }
 

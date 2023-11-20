@@ -1,5 +1,5 @@
 // Importing from another file
-using "../std/Io.nv"
+using "std/Io.nv"
 
 // Type declaratIon
 struct Person {
@@ -57,7 +57,7 @@ module Zed {
 Zed::test()
 
 // Using iterators
-using "../std/Iter.nv"
+using "std/Iter.nv"
 
 let myIter : () -> ?Int = [1,2,3,4,5].Iter::create()
     .Iter::map(fn(x:Int)->Int{return x * x})

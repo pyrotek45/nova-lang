@@ -4,7 +4,7 @@ use common::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-enum ParsingState {
+enum LexerState {
     Token,
     Char,
     String,
@@ -20,7 +20,7 @@ pub struct Lexer {
     source: String,
     tokens: TokenList,
     buffer: String,
-    parsing: ParsingState,
+    parsing: LexerState,
 }
 
 impl Default for Lexer {
@@ -32,7 +32,7 @@ impl Default for Lexer {
             source: Default::default(),
             tokens: Default::default(),
             buffer: Default::default(),
-            parsing: ParsingState::Token,
+            parsing: LexerState::Token,
         }
     }
 }
@@ -51,7 +51,7 @@ impl Lexer {
             source,
             tokens: Default::default(),
             buffer: Default::default(),
-            parsing: ParsingState::Token,
+            parsing: LexerState::Token,
         })
     }
 
@@ -59,7 +59,7 @@ impl Lexer {
         if !self.buffer.is_empty() {
             if let Ok(v) = self.buffer.parse() {
                 return Some(if self.buffer.contains('.') {
-                    self.parsing = ParsingState::Token;
+                    self.parsing = LexerState::Token;
                     Token::Float(
                         v,
                         Position {
@@ -84,7 +84,7 @@ impl Lexer {
                 let split = self.buffer.split('.');
                 for id in split {
                     if let Ok(v) = id.parse::<i64>() {
-                        self.parsing = ParsingState::Token;
+                        self.parsing = LexerState::Token;
                         self.tokens.push(Token::Integer(
                             v as i64,
                             Position {
@@ -224,18 +224,18 @@ impl Lexer {
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
-            if self.parsing == ParsingState::Comment {
+            if self.parsing == LexerState::Comment {
                 if c != '\n' {
                     self.row += 1;
                     continue;
                 } else {
-                    self.parsing = ParsingState::Token;
+                    self.parsing = LexerState::Token;
                     self.line += 1;
                     self.row = 0;
                     continue;
                 }
             }
-            if self.parsing == ParsingState::String {
+            if self.parsing == LexerState::String {
                 if c == '\\' {
                     match chars.peek() {
                         Some('n') => {
@@ -295,7 +295,7 @@ impl Lexer {
                     self.buffer.push(c);
                     continue;
                 } else {
-                    self.parsing = ParsingState::Token;
+                    self.parsing = LexerState::Token;
                     self.tokens.push(Token::String(
                         self.buffer.clone(),
                         Position {
@@ -309,12 +309,12 @@ impl Lexer {
                     continue;
                 }
             }
-            if self.parsing == ParsingState::Char {
+            if self.parsing == LexerState::Char {
                 if c != '\'' {
                     self.buffer.push(c);
                     continue;
                 } else {
-                    self.parsing = ParsingState::Token;
+                    self.parsing = LexerState::Token;
                     if self.buffer.len() > 1 {
                         return Err(common::error::lexer_error(
                             "Char cannot contain more than one character".to_string(),
@@ -341,11 +341,11 @@ impl Lexer {
             match c {
                 '\'' => {
                     self.row += 1;
-                    self.parsing = ParsingState::Char;
+                    self.parsing = LexerState::Char;
                     self.check_token()?;
                 }
                 '"' => {
-                    self.parsing = ParsingState::String;
+                    self.parsing = LexerState::String;
                     self.check_token()?;
                 }
                 '\n' => {
@@ -358,10 +358,10 @@ impl Lexer {
                     self.row = 0;
                 }
                 '.' => {
-                    if self.parsing != ParsingState::Float {
+                    if self.parsing != LexerState::Float {
                         if let Ok(v) = self.buffer.parse() {
                             let _n: i64 = v;
-                            self.parsing = ParsingState::Float;
+                            self.parsing = LexerState::Float;
                             self.buffer.push(c);
                         } else {
                             self.check_token()?;
@@ -538,7 +538,7 @@ impl Lexer {
                             if let Some('/') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.parsing = ParsingState::Comment;
+                                self.parsing = LexerState::Comment;
                             } else {
                                 self.tokens.push(Token::Operator(
                                     Operator::Division,
@@ -658,11 +658,13 @@ impl Lexer {
             }
             self.row += 1;
         }
+
         self.check_token()?;
         self.tokens.push(Token::EOF(Position {
             line: self.line,
             row: self.row,
         }));
+        
         Ok(self.tokens)
     }
 }
