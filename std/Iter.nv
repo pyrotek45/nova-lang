@@ -1,4 +1,6 @@
-using "types.nv"
+struct Int_box {
+    value: Int
+}
 
 struct Iter {
     create: ([$a]) -> () -> ?$a,
