@@ -4,7 +4,7 @@ struct Person {
     age: Int,
 }
 
-// hello world
+// Hello world
 println("hello world!")
 
 // Creating instance of type
@@ -27,9 +27,17 @@ for i = 0; i < 10; i += 1 {
     println(i)
 }
 
+using "../std/list.nv"
+
 // Array
-let arr  = [1,2,3]
+let arr = [1,2,3]
 println(arr)
+
+let arr2 = []: Int.list::fill(10,5)
+arr2.println()
+
+let arr3 = list::initList(10,5)
+arr3.println()
 
 arr[1] = 4
 println(arr)
@@ -44,13 +52,13 @@ struct Zed {
 }
 
 // Creating an instance from a type
-let zed =  Zed {
+let zed = Zed {
     test = fn() {
         print("wow\n")
     }
 }
 
-// now we can access its namespace and call functions directly
+// Now we can access its namespace and call functions directly
 zed::test()
 
 // Using iterators
@@ -75,7 +83,13 @@ let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
 let myOtherFunc = myMul.function
 let simpleSquare = fn(x: Int) -> Int {return x * x}
 
-(myMul.function)(4,7).println()
+// Calling function pointer from a struct
+(myMul.function)(4,99).println()
+myMul::function(4,99).println()
+
+// Support for most escape chars
+print("hello again!\n")
+
 myOtherFunc(4,7).println()
 
 let myIterTwo = [1,2,3,4,5]
