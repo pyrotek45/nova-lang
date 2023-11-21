@@ -84,9 +84,11 @@ impl NovaError {
             }
             ErrorType::Lexing => {
                 println!(
-                    "{} in: {}",
+                    "{} in: {}:{}:{}",
                     "Lexing Error".bright_red(),
-                    self.filepath.bright_red()
+                    self.filepath,
+                    self.line,
+                    self.row
                 );
                 print_line(
                     self.line,
@@ -98,9 +100,11 @@ impl NovaError {
             }
             ErrorType::Parsing => {
                 println!(
-                    "{} in: {}",
+                    "{} in: {}:{}:{}",
                     "Parsing Error".bright_red(),
-                    self.filepath.bright_red()
+                    self.filepath,
+                    self.line,
+                    self.row
                 );
                 print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
                 if let Some(extra) = &self.extra {
@@ -115,9 +119,11 @@ impl NovaError {
             }
             ErrorType::Compiler => {
                 println!(
-                    "{} in: {}",
-                    "Compiler Error".bright_red(),
-                    self.filepath.bright_red()
+                    "{} in: {}:{}:{}",
+                    "Compiling Error".bright_red(),
+                    self.filepath,
+                    self.line,
+                    self.row
                 );
                 print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
                 println!("{}: {}", "Note".bright_yellow(), self.note.bright_yellow());
