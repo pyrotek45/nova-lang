@@ -38,7 +38,7 @@ arr2.println()
 
 let arr3 = list::initList(10,5)
 arr3.println()
-
+ 
 arr[1] = 4
 println(arr)
 
