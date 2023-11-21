@@ -311,11 +311,11 @@ impl Token {
         }
     }
 
-    pub fn get_operator(&self) -> Operator {
+    pub fn get_operator(&self) -> Option<Operator> {
         if let Token::Operator(op, _) = self {
-            op.clone()
+            Some(op.clone())
         } else {
-            todo!()
+            None    
         }
     }
 }

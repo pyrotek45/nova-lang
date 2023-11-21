@@ -201,12 +201,11 @@ impl Lexer {
         None
     }
 
-    fn check_token(&mut self) -> Result<(), NovaError> {
+    fn check_token(&mut self) {
         if let Some(token) = self.check_token_buffer() {
             self.tokens.push(token);
         }
         self.buffer.clear();
-        Ok(())
     }
 
     pub fn tokenize(mut self) -> Result<TokenList, NovaError> {
@@ -342,14 +341,14 @@ impl Lexer {
                 '\'' => {
                     self.row += 1;
                     self.parsing = LexerState::Char;
-                    self.check_token()?;
+                    self.check_token();
                 }
                 '"' => {
                     self.parsing = LexerState::String;
-                    self.check_token()?;
+                    self.check_token();
                 }
                 '\n' => {
-                    self.check_token()?;
+                    self.check_token();
                     self.tokens.push(Token::NewLine(Position {
                         line: self.line,
                         row: self.row,
@@ -364,7 +363,7 @@ impl Lexer {
                             self.parsing = LexerState::Float;
                             self.buffer.push(c);
                         } else {
-                            self.check_token()?;
+                            self.check_token();
                             match self.tokens.last() {
                                 Some(Token::NewLine(_)) => {
                                     self.tokens.pop();
@@ -380,7 +379,7 @@ impl Lexer {
                             ));
                         }
                     } else {
-                        self.check_token()?;
+                        self.check_token();
                         match self.tokens.last() {
                             Some(Token::NewLine(_)) => {
                                 self.tokens.pop();
@@ -400,10 +399,10 @@ impl Lexer {
                     self.buffer.push(c);
                 }
                 ' ' => {
-                    self.check_token()?;
+                    self.check_token();
                 }
                 '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' | '&' | '|' => {
-                    self.check_token()?;
+                    self.check_token();
                     match c {
                         ':' => {
                             if let Some(':') = chars.peek() {
@@ -637,7 +636,7 @@ impl Lexer {
                     }
                 }
                 ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' | '?' | '#' => {
-                    self.check_token()?;
+                    self.check_token();
                     self.tokens.push(Token::Symbol(
                         c,
                         Position {
@@ -659,12 +658,12 @@ impl Lexer {
             self.row += 1;
         }
 
-        self.check_token()?;
+        self.check_token();
         self.tokens.push(Token::EOF(Position {
             line: self.line,
             row: self.row,
         }));
-        
+
         Ok(self.tokens)
     }
 }
