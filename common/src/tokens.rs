@@ -315,7 +315,7 @@ impl Token {
         if let Token::Operator(op, _) = self {
             Some(op.clone())
         } else {
-            None    
+            None
         }
     }
 }
