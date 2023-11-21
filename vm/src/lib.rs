@@ -1502,7 +1502,9 @@ impl Vm {
                                         self.state.heap[index as usize] = Heap::ListAddress(v)
                                     }
                                     VmData::None => todo!(),
-                                    VmData::String(_) => todo!(),
+                                    VmData::String(v) => {
+                                        self.state.heap[index as usize] = Heap::StringAddress(v)
+                                    }
                                     VmData::Closure(_) => todo!(),
                                     VmData::StackAddress(_) => todo!(),
                                     VmData::Struct(_) => todo!(),
