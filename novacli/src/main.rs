@@ -1,6 +1,6 @@
-use std::{process::exit, time::Instant};
 use common::tokens::TType;
 use lexer::Lexer;
+use std::{process::exit, time::Instant};
 
 fn main() {
     match std::env::args().nth(1) {

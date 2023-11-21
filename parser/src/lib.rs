@@ -219,10 +219,7 @@ impl Parser {
                 (TType::Generic(name1), _) => {
                     if t2 == &TType::None {
                         return Err(common::error::parser_error(
-                            format!(
-                                "Type error, expecting some value, but found {:?}",
-                                t2
-                            ),
+                            format!("Type error, expecting some value, but found {:?}", t2),
                             format!("Cannot bind to a None value"),
                             self.current_token().line(),
                             self.current_token().row(),
@@ -260,7 +257,7 @@ impl Parser {
                     self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Option(inner1), TType::Option(inner2)) => {
-                    if**inner1 == TType::None {
+                    if **inner1 == TType::None {
                         continue;
                     } else {
                         self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
@@ -1255,7 +1252,8 @@ impl Parser {
                 match self.current_token() {
                     Token::Operator(Operator::Colon, _) => {
                         self.consume_operator(Operator::Colon)?;
-                        ttype = self.ttype()?;}
+                        ttype = self.ttype()?;
+                    }
                     _ => {}
                 }
                 if ttype == TType::None {
@@ -1519,7 +1517,6 @@ impl Parser {
                 }
                 left = Expr::Binop(TType::Void, operation, Box::new(left), Box::new(right));
             }
-            
         }
         Ok(left)
     }
@@ -1530,7 +1527,7 @@ impl Parser {
             if let Some(operation) = self.current_token().get_operator() {
                 self.advance();
                 let right = self.mid_expr()?;
-    
+
                 match operation {
                     Operator::And | Operator::Or => {
                         if (left.get_type() != TType::Bool) || (right.get_type() != TType::Bool) {
@@ -1570,7 +1567,6 @@ impl Parser {
                     }
                 }
             }
-           
         }
         Ok(left)
     }
@@ -1581,10 +1577,10 @@ impl Parser {
             if let Some(operation) = self.current_token().get_operator() {
                 let line = self.current_token().line();
                 let row = self.current_token().row();
-    
+
                 self.advance();
                 let right = self.term()?;
-    
+
                 match (left.get_type(), right.get_type()) {
                     (TType::Int, TType::Int)
                     | (TType::Float, TType::Float)
@@ -1613,7 +1609,6 @@ impl Parser {
                     }
                 }
             }
-            
         }
         Ok(left)
     }
@@ -1666,7 +1661,7 @@ impl Parser {
                 let mut inner = TType::None;
                 if !self.current_token().is_symbol(']') {
                     inner = self.ttype()?;
-                } 
+                }
                 self.consume_symbol(']')?;
                 Ok(TType::List(Box::new(inner)))
             }
@@ -1974,11 +1969,8 @@ impl Parser {
             self.consume_operator(Operator::Assignment)?;
             expr = self.expr()?;
             self.check_and_map_types(
-
                 &vec![expr.get_type()],
                 &vec![ttype.clone()],
-
-
                 &mut HashMap::default(),
             )?;
         } else {

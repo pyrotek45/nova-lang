@@ -38,7 +38,6 @@ impl Default for Lexer {
 }
 
 impl Lexer {
-    
     pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
         let source = match std::fs::read_to_string(filepath) {
             Ok(content) => content,
