@@ -1,4 +1,4 @@
-// Type declaratIon
+// Type declaration
 struct Person {
     name: String,
     age: Int,
@@ -17,7 +17,7 @@ fn display(self: Person) {
     println(self.age)
 }
 
-// Using functIon
+// Using function
 person.display()
 display(person2)
 
@@ -43,23 +43,25 @@ struct Zed {
     test: ()
 }
 
-// Creating a module from a type
+// Creating an instance from a type
 let zed =  Zed {
     test = fn() {
         print("wow\n")
     }
 }
 
-// now we can access its namespace 
+// now we can access its namespace and call functions directly
 zed::test()
 
 // Using iterators
 using "../std/iter.nv"
 
-let myIter = [1,2,3,4,5].iter::create()
+let myIter = [1,2,3,4,5]
+    .iter::create()
     .iter::map(fn(x:Int)->Int{return x * x})
 
-myIter.iter::printIter()
+myIter
+    .iter::printIter()
 
 // Function pointers
 struct SomeFunction {
@@ -78,6 +80,7 @@ myOtherFunc(4,7).println()
 
 let myIterTwo = [1,2,3,4,5]
     .iter::create()
+    .iter::map(simpleSquare)
     .iter::map(simpleSquare)
     .iter::collect()
 
