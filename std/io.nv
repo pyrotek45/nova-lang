@@ -1,13 +1,8 @@
 struct Io {
-    println : (Any),
     prompt : (String) -> String,
 }
 
-module Io {
-    println = fn(input: Any) {
-        print(input)
-        print("\n")
-    },
+let io = Io {
     prompt = fn(input: String) -> String {
         print(input + "\n")
         return readline()

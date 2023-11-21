@@ -9,7 +9,7 @@ struct Iter {
     collect: (() -> ?$a) -> [$a]
 }
 
-module Iter {
+let iter = Iter {
     create = fn(input:[$a]) -> () -> ?$a {
         let index : Int_box = Int_box {value = 0}    
         return fn() -> ?$a {
@@ -42,7 +42,7 @@ module Iter {
     },
     collect = fn(it: () -> ?$a) -> [$a] {
         let t: ?$a = it()
-        let list: [$a] = []
+        let list = []:$a
         while t.isSome() {
             list.push(t.unwrap())
             t = it()

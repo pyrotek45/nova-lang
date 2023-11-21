@@ -219,6 +219,19 @@ impl Parser {
                     }
                 }
                 (TType::Generic(name1), _) => {
+                    if t2 == &TType::None {
+                        return Err(common::error::parser_error(
+                            format!(
+                                "Type error, expecting some value, but found {:?}",
+                                t2
+                            ),
+                            format!("Cannot bind to a None value"),
+                            self.current_token().line(),
+                            self.current_token().row(),
+                            self.filepath.clone(),
+                            None,
+                        ));
+                    }
                     if let Some(mapped_type) = type_map.clone().get(name1) {
                         if mapped_type != t2 {
                             return Err(common::error::parser_error(
@@ -246,14 +259,10 @@ impl Parser {
                     }
                 }
                 (TType::List(inner1), TType::List(inner2)) => {
-                    if **inner1 == TType::None || **inner2 == TType::None {
-                        continue;
-                    } else {
-                        self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
-                    }
+                    self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Option(inner1), TType::Option(inner2)) => {
-                    if **inner1 == TType::None || **inner2 == TType::None {
+                    if**inner1 == TType::None {
                         continue;
                     } else {
                         self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
@@ -341,6 +350,37 @@ impl Parser {
             },
             _ => Ok(None),
         }
+    }
+
+    fn list_constructor(&mut self) -> Result<Vec<Expr>, NovaError> {
+        let mut exprs = vec![];
+        self.consume_symbol('[')?;
+        self.eat_if_newline();
+        if !self.current_token().is_symbol(']') {
+            exprs.push(self.expr()?);
+        }
+        while self.current_token().is_symbol(',') || self.current_token().is_newline() {
+            self.eat_if_newline();
+            if self.current_token().is_symbol(']') {
+                break;
+            }
+            self.advance();
+            self.eat_if_newline();
+            if self.current_token().is_symbol(']') {
+                break;
+            }
+            let e = self.expr()?;
+            if e.get_type() != TType::Void {
+                exprs.push(e);
+            } else {
+                return Err(self.generate_error(
+                    format!("cannot insert a void expression"),
+                    format!("List expressions must not be void"),
+                ));
+            }
+        }
+        self.consume_symbol(']')?;
+        Ok(exprs)
     }
 
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
@@ -893,16 +933,16 @@ impl Parser {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
             Token::Operator(Operator::DoubleColon, _) => {
-                if !self.modules.has(&identifier) {
-                    return Err(common::error::parser_error(
-                        format!("{identifier} is not a module"),
-                        format!(""),
-                        self.current_token().line(),
-                        self.current_token().row(),
-                        self.filepath.clone(),
-                        None,
-                    ));
-                }
+                // if !self.modules.has(&identifier) {
+                //     return Err(common::error::parser_error(
+                //         format!("{identifier} is not a module"),
+                //         format!(""),
+                //         self.current_token().line(),
+                //         self.current_token().row(),
+                //         self.filepath.clone(),
+                //         None,
+                //     ));
+                // }
                 let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
                     self.consume_operator(Operator::DoubleColon)?;
@@ -1232,6 +1272,18 @@ impl Parser {
                         ));
                     }
                 }
+                match self.current_token() {
+                    Token::Operator(Operator::Colon, _) => {
+                        self.consume_operator(Operator::Colon)?;
+                        ttype = self.ttype()?;}
+                    _ => {}
+                }
+                if ttype == TType::None {
+                    return Err(self.generate_error(
+                        format!("List must have a type"),
+                        format!("use `[]: type` to annotate an empty list"),
+                    ));
+                }
                 left = Expr::ListConstructor(TType::List(Box::new(ttype)), expr_list)
             }
             Token::Symbol('(', _) => {
@@ -1339,36 +1391,36 @@ impl Parser {
             }
             _ => left = Expr::None,
         }
-        match self.current_token() {
-            Token::Operator(Operator::DoubleColon, _) => {
-                match left.get_type().custom_to_string() {
-                    Some(name) => {
-                        if !self.modules.has(&name) {
-                            return Err(common::error::parser_error(
-                                format!("{name} is not a module"),
-                                format!(""),
-                                self.current_token().line(),
-                                self.current_token().row(),
-                                self.filepath.clone(),
-                                None,
-                            ));
-                        }
-                    }
-                    None => {
-                        dbg!(&left);
-                        return Err(common::error::parser_error(
-                            format!("type {:?} is not a valid module", &left.get_type()),
-                            format!(""),
-                            self.current_token().line(),
-                            self.current_token().row(),
-                            self.filepath.clone(),
-                            None,
-                        ));
-                    }
-                };
-            }
-            _ => {}
-        }
+        // match self.current_token() {
+        //     Token::Operator(Operator::DoubleColon, _) => {
+        //         match left.get_type().custom_to_string() {
+        //             Some(name) => {
+        //                 // if !self.modules.has(&name) {
+        //                 //     return Err(common::error::parser_error(
+        //                 //         format!("{name} is not a module"),
+        //                 //         format!(""),
+        //                 //         self.current_token().line(),
+        //                 //         self.current_token().row(),
+        //                 //         self.filepath.clone(),
+        //                 //         None,
+        //                 //     ));
+        //                 // }
+        //             }
+        //             None => {
+        //                 dbg!(&left);
+        //                 return Err(common::error::parser_error(
+        //                     format!("type {:?} is not a valid module", &left.get_type()),
+        //                     format!(""),
+        //                     self.current_token().line(),
+        //                     self.current_token().row(),
+        //                     self.filepath.clone(),
+        //                     None,
+        //                 ));
+        //             }
+        //         };
+        //     }
+        //     _ => {}
+        // }
         loop {
             match self.current_token() {
                 Token::Operator(Operator::DoubleColon, _) => {
@@ -1425,35 +1477,36 @@ impl Parser {
         let line = self.current_token().line();
         let row = self.current_token().row();
         while self.current_token().is_multi_op() {
-            let operation = self.current_token().get_operator();
-            self.advance();
-            let right = self.factor()?;
-            if left.clone().get_type() == right.clone().get_type()
-                && (left.clone().get_type() == TType::Int
-                    || left.clone().get_type() == TType::Float)
-                && (right.clone().get_type() == TType::Int
-                    || right.clone().get_type() == TType::Float)
-            {
-                left = Expr::Binop(
-                    left.clone().get_type(),
-                    operation,
-                    Box::new(left),
-                    Box::new(right),
-                );
-            } else {
-                return Err(common::error::parser_error(
-                    format!(
-                        "Type error, cannot apply operation {:?} to {:?} and {:?}",
-                        operation.clone(),
-                        left.clone(),
-                        right.clone()
-                    ),
-                    format!("type mismatch"),
-                    line,
-                    row,
-                    self.filepath.clone(),
-                    None,
-                ));
+            if let Some(operation) = self.current_token().get_operator() {
+                self.advance();
+                let right = self.factor()?;
+                if left.clone().get_type() == right.clone().get_type()
+                    && (left.clone().get_type() == TType::Int
+                        || left.clone().get_type() == TType::Float)
+                    && (right.clone().get_type() == TType::Int
+                        || right.clone().get_type() == TType::Float)
+                {
+                    left = Expr::Binop(
+                        left.clone().get_type(),
+                        operation,
+                        Box::new(left),
+                        Box::new(right),
+                    );
+                } else {
+                    return Err(common::error::parser_error(
+                        format!(
+                            "Type error, cannot apply operation {:?} to {:?} and {:?}",
+                            operation.clone(),
+                            left.clone(),
+                            right.clone()
+                        ),
+                        format!("type mismatch"),
+                        line,
+                        row,
+                        self.filepath.clone(),
+                        None,
+                    ));
+                }
             }
         }
         Ok(left)
@@ -1464,20 +1517,48 @@ impl Parser {
         while self.current_token().is_assign() {
             let oline = self.current_token().line();
             let orow = self.current_token().row();
-            let operation = self.current_token().get_operator();
-            self.advance();
-            let right = self.top_expr()?;
-            match left.clone() {
-                Expr::Literal(t, v) => match v {
-                    Atom::Id(_) => {
-                        if t != right.get_type() {
+            if let Some(operation) = self.current_token().get_operator() {
+                self.advance();
+                let right = self.top_expr()?;
+                match left.clone() {
+                    Expr::Literal(t, v) => match v {
+                        Atom::Id(_) => {
+                            if t != right.get_type() {
+                                return Err(common::error::parser_error(
+                                    format!(
+                                        "Type error, cannot assing {:?} to {:?}",
+                                        right.clone().get_type(),
+                                        left.clone().get_type(),
+                                    ),
+                                    format!("Assingment error"),
+                                    oline,
+                                    orow,
+                                    self.filepath.clone(),
+                                    None,
+                                ));
+                            }
+                        }
+                        _ => {
+                            return Err(common::error::parser_error(
+                                format!("cannot assign {:?} to {:?}", right.clone(), left.clone(),),
+                                format!("Cannot assign a value to a literal value"),
+                                oline,
+                                orow,
+                                self.filepath.clone(),
+                                None,
+                            ));
+                        }
+                    },
+                    _ => {
+                        if &right.get_type() == &left.get_type() {
+                        } else {
                             return Err(common::error::parser_error(
                                 format!(
-                                    "Type error, cannot assing {:?} to {:?}",
+                                    "cannot assing {:?} to {:?}",
                                     right.clone().get_type(),
                                     left.clone().get_type(),
                                 ),
-                                format!("Assingment error"),
+                                format!("type mismatch"),
                                 oline,
                                 orow,
                                 self.filepath.clone(),
@@ -1485,36 +1566,10 @@ impl Parser {
                             ));
                         }
                     }
-                    _ => {
-                        return Err(common::error::parser_error(
-                            format!("cannot assign {:?} to {:?}", right.clone(), left.clone(),),
-                            format!("Cannot assign a value to a literal value"),
-                            oline,
-                            orow,
-                            self.filepath.clone(),
-                            None,
-                        ));
-                    }
-                },
-                _ => {
-                    if &right.get_type() == &left.get_type() {
-                    } else {
-                        return Err(common::error::parser_error(
-                            format!(
-                                "cannot assing {:?} to {:?}",
-                                right.clone().get_type(),
-                                left.clone().get_type(),
-                            ),
-                            format!("type mismatch"),
-                            oline,
-                            orow,
-                            self.filepath.clone(),
-                            None,
-                        ));
-                    }
                 }
+                left = Expr::Binop(TType::Void, operation, Box::new(left), Box::new(right));
             }
-            left = Expr::Binop(TType::Void, operation, Box::new(left), Box::new(right));
+            
         }
         Ok(left)
     }
@@ -1522,34 +1577,15 @@ impl Parser {
     fn top_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left = self.mid_expr()?;
         while self.current_token().is_relop() {
-            let operation = self.current_token().get_operator();
-            self.advance();
-            let right = self.mid_expr()?;
-
-            match operation {
-                Operator::And | Operator::Or => {
-                    if (left.get_type() != TType::Bool) || (right.get_type() != TType::Bool) {
-                        return Err(self.generate_error(
-                            format!("Logical operation expects bool"),
-                            format!(
-                                "got {:?} {:?}",
-                                left.get_type().clone(),
-                                right.get_type().clone()
-                            ),
-                        ));
-                    }
-                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
-                }
-                Operator::GreaterThan
-                | Operator::GtrOrEqu
-                | Operator::LssOrEqu
-                | Operator::LessThan => {
-                    match (left.get_type(), right.get_type()) {
-                        (TType::Int, TType::Int) => {}
-                        (TType::Float, TType::Float) => {}
-                        _ => {
+            if let Some(operation) = self.current_token().get_operator() {
+                self.advance();
+                let right = self.mid_expr()?;
+    
+                match operation {
+                    Operator::And | Operator::Or => {
+                        if (left.get_type() != TType::Bool) || (right.get_type() != TType::Bool) {
                             return Err(self.generate_error(
-                                format!("Comparison operation expects int or float"),
+                                format!("Logical operation expects bool"),
                                 format!(
                                     "got {:?} {:?}",
                                     left.get_type().clone(),
@@ -1557,13 +1593,34 @@ impl Parser {
                                 ),
                             ));
                         }
+                        left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
                     }
-                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
-                }
-                _ => {
-                    left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                    Operator::GreaterThan
+                    | Operator::GtrOrEqu
+                    | Operator::LssOrEqu
+                    | Operator::LessThan => {
+                        match (left.get_type(), right.get_type()) {
+                            (TType::Int, TType::Int) => {}
+                            (TType::Float, TType::Float) => {}
+                            _ => {
+                                return Err(self.generate_error(
+                                    format!("Comparison operation expects int or float"),
+                                    format!(
+                                        "got {:?} {:?}",
+                                        left.get_type().clone(),
+                                        right.get_type().clone()
+                                    ),
+                                ));
+                            }
+                        }
+                        left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                    }
+                    _ => {
+                        left = Expr::Binop(TType::Bool, operation, Box::new(left), Box::new(right));
+                    }
                 }
             }
+           
         }
         Ok(left)
     }
@@ -1571,40 +1628,42 @@ impl Parser {
     fn mid_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left = self.term()?;
         while self.current_token().is_adding_op() {
-            let operation = self.current_token().get_operator();
-            let line = self.current_token().line();
-            let row = self.current_token().row();
-
-            self.advance();
-            let right = self.term()?;
-
-            match (left.get_type(), right.get_type()) {
-                (TType::Int, TType::Int)
-                | (TType::Float, TType::Float)
-                | (TType::String, TType::String) => {
-                    left = Expr::Binop(
-                        left.clone().get_type(),
-                        operation,
-                        Box::new(left),
-                        Box::new(right),
-                    );
-                }
-                (_, _) => {
-                    return Err(common::error::parser_error(
-                        format!(
-                            "Type error, cannot apply operation {:?} to {:?} and {:?}",
-                            operation.clone(),
-                            left.get_type(),
-                            right.get_type()
-                        ),
-                        format!("type mismatch"),
-                        line,
-                        row,
-                        self.filepath.clone(),
-                        None,
-                    ));
+            if let Some(operation) = self.current_token().get_operator() {
+                let line = self.current_token().line();
+                let row = self.current_token().row();
+    
+                self.advance();
+                let right = self.term()?;
+    
+                match (left.get_type(), right.get_type()) {
+                    (TType::Int, TType::Int)
+                    | (TType::Float, TType::Float)
+                    | (TType::String, TType::String) => {
+                        left = Expr::Binop(
+                            left.clone().get_type(),
+                            operation,
+                            Box::new(left),
+                            Box::new(right),
+                        );
+                    }
+                    (_, _) => {
+                        return Err(common::error::parser_error(
+                            format!(
+                                "Type error, cannot apply operation {:?} to {:?} and {:?}",
+                                operation.clone(),
+                                left.get_type(),
+                                right.get_type()
+                            ),
+                            format!("type mismatch"),
+                            line,
+                            row,
+                            self.filepath.clone(),
+                            None,
+                        ));
+                    }
                 }
             }
+            
         }
         Ok(left)
     }
@@ -1654,7 +1713,10 @@ impl Parser {
             }
             Token::Symbol('[', _) => {
                 self.consume_symbol('[')?;
-                let inner = self.ttype()?;
+                let mut inner = TType::None;
+                if !self.current_token().is_symbol(']') {
+                    inner = self.ttype()?;
+                } 
                 self.consume_symbol(']')?;
                 Ok(TType::List(Box::new(inner)))
             }
@@ -1758,7 +1820,6 @@ impl Parser {
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("using"))?;
-
         let ifilepath = match self.current_token() {
             Token::String(filepath, _) => filepath,
             _ => {
@@ -1768,26 +1829,25 @@ impl Parser {
         self.advance();
         let file = ifilepath.clone();
 
-        // let newfilepath: String = match extract_current_directory(&self.filepath) {
-        //     Some(mut current_dir) => {
-        //         current_dir.push_str(&file);
-        //         current_dir
-        //     }
-        //     _ => file.clone(),
-        // };
-        // dbg!(&newfilepath);
-        let tokenlist = Lexer::new(&ifilepath)?.tokenize()?;
+        let newfilepath: String = match extract_current_directory(&self.filepath) {
+            Some(mut current_dir) => {
+                current_dir.push_str(&file);
+                current_dir
+            }
+            _ => file.clone(),
+        };
+        let tokenlist = Lexer::new(&newfilepath)?.tokenize()?;
 
         let mut iparser = self.clone();
         iparser.index = 0;
-        iparser.filepath = ifilepath.clone();
+        iparser.filepath = newfilepath.clone();
         iparser.input = tokenlist;
         iparser.parse()?;
         self.environment = iparser.environment.clone();
         self.modules = iparser.modules;
         Ok(Some(Statement::Block(
             iparser.ast.program.clone(),
-            ifilepath,
+            newfilepath,
         )))
     }
 
@@ -1805,7 +1865,14 @@ impl Parser {
                 "return" => self.return_statement(line, row),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
-                "module" => self.module(),
+                // "module" => {
+                //     if let Some(module) = self.module()? {
+                //         Ok(Some(Statement::Block(module, self.filepath.clone())))
+                //     } else {
+                //         todo!()
+                //     }
+                    
+                // },
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -1821,72 +1888,76 @@ impl Parser {
         }
     }
 
-    fn module(&mut self) -> Result<Option<Statement>, NovaError> {
-        // let
-        self.consume_identifier(Some("module"))?;
-        // refactor out into two parsing ways for ident. one with module and one without
-        let (identifier, pos) = self.identifier()?;
-        let anchor = self.anchor(identifier.clone(), pos.clone())?;
-        if self.modules.has(&identifier) {
-            return Err(common::error::parser_error(
-                format!("Module '{}' is already instantiated", identifier),
-                "Cannot reinstantiate the same symbol in the same scope".to_string(),
-                pos.line,
-                pos.row,
-                self.filepath.clone(),
-                None,
-            ));
-        } else {
-            self.modules.insert(identifier.clone());
-        }
-        if !self.environment.custom_types.contains_key(&identifier) {
-            return Err(common::error::parser_error(
-                format!("Module '{}' type does not exist", identifier),
-                "cannot create module without type".to_string(),
-                pos.line,
-                pos.row,
-                self.filepath.clone(),
-                None,
-            ));
-        } else {
-            Ok(Some(Statement::Let(
-                TType::Custom(identifier.clone()),
-                identifier,
-                anchor,
-                true,
-            )))
-        }
-    }
-
     // fn module(&mut self) -> Result<Option<Statement>, NovaError> {
+    //     // let
+    //     self.consume_identifier(Some("module"))?;
+    //     // refactor out into two parsing ways for ident. one with module and one without
+    //     let (identifier, pos) = self.identifier()?;
+    //     let anchor = self.anchor(identifier.clone(), pos.clone())?;
+    //     if self.modules.has(&identifier) {
+    //         return Err(common::error::parser_error(
+    //             format!("Module '{}' is already instantiated", identifier),
+    //             "Cannot reinstantiate the same symbol in the same scope".to_string(),
+    //             pos.line,
+    //             pos.row,
+    //             self.filepath.clone(),
+    //             None,
+    //         ));
+    //     } else {
+    //         self.modules.insert(identifier.clone());
+    //     }
+    //     if !self.environment.custom_types.contains_key(&identifier) {
+    //         return Err(common::error::parser_error(
+    //             format!("Module '{}' type does not exist", identifier),
+    //             "cannot create module without type".to_string(),
+    //             pos.line,
+    //             pos.row,
+    //             self.filepath.clone(),
+    //             None,
+    //         ));
+    //     } else {
+    //         Ok(Some(Statement::Let(
+    //             TType::Custom(identifier.clone()),
+    //             identifier,
+    //             anchor,
+    //             true,
+    //         )))
+    //     }
+    // }
+
+    // fn module(&mut self) -> Result<Option<Vec<Statement>>, NovaError> {
     //     self.consume_identifier(Some("module"))?;
     //     let (module_id, _) = self.identifier()?;
-    //     self.consume_symbol('{')?;
-    //     self.eat_if_newline();
+    //     self.modules.insert(module_id.clone());
+
+    //     let modulestatements = self.block()?;
+
     //     let mut fields = vec![];
-    //     let mut modules = vec![];
+    //     let mut modulebody = vec![];
 
-    //     while let Some(field) = self.function_declaration()? {
+    //    for field in modulestatements {
     //         self.eat_if_newline();
-    //         if let Statement::Function(_,field_id,parameters,block) = field {
-    //             modules.push(field.clone());
-    //             // retrieve types for input
-    //             let mut typeinput = vec![];
-    //             for arg in parameters.iter() {
-    //                 typeinput.push(arg.ttype.clone())
-    //             }
+    //         modulebody.push(field.clone());
+    //         if let Statement::Function(output,field_id,parameters,block) = field {
 
+    //             let mut typeinput = vec![];
+    //             for p in parameters.iter() {
+    //                 typeinput.push(p.ttype.clone())
+    //             }
+    //             fields.push((field_id.clone(),TType::Function(typeinput, Box::new(output))));
+                
     //         } else {
     //             // error
     //             todo!()
     //         }
     //     }
-    //     self.eat_if_newline();
-    //     self.consume_symbol('}')?;
-    //     // create type
+
+    //     // create custom type
+    //     self.environment.custom_types.insert(module_id.clone(), fields);
+
     //     // create struct
-    //     // create instance
-    //     todo!()
+    //     // instance the module struct
+    //     Ok(Some(modulebody))
     // }
 
     fn pass_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2035,8 +2106,11 @@ impl Parser {
             self.consume_operator(Operator::Assignment)?;
             expr = self.expr()?;
             self.check_and_map_types(
-                &vec![ttype.clone()],
+
                 &vec![expr.get_type()],
+                &vec![ttype.clone()],
+
+
                 &mut HashMap::default(),
             )?;
         } else {
@@ -2048,7 +2122,7 @@ impl Parser {
         // cant assing a void
         if expr.get_type() == TType::Void {
             return Err(common::error::parser_error(
-                format!("Variable '{}' is cannot be assinged to void", identifier),
+                format!("Variable '{}' cannot be assinged to void", identifier),
                 "Make sure the expression returns a value".to_string(),
                 pos.line,
                 pos.row,
