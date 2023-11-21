@@ -22,7 +22,6 @@ pub struct Parser {
     index: usize,
     pub ast: Ast,
     pub environment: Env,
-    modules: table::Table<String>,
 }
 
 pub fn new(filepath: &str) -> Parser {
@@ -97,7 +96,6 @@ pub fn new(filepath: &str) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        modules: table::new(),
     }
 }
 
@@ -933,16 +931,6 @@ impl Parser {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
             Token::Operator(Operator::DoubleColon, _) => {
-                // if !self.modules.has(&identifier) {
-                //     return Err(common::error::parser_error(
-                //         format!("{identifier} is not a module"),
-                //         format!(""),
-                //         self.current_token().line(),
-                //         self.current_token().row(),
-                //         self.filepath.clone(),
-                //         None,
-                //     ));
-                // }
                 let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
                     self.consume_operator(Operator::DoubleColon)?;
@@ -1078,14 +1066,6 @@ impl Parser {
                 {
                     self.call(identifier.clone(), pos.clone())?
                 } else {
-                    if self.environment.custom_types.contains_key(&identifier)
-                        && !self.modules.has(&identifier)
-                    {
-                        return Err(self.generate_error(
-                            "Cant use type as identifier".to_string(),
-                            "".to_string(),
-                        ));
-                    }
                     if let Some(ttype) = self.environment.get_type(&identifier) {
                         Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                     } else {
@@ -1391,36 +1371,6 @@ impl Parser {
             }
             _ => left = Expr::None,
         }
-        // match self.current_token() {
-        //     Token::Operator(Operator::DoubleColon, _) => {
-        //         match left.get_type().custom_to_string() {
-        //             Some(name) => {
-        //                 // if !self.modules.has(&name) {
-        //                 //     return Err(common::error::parser_error(
-        //                 //         format!("{name} is not a module"),
-        //                 //         format!(""),
-        //                 //         self.current_token().line(),
-        //                 //         self.current_token().row(),
-        //                 //         self.filepath.clone(),
-        //                 //         None,
-        //                 //     ));
-        //                 // }
-        //             }
-        //             None => {
-        //                 dbg!(&left);
-        //                 return Err(common::error::parser_error(
-        //                     format!("type {:?} is not a valid module", &left.get_type()),
-        //                     format!(""),
-        //                     self.current_token().line(),
-        //                     self.current_token().row(),
-        //                     self.filepath.clone(),
-        //                     None,
-        //                 ));
-        //             }
-        //         };
-        //     }
-        //     _ => {}
-        // }
         loop {
             match self.current_token() {
                 Token::Operator(Operator::DoubleColon, _) => {
@@ -1844,7 +1794,6 @@ impl Parser {
         iparser.input = tokenlist;
         iparser.parse()?;
         self.environment = iparser.environment.clone();
-        self.modules = iparser.modules;
         Ok(Some(Statement::Block(
             iparser.ast.program.clone(),
             newfilepath,
@@ -1865,14 +1814,6 @@ impl Parser {
                 "return" => self.return_statement(line, row),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
-                // "module" => {
-                //     if let Some(module) = self.module()? {
-                //         Ok(Some(Statement::Block(module, self.filepath.clone())))
-                //     } else {
-                //         todo!()
-                //     }
-                    
-                // },
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -1887,78 +1828,6 @@ impl Parser {
             _ => self.expression_statement(),
         }
     }
-
-    // fn module(&mut self) -> Result<Option<Statement>, NovaError> {
-    //     // let
-    //     self.consume_identifier(Some("module"))?;
-    //     // refactor out into two parsing ways for ident. one with module and one without
-    //     let (identifier, pos) = self.identifier()?;
-    //     let anchor = self.anchor(identifier.clone(), pos.clone())?;
-    //     if self.modules.has(&identifier) {
-    //         return Err(common::error::parser_error(
-    //             format!("Module '{}' is already instantiated", identifier),
-    //             "Cannot reinstantiate the same symbol in the same scope".to_string(),
-    //             pos.line,
-    //             pos.row,
-    //             self.filepath.clone(),
-    //             None,
-    //         ));
-    //     } else {
-    //         self.modules.insert(identifier.clone());
-    //     }
-    //     if !self.environment.custom_types.contains_key(&identifier) {
-    //         return Err(common::error::parser_error(
-    //             format!("Module '{}' type does not exist", identifier),
-    //             "cannot create module without type".to_string(),
-    //             pos.line,
-    //             pos.row,
-    //             self.filepath.clone(),
-    //             None,
-    //         ));
-    //     } else {
-    //         Ok(Some(Statement::Let(
-    //             TType::Custom(identifier.clone()),
-    //             identifier,
-    //             anchor,
-    //             true,
-    //         )))
-    //     }
-    // }
-
-    // fn module(&mut self) -> Result<Option<Vec<Statement>>, NovaError> {
-    //     self.consume_identifier(Some("module"))?;
-    //     let (module_id, _) = self.identifier()?;
-    //     self.modules.insert(module_id.clone());
-
-    //     let modulestatements = self.block()?;
-
-    //     let mut fields = vec![];
-    //     let mut modulebody = vec![];
-
-    //    for field in modulestatements {
-    //         self.eat_if_newline();
-    //         modulebody.push(field.clone());
-    //         if let Statement::Function(output,field_id,parameters,block) = field {
-
-    //             let mut typeinput = vec![];
-    //             for p in parameters.iter() {
-    //                 typeinput.push(p.ttype.clone())
-    //             }
-    //             fields.push((field_id.clone(),TType::Function(typeinput, Box::new(output))));
-                
-    //         } else {
-    //             // error
-    //             todo!()
-    //         }
-    //     }
-
-    //     // create custom type
-    //     self.environment.custom_types.insert(module_id.clone(), fields);
-
-    //     // create struct
-    //     // instance the module struct
-    //     Ok(Some(modulebody))
-    // }
 
     fn pass_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("pass"))?;
@@ -2095,7 +1964,6 @@ impl Parser {
         let (mut identifier, mut pos) = self.identifier()?;
         if identifier == "global" {
             (identifier, pos) = self.identifier()?;
-            self.modules.insert(identifier.clone());
             global = true
         }
         let mut ttype = TType::None;
