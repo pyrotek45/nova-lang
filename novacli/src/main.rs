@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use std::{
     process::exit,
     time::{Duration, Instant},
@@ -11,74 +12,65 @@ fn main() {
     ) {
         match (command.as_str(), input.as_str()) {
             ("run", "file") => {
-                if let Some(filepath) = std::env::args().nth(3) {
-                    let _ = match novacore::NovaCore::new(&filepath) {
-                        Ok(novacore) => match novacore.run() {
-                            Ok(()) => {}
-                            Err(error) => {
-                                error.show();
-                                exit(1)
-                            }
-                        },
+                let _ = match novacore::NovaCore::new(&filepath) {
+                    Ok(novacore) => match novacore.run() {
+                        Ok(()) => {}
                         Err(error) => {
                             error.show();
                             exit(1)
                         }
-                    };
-                }
+                    },
+                    Err(error) => {
+                        error.show();
+                        exit(1)
+                    }
+                };
             }
             ("dbg", "file") => {
-                if let Some(filepath) = std::env::args().nth(3) {
-                    let _ = match novacore::NovaCore::new(&filepath) {
-                        Ok(novacore) => match novacore.run_debug() {
-                            Ok(()) => {}
-                            Err(error) => {
-                                error.show();
-                                exit(1)
-                            }
-                        },
+                let _ = match novacore::NovaCore::new(&filepath) {
+                    Ok(novacore) => match novacore.run_debug() {
+                        Ok(()) => {}
                         Err(error) => {
                             error.show();
                             exit(1)
                         }
-                    };
-                }
+                    },
+                    Err(error) => {
+                        error.show();
+                        exit(1)
+                    }
+                };
             }
             ("dis", "file") => {
-                if let Some(filepath) = std::env::args().nth(3) {
-                    let _ = match novacore::NovaCore::new(&filepath) {
-                        Ok(novacore) => match novacore.dis_file() {
-                            Ok(()) => {}
-                            Err(error) => {
-                                error.show();
-                                exit(1)
-                            }
-                        },
+                let _ = match novacore::NovaCore::new(&filepath) {
+                    Ok(novacore) => match novacore.dis_file() {
+                        Ok(()) => {}
                         Err(error) => {
                             error.show();
                             exit(1)
                         }
-                    };
-                }
+                    },
+                    Err(error) => {
+                        error.show();
+                        exit(1)
+                    }
+                };
             }
             ("time", "file") => {
                 let now = std::time::Instant::now();
-
-                if let Some(filepath) = std::env::args().nth(3) {
-                    let _ = match novacore::NovaCore::new(&filepath) {
-                        Ok(novacore) => match novacore.run() {
-                            Ok(()) => {}
-                            Err(error) => {
-                                error.show();
-                                exit(1)
-                            }
-                        },
+                let _ = match novacore::NovaCore::new(&filepath) {
+                    Ok(novacore) => match novacore.run() {
+                        Ok(()) => {}
                         Err(error) => {
                             error.show();
                             exit(1)
                         }
-                    };
-                }
+                    },
+                    Err(error) => {
+                        error.show();
+                        exit(1)
+                    }
+                };
                 let exectime = now.elapsed();
                 println!("Total time: {:#?}", exectime);
             }
