@@ -463,6 +463,17 @@ impl Lexer {
                                         row: self.row - 1,
                                     },
                                 ))
+                            }
+                            if let Some('-') = chars.peek() {
+                                chars.next();
+                                self.row += 1;
+                                self.tokens.push(Token::Operator(
+                                    Operator::LeftArrow,
+                                    Position {
+                                        line: self.line,
+                                        row: self.row - 1,
+                                    },
+                                ))
                             } else {
                                 self.tokens.push(Token::Operator(
                                     Operator::LessThan,

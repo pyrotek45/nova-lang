@@ -707,6 +707,7 @@ impl Parser {
         // normal function call <func(args)>
         // get list of types from arguments
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
+
         // if no arguments, push none
         if argument_types.is_empty() {
             argument_types.push(TType::None)
@@ -1019,6 +1020,50 @@ impl Parser {
 
     fn anchor(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
+            Token::Operator(Operator::LeftArrow, _) => {
+                // mything <- compute()
+                self.consume_operator(Operator::LeftArrow)?;
+                let (field, pos) = self.identifier()?;
+                // get type for mything and get its field
+                if let Some(idtype) = self.environment.get_type(&identifier) {
+                    // put mything as arg one
+                    let mut arguments =
+                        vec![Expr::Literal(idtype.clone(), Atom::Id(identifier.clone()))];
+
+                    // get field of mything
+                    let left = self.field(
+                        field.clone(),
+                        Expr::Literal(idtype, Atom::Id(identifier.clone())),
+                        pos,
+                    )?;
+
+                    arguments.extend(self.argument_list()?);
+
+                    if let TType::Function(argtypes, mut output) = left.get_type() {
+                        if arguments.len() != argtypes.len() {
+                            return Err(self.generate_error(
+                                format!("E3 Inccorrect number of arguments"),
+                                format!("Got {:?}, expected {:?}", arguments.len(), argtypes.len()),
+                            ));
+                        }
+                        let mut inputtypes = vec![];
+                        for t in arguments.iter() {
+                            inputtypes.push(t.get_type())
+                        }
+                        let mut map: HashMap<String, TType> = HashMap::default();
+                        map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
+                        output = Box::new(self.get_output(*output.clone(), &mut map)?);
+                        Expr::Call(*output, field.to_string(), Box::new(left), arguments)
+                    } else {
+                        return Err(self.generate_error(
+                            format!("Cant call {:?}", left.get_type()),
+                            format!("not a function"),
+                        ));
+                    }
+                } else {
+                    todo!()
+                }
+            }
             Token::Symbol('[', _) => {
                 if let Some(ttype) = self.environment.get_type(&identifier) {
                     self.index(

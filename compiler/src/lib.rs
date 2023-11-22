@@ -579,6 +579,7 @@ impl Compiler {
                             dbg!(&ttype);
                         }
                     }
+                    common::tokens::Operator::LeftArrow => todo!(),
                 }
                 Ok(())
             }

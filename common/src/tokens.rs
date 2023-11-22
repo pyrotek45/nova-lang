@@ -25,6 +25,7 @@ pub enum Operator {
     LssOrEqu,
     DoubleColon,
     RightArrow,
+    LeftArrow,
     GreaterThan,
     LessThan,
     Assignment,
