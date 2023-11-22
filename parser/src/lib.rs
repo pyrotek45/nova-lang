@@ -257,7 +257,7 @@ impl Parser {
                     self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Option(inner1), TType::Option(inner2)) => {
-                    if **inner1 == TType::None {
+                    if **inner2 == TType::None {
                         continue;
                     } else {
                         self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
@@ -437,8 +437,8 @@ impl Parser {
             }
             if let Some(innerexpr) = exprs.get(fieldname) {
                 self.check_and_map_types(
-                    &vec![innerexpr.get_type()],
                     &vec![fieldtype.clone()],
+                    &vec![innerexpr.get_type()],
                     &mut HashMap::default(),
                 )?;
                 new_exprs.push(innerexpr.clone())
@@ -990,22 +990,18 @@ impl Parser {
     fn anchor(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
             Token::Operator(Operator::LeftArrow, _) => {
-                // mything <- compute()
                 self.consume_operator(Operator::LeftArrow)?;
                 let (field, pos) = self.identifier()?;
-                // get type for mything and get its field
                 if let Some(idtype) = self.environment.get_type(&identifier) {
-                    // put mything as arg one
+                    
                     let mut arguments =
                         vec![Expr::Literal(idtype.clone(), Atom::Id(identifier.clone()))];
 
-                    // get field of mything
                     let left = self.field(
                         field.clone(),
                         Expr::Literal(idtype, Atom::Id(identifier.clone())),
                         pos,
                     )?;
-
                     arguments.extend(self.argument_list()?);
 
                     if let TType::Function(argtypes, mut output) = left.get_type() {
@@ -1030,7 +1026,10 @@ impl Parser {
                         ));
                     }
                 } else {
-                    todo!()
+                    return Err(self.generate_error(
+                        format!("Cant get {field} from {}", identifier.clone()),
+                        format!("{} is not defined", identifier),
+                    ));
                 }
             }
             Token::Symbol('[', _) => {
@@ -1385,6 +1384,42 @@ impl Parser {
         }
         loop {
             match self.current_token() {
+                Token::Operator(Operator::LeftArrow, _) => {
+                    // mything <- compute()
+                    self.consume_operator(Operator::LeftArrow)?;
+                    let (field, pos) = self.identifier()?;
+                    // get type for mything and get its field
+
+                    // put mything as arg one
+                    let mut arguments = vec![left.clone()];
+
+                    // get field of mything
+                    left = self.field(field.clone(), left.clone(), pos)?;
+
+                    arguments.extend(self.argument_list()?);
+
+                    if let TType::Function(argtypes, mut output) = left.get_type() {
+                        if arguments.len() != argtypes.len() {
+                            return Err(self.generate_error(
+                                format!("E3 Inccorrect number of arguments"),
+                                format!("Got {:?}, expected {:?}", arguments.len(), argtypes.len()),
+                            ));
+                        }
+                        let mut inputtypes = vec![];
+                        for t in arguments.iter() {
+                            inputtypes.push(t.get_type())
+                        }
+                        let mut map: HashMap<String, TType> = HashMap::default();
+                        map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
+                        output = Box::new(self.get_output(*output.clone(), &mut map)?);
+                        left = Expr::Call(*output, field.to_string(), Box::new(left), arguments)
+                    } else {
+                        return Err(self.generate_error(
+                            format!("Cant call {:?}", left.get_type()),
+                            format!("not a function"),
+                        ));
+                    }
+                }
                 Token::Operator(Operator::DoubleColon, _) => {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.identifier()?;
