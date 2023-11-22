@@ -83,7 +83,6 @@ fn main() {
                 println!("Total time: {:#?}", exectime);
             }
             _ => {
-                
                 todo!()
             }
         }
@@ -102,5 +101,4 @@ fn main() {
             }
         }
     }
-
 }
