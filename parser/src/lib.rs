@@ -347,37 +347,6 @@ impl Parser {
         }
     }
 
-    fn list_constructor(&mut self) -> Result<Vec<Expr>, NovaError> {
-        let mut exprs = vec![];
-        self.consume_symbol('[')?;
-        self.eat_if_newline();
-        if !self.current_token().is_symbol(']') {
-            exprs.push(self.expr()?);
-        }
-        while self.current_token().is_symbol(',') || self.current_token().is_newline() {
-            self.eat_if_newline();
-            if self.current_token().is_symbol(']') {
-                break;
-            }
-            self.advance();
-            self.eat_if_newline();
-            if self.current_token().is_symbol(']') {
-                break;
-            }
-            let e = self.expr()?;
-            if e.get_type() != TType::Void {
-                exprs.push(e);
-            } else {
-                return Err(self.generate_error(
-                    format!("cannot insert a void expression"),
-                    format!("List expressions must not be void"),
-                ));
-            }
-        }
-        self.consume_symbol(']')?;
-        Ok(exprs)
-    }
-
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
         self.consume_symbol('[')?;
@@ -2006,7 +1975,9 @@ impl Parser {
             (identifier, pos) = self.identifier()?;
             global = true
         }
+        #[allow(unused_assignments)]
         let mut ttype = TType::None;
+        #[allow(unused_assignments)]
         let mut expr = Expr::None;
         if self.current_token().is_op(Operator::Colon) {
             self.consume_operator(Operator::Colon)?;
