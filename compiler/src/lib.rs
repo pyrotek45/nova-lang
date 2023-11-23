@@ -2,7 +2,7 @@ use common::code::{Asm, Code};
 use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};
-use common::tokens::TType;
+use common::tokens::{Position, TType};
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -237,12 +237,12 @@ impl Compiler {
                 //self.output.push(Code::NONE)
             }
             Expr::ListConstructor(_, _) => todo!(),
-            Expr::Field(_, _, index, from) => {
+            Expr::Field(_, _, index, from, pos) => {
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.getref_expr(*from)?;
-                self.asm.push(Asm::PIN);
+                self.asm.push(Asm::PIN(pos));
             }
-            Expr::Indexed(_, _, index, from) => {
+            Expr::Indexed(_, _, index, from, pos) => {
                 match &*index {
                     Expr::Literal(_, atom) => match atom {
                         Atom::Id(id) => {
@@ -258,7 +258,7 @@ impl Compiler {
                     _ => {}
                 }
                 self.getref_expr(*from)?;
-                self.asm.push(Asm::PIN);
+                self.asm.push(Asm::PIN(pos));
             }
             Expr::Call(_, _, _, _) => todo!(),
             Expr::Unary(_, _, _) => todo!(),
@@ -284,8 +284,9 @@ impl Compiler {
                 if let Some(index) = self.variables.get_index(identifier.to_string()) {
                     self.asm.push(Asm::STACKREF(index as u32));
                 } else {
-                    dbg!(identifier);
-                    todo!()
+                    self.variables.insert(identifier.to_string());
+                    let index = self.variables.len() - 1;
+                    self.asm.push(Asm::STACKREF(index as u32));
                 }
             }
             Atom::Float(float) => {
@@ -336,13 +337,13 @@ impl Compiler {
                 self.asm.push(Asm::LIST(list.len()));
                 Ok(())
             }
-            Expr::Field(_, _, index, field) => {
+            Expr::Field(_, _, index, field, _) => {
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.compile_expr(*field)?;
                 self.asm.push(Asm::LIN);
                 Ok(())
             }
-            Expr::Indexed(_, _, index, from) => {
+            Expr::Indexed(_, _, index, from, _) => {
                 self.compile_expr(*index)?;
                 self.compile_expr(*from)?;
                 self.asm.push(Asm::LIN);

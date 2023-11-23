@@ -64,6 +64,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     )
                 } else {
@@ -72,6 +73,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     )
                 });
@@ -89,6 +91,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: preset + offset,
+                                filepath: self.filepath.clone(),
                             },
                         ));
                     } else {
@@ -97,6 +100,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: preset + offset,
+                                filepath: self.filepath.clone(),
                             },
                         ));
                     }
@@ -106,6 +110,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: preset + offset,
+                            filepath: self.filepath.clone(),
                         },
                     ));
                     offset += 1;
@@ -120,6 +125,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -129,6 +135,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -138,6 +145,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -147,6 +155,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -156,6 +165,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -165,6 +175,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -174,6 +185,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -183,6 +195,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -192,6 +205,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row - self.buffer.len(),
+                            filepath: self.filepath.clone(),
                         },
                     ))
                 }
@@ -299,6 +313,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row,
+                            filepath: self.filepath.clone(),
                         },
                     ));
                     self.row += 1;
@@ -328,6 +343,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: self.row,
+                                filepath: self.filepath.clone(),
                             },
                         ));
                     }
@@ -351,6 +367,7 @@ impl Lexer {
                     self.tokens.push(Token::NewLine(Position {
                         line: self.line,
                         row: self.row,
+                        filepath: self.filepath.clone(),
                     }));
                     self.line += 1;
                     self.row = 0;
@@ -374,6 +391,7 @@ impl Lexer {
                                 Position {
                                     line: self.line,
                                     row: self.row,
+                                    filepath: self.filepath.clone(),
                                 },
                             ));
                         }
@@ -390,6 +408,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: self.row,
+                                filepath: self.filepath.clone(),
                             },
                         ));
                     }
@@ -412,6 +431,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -420,6 +440,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -429,6 +450,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: self.row,
+                                filepath: self.filepath.clone(),
                             },
                         )),
                         '>' => {
@@ -440,6 +462,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -448,6 +471,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -461,6 +485,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -472,6 +497,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -480,6 +506,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -493,6 +520,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -501,6 +529,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -514,6 +543,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else if let Some('=') = chars.peek() {
@@ -524,6 +554,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -532,6 +563,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -541,6 +573,7 @@ impl Lexer {
                             Position {
                                 line: self.line,
                                 row: self.row,
+                                filepath: self.filepath.clone(),
                             },
                         )),
                         '/' => {
@@ -548,12 +581,21 @@ impl Lexer {
                                 chars.next();
                                 self.row += 1;
                                 self.parsing = LexerState::Comment;
+                                self.tokens.push(Token::Symbol(
+                                    ';',
+                                    Position {
+                                        line: self.line,
+                                        row: self.row,
+                                        filepath: self.filepath.clone(),
+                                    },
+                                ))
                             } else {
                                 self.tokens.push(Token::Operator(
                                     Operator::Division,
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -567,6 +609,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -575,6 +618,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -588,6 +632,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -596,6 +641,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             }
@@ -609,6 +655,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -617,6 +664,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ));
                             }
@@ -630,6 +678,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row - 1,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ))
                             } else {
@@ -638,6 +687,7 @@ impl Lexer {
                                     Position {
                                         line: self.line,
                                         row: self.row,
+                                        filepath: self.filepath.clone(),
                                     },
                                 ));
                             }
@@ -652,6 +702,7 @@ impl Lexer {
                         Position {
                             line: self.line,
                             row: self.row,
+                            filepath: self.filepath.clone(),
                         },
                     ));
                 }
@@ -672,6 +723,7 @@ impl Lexer {
         self.tokens.push(Token::EOF(Position {
             line: self.line,
             row: self.row,
+            filepath: self.filepath.clone(),
         }));
 
         Ok(self.tokens)

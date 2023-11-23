@@ -1,11 +1,15 @@
 pub mod state;
 pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 use common::{
     code::{byte_to_string, Code},
     error::NovaError,
+    tokens::Position,
 };
 
 use modulo::Mod;
@@ -15,6 +19,7 @@ use crate::state::VmData;
 
 #[derive(Debug, Clone)]
 pub struct Vm {
+    pub runtime_errors_table: HashMap<usize, Position>,
     pub native_functions: Vec<CallBack>,
     pub state: state::State,
 }
@@ -23,6 +28,7 @@ pub fn new() -> Vm {
     Vm {
         native_functions: vec![],
         state: state::new(),
+        runtime_errors_table: HashMap::default(),
     }
 }
 
@@ -686,6 +692,16 @@ impl Vm {
                                         &self.state.stack[self.state.offset + array_index as usize]
                                     {
                                         if let Heap::List(array) = self.state.deref(*newindex) {
+                                            if array.len() <= index_to_get as usize {
+                                                if let Some(pos) = self
+                                                    .runtime_errors_table
+                                                    .get(&self.state.current_instruction)
+                                                {
+                                                    return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                                                } else {
+                                                    return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                                                }
+                                            }
                                             self.state
                                                 .stack
                                                 .push(VmData::List(array[index_to_get as usize]))
@@ -700,6 +716,16 @@ impl Vm {
                                     &self.state.stack[self.state.offset + array_index as usize]
                                 {
                                     if let Heap::List(array) = self.state.deref(*newindex) {
+                                        if array.len() <= index_to_get as usize {
+                                            if let Some(pos) = self
+                                                .runtime_errors_table
+                                                .get(&self.state.current_instruction)
+                                            {
+                                                return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                                            } else {
+                                                return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                                            }
+                                        }
                                         self.state
                                             .stack
                                             .push(VmData::List(array[index_to_get as usize]))
@@ -711,6 +737,16 @@ impl Vm {
                                     self.state.deref(array_index as usize)
                                 {
                                     if let Heap::List(array) = self.state.deref(newindex) {
+                                        if array.len() <= index_to_get as usize {
+                                            if let Some(pos) = self
+                                                .runtime_errors_table
+                                                .get(&self.state.current_instruction)
+                                            {
+                                                return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                                            } else {
+                                                return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                                            }
+                                        }
                                         self.state
                                             .stack
                                             .push(VmData::List(array[index_to_get as usize]))

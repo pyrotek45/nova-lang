@@ -2,6 +2,7 @@ pub type TokenList = Vec<Token>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
+    pub filepath: String,
     pub line: usize,
     pub row: usize,
 }

@@ -105,6 +105,7 @@ impl NovaCore {
             .compile_program(ast, self.filepath, true, true, false)?;
         self.assembler.input = asm;
         self.assembler.assemble();
+        self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output;
         self.vm.run()?;
         Ok(())
