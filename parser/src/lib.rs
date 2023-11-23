@@ -1593,7 +1593,7 @@ impl Parser {
                             None,
                         ));
                     }
-                    Expr::Literal(t, v) => match v {
+                    Expr::Literal(_, v) => match v {
                         Atom::Id(_) => {
                             self.check_and_map_types(
                                 &vec![left.get_type()],
