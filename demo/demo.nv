@@ -195,3 +195,18 @@ fn do(x: ?$A, f:($A)) {
 }
 
 x.do(fn(x:Int) {x.println()})
+
+new <- 10
+new = 33
+
+fn tak(x: $A) -> $A {
+    x.println()
+    return x
+}
+
+dirtylist <- [1,2,3]
+    .iter::create()
+    .iter::map(println)
+    .iter::collect()
+
+dirtylist.println()
