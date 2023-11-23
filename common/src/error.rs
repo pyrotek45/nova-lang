@@ -1,5 +1,7 @@
 use colored::Colorize;
 
+use crate::tokens::Position;
+
 fn read_lines<P>(filename: P) -> std::io::Result<std::io::Lines<std::io::BufReader<std::fs::File>>>
 where
     P: AsRef<std::path::Path>,
@@ -62,6 +64,7 @@ pub enum ErrorType {
     Parsing,
     Compiler,
     Runtime,
+    RuntimeWithPos,
 }
 
 #[derive(Debug)]
@@ -128,6 +131,16 @@ impl NovaError {
                 print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
                 println!("{}: {}", "Note".bright_yellow(), self.note.bright_yellow());
             }
+            ErrorType::RuntimeWithPos => {
+                println!(
+                    "{} in: {}:{}:{}",
+                    "Runtime Error".bright_red(),
+                    self.filepath,
+                    self.line,
+                    self.row
+                );
+                print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
+            }
         }
     }
 }
@@ -189,6 +202,18 @@ pub fn runtime_error(msg: String) -> NovaError {
         line: 0,
         filepath: String::new(),
         row: 0,
+        extra: None,
+    }
+}
+
+pub fn runtime_error_with_pos(msg: String, pos: Position) -> NovaError {
+    NovaError {
+        error: ErrorType::RuntimeWithPos,
+        msg,
+        note: String::new(),
+        line: pos.line,
+        filepath: pos.filepath,
+        row: pos.row,
         extra: None,
     }
 }

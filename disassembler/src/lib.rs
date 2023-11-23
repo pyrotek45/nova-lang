@@ -61,7 +61,7 @@ impl Disassembler {
                 Asm::IMODULO => println!("    imod"),
                 Asm::NOT => println!("    not"),
                 Asm::NEG => println!("    neg"),
-                Asm::PIN => println!("    pin"),
+                Asm::PIN(_) => println!("    pin"),
                 Asm::LIN => println!("    lin"),
                 Asm::TCALL(v) => println!("    tcall: {v}"),
                 Asm::AND => println!("    and"),

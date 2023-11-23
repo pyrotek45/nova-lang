@@ -142,6 +142,7 @@ impl Parser {
         Position {
             line: self.current_token().line(),
             row: self.current_token().row(),
+            filepath: self.filepath.clone(),
         }
     }
 
@@ -257,7 +258,7 @@ impl Parser {
                     self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Option(inner1), TType::Option(inner2)) => {
-                    if **inner2 == TType::None {
+                    if **inner1 == TType::None || **inner2 == TType::None {
                         continue;
                     } else {
                         self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
@@ -856,7 +857,13 @@ impl Parser {
                 let mut found = false;
                 for (index, (field_name, ttype)) in fields.iter().enumerate() {
                     if &identifier == field_name {
-                        lhs = Expr::Field(ttype.clone(), name.clone(), index, Box::new(lhs));
+                        lhs = Expr::Field(
+                            ttype.clone(),
+                            name.clone(),
+                            index,
+                            Box::new(lhs),
+                            pos.clone(),
+                        );
                         found = true;
                         break;
                     }
@@ -974,6 +981,7 @@ impl Parser {
                 identifier.clone(),
                 Box::new(index),
                 Box::new(lhs),
+                self.get_pos(),
             );
             if self.current_token().is_symbol('[') {
                 lhs = self.index(identifier.clone(), lhs, inner)?;
@@ -993,7 +1001,6 @@ impl Parser {
                 self.consume_operator(Operator::LeftArrow)?;
                 let (field, pos) = self.identifier()?;
                 if let Some(idtype) = self.environment.get_type(&identifier) {
-                    
                     let mut arguments =
                         vec![Expr::Literal(idtype.clone(), Atom::Id(identifier.clone()))];
 
@@ -1266,6 +1273,15 @@ impl Parser {
                     Token::Operator(Operator::Colon, _) => {
                         self.consume_operator(Operator::Colon)?;
                         ttype = self.ttype()?;
+                        if !expr_list.is_empty() {
+                            if ttype != expr_list[0].get_type() {
+                                return Err(self.generate_error(
+                                    format!("List must contain same type"),
+                                    format!("Got type {:?}, expected type {:?}", expr_list[0].get_type(), ttype),
+                                ));
+                            }
+                        }
+
                     }
                     _ => {}
                 }
@@ -1312,10 +1328,71 @@ impl Parser {
                         self.consume_symbol(')')?;
                         identifier = generate_unique_string(&identifier, &type_annotation);
                     }
+                    Token::Operator(Operator::Assignment, _) => {
+                        self.consume_operator(Operator::Assignment)?;
+                        let expr = self.expr()?;
+
+                        // cant assing a void
+                        if expr.get_type() == TType::Void {
+                            return Err(common::error::parser_error(
+                                format!("Variable '{}' cannot be assinged to void", identifier),
+                                "Make sure the expression returns a value".to_string(),
+                                pos.line,
+                                pos.row,
+                                self.filepath.clone(),
+                                None,
+                            ));
+                        }
+
+                        if let Some(ttype) = self.environment.get_type(&identifier) {
+                            if ttype != expr.get_type() {
+                                return Err(common::error::parser_error(
+                                    format!(
+                                        "Variable '{}' type is {:?}",
+                                        identifier.clone(),
+                                        ttype
+                                    ),
+                                    format!(
+                                        "Type error: cannot assign a {:?} to {}",
+                                        expr.get_type(),
+                                        identifier.clone()
+                                    ),
+                                    pos.line,
+                                    pos.row,
+                                    self.filepath.clone(),
+                                    None,
+                                ));
+                            } else {
+                                return Ok(Expr::Binop(
+                                    TType::Void,
+                                    Operator::Assignment,
+                                    Box::new(Expr::Literal(
+                                        expr.get_type(),
+                                        Atom::Id(identifier.clone()),
+                                    )),
+                                    Box::new(expr),
+                                ));
+                            }
+                        } else {
+                            self.environment.insert_symbol(
+                                &identifier,
+                                expr.get_type(),
+                                Some(pos.clone()),
+                                SymbolKind::Variable,
+                            );
+                            return Ok(Expr::Binop(
+                                TType::Void,
+                                Operator::Assignment,
+                                Box::new(Expr::Literal(
+                                    expr.get_type(),
+                                    Atom::Id(identifier.clone()),
+                                )),
+                                Box::new(expr),
+                            ));
+                        }
+                    }
                     _ => {}
                 }
-
-                if self.current_token().is_symbol('@') {}
 
                 let leftt = self.anchor(identifier, pos)?;
                 left = leftt;
@@ -1518,6 +1595,21 @@ impl Parser {
                 self.advance();
                 let right = self.top_expr()?;
                 match left.clone() {
+                    Expr::ListConstructor(_, _)
+                    | Expr::Binop(_, _, _, _)
+                    | Expr::Call(_, _, _, _)
+                    | Expr::Unary(_, _, _)
+                    | Expr::Closure(_, _, _, _)
+                    | Expr::None => {
+                        return Err(common::error::parser_error(
+                            format!("Error: left hand side of `=` must be assignable"),
+                            format!("Cannot assign a value to a literal value"),
+                            oline,
+                            orow,
+                            self.filepath.clone(),
+                            None,
+                        ));
+                    }
                     Expr::Literal(t, v) => match v {
                         Atom::Id(_) => {
                             if t != right.get_type() {
@@ -1750,7 +1842,14 @@ impl Parser {
         };
         let (line, row) = self.get_line_and_row();
         self.advance();
-        Ok((id, Position { line, row }))
+        Ok((
+            id,
+            Position {
+                line,
+                row,
+                filepath: self.filepath.clone(),
+            },
+        ))
     }
 
     fn parameter_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {

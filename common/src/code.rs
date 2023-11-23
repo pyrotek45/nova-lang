@@ -1,3 +1,5 @@
+use crate::tokens::Position;
+
 pub struct Code {}
 
 impl Code {
@@ -284,7 +286,7 @@ pub enum Asm {
     CALL,
 
     // list operations
-    PIN,
+    PIN(Position),
     LIN,
     NATIVE(usize),
 }

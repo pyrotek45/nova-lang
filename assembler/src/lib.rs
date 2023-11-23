@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use common::{
     code::{Asm, Code},
-    tokens::{self, TokenList},
+    tokens::{self, Position, TokenList},
 };
 
 #[derive(Debug)]
 pub struct Assembler {
+    pub runtime_error_table: HashMap<usize, Position>,
     pub input: Vec<Asm>,
     pub nva: Vec<Asm>,
     pub output: Vec<u8>,
@@ -21,6 +22,7 @@ pub fn new(input: Vec<Asm>) -> Assembler {
         labels: HashMap::default(),
         forwardjumps: vec![],
         nva: vec![],
+        runtime_error_table: HashMap::default(),
     }
 }
 
@@ -31,6 +33,7 @@ pub fn new_empty() -> Assembler {
         labels: HashMap::default(),
         forwardjumps: vec![],
         nva: vec![],
+        runtime_error_table: HashMap::default(),
     }
 }
 
@@ -266,7 +269,11 @@ impl Assembler {
                         }
                         "pin" => {
                             ci += 1;
-                            self.nva.push(Asm::PIN);
+                            self.nva.push(Asm::PIN(Position {
+                                line: 0,
+                                row: 0,
+                                filepath: "asm".to_string(),
+                            }));
                         }
                         "lin" => {
                             ci += 1;
@@ -511,7 +518,10 @@ impl Assembler {
                         self.output.extend_from_slice(&t);
                     }
                 }
-                Asm::PIN => self.output.push(Code::PINDEX),
+                Asm::PIN(pos) => {
+                    self.output.push(Code::PINDEX);
+                    self.runtime_error_table.insert(self.output.len(), pos);
+                }
                 Asm::LIN => self.output.push(Code::LINDEX),
                 Asm::TCALL(index) => {
                     self.output.push(Code::TAILCALL);
