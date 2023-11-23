@@ -1837,6 +1837,12 @@ impl Parser {
             Token::Symbol('?', _) => {
                 self.consume_symbol('?')?;
                 let ttype = self.ttype()?;
+                if let TType::Option(_) = ttype {
+                    return Err(self.generate_error(
+                        "Cannot have option directly inside an option".to_string(),
+                        format!("Type Error: Try removing the extra `?`"),
+                    ));
+                }
                 Ok(TType::Option(Box::new(ttype)))
             }
             Token::Symbol('[', _) => {
