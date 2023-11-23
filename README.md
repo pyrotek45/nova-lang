@@ -23,7 +23,7 @@ let person : Person = Person {name = "bob", age = 42}
 let person2 = Person("joe", 50)
 
 // Creating new variable the easy way
-person3 = Person("bobby", 30)
+person3 <- Person("bobby", 30)
 
 // Updating a variable 
 person3 = Person("jesse", 25)
@@ -39,7 +39,7 @@ person.display()
 display(person2)
 
 // For loop
-for i = 0; i < 10; i += 1 {
+for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
@@ -116,7 +116,7 @@ let myIterTwo = [1,2,3,4,5]
 println(myIterTwo)
 
 // Creating an empty list
-mylist = []: Int
+mylist <- []: Int
 
 // function overloading
 fn add(x:Int,y:Int) -> Int {
@@ -133,7 +133,7 @@ add(1,3).println()
 add(1.0,3.0).println()
 
 // Passing an overloaded function
-myIntAdder = add@(Int,Int)
+myIntAdder <- add@(Int,Int)
 myIntAdder(1,4).println()
 
 // Generic functions
@@ -157,7 +157,7 @@ fn CounterInit() -> Counter {
     return Counter {
         value = 0,
         count = fn(self: Counter) -> Int {
-            result = self.value
+            result <- self.value
             self.value += 1
             return result
         },
@@ -170,15 +170,15 @@ fn CounterInit() -> Counter {
 // Creating a function for counter outside of the struct
 fn count(self: Counter) -> Int {
     println("im in a normal function")
-    result = self.value
+    result <- self.value
     self.value += 1
     return result
 }
 
-mycounter = CounterInit()
+mycounter <- CounterInit()
 
 // The <- takes the function from the struct, and applys it to itself
-mycounter<-count().println()
+mycounter->count().println()
 
 // the normal function 'count' will be called here, not from the struct itself
 mycounter.count().println()
