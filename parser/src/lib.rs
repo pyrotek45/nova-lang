@@ -238,7 +238,7 @@ impl Parser {
                             None,
                         ));
                     }
-                    if let Some((_,Some(mapped_gen))) = type_map.clone().get(name2) {
+                    if let Some((_, Some(mapped_gen))) = type_map.clone().get(name2) {
                         if mapped_gen != t2 {
                             return Err(common::error::parser_error(
                                 format!(
@@ -261,9 +261,10 @@ impl Parser {
                             ));
                         }
                     } else {
-                        if let Some((mapped_type,Some(gen))) = type_map.clone().get(name2) {
-                            type_map.insert(name1.clone(), (mapped_type.clone(),Some(gen.clone())));
-                        }  
+                        if let Some((mapped_type, Some(gen))) = type_map.clone().get(name2) {
+                            type_map
+                                .insert(name1.clone(), (mapped_type.clone(), Some(gen.clone())));
+                        }
                     }
                 }
                 (TType::Generic(name1), _) => {
@@ -287,7 +288,7 @@ impl Parser {
                             None,
                         ));
                     }
-                    if let Some((Some(mapped_type),_)) = type_map.clone().get(name1) {
+                    if let Some((Some(mapped_type), _)) = type_map.clone().get(name1) {
                         if mapped_type != t2 {
                             return Err(common::error::parser_error(
                                 format!(
@@ -310,11 +311,11 @@ impl Parser {
                             ));
                         }
                     } else {
-                        if let Some((Some(mapped_type),gen)) = type_map.clone().get(name1) {
-                            type_map.insert(name1.clone(), (Some(t2.clone()),gen.clone()));
-                        }  
+                        if let Some((Some(mapped_type), gen)) = type_map.clone().get(name1) {
+                            type_map
+                                .insert(name1.clone(), (Some(mapped_type.clone()), gen.clone()));
+                        }
                     }
-                   
                 }
 
                 (TType::List(inner1), TType::List(inner2)) => {
@@ -357,7 +358,7 @@ impl Parser {
     ) -> Result<TType, NovaError> {
         match output {
             TType::Generic(name) => {
-                if let Some((Some(mapped_type),_)) = type_map.get(&name) {
+                if let Some((Some(mapped_type), _)) = type_map.get(&name) {
                     Ok(mapped_type.clone())
                 } else {
                     Ok(TType::Generic(name.clone()))
@@ -997,7 +998,8 @@ impl Parser {
                     for t in arguments.iter() {
                         inputtypes.push(t.get_type())
                     }
-                    let mut map: HashMap<String, (Option<TType>, Option<TType>)> = HashMap::default();
+                    let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
+                        HashMap::default();
                     map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                     output = Box::new(self.get_output(*output.clone(), &mut map)?);
                     lhs = Expr::Call(*output, "anon".to_string(), Box::new(rhs), arguments);
@@ -1085,7 +1087,8 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> = HashMap::default();
+                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
+                            HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         Expr::Call(*output, field.to_string(), Box::new(left), arguments)
@@ -1532,7 +1535,8 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> = HashMap::default();
+                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
+                            HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         left = Expr::Call(*output, field.to_string(), Box::new(left), arguments)
@@ -1569,7 +1573,8 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> = HashMap::default();
+                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
+                            HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         left = Expr::Call(*output, "anon".to_string(), Box::new(left), arguments);
