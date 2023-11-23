@@ -18,7 +18,15 @@ println("hello world!")
 
 // Creating instance of type
 let person : Person = Person {name = "bob", age = 42}
-let person2 : Person = Person("joe", 50)
+
+// Optional type annotation
+let person2 = Person("joe", 50)
+
+// Creating new variable the easy way
+person3 = Person("bobby", 30)
+
+// Updating a variable 
+person3 = Person("jesse", 25)
 
 // Function for type
 fn display(self: Person) {
@@ -31,7 +39,6 @@ person.display()
 display(person2)
 
 // For loop
-let i = 0
 for i = 0; i < 10; i += 1 {
     println(i)
 }
@@ -54,7 +61,6 @@ println(arr)
 // Changing struct value
 person.name = "bingo"
 person.display()
-
 
 struct Zed {
     test: ()
@@ -108,4 +114,94 @@ let myIterTwo = [1,2,3,4,5]
     .iter::collect()
 
 println(myIterTwo)
+
+// Creating an empty list
+mylist = []: Int
+
+// function overloading
+fn add(x:Int,y:Int) -> Int {
+    println("im adding ints")
+    return x + y
+}
+
+fn add(x:Float,y:Float) -> Float {
+    println("im adding floats")
+    return x + y
+}
+
+add(1,3).println()
+add(1.0,3.0).println()
+
+// Passing an overloaded function
+myIntAdder = add@(Int,Int)
+myIntAdder(1,4).println()
+
+// Generic functions
+fn generic(x: $A) {
+    x.println()
+}
+
+generic("hello!")
+generic(10)
+generic(5.5)
+
+// More advance structs
+struct Counter {
+    value: Int,
+    count: (Counter) -> Int,
+    reset: (Counter)
+}
+
+// Creating a init funciton for Counter
+fn CounterInit() -> Counter {
+    return Counter {
+        value = 0,
+        count = fn(self: Counter) -> Int {
+            result = self.value
+            self.value += 1
+            return result
+        },
+        reset = fn(self: Counter) {
+            self.value = 0
+        }
+    }
+}
+
+// Creating a function for counter outside of the struct
+fn count(self: Counter) -> Int {
+    println("im in a normal function")
+    result = self.value
+    self.value += 1
+    return result
+}
+
+mycounter = CounterInit()
+
+// The <- takes the function from the struct, and applys it to itself
+mycounter<-count().println()
+
+// the normal function 'count' will be called here, not from the struct itself
+mycounter.count().println()
+
+// Option type ?type lets you represent none
+let x: ?Int = some(20)
+
+// using the isSome() function here
+if x.isSome() {
+    x.unwrap().println()
+}
+
+x = none()
+if x.isSome() {
+    println("i never print")
+    x.unwrap().println()
+}
+
+fn do(x: ?$A, f:($A)) {
+    if x.isSome() {
+        f(x.unwrap())
+    }
+}
+
+x.do(fn(x:Int) {x.println()})
 ```

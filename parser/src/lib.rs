@@ -1277,11 +1277,14 @@ impl Parser {
                             if ttype != expr_list[0].get_type() {
                                 return Err(self.generate_error(
                                     format!("List must contain same type"),
-                                    format!("Got type {:?}, expected type {:?}", expr_list[0].get_type(), ttype),
+                                    format!(
+                                        "Got type {:?}, expected type {:?}",
+                                        expr_list[0].get_type(),
+                                        ttype
+                                    ),
                                 ));
                             }
                         }
-
                     }
                     _ => {}
                 }
@@ -1345,34 +1348,21 @@ impl Parser {
                         }
 
                         if let Some(ttype) = self.environment.get_type(&identifier) {
-                            if ttype != expr.get_type() {
-                                return Err(common::error::parser_error(
-                                    format!(
-                                        "Variable '{}' type is {:?}",
-                                        identifier.clone(),
-                                        ttype
-                                    ),
-                                    format!(
-                                        "Type error: cannot assign a {:?} to {}",
-                                        expr.get_type(),
-                                        identifier.clone()
-                                    ),
-                                    pos.line,
-                                    pos.row,
-                                    self.filepath.clone(),
-                                    None,
-                                ));
-                            } else {
-                                return Ok(Expr::Binop(
-                                    TType::Void,
-                                    Operator::Assignment,
-                                    Box::new(Expr::Literal(
-                                        expr.get_type(),
-                                        Atom::Id(identifier.clone()),
-                                    )),
-                                    Box::new(expr),
-                                ));
-                            }
+                            self.check_and_map_types(
+                                &vec![expr.get_type()],
+                                &vec![ttype.clone()],
+                                &mut HashMap::default(),
+                            )?;
+
+                            return Ok(Expr::Binop(
+                                TType::Void,
+                                Operator::Assignment,
+                                Box::new(Expr::Literal(
+                                    expr.get_type(),
+                                    Atom::Id(identifier.clone()),
+                                )),
+                                Box::new(expr),
+                            ));
                         } else {
                             self.environment.insert_symbol(
                                 &identifier,
