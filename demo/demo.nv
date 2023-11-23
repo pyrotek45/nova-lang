@@ -199,14 +199,22 @@ x.do(fn(x:Int) {x.println()})
 new <- 10
 new = 33
 
-fn tak(x: $A) -> $A {
+fn printOut(x: $A) -> $A {
     x.println()
     return x
 }
 
+fn toFloat(x:Int) -> Float {
+    return 1.0
+}
+
+fn toInt(x:Float) -> Int {
+    return 1
+}
 dirtylist <- [1,2,3]
     .iter::create()
-    .iter::map(println)
+    .iter::map(toFloat@(Int))
+    .iter::map(toInt@(Float))
     .iter::collect()
 
 dirtylist.println()
