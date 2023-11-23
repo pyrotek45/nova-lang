@@ -581,14 +581,16 @@ impl Lexer {
                                 chars.next();
                                 self.row += 1;
                                 self.parsing = LexerState::Comment;
-                                self.tokens.push(Token::Symbol(
-                                    ';',
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                if self.row == 1 {
+                                    self.tokens.push(Token::Symbol(
+                                        ';',
+                                        Position {
+                                            line: self.line,
+                                            row: self.row,
+                                            filepath: self.filepath.clone(),
+                                        },
+                                    ))
+                                }
                             } else {
                                 self.tokens.push(Token::Operator(
                                     Operator::Division,
