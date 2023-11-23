@@ -997,8 +997,8 @@ impl Parser {
 
     fn anchor(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
-            Token::Operator(Operator::LeftArrow, _) => {
-                self.consume_operator(Operator::LeftArrow)?;
+            Token::Operator(Operator::RightArrow, _) => {
+                self.consume_operator(Operator::RightArrow)?;
                 let (field, pos) = self.identifier()?;
                 if let Some(idtype) = self.environment.get_type(&identifier) {
                     let mut arguments =
@@ -1331,8 +1331,8 @@ impl Parser {
                         self.consume_symbol(')')?;
                         identifier = generate_unique_string(&identifier, &type_annotation);
                     }
-                    Token::Operator(Operator::Assignment, _) => {
-                        self.consume_operator(Operator::Assignment)?;
+                    Token::Operator(Operator::LeftArrow, _) => {
+                        self.consume_operator(Operator::LeftArrow)?;
                         let expr = self.expr()?;
 
                         // cant assing a void
@@ -1347,21 +1347,14 @@ impl Parser {
                             ));
                         }
 
-                        if let Some(ttype) = self.environment.get_type(&identifier) {
-                            self.check_and_map_types(
-                                &vec![expr.get_type()],
-                                &vec![ttype.clone()],
-                                &mut HashMap::default(),
-                            )?;
-
-                            return Ok(Expr::Binop(
-                                TType::Void,
-                                Operator::Assignment,
-                                Box::new(Expr::Literal(
-                                    expr.get_type(),
-                                    Atom::Id(identifier.clone()),
-                                )),
-                                Box::new(expr),
+                        if self.environment.has(&identifier) {
+                            return Err(common::error::parser_error(
+                                format!("Variable '{}' has already been created", identifier),
+                                "".to_string(),
+                                pos.line,
+                                pos.row,
+                                self.filepath.clone(),
+                                None,
                             ));
                         } else {
                             self.environment.insert_symbol(
@@ -1451,9 +1444,9 @@ impl Parser {
         }
         loop {
             match self.current_token() {
-                Token::Operator(Operator::LeftArrow, _) => {
+                Token::Operator(Operator::RightArrow, _) => {
                     // mything <- compute()
-                    self.consume_operator(Operator::LeftArrow)?;
+                    self.consume_operator(Operator::RightArrow)?;
                     let (field, pos) = self.identifier()?;
                     // get type for mything and get its field
 
@@ -1602,20 +1595,11 @@ impl Parser {
                     }
                     Expr::Literal(t, v) => match v {
                         Atom::Id(_) => {
-                            if t != right.get_type() {
-                                return Err(common::error::parser_error(
-                                    format!(
-                                        "Type error, cannot assing {:?} to {:?}",
-                                        right.clone().get_type(),
-                                        left.clone().get_type(),
-                                    ),
-                                    format!("Assingment error"),
-                                    oline,
-                                    orow,
-                                    self.filepath.clone(),
-                                    None,
-                                ));
-                            }
+                            self.check_and_map_types(
+                                &vec![left.get_type()],
+                                &vec![right.get_type()],
+                                &mut HashMap::default(),
+                            )?;
                         }
                         _ => {
                             return Err(common::error::parser_error(
