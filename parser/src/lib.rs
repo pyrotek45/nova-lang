@@ -871,7 +871,7 @@ impl Parser {
             } else {
                 //dbg!(&self.environment.values);
                 let mut lex = Lexicon::new();
-                for (i,_) in self.environment.values.last().unwrap().iter() {
+                for (i, _) in self.environment.values.last().unwrap().iter() {
                     lex.insert(i)
                 }
 
@@ -915,7 +915,7 @@ impl Parser {
                 }
                 if !found {
                     let mut lex = Lexicon::new();
-                    for (i,_) in fields.iter() {
+                    for (i, _) in fields.iter() {
                         lex.insert(i)
                     }
                     let corrections = lex.corrections_for(&identifier);
@@ -1120,14 +1120,14 @@ impl Parser {
                         )?
                     } else {
                         let mut lex = Lexicon::new();
-                        for (i,_) in self.environment.values.last().unwrap().iter() {
+                        for (i, _) in self.environment.values.last().unwrap().iter() {
                             lex.insert(i)
                         }
-        
+
                         let corrections = lex.corrections_for(&identifier);
                         return Err(common::error::parser_error(
                             format!("E1 Not a valid symbol: {}", identifier),
-                            format!("Unknown identifier\nDid you mean? {:?}",corrections),
+                            format!("Unknown identifier\nDid you mean? {:?}", corrections),
                             pos.line,
                             pos.row,
                             self.filepath.clone(),
@@ -1167,14 +1167,14 @@ impl Parser {
                             Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                         } else {
                             let mut lex = Lexicon::new();
-                            for (i,_) in self.environment.values.last().unwrap().iter() {
+                            for (i, _) in self.environment.values.last().unwrap().iter() {
                                 lex.insert(i)
                             }
-            
+
                             let corrections = lex.corrections_for(&identifier);
                             return Err(common::error::parser_error(
                                 format!("E2 Not a valid symbol: {}", identifier),
-                                format!("Unknown identifier\nDid you mean? {:?}",corrections),
+                                format!("Unknown identifier\nDid you mean? {:?}", corrections),
                                 pos.line,
                                 pos.row,
                                 self.filepath.clone(),
