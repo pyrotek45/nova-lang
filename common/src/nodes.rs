@@ -132,13 +132,11 @@ impl Env {
             Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
         } else {
             if self.captured.len() < 1 {
-
                 return None;
             }
             if let Some(s) = self.captured.last().unwrap().get(symbol) {
                 return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
             } else {
-
                 None
             }
         }
