@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use dym::Lexicon;
+
 use crate::{
     table,
     tokens::{generate_unique_string, Operator, Position, TType, Unary},
@@ -42,7 +44,7 @@ pub struct Symbol {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env {
-    pub captured: Vec<HashMap<String, TType>>,
+    pub captured: Vec<HashMap<String, Symbol>>,
     pub custom_types: HashMap<String, Vec<(String, TType)>>,
     pub no_override: table::Table<String>,
     pub values: Vec<HashMap<String, Symbol>>,
@@ -129,7 +131,16 @@ impl Env {
         if let Some(s) = self.values.get(self.values.len() - 2).unwrap().get(symbol) {
             Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
         } else {
-            None
+            if self.captured.len() < 1 {
+
+                return None;
+            }
+            if let Some(s) = self.captured.last().unwrap().get(symbol) {
+                return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
+            } else {
+
+                None
+            }
         }
     }
 
