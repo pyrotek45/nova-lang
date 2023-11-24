@@ -108,6 +108,7 @@ impl TType {
     pub fn get_inner(&self) -> Option<TType> {
         match self {
             TType::List(inner) => Some(*inner.clone()),
+            TType::String => Some(TType::String),
             _ => None,
         }
     }

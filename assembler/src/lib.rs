@@ -541,7 +541,11 @@ impl Assembler {
                 Asm::ISSOME => self.output.push(Code::ISSOME),
                 Asm::UNWRAP => self.output.push(Code::UNWRAP),
                 Asm::CONCAT => self.output.push(Code::CONCAT),
-                Asm::Char(_v) => todo!(),
+                Asm::Char(v) => {
+                    self.output.push(Code::CHAR);
+                    let cast = v as u8;
+                    self.output.push(cast);
+                }
             }
         }
 

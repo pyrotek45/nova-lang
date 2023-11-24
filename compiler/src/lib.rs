@@ -702,7 +702,7 @@ impl Compiler {
                     }
                 }
             }
-            Atom::Char(_) => todo!(),
+            Atom::Char(c) => self.asm.push(Asm::Char(c)),
         }
         Ok(())
     }

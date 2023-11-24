@@ -293,7 +293,15 @@ impl State {
                     return self.heap.len() - 1;
                 }
             }
-            VmData::Char(_) => todo!(),
+            VmData::Char(v) => {
+                if let Some(space) = self.free_space.pop() {
+                    self.heap[space] = Heap::Char(v);
+                    return space;
+                } else {
+                    self.heap.push(Heap::Char(v));
+                    return self.heap.len() - 1;
+                }
+            }
         }
     }
 

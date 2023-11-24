@@ -3,28 +3,40 @@ struct Int_box {
 }
 
 struct Iter {
-    create: ([$a]) -> () -> ?$a,
-    map: (() -> ?$a, ($a) -> $a) -> () -> ?$a,
-    printIter: (() -> ?$a),
-    collect: (() -> ?$a) -> [$a]
+    create: ([$A]) -> () -> ?$A,
+    map: (() -> ?$A, ($A) -> $A) -> () -> ?$A,
+    printIter: (() -> ?$A),
+    collect: (() -> ?$A) -> [$A],
+    filter: (() -> ?$A, ($A) -> Bool) -> [$A],
 }
 
 let iter = Iter {
-    create = fn(input:[$a]) -> () -> ?$a {
+    filter = fn(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
+        let t: ?$A = it()
+        let list = []:$A
+        while t.isSome() {
+            if t.unwrap().f() {
+                list.push(t.unwrap())
+            }
+            t = it()
+        }
+        return list
+    },
+    create = fn(input:[$A]) -> () -> ?$A {
         let index : Int_box = Int_box {value = 0}    
-        return fn() -> ?$a {
+        return fn() -> ?$A {
             if index.value >= input.len() {
                 return none()
             } else {
-                let result : ?$a = some(input[index.value])
+                let result : ?$A = some(input[index.value])
                 index.value = index.value + 1
                 return result
             }
         }
     },
-    map = fn(t: () -> ?$a, f:($a) -> $a) -> () -> ?$a {
-        return fn() -> ?$a {
-            let result: ?$a = t()
+    map = fn(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
+        return fn() -> ?$A {
+            let result: ?$A = it()
             if result.isSome() {
                 return some(f(result.unwrap()))
             } else {
@@ -32,17 +44,17 @@ let iter = Iter {
             }
         }
     },
-    printIter = fn(it: () -> ?$a) {
-        let t: ?$a = it()
+    printIter = fn(it: () -> ?$A) {
+        let t: ?$A = it()
         while t.isSome() {
             print(t.unwrap())
             print("\n")
             t = it()
         }
     },
-    collect = fn(it: () -> ?$a) -> [$a] {
-        let t: ?$a = it()
-        let list = []:$a
+    collect = fn(it: () -> ?$A) -> [$A] {
+        let t: ?$A = it()
+        let list = []:$A
         while t.isSome() {
             list.push(t.unwrap())
             t = it()
