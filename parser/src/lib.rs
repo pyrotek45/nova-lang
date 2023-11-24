@@ -27,6 +27,12 @@ pub struct Parser {
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_env();
     env.insert_symbol(
+        "strlen",
+        TType::Function(vec![TType::String], Box::new(TType::Int)),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
         "isSome",
         TType::Function(
             vec![TType::Option(Box::new(TType::Generic("a".to_string())))],
@@ -197,8 +203,8 @@ impl Parser {
         &self,
         type_list1: &[TType],
         type_list2: &[TType],
-        type_map: &mut HashMap<String, (Option<TType>, Option<TType>)>,
-    ) -> Result<HashMap<String, (Option<TType>, Option<TType>)>, NovaError> {
+        type_map: &mut HashMap<String, TType>,
+    ) -> Result<HashMap<String, TType>, NovaError> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error(
                 "E2 Incorrect amount of arguments".to_owned(),
@@ -215,56 +221,6 @@ impl Parser {
                             format!("Type error, expecting {:?}, but found {:?}", TType::Any, t2),
                             format!("expecting input, got void",),
                         ));
-                    }
-                }
-                (TType::Generic(name1), TType::Generic(name2)) => {
-                    if t2 == &TType::None {
-                        return Err(common::error::parser_error(
-                            format!("Type error, expecting some value, but found {:?}", t2),
-                            format!("Cannot bind to a None value"),
-                            self.current_token().line(),
-                            self.current_token().row(),
-                            self.filepath.clone(),
-                            None,
-                        ));
-                    }
-                    if t2 == &TType::Void {
-                        return Err(common::error::parser_error(
-                            format!("Type error, expecting some value, but found {:?}", t2),
-                            format!("Cannot bind to a None value"),
-                            self.current_token().line(),
-                            self.current_token().row(),
-                            self.filepath.clone(),
-                            None,
-                        ));
-                    }
-                    if let Some((_, Some(mapped_gen))) = type_map.clone().get(name2) {
-                        if mapped_gen != t2 {
-                            return Err(common::error::parser_error(
-                                format!(
-                                    "Type error, expecting {:?}, but found {:?}",
-                                    mapped_gen.clone(),
-                                    t2
-                                ),
-                                format!(
-                                    "{:?} != {:?} \n ~ {:?} -> {:?}\n ~ {:?}",
-                                    mapped_gen.clone(),
-                                    t2,
-                                    type_list1,
-                                    mapped_gen.clone(),
-                                    type_list2
-                                ),
-                                self.current_token().line(),
-                                self.current_token().row(),
-                                self.filepath.clone(),
-                                None,
-                            ));
-                        }
-                    } else {
-                        if let Some((mapped_type, Some(gen))) = type_map.clone().get(name2) {
-                            type_map
-                                .insert(name1.clone(), (mapped_type.clone(), Some(gen.clone())));
-                        }
                     }
                 }
                 (TType::Generic(name1), _) => {
@@ -288,16 +244,18 @@ impl Parser {
                             None,
                         ));
                     }
-                    if let Some((Some(mapped_type), _)) = type_map.clone().get(name1) {
+                    if let Some(mapped_type) = type_map.get(name1) {
+                        // If the types are not equal, return an error
                         if mapped_type != t2 {
                             return Err(common::error::parser_error(
                                 format!(
-                                    "Type error, expecting {:?}, but found {:?}",
+                                    "Type error: Expected {:?}, but found {:?}",
                                     mapped_type.clone(),
                                     t2
                                 ),
+                                // Additional information for debugging the error
                                 format!(
-                                    "{:?} != {:?} \n ~ {:?} -> {:?}\n ~ {:?}",
+                                    "Mismatched types:\n ~ Expected: {:?}\n ~ Found: {:?}\n ~ In context:\n   ~ {:?} -> {:?}\n   ~ {:?}",
                                     mapped_type.clone(),
                                     t2,
                                     type_list1,
@@ -311,10 +269,8 @@ impl Parser {
                             ));
                         }
                     } else {
-                        if let Some((Some(mapped_type), gen)) = type_map.clone().get(name1) {
-                            type_map
-                                .insert(name1.clone(), (Some(mapped_type.clone()), gen.clone()));
-                        }
+                        // If name1 is not in the type_map, insert it with the corresponding type (t2)
+                        type_map.insert(name1.clone(), t2.clone());
                     }
                 }
 
@@ -354,11 +310,11 @@ impl Parser {
     fn get_output(
         &self,
         output: TType,
-        type_map: &mut HashMap<String, (Option<TType>, Option<TType>)>,
+        type_map: &mut HashMap<String, TType>,
     ) -> Result<TType, NovaError> {
         match output {
             TType::Generic(name) => {
-                if let Some((Some(mapped_type), _)) = type_map.get(&name) {
+                if let Some(mapped_type) = type_map.get(&name) {
                     Ok(mapped_type.clone())
                 } else {
                     Ok(TType::Generic(name.clone()))
@@ -998,8 +954,7 @@ impl Parser {
                     for t in arguments.iter() {
                         inputtypes.push(t.get_type())
                     }
-                    let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
-                        HashMap::default();
+                    let mut map: HashMap<String, TType> = HashMap::default();
                     map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                     output = Box::new(self.get_output(*output.clone(), &mut map)?);
                     lhs = Expr::Call(*output, "anon".to_string(), Box::new(rhs), arguments);
@@ -1087,8 +1042,7 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
-                            HashMap::default();
+                        let mut map: HashMap<String, TType> = HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         Expr::Call(*output, field.to_string(), Box::new(left), arguments)
@@ -1535,8 +1489,7 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
-                            HashMap::default();
+                        let mut map: HashMap<String, TType> = HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         left = Expr::Call(*output, field.to_string(), Box::new(left), arguments)
@@ -1573,8 +1526,7 @@ impl Parser {
                         for t in arguments.iter() {
                             inputtypes.push(t.get_type())
                         }
-                        let mut map: HashMap<String, (Option<TType>, Option<TType>)> =
-                            HashMap::default();
+                        let mut map: HashMap<String, TType> = HashMap::default();
                         map = self.check_and_map_types(&argtypes, &inputtypes, &mut map)?;
                         output = Box::new(self.get_output(*output.clone(), &mut map)?);
                         left = Expr::Call(*output, "anon".to_string(), Box::new(left), arguments);

@@ -196,25 +196,21 @@ fn do(x: ?$A, f:($A)) {
 
 x.do(fn(x:Int) {x.println()})
 
-new <- 10
-new = 33
+// String manipulation
+str <- "hello world!"
+    .strToChars()
+    .iter::create() 
+    .iter::filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
+    .charsToStr()
 
-fn printOut(x: $A) -> $A {
-    x.println()
-    return x
+str.println()
+
+// Currying
+fn add(x:Int) -> (Int) -> Int {
+    return fn(y:Int) -> Int {
+        return x + y
+    }
 }
 
-fn toFloat(x:Int) -> Float {
-    return 1.0
-}
-
-fn toInt(x:Float) -> Int {
-    return 1
-}
-dirtylist <- [1,2,3]
-    .iter::create()
-    .iter::map(toFloat@(Int))
-    .iter::map(toInt@(Float))
-    .iter::collect()
-
-dirtylist.println()
+inc <- add(1)
+4.inc().println()

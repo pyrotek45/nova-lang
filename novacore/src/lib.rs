@@ -92,6 +92,30 @@ impl NovaCore {
             common::nodes::SymbolKind::GenericFunction,
             native::rand::random_int,
         );
+        self.add_function(
+            "strlen",
+            common::tokens::TType::Function(vec![TType::String], Box::new(TType::Int)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::strlen,
+        );
+        self.add_function(
+            "strToChars",
+            common::tokens::TType::Function(
+                vec![TType::String],
+                Box::new(TType::List(Box::new(TType::Char))),
+            ),
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::str_to_chars,
+        );
+        self.add_function(
+            "charsToStr",
+            common::tokens::TType::Function(
+                vec![TType::List(Box::new(TType::Char))],
+                Box::new(TType::String),
+            ),
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::chars_to_str,
+        );
     }
 
     pub fn run(mut self) -> Result<(), NovaError> {

@@ -15,7 +15,7 @@ pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
     }
     // removing newline token
     input.pop();
-    let index = state.allocate_string(input);
-    state.stack.push(VmData::String(index));
+    //let index = state.allocate_string(input);
+    //state.stack.push(VmData::String(index));
     Ok(())
 }

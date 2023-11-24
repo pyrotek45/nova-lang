@@ -177,7 +177,7 @@ fn count(self: Counter) -> Int {
 
 mycounter <- CounterInit()
 
-// The <- takes the function from the struct, and applys it to itself
+// The -> takes the function from the struct, and applys it to itself
 mycounter->count().println()
 
 // the normal function 'count' will be called here, not from the struct itself
@@ -204,4 +204,23 @@ fn do(x: ?$A, f:($A)) {
 }
 
 x.do(fn(x:Int) {x.println()})
+
+// String manipulation
+str <- "hello world!"
+    .strToChars()
+    .iter::create() 
+    .iter::filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
+    .charsToStr()
+
+str.println()
+
+// Currying
+fn add(x:Int) -> (Int) -> Int {
+    return fn(y:Int) -> Int {
+        return x + y
+    }
+}
+
+inc <- add(1)
+4.inc().println()
 ```

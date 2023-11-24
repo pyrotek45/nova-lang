@@ -252,7 +252,9 @@ impl Vm {
                         VmData::Closure(_) => todo!(),
                         VmData::StackAddress(_) => todo!(),
                         VmData::Struct(_) => todo!(),
-                        VmData::Char(_) => todo!(),
+                        VmData::Char(char) => {
+                            print!("{char}")
+                        }
                     }
                 }
 
@@ -774,12 +776,6 @@ impl Vm {
                         match (array, index) {
                             (VmData::List(array), VmData::Int(index_to)) => {
                                 match self.state.deref(array as usize) {
-                                    Heap::Function(_) => todo!(),
-                                    Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
-                                    Heap::Float(_) => todo!(),
-                                    Heap::Bool(_) => todo!(),
-                                    Heap::ListAddress(_) => todo!(),
-                                    Heap::StringAddress(_) => todo!(),
                                     Heap::List(array) => {
                                         let item = self.state.deref(array[index_to as usize]);
                                         match item {
@@ -806,16 +802,12 @@ impl Vm {
                                             }
                                             Heap::Struct(_, _) => todo!(),
                                             Heap::StructAddress(_) => todo!(),
-                                            Heap::Char(_) => todo!(),
+                                            Heap::Char(v) => self.state.stack.push(VmData::Char(v)),
                                         }
                                     }
-                                    Heap::String(_) => todo!(),
-                                    Heap::None => todo!(),
-                                    Heap::Closure(_, _) => todo!(),
-                                    Heap::ClosureAddress(_) => todo!(),
-                                    Heap::Struct(_, _) => todo!(),
-                                    Heap::StructAddress(_) => todo!(),
-                                    Heap::Char(_) => todo!(),
+                                    _ => {
+                                        todo!()
+                                    }
                                 }
                             }
                             (a, b) => {
@@ -913,6 +905,11 @@ impl Vm {
                     let index = self.state.allocate_string(string);
                     self.state.stack.push(VmData::String(index));
                     //self.state.collect_garbage();
+                }
+
+                Code::CHAR => {
+                    let char = self.state.next() as char;
+                    self.state.stack.push(VmData::Char(char));
                 }
 
                 Code::FREE => {
