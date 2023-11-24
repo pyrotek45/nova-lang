@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use common::{
     error::{self, NovaError},
-    nodes::{new_env, Arg, Ast, Atom, Env, Expr, Field, Statement, SymbolKind},
+    nodes::{new_env, Arg, Ast, Atom, Env, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
     tokens::{generate_unique_string, Operator, Position, TType, Token, TokenList, Unary},
 };
+use dym::Lexicon;
 use lexer::Lexer;
 
 fn extract_current_directory(path: &str) -> Option<String> {
@@ -599,9 +600,18 @@ impl Parser {
                 function_kind,
             )) = self.environment.get_type_capture(&identifier)
             {
+                let pos = self.get_pos();
                 self.environment.captured.last_mut().unwrap().insert(
                     identifier.clone(),
-                    TType::Function(function_parameters.clone(), function_output.clone()),
+                    Symbol {
+                        id: identifier.clone(),
+                        ttype: TType::Function(
+                            function_parameters.clone(),
+                            function_output.clone(),
+                        ),
+                        pos: Some(pos),
+                        kind: SymbolKind::Parameter,
+                    },
                 );
                 match function_kind {
                     SymbolKind::GenericFunction => {
@@ -783,11 +793,19 @@ impl Parser {
                 .environment
                 .get_function_type_capture(&identifier, &argument_types)
             {
+                let pos = self.get_pos();
                 self.environment.captured.last_mut().unwrap().insert(
                     identifier.clone(),
-                    TType::Function(function_parameters.clone(), function_output.clone()),
+                    Symbol {
+                        id: identifier.clone(),
+                        ttype: TType::Function(
+                            function_parameters.clone(),
+                            function_output.clone(),
+                        ),
+                        pos: Some(pos),
+                        kind: SymbolKind::Parameter,
+                    },
                 );
-
                 match function_kind {
                     SymbolKind::GenericFunction => {
                         let mut map = self.check_and_map_types(
@@ -851,11 +869,18 @@ impl Parser {
                     }
                 }
             } else {
+                //dbg!(&self.environment.values);
+                let mut lex = Lexicon::new();
+                for (i,_) in self.environment.values.last().unwrap().iter() {
+                    lex.insert(i)
+                }
+
+                let corrections = lex.corrections_for(&identifier);
                 return Err(common::error::parser_error(
                     format!("Not a valid call: {}", identifier),
                     format!(
-                        "E1 No function signature '{}' with {:?} as arguments",
-                        identifier, argument_types
+                        "E1 No function signature '{}' with {:?} as arguments\nDid you mean? {:?}",
+                        identifier, argument_types, corrections
                     ),
                     pos.line,
                     pos.row,
@@ -889,9 +914,14 @@ impl Parser {
                     }
                 }
                 if !found {
+                    let mut lex = Lexicon::new();
+                    for (i,_) in fields.iter() {
+                        lex.insert(i)
+                    }
+                    let corrections = lex.corrections_for(&identifier);
                     return Err(common::error::parser_error(
                         format!("No field '{}' found for {}", identifier, name),
-                        format!("cannot retrieve field"),
+                        format!("cannot retrieve field\nDid you mean? {:?}", corrections),
                         pos.line,
                         pos.row,
                         self.filepath.clone(),
@@ -1068,11 +1098,15 @@ impl Parser {
                     )?
                 } else {
                     if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
-                        self.environment
-                            .captured
-                            .last_mut()
-                            .unwrap()
-                            .insert(identifier.clone(), ttype.clone());
+                        self.environment.captured.last_mut().unwrap().insert(
+                            identifier.clone(),
+                            Symbol {
+                                id: identifier.clone(),
+                                ttype: ttype.clone(),
+                                pos: Some(pos.clone()),
+                                kind: kind.clone(),
+                            },
+                        );
                         self.environment.insert_symbol(
                             &identifier,
                             ttype.clone(),
@@ -1085,9 +1119,15 @@ impl Parser {
                             ttype.clone(),
                         )?
                     } else {
+                        let mut lex = Lexicon::new();
+                        for (i,_) in self.environment.values.last().unwrap().iter() {
+                            lex.insert(i)
+                        }
+        
+                        let corrections = lex.corrections_for(&identifier);
                         return Err(common::error::parser_error(
                             format!("E1 Not a valid symbol: {}", identifier),
-                            format!("Unknown identifier"),
+                            format!("Unknown identifier\nDid you mean? {:?}",corrections),
                             pos.line,
                             pos.row,
                             self.filepath.clone(),
@@ -1109,11 +1149,15 @@ impl Parser {
                         if let Some((ttype, _, kind)) =
                             self.environment.get_type_capture(&identifier)
                         {
-                            self.environment
-                                .captured
-                                .last_mut()
-                                .unwrap()
-                                .insert(identifier.clone(), ttype.clone());
+                            self.environment.captured.last_mut().unwrap().insert(
+                                identifier.clone(),
+                                Symbol {
+                                    id: identifier.clone(),
+                                    ttype: ttype.clone(),
+                                    pos: Some(pos.clone()),
+                                    kind: kind.clone(),
+                                },
+                            );
                             self.environment.insert_symbol(
                                 &identifier,
                                 ttype.clone(),
@@ -1122,9 +1166,15 @@ impl Parser {
                             );
                             Expr::Literal(ttype.clone(), Atom::Id(identifier.clone()))
                         } else {
+                            let mut lex = Lexicon::new();
+                            for (i,_) in self.environment.values.last().unwrap().iter() {
+                                lex.insert(i)
+                            }
+            
+                            let corrections = lex.corrections_for(&identifier);
                             return Err(common::error::parser_error(
                                 format!("E2 Not a valid symbol: {}", identifier),
-                                format!("Unknown identifier"),
+                                format!("Unknown identifier\nDid you mean? {:?}",corrections),
                                 pos.line,
                                 pos.row,
                                 self.filepath.clone(),
@@ -1227,7 +1277,9 @@ impl Parser {
                         ),
                     };
                 }
+
                 let mut statements = self.block()?;
+
                 let captured = self
                     .environment
                     .captured
@@ -1236,8 +1288,9 @@ impl Parser {
                     .iter()
                     .map(|v| v.0.clone())
                     .collect();
+
                 self.environment.pop_scope();
-                // check return types
+
                 let (_, has_return) = self.check_returns(
                     &statements,
                     output.clone(),
@@ -1267,7 +1320,6 @@ impl Parser {
                         ));
                     }
                 }
-
                 left = Expr::Closure(
                     TType::Function(typeinput, Box::new(output)),
                     input,

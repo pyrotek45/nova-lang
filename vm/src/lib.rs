@@ -249,7 +249,10 @@ impl Vm {
                                 io::stdout().flush().expect("");
                             }
                         }
-                        VmData::Closure(_) => todo!(),
+                        VmData::Closure(v) => {
+                            print!("Closure: {v}");
+                            io::stdout().flush().expect("");
+                        }
                         VmData::StackAddress(_) => todo!(),
                         VmData::Struct(_) => todo!(),
                         VmData::Char(char) => {
@@ -622,7 +625,9 @@ impl Vm {
                             }
                             (item, VmData::List(index)) => {
                                 match item {
-                                    VmData::Function(_) => todo!(),
+                                    VmData::Function(v) => {
+                                        self.state.heap[index as usize] = Heap::Function(v)
+                                    }
                                     VmData::Int(v) => {
                                         self.state.heap[index as usize] = Heap::Int(v)
                                     }
@@ -638,7 +643,9 @@ impl Vm {
                                     VmData::Closure(_) => todo!(),
                                     VmData::StackAddress(_) => todo!(),
                                     VmData::Struct(_) => todo!(),
-                                    VmData::Char(_) => todo!(),
+                                    VmData::Char(v) => {
+                                        self.state.heap[index as usize] = Heap::Char(v)
+                                    }
                                 };
                             }
                             (a, b) => {
