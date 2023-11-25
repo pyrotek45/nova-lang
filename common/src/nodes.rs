@@ -125,21 +125,16 @@ impl Env {
     }
 
     pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, String, SymbolKind)> {
-        if self.values.len() <= 1 {
-            return None;
-        }
-        if let Some(s) = self.values.get(self.values.len() - 2).unwrap().get(symbol) {
-            Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
-        } else {
-            if self.captured.len() < 1 {
-                return None;
-            }
-            if let Some(s) = self.captured.last().unwrap().get(symbol) {
+        for search in self.values.iter().rev() {
+            if let Some(s) = search.get(symbol) {
+                self.captured
+                    .last_mut()
+                    .unwrap()
+                    .insert(s.id.clone(), s.clone());
                 return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
-            } else {
-                None
             }
         }
+        return None;
     }
 
     pub fn get_function_type_capture(
@@ -147,31 +142,32 @@ impl Env {
         symbol: &str,
         arguments: &[TType],
     ) -> Option<(TType, String, SymbolKind)> {
-        if self.values.len() <= 1 {
-            return None;
-        }
-        if let Some(s) = self.values.get(self.values.len() - 2).unwrap().get(symbol) {
-            if let TType::Function(_, _) = s.ttype {
-                Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
-            } else {
-                None
-            }
-        } else {
-            if let Some(s) = self
-                .values
-                .last()
-                .unwrap()
-                .get(&generate_unique_string(symbol, arguments))
-            {
+        for search in self.values.iter().rev() {
+            if let Some(s) = search.get(&generate_unique_string(symbol, arguments)) {
+                self.captured
+                    .last_mut()
+                    .unwrap()
+                    .insert(generate_unique_string(symbol, arguments), s.clone());
                 if let TType::Function(_, _) = s.ttype {
-                    Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
-                } else {
-                    None
+                    return Some((
+                        s.ttype.clone(),
+                        generate_unique_string(symbol, arguments),
+                        s.kind.clone(),
+                    ));
                 }
             } else {
-                None
+                if let Some(s) = search.get(symbol) {
+                    self.captured
+                        .last_mut()
+                        .unwrap()
+                        .insert(s.id.clone(), s.clone());
+                    if let TType::Function(_, _) = s.ttype {
+                        return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
+                    }
+                }
             }
         }
+        return None;
     }
 
     pub fn get_function_type(

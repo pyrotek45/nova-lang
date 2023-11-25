@@ -1205,47 +1205,6 @@ impl Parser {
             Token::Identifier(id, _) if id.as_str() == "fn" => {
                 let pos = self.get_pos();
                 self.advance();
-                let mut fcaptured = vec![];
-
-                if self.current_token().is_symbol('[') {
-                    self.advance();
-
-                    let (mut cid, _) = self.identifier()?;
-                    if let Some(_) = self.environment.get_type(&cid) {
-                        fcaptured.push(cid.clone());
-                    } else {
-                        let mut lex = Lexicon::new();
-                        for (i, _) in self.environment.values.last().unwrap().iter() {
-                            lex.insert(i)
-                        }
-
-                        let corrections = lex.corrections_for(&cid);
-                        return Err(self.generate_error(
-                            format!("{} is no ot a valid identifier", &cid),
-                            format!("Did you mean? {:?}", corrections),
-                        ));
-                    }
-                    while self.current_token().is_symbol(',') {
-                        self.advance();
-                        (cid, _) = self.identifier()?;
-                        if let Some(_) = self.environment.get_type(&cid) {
-                            fcaptured.push(cid.clone());
-                        } else {
-                            let mut lex = Lexicon::new();
-                            for (i, _) in self.environment.values.last().unwrap().iter() {
-                                lex.insert(i)
-                            }
-
-                            let corrections = lex.corrections_for(&cid);
-                            return Err(self.generate_error(
-                                format!("{} is no ot a valid identifier", &cid),
-                                format!("Did you mean? {:?}", corrections),
-                            ));
-                        }
-                    }
-
-                    self.consume_symbol(']')?;
-                }
                 // get parameters
                 self.consume_symbol('(')?;
                 let parameters = self.parameter_list()?;
@@ -1299,27 +1258,6 @@ impl Parser {
                 }
 
                 self.environment.push_scope();
-                for cv in fcaptured.iter() {
-                    if let Some(ctype) = self.environment.get_type_capture(&cv) {
-                        self.environment.captured.last_mut().unwrap().insert(
-                            cv.clone(),
-                            Symbol {
-                                id: cv.clone(),
-                                ttype: ctype.0.clone(),
-                                pos: Some(pos.clone()),
-                                kind: SymbolKind::Variable,
-                            },
-                        );
-                        self.environment.insert_symbol(
-                            &cv,
-                            ctype.0.clone(),
-                            Some(pos.clone()),
-                            SymbolKind::Variable,
-                        );
-                    } else {
-                        todo!()
-                    }
-                }
 
                 // insert params into scope
                 for (ttype, id) in parameters.iter() {
@@ -1343,7 +1281,7 @@ impl Parser {
 
                 let mut statements = self.block()?;
 
-                let captured: Vec<String> = self
+                let mut captured: Vec<String> = self
                     .environment
                     .captured
                     .last()
@@ -1351,9 +1289,31 @@ impl Parser {
                     .iter()
                     .map(|v| v.0.clone())
                     .collect();
-
                 self.environment.pop_scope();
 
+                for c in captured.iter() {
+                    if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+                        let pos = self.get_pos();
+                        self.environment.captured.last_mut().unwrap().insert(
+                            c.clone(),
+                            Symbol {
+                                id: mc.1,
+                                ttype: mc.0,
+                                pos: Some(pos),
+                                kind: mc.2,
+                            },
+                        );
+                    }
+                }
+
+                captured = self
+                    .environment
+                    .captured
+                    .last()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.0.clone())
+                    .collect();
                 // check return types
                 let (_, has_return) = self.check_returns(
                     &statements,
