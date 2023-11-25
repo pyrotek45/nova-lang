@@ -119,7 +119,7 @@ impl Lexer {
                 return None;
             }
             match self.buffer.as_str() {
-                "False" => {
+                "false" => {
                     return Some(Token::Bool(
                         false,
                         Position {
@@ -129,7 +129,7 @@ impl Lexer {
                         },
                     ))
                 }
-                "True" => {
+                "true" => {
                     return Some(Token::Bool(
                         true,
                         Position {
