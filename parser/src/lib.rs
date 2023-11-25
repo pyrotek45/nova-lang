@@ -1289,11 +1289,13 @@ impl Parser {
                     .iter()
                     .map(|v| v.0.clone())
                     .collect();
+
                 self.environment.pop_scope();
 
                 for c in captured.iter() {
                     if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_pos();
+
                         self.environment.captured.last_mut().unwrap().insert(
                             c.clone(),
                             Symbol {
@@ -1314,7 +1316,14 @@ impl Parser {
                     .iter()
                     .map(|v| v.0.clone())
                     .collect();
+
+                for dc in captured.iter() {
+                    if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                        self.environment.captured.last_mut().unwrap().remove(dc);
+                    }
+                }
                 // check return types
+
                 let (_, has_return) = self.check_returns(
                     &statements,
                     output.clone(),

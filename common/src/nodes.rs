@@ -125,12 +125,14 @@ impl Env {
     }
 
     pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, String, SymbolKind)> {
-        for search in self.values.iter().rev() {
+        for (i, search) in self.values.iter().rev().enumerate() {
             if let Some(s) = search.get(symbol) {
-                self.captured
-                    .last_mut()
-                    .unwrap()
-                    .insert(s.id.clone(), s.clone());
+                if i != 0 {
+                    self.captured
+                        .last_mut()
+                        .unwrap()
+                        .insert(s.id.clone(), s.clone());
+                }
                 return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
             }
         }
@@ -142,12 +144,14 @@ impl Env {
         symbol: &str,
         arguments: &[TType],
     ) -> Option<(TType, String, SymbolKind)> {
-        for search in self.values.iter().rev() {
+        for (i, search) in self.values.iter().rev().enumerate() {
             if let Some(s) = search.get(&generate_unique_string(symbol, arguments)) {
-                self.captured
-                    .last_mut()
-                    .unwrap()
-                    .insert(generate_unique_string(symbol, arguments), s.clone());
+                if i != 0 {
+                    self.captured
+                        .last_mut()
+                        .unwrap()
+                        .insert(s.id.clone(), s.clone());
+                }
                 if let TType::Function(_, _) = s.ttype {
                     return Some((
                         s.ttype.clone(),
@@ -157,10 +161,12 @@ impl Env {
                 }
             } else {
                 if let Some(s) = search.get(symbol) {
-                    self.captured
-                        .last_mut()
-                        .unwrap()
-                        .insert(s.id.clone(), s.clone());
+                    if i != 0 {
+                        self.captured
+                            .last_mut()
+                            .unwrap()
+                            .insert(s.id.clone(), s.clone());
+                    }
                     if let TType::Function(_, _) = s.ttype {
                         return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
                     }
@@ -201,7 +207,7 @@ impl Env {
 
     pub fn push_scope(&mut self) {
         let mut scope: HashMap<String, Symbol> = HashMap::default();
-        self.captured.push(HashMap::default());
+        self.captured.push(self.captured.last().unwrap().clone());
         for (id, sym) in self.values.last().unwrap().iter() {
             match sym.kind {
                 SymbolKind::Function => {
