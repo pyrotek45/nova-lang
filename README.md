@@ -215,12 +215,33 @@ str <- "hello world!"
 str.println()
 
 // Currying
-fn add(x:Int) -> (Int) -> Int {
-    return fn(y:Int) -> Int {
-        return x + y
+fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {   
+    return fn(y:Int) -> (Int) -> (Int) -> Int {  
+        return fn(z:Int) -> (Int) -> Int {            
+            return fn(t:Int) -> Int {            
+                return x + y + z + t
+            }            
+        }  
     }
 }
 
-inc <- add(1)
-4.inc().println()
+inc <- add(1)(2)(3)(4)
+inc.println()
+
+
+fn curry(f:($A,$A) -> $A) -> ($A) -> ($A) -> $A {
+    return fn(x: $A) -> ($A) -> $A {
+        return fn(y: $A) -> $A {
+            return f(x,y)
+        }
+    }
+}
+
+fn mul(x:Int,y:Int) -> Int {
+    return x * y
+}
+
+curriedmul <- curry(mul@(Int,Int))
+
+curriedmul(5)(5).println()
 ```
