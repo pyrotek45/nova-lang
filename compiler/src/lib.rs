@@ -601,6 +601,7 @@ impl Compiler {
                     if let Some(index) = self.variables.get_index(x.to_string()) {
                         self.asm.push(Asm::GET(index as u32));
                     } else {
+                        dbg!(&x);
                         panic!()
                     }
                 }
