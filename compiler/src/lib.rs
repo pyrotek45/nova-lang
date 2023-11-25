@@ -599,6 +599,7 @@ impl Compiler {
                 }
                 for x in captured.iter().cloned() {
                     if let Some(index) = self.variables.get_index(x.to_string()) {
+                        //dbg!(&captured);
                         self.asm.push(Asm::GET(index as u32));
                     } else {
                         dbg!(&x);
