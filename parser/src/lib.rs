@@ -1897,6 +1897,9 @@ impl Parser {
             }
             Token::Identifier(_, _) => {
                 let (identifier, _) = self.identifier()?;
+                if let Some(ttype) = self.environment.type_alias.get(&identifier) {
+                    return Ok(ttype.clone())
+                }
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
                     Ok(TType::Custom(identifier))
                 } else {
@@ -2033,6 +2036,7 @@ impl Parser {
 
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
+                "type" => self.typealias(),
                 "using" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
@@ -2060,6 +2064,29 @@ impl Parser {
     fn pass_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("pass"))?;
         Ok(Some(Statement::Pass))
+    }
+
+    fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("type"))?;
+        // get type id
+        let (id,pos) = self.identifier()?;
+        if self.environment.custom_types.contains_key(&id) {
+            return Err(common::error::parser_error(
+                format!("Type '{}' is already instantiated", id),
+                "Cannot alias a custom type".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        }
+        // assingment
+        self.consume_operator(Operator::Assignment)?;
+        // get type
+        let ttype = self.ttype()?;
+        // insert into type alias
+        self.environment.type_alias.insert(id, ttype);
+        Ok(None)
     }
 
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
