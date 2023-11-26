@@ -244,4 +244,15 @@ fn mul(x:Int,y:Int) -> Int {
 curriedmul <- curry(mul@(Int,Int))
 
 curriedmul(5)(5).println()
+
+// Type alias
+type Str = String
+
+let name : Str = "wow"
+
+fn test(x: Str) -> Str {
+    return x
+}
+
+test("hello world").println()
 ```
