@@ -1342,6 +1342,29 @@ impl Parser {
                     ));
                 }
 
+                //check to see if all generic types in output are present in input
+                // let mut inputtable = table::new();
+                // for i in typeinput.iter() {
+                //     inputtable.extend(self.getgen(i.clone()))
+                // }
+
+                // let outputtable = self.getgen(output.clone());
+                // dbg!(&inputtable, &outputtable);
+
+                // for o in outputtable.items.iter() {
+                //     if inputtable.has(o) {
+                //     } else {
+                //         return Err(error::parser_error(
+                //             format!("Input is missing type {}", o),
+                //             format!("All generic types in output must be present in input"),
+                //             pos.line,
+                //             pos.row,
+                //             self.filepath.clone(),
+                //             None,
+                //         ));
+                //     }
+                // }
+
                 if output == TType::Void {
                     if let Some(Statement::Return(_, _, _, _)) = statements.last() {
                     } else {
@@ -1833,6 +1856,36 @@ impl Parser {
         Ok(left)
     }
 
+    fn getgen(&self, ttype: TType) -> Table<String> {
+        let mut gtable = table::new();
+        match ttype {
+            TType::List(inner) => {
+                let innertable = self.getgen(*inner);
+                gtable.extend(innertable);
+            }
+            TType::Function(input, output) => {
+                let mut input_table = table::new();
+                let mut output_table = table::new();
+                for i in input.iter() {
+                    input_table.extend(self.getgen(i.clone()));
+                }
+                output_table.extend(self.getgen(*output));
+
+                gtable.extend(input_table);
+                gtable.extend(output_table);
+            }
+            TType::Generic(gen) => {
+                gtable.insert(gen);
+            }
+            TType::Option(inner) => {
+                let innertable = self.getgen(*inner);
+                gtable.extend(innertable);
+            }
+            _ => {}
+        }
+        gtable
+    }
+
     fn ttype(&mut self) -> Result<TType, NovaError> {
         match self.current_token() {
             Token::Symbol('(', _) => {
@@ -1852,6 +1905,27 @@ impl Parser {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
+
+                    // check to see if all generic types in output are present in input
+                    // let mut inputtable = table::new();
+                    // for i in input.iter() {
+                    //     inputtable.extend(self.getgen(i.clone()))
+                    // }
+
+                    // let outputtable = self.getgen(output.clone());
+                    // dbg!(&inputtable,&outputtable);
+
+                    // for o in outputtable.items.iter() {
+                    //     if inputtable.has(o) {
+
+                    //     } else {
+                    //         return Err(self.generate_error(
+                    //             format!("Input is missing type {}", o),
+                    //             format!("All generic types in output must be present in input"),
+                    //         ));
+                    //     }
+                    // }
+
                     Ok(TType::Function(*Box::new(input), Box::new(output)))
                 } else {
                     self.consume_symbol(')')?;
@@ -1860,6 +1934,27 @@ impl Parser {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
+
+                    //check to see if all generic types in output are present in input
+                    // let mut inputtable = table::new();
+                    // for i in input.iter() {
+                    //     inputtable.extend(self.getgen(i.clone()))
+                    // }
+
+                    // let outputtable = self.getgen(output.clone());
+                    // dbg!(&inputtable,&outputtable);
+
+                    // for o in outputtable.items.iter() {
+                    //     if inputtable.has(o) {
+
+                    //     } else {
+                    //         return Err(self.generate_error(
+                    //             format!("Input is missing type {}", o),
+                    //             format!("All generic types in output must be present in input"),
+                    //         ));
+                    //     }
+                    // }
+
                     Ok(TType::Function(
                         *Box::new(vec![TType::None]),
                         Box::new(output),
@@ -1898,7 +1993,7 @@ impl Parser {
             Token::Identifier(_, _) => {
                 let (identifier, _) = self.identifier()?;
                 if let Some(ttype) = self.environment.type_alias.get(&identifier) {
-                    return Ok(ttype.clone())
+                    return Ok(ttype.clone());
                 }
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
                     Ok(TType::Custom(identifier))
@@ -2069,7 +2164,7 @@ impl Parser {
     fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("type"))?;
         // get type id
-        let (id,pos) = self.identifier()?;
+        let (id, pos) = self.identifier()?;
         if self.environment.custom_types.contains_key(&id) {
             return Err(common::error::parser_error(
                 format!("Type '{}' is already instantiated", id),
@@ -2079,12 +2174,24 @@ impl Parser {
                 self.filepath.clone(),
                 None,
             ));
+        } else {
+            self.environment.custom_types.insert(id.clone(), vec![]);
         }
         // assingment
         self.consume_operator(Operator::Assignment)?;
         // get type
         let ttype = self.ttype()?;
         // insert into type alias
+
+
+        let gmap = self.getgen(ttype.clone());
+        if !gmap.is_empty() {
+            return Err(self.generate_error(
+                format!("Type alias cannot contain generic type"),
+                format!("Try removing the generic type"),
+            ));
+        }
+
         self.environment.type_alias.insert(id, ttype);
         Ok(None)
     }
