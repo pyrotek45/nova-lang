@@ -48,7 +48,7 @@ pub struct Env {
     pub custom_types: HashMap<String, Vec<(String, TType)>>,
     pub no_override: table::Table<String>,
     pub values: Vec<HashMap<String, Symbol>>,
-    pub type_alias: HashMap<String, TType>
+    pub type_alias: HashMap<String, TType>,
 }
 
 pub fn new_env() -> Env {

@@ -673,16 +673,16 @@ impl Compiler {
                         self.asm.push(Asm::STRING("\n".to_string()));
                         self.asm.push(Asm::PRINT);
                     }
+                    "print" => {
+                        self.asm.push(Asm::PRINT);
+                    }
                     "none" => self.asm.push(Asm::NONE),
                     "unwrap" => self.asm.push(Asm::UNWRAP),
                     "some" => {}
                     "isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
-                    "print" => {
-                        self.asm.push(Asm::PRINT);
-                        self.output.push(Code::PRINT)
-                    }
+
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {

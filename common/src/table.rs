@@ -7,7 +7,7 @@ pub struct Table<T> {
     pub items: Vec<T>,
 }
 
-impl<T: Eq> Table<T> {
+impl<T: Eq + Clone> Table<T> {
     #[inline(always)]
     pub fn insert(&mut self, item: T) {
         if !self.items.contains(&item) {
@@ -37,6 +37,12 @@ impl<T: Eq> Table<T> {
     #[inline(always)]
     pub fn clear(&mut self) {
         self.items.clear()
+    }
+    #[inline(always)]
+    pub fn extend(&mut self, othertable: Table<T>) {
+        for items in othertable.items.iter() {
+            self.insert(items.clone())
+        }
     }
 }
 
