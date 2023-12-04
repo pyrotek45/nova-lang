@@ -1,0 +1,22 @@
+struct List {
+    fill: ([$A], $A, Int) -> [$A],
+    initList: ($A, Int) -> [$A]
+}
+
+let list = List {
+    fill = fn(list: [$A], input: $A, ammount: Int) -> [$A] {
+        let i = 0
+        for i = 0; i < ammount; i += 1 {
+            list.push(input)
+        }
+        return list
+    },
+    initList = fn(input: $A, ammount: Int) -> [$A] {
+        let list = []: $A
+        let i = 0
+        for i = 0; i < ammount; i += 1 {
+            list.push(input)
+        }
+        return list
+    }
+}
