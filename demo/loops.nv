@@ -1,0 +1,18 @@
+// For loop (expression;condition;iteration)
+// <- is like a let statement, but its an expression instead, so we can use it here. 
+for i <- 0; i < 10; i += 1 {
+    i.println()
+}
+
+// While loops (condition)
+j <- 0
+while true {
+    j += 1
+    if j == 5 {
+        continue  // this will jump to the top of the loop
+    }
+    if j == 10 {
+        break  // this will break the loop
+    }
+    j.println()
+}

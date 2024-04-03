@@ -1,0 +1,12 @@
+// optional types are created with ?
+let option  : ?Int = some(10)
+let option2 : ?Int = ?Int // this is a nil value. 
+
+// checking if it exist
+if option.isSome() {
+    option.unwrap().println()
+}
+
+if option2.isSome() {
+    option2.unwrap().println()
+}
