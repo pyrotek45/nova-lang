@@ -452,7 +452,6 @@ impl Lexer {
                     self.buffer.clear();
                     continue;
                 }
-
             }
 
             match c {

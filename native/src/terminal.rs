@@ -2,7 +2,10 @@ use std::{io::stdout, time::Duration};
 
 use common::error::NovaError;
 use crossterm::{
-    cursor::MoveTo, event::{self, Event, KeyCode, KeyEvent}, execute, terminal::{self, ClearType}
+    cursor::MoveTo,
+    event::{self, Event, KeyCode, KeyEvent},
+    execute,
+    terminal::{self, ClearType},
 };
 use vm::state::{self, VmData};
 

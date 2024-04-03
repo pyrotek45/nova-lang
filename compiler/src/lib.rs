@@ -67,7 +67,7 @@ impl Compiler {
                             self.asm.push(Asm::STOREGLOBAL(index as u32))
                         } else {
                             self.global.insert(identifier.to_string());
-                            let index = self.variables.len() - 1;
+                            let index = self.global.len() - 1;
                             self.asm.push(Asm::STOREGLOBAL(index as u32))
                         }
                     } else {
@@ -618,8 +618,13 @@ impl Compiler {
                         //dbg!(&captured);
                         self.asm.push(Asm::GET(index as u32));
                     } else {
-                        dbg!(&x);
-                        panic!()
+                        if let Some(index) = self.global.get_index(x.to_string()) {
+                            //dbg!(&captured);
+                            self.asm.push(Asm::GETGLOBAL(index as u32));
+                        } else {
+                            dbg!(&x);
+                            panic!()
+                        }
                     }
                 }
 
