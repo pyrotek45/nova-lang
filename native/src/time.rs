@@ -8,9 +8,7 @@ pub fn sleep(state: &mut state::State) -> Result<(), NovaError> {
         let delay = time::Duration::from_millis(time as u64);
         thread::sleep(delay);
     } else {
-        return Err(common::error::runtime_error(
-            "Failed to sleep".to_owned(),
-        ))
+        return Err(common::error::runtime_error("Failed to sleep".to_owned()));
     }
     Ok(())
 }
