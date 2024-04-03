@@ -1,5 +1,5 @@
 use assembler::Assembler;
-use common::{error::NovaError, nodes::SymbolKind, tokens::TType};
+use common::{error::NovaError, nodes::SymbolKind, ttype::TType};
 use compiler::Compiler;
 use lexer::Lexer;
 use optimizer::Optimizer;
@@ -52,7 +52,7 @@ impl NovaCore {
     fn initnova(&mut self) {
         self.add_function(
             "len",
-            common::tokens::TType::Function(
+            TType::Function(
                 vec![TType::List(Box::new(TType::Generic("a".to_string())))],
                 Box::new(TType::Int),
             ),
@@ -61,13 +61,13 @@ impl NovaCore {
         );
         self.add_function(
             "readline",
-            common::tokens::TType::Function(vec![TType::None], Box::new(TType::String)),
+            TType::Function(vec![TType::None], Box::new(TType::String)),
             common::nodes::SymbolKind::GenericFunction,
             native::io::read_line,
         );
         self.add_function(
             "push",
-            common::tokens::TType::Function(
+            TType::Function(
                 vec![
                     TType::List(Box::new(TType::Generic("a".to_string()))),
                     TType::Generic("a".to_string()),
@@ -79,7 +79,7 @@ impl NovaCore {
         );
         self.add_function(
             "pop",
-            common::tokens::TType::Function(
+            TType::Function(
                 vec![TType::List(Box::new(TType::Generic("a".to_string())))],
                 Box::new(TType::Void),
             ),
@@ -88,19 +88,19 @@ impl NovaCore {
         );
         self.add_function(
             "randomInt",
-            common::tokens::TType::Function(vec![TType::Int, TType::Int], Box::new(TType::Int)),
+            TType::Function(vec![TType::Int, TType::Int], Box::new(TType::Int)),
             common::nodes::SymbolKind::GenericFunction,
             native::rand::random_int,
         );
         self.add_function(
             "strlen",
-            common::tokens::TType::Function(vec![TType::String], Box::new(TType::Int)),
+            TType::Function(vec![TType::String], Box::new(TType::Int)),
             common::nodes::SymbolKind::GenericFunction,
             native::str::strlen,
         );
         self.add_function(
             "strToChars",
-            common::tokens::TType::Function(
+            TType::Function(
                 vec![TType::String],
                 Box::new(TType::List(Box::new(TType::Char))),
             ),
@@ -109,7 +109,7 @@ impl NovaCore {
         );
         self.add_function(
             "charsToStr",
-            common::tokens::TType::Function(
+            TType::Function(
                 vec![TType::List(Box::new(TType::Char))],
                 Box::new(TType::String),
             ),
@@ -191,7 +191,7 @@ impl NovaCore {
 //                             // adding native functions
 //                             parser.environment.insert_symbol(
 //                                 "len",
-//                                 common::tokens::TType::Function(
+//                                 TType::Function(
 //                                     vec![TType::List(Box::new(TType::Generic(
 //                                         "a".to_string(),
 //                                     )))],

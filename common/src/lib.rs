@@ -1,7 +1,9 @@
 pub mod code;
+pub mod environment;
 pub mod error;
 pub mod gen;
 pub mod nodes;
 pub mod table;
 pub mod tokens;
+pub mod ttype;
 pub mod utilities;

@@ -2,7 +2,7 @@ use common::code::{Asm, Code};
 use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};
-use common::tokens::TType;
+use common::ttype::TType;
 
 #[derive(Debug, Clone)]
 pub struct Compiler {

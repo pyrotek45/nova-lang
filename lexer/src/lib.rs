@@ -1,6 +1,7 @@
 use common::{
     error::{file_error, lexer_error, NovaError},
-    tokens::{Operator, Position, TType, Token, TokenList},
+    tokens::{Operator, Position, Token, TokenList},
+    ttype::TType,
 };
 
 #[derive(Debug, PartialEq, Eq)]
