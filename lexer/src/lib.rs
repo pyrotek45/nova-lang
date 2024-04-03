@@ -487,7 +487,8 @@ impl Lexer {
                                         row: self.row - 1,
                                         filepath: self.filepath.clone(),
                                     },
-                                ))
+                                ));
+                                continue;
                             }
                             if let Some('-') = chars.peek() {
                                 chars.next();
