@@ -96,7 +96,7 @@ let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
 })
 
 let myOtherFunc = myMul.function
-let simpleSquare = fn(x: Int) -> Int {return x * x}
+let simpleSquare = fn(x: Int) -> Int {return x * x};
 
 // Calling function pointer from a struct
 (myMul.function)(4,99).println()
