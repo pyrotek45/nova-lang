@@ -60,10 +60,40 @@ impl NovaCore {
             native::list::len,
         );
         self.add_function(
+            "sleep",
+            TType::Function(vec![TType::Int], Box::new(TType::Void)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::time::sleep,
+        );
+        self.add_function(
+            "rawmode",
+            TType::Function(vec![TType::Bool], Box::new(TType::Void)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::rawmode,
+        );
+        self.add_function(
+            "getch",
+            TType::Function(vec![TType::None], Box::new(TType::Option(Box::new(TType::Char)))),
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::getch,
+        );
+        self.add_function(
+            "rawread",
+            TType::Function(vec![TType::None], Box::new(TType::Option(Box::new(TType::Char)))),
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::rawread,
+        );
+        self.add_function(
             "readline",
             TType::Function(vec![TType::None], Box::new(TType::String)),
             common::nodes::SymbolKind::GenericFunction,
             native::io::read_line,
+        );
+        self.add_function(
+            "clearscreen",
+            TType::Function(vec![TType::None], Box::new(TType::Void)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::clear_screen,
         );
         self.add_function(
             "push",

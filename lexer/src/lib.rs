@@ -324,35 +324,137 @@ impl Lexer {
                 }
             }
             if self.parsing == LexerState::Char {
-                if c != '\'' {
-                    self.buffer.push(c);
+                if c == '\\' {
+                    match chars.peek() {
+                        Some('n') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\n',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('t') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\t',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('r') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\r',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('\'') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\'',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('\"') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\"',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('0') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\0',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('\\') => {
+                            chars.next();
+                            self.tokens.push(Token::Char(
+                                '\\',
+                                Position {
+                                    line: self.line,
+                                    row: self.row,
+                                    filepath: self.filepath.clone(),
+                                },
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        _ => {
+                            return Err(common::error::lexer_error(
+                                "Expecting valid escape char".to_string(),
+                                "".to_string(),
+                                self.line,
+                                self.row - self.buffer.len(),
+                                self.filepath.clone(),
+                            ));
+                        }
+                    }
+                } else if c == '\'' {
+                    self.parsing = LexerState::Token;
+                    self.row += 1;
+                    self.buffer.clear();
                     continue;
                 } else {
-                    self.parsing = LexerState::Token;
-                    if self.buffer.len() > 1 {
-                        return Err(common::error::lexer_error(
-                            "Char cannot contain more than one character".to_string(),
-                            "Try using double quotes instead, if you need a string".to_string(),
-                            self.line,
-                            self.row - self.buffer.len(),
-                            self.filepath.clone(),
-                        ));
-                    }
-                    if let Some(ch) = self.buffer.chars().next() {
-                        self.tokens.push(Token::Char(
-                            ch,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                                filepath: self.filepath.clone(),
-                            },
-                        ));
-                    }
+                    self.tokens.push(Token::Char(
+                        c,
+                        Position {
+                            line: self.line,
+                            row: self.row,
+                            filepath: self.filepath.clone(),
+                        },
+                    ));
                     self.row += 1;
                     self.buffer.clear();
                     continue;
                 }
+
             }
+
             match c {
                 '\'' => {
                     self.row += 1;

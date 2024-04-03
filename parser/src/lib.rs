@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 
 use common::{
     environment::{new_environment, Environment},
@@ -1000,13 +1000,16 @@ impl Parser {
                         )
                     } else {
                         return Err(self.generate_error(
-                            format!("Cannot index into tuple with {:?}",self.current_token()),
+                            format!("Cannot index into tuple with {:?}", self.current_token()),
                             format!(""),
                         ));
                     }
                 } else {
                     return Err(self.generate_error(
-                        format!("Failed to index into tuple, {} is not a tuple ",type_to_string(&lhs.get_type())),
+                        format!(
+                            "Failed to index into tuple, {} is not a tuple ",
+                            type_to_string(&lhs.get_type())
+                        ),
                         format!(""),
                     ));
                 }
@@ -1665,13 +1668,16 @@ impl Parser {
                             )
                         } else {
                             return Err(self.generate_error(
-                                format!("Cannot index into tuple with {:?}",self.current_token()),
+                                format!("Cannot index into tuple with {:?}", self.current_token()),
                                 format!(""),
                             ));
                         }
                     } else {
                         return Err(self.generate_error(
-                            format!("Failed to index into tuple, {} is not a tuple ",type_to_string(&left.get_type())),
+                            format!(
+                                "Failed to index into tuple, {} is not a tuple ",
+                                type_to_string(&left.get_type())
+                            ),
                             format!(""),
                         ));
                     }
