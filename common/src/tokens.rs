@@ -56,7 +56,6 @@ pub enum Token {
     Symbol(char, Position),
     Bool(bool, Position),
     Operator(Operator, Position),
-    NewLine(Position),
     EOF(Position),
 }
 
@@ -136,7 +135,6 @@ impl Token {
             | Token::Bool(_, pos)
             | Token::Operator(_, pos)
             | Token::EOF(pos) => pos.line,
-            Token::NewLine(pos) => pos.line,
         }
     }
 
@@ -152,7 +150,6 @@ impl Token {
             | Token::Bool(_, pos)
             | Token::Operator(_, pos)
             | Token::EOF(pos) => pos.row,
-            Token::NewLine(pos) => pos.row,
         }
     }
 
@@ -163,13 +160,7 @@ impl Token {
             false
         }
     }
-    pub fn is_newline(&self) -> bool {
-        if let Token::NewLine(_) = self {
-            true
-        } else {
-            false
-        }
-    }
+
     pub fn is_relop(&self) -> bool {
         if let Token::Operator(op, _) = self {
             match op {

@@ -124,9 +124,10 @@ impl Parser {
         }
     }
 
-    fn eat_if_newline(&mut self) {
-        if self.current_token().is_newline() {
-            self.advance()
+    fn is_current_eof(&mut self) -> bool {
+        match self.current_token() {
+            Token::EOF(_) => true,
+            _ => false,
         }
     }
 
@@ -370,17 +371,16 @@ impl Parser {
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
         self.consume_symbol('[')?;
-        self.eat_if_newline();
+
         if !self.current_token().is_symbol(']') {
             exprs.push(self.expr()?);
         }
-        while self.current_token().is_symbol(',') || self.current_token().is_newline() {
-            self.eat_if_newline();
+        while self.current_token().is_symbol(',') {
             if self.current_token().is_symbol(']') {
                 break;
             }
             self.advance();
-            self.eat_if_newline();
+
             if self.current_token().is_symbol(']') {
                 break;
             }
@@ -424,18 +424,17 @@ impl Parser {
         let mut exprs: HashMap<String, Expr> = HashMap::default();
 
         self.consume_symbol('{')?;
-        self.eat_if_newline();
+
         let (id, _) = self.identifier()?;
         self.consume_operator(Operator::Assignment)?;
         exprs.insert(id.clone(), self.expr()?);
 
         while self.current_token().is_symbol(',') {
-            self.eat_if_newline();
             self.advance();
             if self.current_token().is_symbol('}') {
                 break;
             }
-            self.eat_if_newline();
+
             if self.current_token().is_symbol('}') {
                 break;
             }
@@ -446,7 +445,7 @@ impl Parser {
                 break;
             }
         }
-        self.eat_if_newline();
+
         self.consume_symbol('}')?;
 
         let mut new_exprs = vec![];
@@ -2050,7 +2049,7 @@ impl Parser {
         }
         while self.current_token().is_symbol(',') {
             self.advance();
-            self.eat_if_newline();
+
             match self.identifier() {
                 Ok((id, _)) => {
                     if parameters.has(&id) {
@@ -2206,9 +2205,9 @@ impl Parser {
             .custom_types
             .insert(identifier.clone(), vec![]);
         self.consume_symbol('{')?;
-        self.eat_if_newline();
+
         let parameters = self.parameter_list()?;
-        self.eat_if_newline();
+
         self.consume_symbol('}')?;
 
         let mut fields: Vec<(String, TType)> = vec![];
@@ -2662,27 +2661,22 @@ impl Parser {
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {
-        if !self.current_token().is_newline() {
-            let expr = self.expr()?;
-            if expr.get_type() != TType::Void {
-                return Err(self.generate_error(
-                    "Expression returns value, but does nothing with it".to_string(),
-                    "Remove the expression or assign it to a variable".to_string(),
-                ));
-            }
-            match expr {
-                Expr::None => Ok(None),
-                _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
-            }
-        } else {
-            self.advance();
-            Ok(None)
+        let expr = self.expr()?;
+        if expr.get_type() != TType::Void {
+            return Err(self.generate_error(
+                "Expression returns value, but does nothing with it".to_string(),
+                "Remove the expression or assign it to a variable".to_string(),
+            ));
+        }
+        match expr {
+            Expr::None => Ok(None),
+            _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
         }
     }
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
         self.consume_symbol('{')?;
-        self.eat_if_newline();
+
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
         Ok(statements)
@@ -2690,17 +2684,16 @@ impl Parser {
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {
         let mut statements = vec![];
-        self.eat_if_newline();
+
         if let Some(statement) = self.statement()? {
             statements.push(statement);
         }
-        while self.current_token().is_newline() || self.current_token().is_symbol(';') {
-            self.advance();
+        while self.current_token().is_symbol(';') || !self.is_current_eof() {
+            if self.current_token().is_symbol(';') {
+                self.advance()
+            }
             if self.current_token().is_symbol('}') {
                 break;
-            }
-            if self.current_token().is_newline() {
-                continue;
             }
             if let Some(statement) = self.statement()? {
                 statements.push(statement);

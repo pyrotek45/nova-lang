@@ -331,7 +331,6 @@ impl Assembler {
                 tokens::Token::Symbol(_, _) => todo!(),
                 tokens::Token::Bool(_, _) => todo!(),
                 tokens::Token::Operator(_, _) => todo!(),
-                tokens::Token::NewLine(_) => ci += 1,
                 tokens::Token::EOF(_) => ci += 1,
             }
         }
