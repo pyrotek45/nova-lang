@@ -365,11 +365,6 @@ impl Lexer {
                 }
                 '\n' => {
                     self.check_token();
-                    self.tokens.push(Token::NewLine(Position {
-                        line: self.line,
-                        row: self.row,
-                        filepath: self.filepath.clone(),
-                    }));
                     self.line += 1;
                     self.row = 0;
                 }
@@ -381,12 +376,6 @@ impl Lexer {
                             self.buffer.push(c);
                         } else {
                             self.check_token();
-                            match self.tokens.last() {
-                                Some(Token::NewLine(_)) => {
-                                    self.tokens.pop();
-                                }
-                                _ => {}
-                            }
                             self.tokens.push(Token::Symbol(
                                 c,
                                 Position {
@@ -398,12 +387,6 @@ impl Lexer {
                         }
                     } else {
                         self.check_token();
-                        match self.tokens.last() {
-                            Some(Token::NewLine(_)) => {
-                                self.tokens.pop();
-                            }
-                            _ => {}
-                        }
                         self.tokens.push(Token::Symbol(
                             c,
                             Position {
@@ -583,16 +566,6 @@ impl Lexer {
                                 chars.next();
                                 self.row += 1;
                                 self.parsing = LexerState::Comment;
-                                if self.row == 1 {
-                                    self.tokens.push(Token::Symbol(
-                                        ';',
-                                        Position {
-                                            line: self.line,
-                                            row: self.row,
-                                            filepath: self.filepath.clone(),
-                                        },
-                                    ))
-                                }
                             } else {
                                 self.tokens.push(Token::Operator(
                                     Operator::Division,
