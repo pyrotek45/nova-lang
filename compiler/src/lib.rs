@@ -320,6 +320,7 @@ impl Compiler {
                 }
             }
             Atom::Char(_) => todo!(),
+            Atom::None => todo!(),
         }
         Ok(())
     }
@@ -705,6 +706,7 @@ impl Compiler {
                 }
             }
             Atom::Char(c) => self.asm.push(Asm::Char(c)),
+            Atom::None => self.asm.push(Asm::NONE),
         }
         Ok(())
     }
