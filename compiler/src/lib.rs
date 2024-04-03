@@ -17,6 +17,7 @@ pub struct Compiler {
     pub asm: Vec<Asm>,
     pub gen: Gen,
     pub breaks: Vec<usize>,
+    pub continues: Vec<usize>
 }
 
 pub fn new() -> Compiler {
@@ -32,6 +33,7 @@ pub fn new() -> Compiler {
         asm: vec![],
         gen: common::gen::new(),
         breaks: vec![],
+        continues: vec![],
     }
 }
 
@@ -164,6 +166,7 @@ impl Compiler {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
                     self.breaks.push(end);
+                    self.continues.push(top);
                     self.asm.push(Asm::LABEL(top));
                     self.compile_expr(test.clone())?;
                     self.asm.push(Asm::JUMPIFFALSE(end));
@@ -175,11 +178,13 @@ impl Compiler {
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
                     self.breaks.pop();
+                    self.continues.pop();
                 }
                 common::nodes::Statement::For(init, test, inc, body) => {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
                     self.breaks.push(end);
+                    self.continues.push(top);
                     self.compile_expr(init.clone())?;
                     self.asm.push(Asm::LABEL(top));
                     self.compile_expr(test.clone())?;
@@ -193,6 +198,7 @@ impl Compiler {
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
                     self.breaks.pop();
+                    self.continues.pop();
                 }
                 common::nodes::Statement::Break => {
                     if let Some(target) = self.breaks.last() {
@@ -201,7 +207,13 @@ impl Compiler {
                         todo!()
                     }
                 }
-                common::nodes::Statement::Continue => todo!(),
+                common::nodes::Statement::Continue => {
+                    if let Some(target) = self.continues.last() {
+                        self.asm.push(Asm::BJMP(*target));
+                    } else {
+                        todo!()
+                    }
+                }
                 common::nodes::Statement::Block(body, filepath) => {
                     let body = Ast {
                         program: body.clone(),
@@ -359,7 +371,7 @@ impl Compiler {
                 Ok(())
             }
             Expr::Unary(_, unary, expr) => match unary {
-                common::tokens::Unary::Positive => todo!(),
+                common::tokens::Unary::Positive => {Ok(())},
                 common::tokens::Unary::Negitive => {
                     self.compile_expr(*expr)?;
                     self.asm.push(Asm::NEG);
