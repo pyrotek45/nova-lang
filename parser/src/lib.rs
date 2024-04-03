@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 use common::{
+    environment::{new_environment, Environment},
     error::{self, NovaError},
-    nodes::{new_env, Arg, Ast, Atom, Env, Expr, Field, Statement, Symbol, SymbolKind},
+    nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
-    tokens::{generate_unique_string, Operator, Position, TType, Token, TokenList, Unary},
+    tokens::{Operator, Position, Token, TokenList, Unary},
+    ttype::{generate_unique_string, TType},
 };
 use dym::Lexicon;
 use lexer::Lexer;
@@ -22,11 +24,11 @@ pub struct Parser {
     pub input: TokenList,
     index: usize,
     pub ast: Ast,
-    pub environment: Env,
+    pub environment: Environment,
 }
 
 pub fn new(filepath: &str) -> Parser {
-    let mut env = new_env();
+    let mut env = new_environment();
     env.insert_symbol(
         "strlen",
         TType::Function(vec![TType::String], Box::new(TType::Int)),
