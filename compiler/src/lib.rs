@@ -1,4 +1,4 @@
-use common::code::{Asm, Code};
+use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};

@@ -1320,7 +1320,7 @@ impl Parser {
                     .collect();
 
                 for dc in captured.iter() {
-                    if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                    if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
                         self.environment.captured.last_mut().unwrap().remove(dc);
                     }
                 }
