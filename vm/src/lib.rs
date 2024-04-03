@@ -246,7 +246,7 @@ impl Vm {
                         VmData::String(index) => {
                             if let Heap::String(str) = self.state.deref(index) {
                                 print!("{str}");
-                                io::stdout().flush().expect("");
+                                //io::stdout().flush().expect("");
                             }
                         }
                         VmData::Closure(v) => {
@@ -256,7 +256,8 @@ impl Vm {
                         VmData::StackAddress(_) => todo!(),
                         VmData::Struct(_) => todo!(),
                         VmData::Char(char) => {
-                            print!("{char}")
+                            print!("{char}");
+                            io::stdout().flush().expect("");
                         }
                     }
                 }
