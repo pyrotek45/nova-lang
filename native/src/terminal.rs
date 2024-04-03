@@ -33,20 +33,22 @@ pub fn getch(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
-    if event::poll(Duration::from_millis(100)).expect("Error") {
-        if let Event::Key(KeyEvent {
-            code: KeyCode::Char(character),
-            modifiers: event::KeyModifiers::NONE,
-            kind: _,
-            state: _,
-        }) = event::read().expect("Failed to read line")
-        {
-            state.stack.push(VmData::Char(character));
+    if let Some(VmData::Int(time)) = state.stack.pop() {
+        if event::poll(Duration::from_millis(time as u64)).expect("Error") {
+            if let Event::Key(KeyEvent {
+                code: KeyCode::Char(character),
+                modifiers: event::KeyModifiers::NONE,
+                kind: _,
+                state: _,
+            }) = event::read().expect("Failed to read line")
+            {
+                state.stack.push(VmData::Char(character));
+            } else {
+                state.stack.push(VmData::None);
+            }
         } else {
             state.stack.push(VmData::None);
         }
-    } else {
-        state.stack.push(VmData::None);
     }
     Ok(())
 }

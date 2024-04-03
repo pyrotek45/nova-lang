@@ -1,0 +1,92 @@
+struct Player {
+    x: Int,
+    y: Int,
+    symbol: Char
+}
+
+struct Wall {
+    location: Int,
+    opening: Int
+}
+
+fn endgame() {
+    rawmode(false)
+    println("YOU DIED")
+
+}
+
+fn showscreen(player: Player, wall: Wall, points: Int) -> Bool {
+    let screen = []: Char
+    screen.push('\n')
+    screen.push('\r')
+    for i <- 0; i < 20; i += 1 {
+        for j <- 0; j < 35; j += 1 {
+            if (player.x == i) && (player.y == j) {
+                screen.push(player.symbol)
+            } elif wall.location == j {
+                if (wall.opening + 1 == i) 
+                || (wall.opening + 2 == i) 
+                || (wall.opening + 3 == i) 
+                || (wall.opening + 4 == i) 
+                || (wall.opening + 5 == i) {
+                    screen.push(' ')
+                } else {
+                    if (player.y == wall.location) 
+                    && (player.x != wall.opening + 1)
+                    && (player.x != wall.opening + 2) 
+                    && (player.x != wall.opening + 3) 
+                    && (player.x != wall.opening + 4) 
+                    && (player.x != wall.opening + 5) {
+                        endgame()
+                        return false
+                    }
+                    screen.push('#')
+                }
+            } else {
+                screen.push(' ')
+            }
+        }
+        screen.push('\n')
+        screen.push('\r')
+    }
+    print("press q to exit, w to jump. Points: "); println(points)
+    screen.charsToStr().println()
+    return true
+}
+
+
+let input = ?Char
+let player = Player(5,5,'@')
+let wall = Wall(35,randomInt(0,14))
+let points = 0
+
+rawmode(true)
+let alive = true
+while alive {
+    clearscreen()
+    alive = showscreen(player,wall, points)
+    input = rawread(120);
+    if input.isSome() {
+        if input == 'q' {
+            break
+        } elif input == 'w' {
+            player.x -= 4
+        }
+    }
+    player.x += 1
+    if player.x >= 20 {
+        endgame()
+        alive = false
+    } elif player.x <= 0 {
+        endgame()
+        alive = false
+    }
+    if wall.location <= 0 {
+        wall.location = 35
+        wall.opening = randomInt(0,14)
+        points += 1
+    } else {
+        wall.location -= 1
+    }
+}
+rawmode(false)
