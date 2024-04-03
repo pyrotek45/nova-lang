@@ -4,6 +4,45 @@
 
 Programming lang WIP
 
+# Getting Started with Cargo and Nova
+
+Nova is built in Rust, which means that you'll need to have Rust installed on your computer in order to run it. If you don't already have Rust installed, you can download it from rust-lang.org.
+
+Once you have Rust installed, you can use Cargo to easily build and run Nova. Cargo is Rust's package manager and build tool, and it comes bundled with Rust.
+
+# Installing Nova
+
+To install Nova using Cargo, follow these steps:
+
+Clone the Nova repository to your local machine by running the following command in your terminal:
+
+    
+```bash
+git clone https://github.com/pyrotek45/nova-lang
+```
+
+Change your working directory to the root of the Nova repository:
+
+```bash
+
+cd nova
+```
+
+Build Nova using Cargo:
+
+```bash
+
+cargo build --release
+```
+This may take a few minutes, especially the first time you build Nova.
+
+Once Cargo has finished building Nova, you can run it using the following command:
+
+```bash
+
+ ./target/release/nova
+```
+
 Enjoy this demo!
 
 ```swift
