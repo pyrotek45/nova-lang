@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use common::{
     environment::{new_environment, Environment},
@@ -6,7 +6,7 @@ use common::{
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
     tokens::{Operator, Position, Token, TokenList, Unary},
-    ttype::{generate_unique_string, TType},
+    ttype::{generate_unique_string, type_to_string, TType},
 };
 use dym::Lexicon;
 use lexer::Lexer;
@@ -366,6 +366,34 @@ impl Parser {
             },
             _ => Ok(None),
         }
+    }
+
+    fn tuple_list(&mut self) -> Result<Vec<Expr>, NovaError> {
+        let mut exprs = vec![];
+        self.consume_symbol('(')?;
+        if !self.current_token().is_symbol(')') {
+            exprs.push(self.expr()?);
+        }
+        while self.current_token().is_symbol(',') {
+            if self.current_token().is_symbol(')') {
+                break;
+            }
+            self.advance();
+            if self.current_token().is_symbol(')') {
+                break;
+            }
+            let e = self.expr()?;
+            if e.get_type() != TType::Void {
+                exprs.push(e);
+            } else {
+                return Err(self.generate_error(
+                    format!("cannot insert a void expression"),
+                    format!("tuple expressions must not be void"),
+                ));
+            }
+        }
+        self.consume_symbol(')')?;
+        Ok(exprs)
     }
 
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
@@ -951,6 +979,38 @@ impl Parser {
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
+            Token::Operator(Operator::Colon, _) => {
+                self.consume_operator(Operator::Colon)?;
+                if let TType::Tuple(typelist) = lhs.get_type() {
+                    if let Token::Integer(index, _) = self.current_token() {
+                        self.advance();
+                        if index as usize >= typelist.len() {
+                            return Err(self.generate_error(
+                                format!("Tuple cannot index into {index}"),
+                                format!("Tuple has {} values", typelist.len()),
+                            ));
+                        }
+                        let ttype = &typelist[index as usize];
+                        lhs = Expr::Indexed(
+                            ttype.clone(),
+                            "anon".to_string(),
+                            Box::new(Expr::Literal(TType::Int, Atom::Integer(index))),
+                            Box::new(lhs),
+                            self.get_pos(),
+                        )
+                    } else {
+                        return Err(self.generate_error(
+                            format!("Cannot index into tuple with {:?}",self.current_token()),
+                            format!(""),
+                        ));
+                    }
+                } else {
+                    return Err(self.generate_error(
+                        format!("Failed to index into tuple, {} is not a tuple ",type_to_string(&lhs.get_type())),
+                        format!(""),
+                    ));
+                }
+            }
             Token::Operator(Operator::DoubleColon, _) => {
                 let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
@@ -1195,6 +1255,16 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
+            Token::Symbol('#', _) => {
+                self.consume_symbol('#')?;
+                let mut typelist = vec![];
+
+                let expressions = self.tuple_list()?;
+                for ttype in expressions.iter() {
+                    typelist.push(ttype.get_type());
+                }
+                left = Expr::ListConstructor(TType::Tuple(typelist), expressions);
+            }
             Token::Symbol('?', _) => {
                 self.consume_symbol('?')?;
                 let option_type = self.ttype()?;
@@ -1574,6 +1644,38 @@ impl Parser {
         }
         loop {
             match self.current_token() {
+                Token::Operator(Operator::Colon, _) => {
+                    self.consume_operator(Operator::Colon)?;
+                    if let TType::Tuple(typelist) = left.get_type() {
+                        if let Token::Integer(index, _) = self.current_token() {
+                            self.advance();
+                            if index as usize >= typelist.len() {
+                                return Err(self.generate_error(
+                                    format!("Tuple cannot index into {index}"),
+                                    format!("Tuple has {} values", typelist.len()),
+                                ));
+                            }
+                            let ttype = &typelist[index as usize];
+                            left = Expr::Indexed(
+                                ttype.clone(),
+                                "anon".to_string(),
+                                Box::new(Expr::Literal(TType::Int, Atom::Integer(index))),
+                                Box::new(left),
+                                self.get_pos(),
+                            )
+                        } else {
+                            return Err(self.generate_error(
+                                format!("Cannot index into tuple with {:?}",self.current_token()),
+                                format!(""),
+                            ));
+                        }
+                    } else {
+                        return Err(self.generate_error(
+                            format!("Failed to index into tuple, {} is not a tuple ",type_to_string(&left.get_type())),
+                            format!(""),
+                        ));
+                    }
+                }
                 Token::Operator(Operator::RightArrow, _) => {
                     // mything <- compute()
                     self.consume_operator(Operator::RightArrow)?;
@@ -1890,6 +1992,18 @@ impl Parser {
 
     fn ttype(&mut self) -> Result<TType, NovaError> {
         match self.current_token() {
+            Token::Symbol('#', _) => {
+                self.consume_symbol('#')?;
+                let mut typelist = vec![];
+                self.consume_symbol('(')?;
+                typelist.push(self.ttype()?);
+                while self.current_token().is_symbol(',') {
+                    self.consume_symbol(',')?;
+                    typelist.push(self.ttype()?);
+                }
+                self.consume_symbol(')')?;
+                Ok(TType::Tuple(typelist))
+            }
             Token::Symbol('(', _) => {
                 self.consume_symbol('(')?;
                 let mut input = vec![];

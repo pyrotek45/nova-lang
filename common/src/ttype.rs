@@ -14,6 +14,7 @@ pub enum TType {
     Function(Vec<TType>, Box<TType>),
     Generic(String),
     Option(Box<TType>),
+    Tuple(Vec<TType>),
 }
 
 pub fn generate_unique_string(input: &str, types: &[TType]) -> String {
@@ -56,6 +57,14 @@ pub fn type_to_string(ttype: &TType) -> String {
         TType::None => "None".to_string(),
         TType::Option(name) => format!("Option_{}", type_to_string(name)),
         TType::Char => "Char".to_string(),
+        TType::Tuple(tuple) => {
+            let types = tuple
+                .iter()
+                .map(|t| type_to_string(t))
+                .collect::<Vec<String>>()
+                .join("_");
+            format!("Function_{}", types)
+        }
     }
 }
 
