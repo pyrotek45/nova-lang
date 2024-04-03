@@ -371,7 +371,10 @@ impl Compiler {
                 Ok(())
             }
             Expr::Unary(_, unary, expr) => match unary {
-                common::tokens::Unary::Positive => {Ok(())},
+                common::tokens::Unary::Positive => {
+                    self.compile_expr(*expr)?;
+                    Ok(())
+                }
                 common::tokens::Unary::Negitive => {
                     self.compile_expr(*expr)?;
                     self.asm.push(Asm::NEG);
