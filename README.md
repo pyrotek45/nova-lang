@@ -11,7 +11,7 @@ Enjoy this demo!
 struct Person {
     name: String,
     age: Int,
-}
+};
 
 // Hello world
 println("hello world!")
@@ -191,7 +191,7 @@ if x.isSome() {
     x.unwrap().println()
 }
 
-x = none()
+x = ?Int
 if x.isSome() {
     println("i never print")
     x.unwrap().println()
