@@ -17,7 +17,7 @@ pub struct Compiler {
     pub asm: Vec<Asm>,
     pub gen: Gen,
     pub breaks: Vec<usize>,
-    pub continues: Vec<usize>
+    pub continues: Vec<usize>,
 }
 
 pub fn new() -> Compiler {
