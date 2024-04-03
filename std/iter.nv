@@ -26,7 +26,7 @@ let iter = Iter {
         let index : Int_box = Int_box {value = 0}    
         return fn() -> ?$A {
             if index.value >= input.len() {
-                return none()
+                return ?$A
             } else {
                 let result : ?$A = some(input[index.value])
                 index.value = index.value + 1
@@ -40,7 +40,7 @@ let iter = Iter {
             if result.isSome() {
                 return some(f(result.unwrap()))
             } else {
-                return none()
+                return ?$A
             }
         }
     },

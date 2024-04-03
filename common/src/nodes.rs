@@ -271,6 +271,7 @@ pub enum Statement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
+    None,
     Char(char),
     Bool(bool),
     Id(String),

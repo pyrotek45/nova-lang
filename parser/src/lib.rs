@@ -279,11 +279,7 @@ impl Parser {
                     self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Option(inner1), TType::Option(inner2)) => {
-                    if **inner1 == TType::None || **inner2 == TType::None {
-                        continue;
-                    } else {
-                        self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
-                    }
+                    self.check_and_map_types(&[*inner1.clone()], &[*inner2.clone()], type_map)?;
                 }
                 (TType::Function(params1, ret1), TType::Function(params2, ret2)) => {
                     if params1.len() != params2.len() {
@@ -1198,6 +1194,11 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
+            Token::Symbol('?', _) => {
+                self.consume_symbol('?')?;
+                let option_type = self.ttype()?;
+                left = Expr::Literal(TType::Option(Box::new(option_type)), Atom::None);
+            }
             Token::Char(char, _) => {
                 self.advance();
                 left = Expr::Literal(TType::Char, Atom::Char(char))
@@ -2182,7 +2183,6 @@ impl Parser {
         // get type
         let ttype = self.ttype()?;
         // insert into type alias
-
 
         let gmap = self.getgen(ttype.clone());
         if !gmap.is_empty() {
