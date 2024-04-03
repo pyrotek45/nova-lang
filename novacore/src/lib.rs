@@ -79,7 +79,7 @@ impl NovaCore {
         );
         self.add_function(
             "rawread",
-            TType::Function(vec![TType::None], Box::new(TType::Option(Box::new(TType::Char)))),
+            TType::Function(vec![TType::Int], Box::new(TType::Option(Box::new(TType::Char)))),
             common::nodes::SymbolKind::GenericFunction,
             native::terminal::rawread,
         );
