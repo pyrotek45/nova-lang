@@ -1,3 +1,4 @@
+println("speedtest")
 let num = 20000
 let v = num
 let i = 1
