@@ -454,7 +454,7 @@ impl Parser {
         self.consume_symbol('{')?;
 
         let (id, _) = self.identifier()?;
-        self.consume_operator(Operator::Assignment)?;
+        self.consume_operator(Operator::Colon)?;
         exprs.insert(id.clone(), self.expr()?);
 
         while self.current_token().is_symbol(',') {
@@ -467,7 +467,7 @@ impl Parser {
                 break;
             }
             let (id, _) = self.identifier()?;
-            self.consume_operator(Operator::Assignment)?;
+            self.consume_operator(Operator::Colon)?;
             exprs.insert(id.clone(), self.expr()?);
             if self.current_token().is_symbol('}') {
                 break;

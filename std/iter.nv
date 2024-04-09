@@ -11,7 +11,7 @@ struct Iter {
 }
 
 let iter = Iter {
-    filter = fn(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
+    filter: fn(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
         let t: ?$A = it()
         let list = []:$A
         while t.isSome() {
@@ -22,8 +22,8 @@ let iter = Iter {
         }
         return list
     },
-    create = fn(input:[$A]) -> () -> ?$A {
-        let index : Int_box = Int_box {value = 0}    
+    create: fn(input:[$A]) -> () -> ?$A {
+        let index : Int_box = Int_box {value: 0}    
         return fn() -> ?$A {
             if index.value >= input.len() {
                 return ?$A
@@ -34,7 +34,7 @@ let iter = Iter {
             }
         }
     },
-    map = fn(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
+    map: fn(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
         return fn() -> ?$A {
             let result: ?$A = it()
             if result.isSome() {
@@ -44,7 +44,7 @@ let iter = Iter {
             }
         }
     },
-    printIter = fn(it: () -> ?$A) {
+    printIter: fn(it: () -> ?$A) {
         let t: ?$A = it()
         while t.isSome() {
             print(t.unwrap())
@@ -52,7 +52,7 @@ let iter = Iter {
             t = it()
         }
     },
-    collect = fn(it: () -> ?$A) -> [$A] {
+    collect: fn(it: () -> ?$A) -> [$A] {
         let t: ?$A = it()
         let list = []:$A
         while t.isSome() {

@@ -8,7 +8,7 @@ struct Person {
 println("hello world!")
 
 // Creating instance of type
-let person : Person = Person {name = "bob", age = 42}
+let person : Person = Person {name: "bob", age: 42}
 
 // Optional type annotation
 let person2 = Person("joe", 50)
@@ -59,7 +59,7 @@ struct Zed {
 
 // Creating an instance from a type
 let zed = Zed {
-    test = fn() {
+    test: fn() {
         print("wow\n")
     }
 }
@@ -146,13 +146,13 @@ struct Counter {
 // Creating a init funciton for Counter
 fn CounterInit() -> Counter {
     return Counter {
-        value = 0,
-        count = fn(self: Counter) -> Int {
+        value: 0,
+        count: fn(self: Counter) -> Int {
             result <- self.value
             self.value += 1
             return result
         },
-        reset = fn(self: Counter) {
+        reset: fn(self: Counter) {
             self.value = 0
         }
     }
@@ -246,3 +246,4 @@ fn test(x: Str) -> Str {
 }
 
 test("hello world").println()
+
