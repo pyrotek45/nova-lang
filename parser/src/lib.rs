@@ -1026,8 +1026,30 @@ impl Parser {
                             pos,
                         )?;
                     } else {
-                        dbg!(&lhs, &rhs);
-                        panic!()
+                        let mut lex = Lexicon::new();
+                        self.environment.values.last().iter().for_each(|table| {
+                            table.iter().for_each(|value: (&String, &Symbol)| {
+                                if let Symbol {
+                                    kind: SymbolKind::Variable,
+                                    id: _,
+                                    ttype: _,
+                                    pos: _,
+                                } = value.1
+                                {
+                                    lex.insert(value.0)
+                                }
+                            })
+                        });
+
+                        let corrections = lex.corrections_for(&identifier);
+                        return Err(common::error::parser_error(
+                            format!("'{}' does not exist ", identifier),
+                            format!("cannot retrieve field\nDid you mean? {:?}", corrections),
+                            pos.line,
+                            pos.row,
+                            self.filepath.clone(),
+                            None,
+                        ));
                     }
                 }
                 // function pointer return call <func()(args)>
@@ -2217,7 +2239,7 @@ impl Parser {
     }
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("using"))?;
+        self.consume_identifier(Some("import"))?;
         let ifilepath = match self.current_token() {
             Token::String(filepath, _) => filepath,
             _ => {
@@ -2254,7 +2276,7 @@ impl Parser {
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
                 "type" => self.typealias(),
-                "using" => self.import_file(),
+                "import" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
                 "if" => self.if_statement(),

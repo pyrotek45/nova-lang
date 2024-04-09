@@ -25,7 +25,7 @@ fn display(self: Person) {
     println(self.age)
 }
 
-// Using function
+// import function
 person.display()
 display(person2)
 
@@ -34,7 +34,7 @@ for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-using "../std/list.nv"
+import "../std/list.nv" let list = defualtList()
 
 // Array
 let arr = [1,2,3]
@@ -67,8 +67,11 @@ let zed = Zed {
 // Now we can access its namespace and call functions directly
 zed::test()
 
-// Using iterators
-using "../std/iter.nv"
+// import iterators
+import "../std/iter.nv" let iter = defualtIter()
+
+// import defualt iter functions
+
 
 let myIter = [1,2,3,4,5]
     .iter::create()
@@ -177,7 +180,7 @@ mycounter.count().println()
 // Option type ?type lets you represent none
 let x: ?Int = some(20)
 
-// using the isSome() function here
+// import the isSome() function here
 if x.isSome() {
     x.unwrap().println()
 }
@@ -247,3 +250,7 @@ fn test(x: Str) -> Str {
 
 test("hello world").println()
 
+import "../std/io.nv" let io = defualtIO()
+
+let input = io::prompt("wow")
+input.println()

@@ -1,10 +1,12 @@
-struct Io {
-    prompt : (String) -> String,
+struct IO {
+    prompt: (String) -> String,
 }
 
-let io = Io {
-    prompt = fn(input: String) -> String {
-        print(input + "\n")
-        return readline()
+fn defualtIO() -> IO {
+    return IO {
+        prompt: fn(input: String) -> String {
+            print(input + "\n")
+            return readline()
+        }
     }
 }
