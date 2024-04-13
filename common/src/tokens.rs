@@ -1,13 +1,6 @@
+use crate::fileposition::FilePosition;
 use crate::ttype::TType;
-
 pub type TokenList = Vec<Token>;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Position {
-    pub filepath: String,
-    pub line: usize,
-    pub row: usize,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Unary {
@@ -47,16 +40,16 @@ pub enum Operator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    Type(TType, Position),
-    Identifier(String, Position),
-    Integer(i64, Position),
-    Float(f64, Position),
-    String(String, Position),
-    Char(char, Position),
-    Symbol(char, Position),
-    Bool(bool, Position),
-    Operator(Operator, Position),
-    EOF(Position),
+    Type(TType, FilePosition),
+    Identifier(String, FilePosition),
+    Integer(i64, FilePosition),
+    Float(f64, FilePosition),
+    String(String, FilePosition),
+    Char(char, FilePosition),
+    Symbol(char, FilePosition),
+    Bool(bool, FilePosition),
+    Operator(Operator, FilePosition),
+    EOF(FilePosition),
 }
 
 impl Token {

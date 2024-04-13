@@ -9,7 +9,7 @@ use std::{
 use common::{
     code::{byte_to_string, Code},
     error::NovaError,
-    tokens::Position,
+    fileposition::FilePosition,
 };
 
 use modulo::Mod;
@@ -19,7 +19,7 @@ use crate::state::VmData;
 
 #[derive(Debug, Clone)]
 pub struct Vm {
-    pub runtime_errors_table: HashMap<usize, Position>,
+    pub runtime_errors_table: HashMap<usize, FilePosition>,
     pub native_functions: Vec<CallBack>,
     pub state: state::State,
 }

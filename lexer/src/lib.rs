@@ -1,6 +1,7 @@
 use common::{
     error::{file_error, lexer_error, NovaError},
-    tokens::{Operator, Position, Token, TokenList},
+    fileposition::FilePosition,
+    tokens::{Operator, Token, TokenList},
     ttype::TType,
 };
 
@@ -18,10 +19,10 @@ pub struct Lexer {
     line: usize,
     row: usize,
     filepath: String,
-    source: String,
-    tokens: TokenList,
+    source_file: String,
+    token_list: TokenList,
     buffer: String,
-    parsing: LexerState,
+    state: LexerState,
 }
 
 impl Default for Lexer {
@@ -30,15 +31,16 @@ impl Default for Lexer {
             line: 1,
             row: 1,
             filepath: Default::default(),
-            source: Default::default(),
-            tokens: Default::default(),
+            source_file: Default::default(),
+            token_list: Default::default(),
             buffer: Default::default(),
-            parsing: LexerState::Token,
+            state: LexerState::Token,
         }
     }
 }
 
 impl Lexer {
+    // Move opening file into seperate section
     pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
         let source = match std::fs::read_to_string(filepath) {
             Ok(content) => content,
@@ -48,35 +50,45 @@ impl Lexer {
             line: 1,
             row: 1,
             filepath: filepath.to_string(),
-            source,
-            tokens: Default::default(),
+            source_file: source,
+            token_list: Default::default(),
             buffer: Default::default(),
-            parsing: LexerState::Token,
+            state: LexerState::Token,
         })
+    }
+
+    fn current_position(&self) -> FilePosition {
+        return FilePosition {
+            line: self.line,
+            row: self.row,
+            filepath: self.filepath.to_string(),
+        };
+    }
+
+    fn current_position_buffer_offset(&self) -> FilePosition {
+        return FilePosition {
+            line: self.line,
+            row: self.row - self.buffer.len(),
+            filepath: self.filepath.clone(),
+        };
+    }
+
+    fn current_position_plus_offset(&self, offset: usize) -> FilePosition {
+        return FilePosition {
+            line: self.line,
+            row: self.row + offset,
+            filepath: self.filepath.clone(),
+        };
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
         if !self.buffer.is_empty() {
             if let Ok(v) = self.buffer.parse() {
                 return Some(if self.buffer.contains('.') {
-                    self.parsing = LexerState::Token;
-                    Token::Float(
-                        v,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
-                    )
+                    self.state = LexerState::Token;
+                    Token::Float(v, self.current_position_buffer_offset())
                 } else {
-                    Token::Integer(
-                        v as i64,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
-                    )
+                    Token::Integer(v as i64, self.current_position_buffer_offset())
                 });
             }
             // splits buffers begining with a number, 1.print()
@@ -86,128 +98,71 @@ impl Lexer {
                 let split = self.buffer.split('.');
                 for id in split {
                     if let Ok(v) = id.parse::<i64>() {
-                        self.parsing = LexerState::Token;
-                        self.tokens.push(Token::Integer(
+                        self.state = LexerState::Token;
+                        self.token_list.push(Token::Integer(
                             v as i64,
-                            Position {
-                                line: self.line,
-                                row: preset + offset,
-                                filepath: self.filepath.clone(),
-                            },
+                            self.current_position_plus_offset(preset + offset),
                         ));
                     } else {
-                        self.tokens.push(Token::Identifier(
+                        self.token_list.push(Token::Identifier(
                             id.to_string(),
-                            Position {
-                                line: self.line,
-                                row: preset + offset,
-                                filepath: self.filepath.clone(),
-                            },
+                            self.current_position_plus_offset(preset + offset),
                         ));
                     }
                     offset += id.len();
-                    self.tokens.push(Token::Symbol(
+                    self.token_list.push(Token::Symbol(
                         '.',
-                        Position {
-                            line: self.line,
-                            row: preset + offset,
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_plus_offset(preset + offset),
                     ));
                     offset += 1;
                 }
-                self.tokens.pop();
+                self.token_list.pop();
                 return None;
             }
+            // consider adding keywords like let,if,for,type,fn
             match self.buffer.as_str() {
-                "false" => {
-                    return Some(Token::Bool(
-                        false,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
-                    ))
-                }
-                "true" => {
-                    return Some(Token::Bool(
-                        true,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
-                    ))
-                }
+                "false" => return Some(Token::Bool(false, self.current_position_buffer_offset())),
+                "true" => return Some(Token::Bool(true, self.current_position_buffer_offset())),
                 "Int" => {
                     return Some(Token::Type(
                         TType::Int,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 "Float" => {
                     return Some(Token::Type(
                         TType::Float,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 "Bool" => {
                     return Some(Token::Type(
                         TType::Bool,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 "String" => {
                     return Some(Token::Type(
                         TType::String,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 "Any" => {
                     return Some(Token::Type(
                         TType::Any,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 "Char" => {
                     return Some(Token::Type(
                         TType::Char,
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
                 _ => {
                     return Some(Token::Identifier(
                         self.buffer.to_string(),
-                        Position {
-                            line: self.line,
-                            row: self.row - self.buffer.len(),
-                            filepath: self.filepath.clone(),
-                        },
+                        self.current_position_buffer_offset(),
                     ))
                 }
             }
@@ -217,13 +172,14 @@ impl Lexer {
 
     fn check_token(&mut self) {
         if let Some(token) = self.check_token_buffer() {
-            self.tokens.push(token);
+            self.token_list.push(token);
         }
         self.buffer.clear();
     }
 
     pub fn tokenize(mut self) -> Result<TokenList, NovaError> {
         if self.filepath.is_empty() {
+            // consider making the error take a Position struct
             return Err(lexer_error(
                 format!("Missing filepath "),
                 format!(""),
@@ -233,22 +189,22 @@ impl Lexer {
             ));
         }
 
-        let tempstr = self.source.clone();
+        let tempstr = self.source_file.clone();
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
-            if self.parsing == LexerState::Comment {
+            if self.state == LexerState::Comment {
                 if c != '\n' {
                     self.row += 1;
                     continue;
                 } else {
-                    self.parsing = LexerState::Token;
+                    self.state = LexerState::Token;
                     self.line += 1;
                     self.row = 0;
                     continue;
                 }
             }
-            if self.parsing == LexerState::String {
+            if self.state == LexerState::String {
                 if c == '\\' {
                     match chars.peek() {
                         Some('n') => {
@@ -294,6 +250,7 @@ impl Lexer {
                             continue;
                         }
                         _ => {
+                            // consider making the error take a Position struct
                             return Err(common::error::lexer_error(
                                 "Expecting valid escape char".to_string(),
                                 "".to_string(),
@@ -308,118 +265,70 @@ impl Lexer {
                     self.buffer.push(c);
                     continue;
                 } else {
-                    self.parsing = LexerState::Token;
-                    self.tokens.push(Token::String(
-                        self.buffer.clone(),
-                        Position {
-                            line: self.line,
-                            row: self.row,
-                            filepath: self.filepath.clone(),
-                        },
-                    ));
+                    self.state = LexerState::Token;
+                    self.token_list
+                        .push(Token::String(self.buffer.clone(), self.current_position()));
                     self.row += 1;
                     self.row += self.buffer.len();
                     self.buffer.clear();
                     continue;
                 }
             }
-            if self.parsing == LexerState::Char {
+            if self.state == LexerState::Char {
                 if c == '\\' {
                     match chars.peek() {
                         Some('n') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\n',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\n', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('t') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\t',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\t', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('r') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\r',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\r', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\'',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\'', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\"',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\"', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('0') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\0',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\0', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
-                            self.tokens.push(Token::Char(
-                                '\\',
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Char('\\', self.current_position()));
                             self.row += 1;
                             self.buffer.clear();
                             continue;
@@ -435,19 +344,13 @@ impl Lexer {
                         }
                     }
                 } else if c == '\'' {
-                    self.parsing = LexerState::Token;
+                    self.state = LexerState::Token;
                     self.row += 1;
                     self.buffer.clear();
                     continue;
                 } else {
-                    self.tokens.push(Token::Char(
-                        c,
-                        Position {
-                            line: self.line,
-                            row: self.row,
-                            filepath: self.filepath.clone(),
-                        },
-                    ));
+                    self.token_list
+                        .push(Token::Char(c, self.current_position()));
                     self.row += 1;
                     self.buffer.clear();
                     continue;
@@ -457,11 +360,11 @@ impl Lexer {
             match c {
                 '\'' => {
                     self.row += 1;
-                    self.parsing = LexerState::Char;
+                    self.state = LexerState::Char;
                     self.check_token();
                 }
                 '"' => {
-                    self.parsing = LexerState::String;
+                    self.state = LexerState::String;
                     self.check_token();
                 }
                 '\n' => {
@@ -470,32 +373,20 @@ impl Lexer {
                     self.row = 0;
                 }
                 '.' => {
-                    if self.parsing != LexerState::Float {
+                    if self.state != LexerState::Float {
                         if let Ok(v) = self.buffer.parse() {
                             let _n: i64 = v;
-                            self.parsing = LexerState::Float;
+                            self.state = LexerState::Float;
                             self.buffer.push(c);
                         } else {
                             self.check_token();
-                            self.tokens.push(Token::Symbol(
-                                c,
-                                Position {
-                                    line: self.line,
-                                    row: self.row,
-                                    filepath: self.filepath.clone(),
-                                },
-                            ));
+                            self.token_list
+                                .push(Token::Symbol(c, self.current_position()));
                         }
                     } else {
                         self.check_token();
-                        self.tokens.push(Token::Symbol(
-                            c,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                                filepath: self.filepath.clone(),
-                            },
-                        ));
+                        self.token_list
+                            .push(Token::Symbol(c, self.current_position()));
                     }
                 }
                 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
@@ -510,264 +401,160 @@ impl Lexer {
                         ':' => {
                             if let Some(':') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::DoubleColon,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
-                                    Operator::Colon,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                self.token_list
+                                    .push(Token::Operator(Operator::Colon, self.current_position()))
                             }
                         }
-                        '%' => self.tokens.push(Token::Operator(
-                            Operator::Modulo,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                                filepath: self.filepath.clone(),
-                            },
-                        )),
+                        '%' => self
+                            .token_list
+                            .push(Token::Operator(Operator::Modulo, self.current_position())),
                         '>' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::GtrOrEqu,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::GreaterThan,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
                         '<' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::LssOrEqu,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ));
+                                self.row += 1;
                                 continue;
                             }
                             if let Some('-') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+
+                                self.token_list.push(Token::Operator(
                                     Operator::LeftArrow,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::LessThan,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
                         '+' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::AdditionAssignment,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::Addition,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
                         '-' => {
                             if let Some('>') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::RightArrow,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::SubtractionAssignment,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::Subtraction,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
-                        '*' => self.tokens.push(Token::Operator(
+                        '*' => self.token_list.push(Token::Operator(
                             Operator::Multiplication,
-                            Position {
-                                line: self.line,
-                                row: self.row,
-                                filepath: self.filepath.clone(),
-                            },
+                            self.current_position(),
                         )),
                         '/' => {
                             if let Some('/') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
-                                self.parsing = LexerState::Comment;
+                                self.state = LexerState::Comment;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::Division,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
                         '=' => {
                             if let Some(&'=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::Equality,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::Assignment,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
+                                    self.current_position(),
                                 ))
                             }
                         }
                         '!' => {
                             if let Some(&'=') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
-                                self.tokens.push(Token::Operator(
+                                self.token_list.push(Token::Operator(
                                     Operator::NotEqual,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                    self.current_position(),
+                                ));
+                                self.row += 1;
                             } else {
-                                self.tokens.push(Token::Operator(
-                                    Operator::Not,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
+                                self.token_list
+                                    .push(Token::Operator(Operator::Not, self.current_position()))
                             }
                         }
                         '&' => {
                             if let Some(&'&') = chars.peek() {
                                 chars.next();
+                                self.token_list
+                                    .push(Token::Operator(Operator::And, self.current_position()));
                                 self.row += 1;
-                                self.tokens.push(Token::Operator(
-                                    Operator::And,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
                             } else {
-                                self.tokens.push(Token::Symbol(
-                                    c,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ));
+                                self.token_list
+                                    .push(Token::Symbol(c, self.current_position()));
                             }
                         }
                         '|' => {
                             if let Some(&'|') = chars.peek() {
                                 chars.next();
+                                self.token_list
+                                    .push(Token::Operator(Operator::Or, self.current_position()));
                                 self.row += 1;
-                                self.tokens.push(Token::Operator(
-                                    Operator::Or,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row - 1,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ))
                             } else {
-                                self.tokens.push(Token::Symbol(
-                                    c,
-                                    Position {
-                                        line: self.line,
-                                        row: self.row,
-                                        filepath: self.filepath.clone(),
-                                    },
-                                ));
+                                self.token_list
+                                    .push(Token::Symbol(c, self.current_position()));
                             }
                         }
                         _ => {}
@@ -775,16 +562,11 @@ impl Lexer {
                 }
                 ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' | '?' | '#' => {
                     self.check_token();
-                    self.tokens.push(Token::Symbol(
-                        c,
-                        Position {
-                            line: self.line,
-                            row: self.row,
-                            filepath: self.filepath.clone(),
-                        },
-                    ));
+                    self.token_list
+                        .push(Token::Symbol(c, self.current_position()));
                 }
                 error => {
+                    // consider making this take a position struct
                     return Err(common::error::lexer_error(
                         format!("Unknown char {error}"),
                         format!("Remove char {error}"),
@@ -798,12 +580,8 @@ impl Lexer {
         }
 
         self.check_token();
-        self.tokens.push(Token::EOF(Position {
-            line: self.line,
-            row: self.row,
-            filepath: self.filepath.clone(),
-        }));
+        self.token_list.push(Token::EOF(self.current_position()));
 
-        Ok(self.tokens)
+        Ok(self.token_list)
     }
 }

@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use common::{
     environment::{new_environment, Environment},
     error::{self, NovaError},
+    fileposition::FilePosition,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
-    tokens::{Operator, Position, Token, TokenList, Unary},
+    tokens::{Operator, Token, TokenList, Unary},
     ttype::{generate_unique_string, type_to_string, TType},
 };
 use dym::Lexicon;
@@ -148,8 +149,8 @@ impl Parser {
         (line, row)
     }
 
-    fn get_pos(&self) -> Position {
-        Position {
+    fn get_pos(&self) -> FilePosition {
+        FilePosition {
             line: self.current_token().line(),
             row: self.current_token().row(),
             filepath: self.filepath.clone(),
@@ -447,7 +448,7 @@ impl Parser {
         &mut self,
         constructor: &str,
         fields: Vec<(String, TType)>,
-        conpos: Position,
+        conpos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
         let mut exprs: HashMap<String, Expr> = HashMap::default();
 
@@ -539,7 +540,7 @@ impl Parser {
         &mut self,
         identifier: String,
         first_argument: Expr,
-        pos: Position,
+        pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         let mut arguments = vec![first_argument];
         arguments.extend(self.argument_list()?);
@@ -716,7 +717,7 @@ impl Parser {
         }
     }
 
-    fn call(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
+    fn call(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
         let arguments: Vec<Expr>;
         // constructor
         if let Some(fields) = self.environment.custom_types.get(&identifier) {
@@ -920,7 +921,7 @@ impl Parser {
         &mut self,
         identifier: String,
         mut lhs: Expr,
-        pos: Position,
+        pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(name) = lhs.get_type().custom_to_string() {
             if let Some(fields) = self.environment.custom_types.get(&name) {
@@ -1127,7 +1128,7 @@ impl Parser {
         Ok(lhs)
     }
 
-    fn anchor(&mut self, identifier: String, pos: Position) -> Result<Expr, NovaError> {
+    fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
             Token::Operator(Operator::RightArrow, _) => {
                 self.consume_operator(Operator::RightArrow)?;
@@ -2157,7 +2158,7 @@ impl Parser {
         }
     }
 
-    fn identifier(&mut self) -> Result<(String, Position), NovaError> {
+    fn identifier(&mut self) -> Result<(String, FilePosition), NovaError> {
         let id = match self.current_token().expect_id() {
             Some(id) => id,
             None => {
@@ -2171,7 +2172,7 @@ impl Parser {
         self.advance();
         Ok((
             id,
-            Position {
+            FilePosition {
                 line,
                 row,
                 filepath: self.filepath.clone(),
