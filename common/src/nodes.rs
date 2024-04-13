@@ -50,7 +50,7 @@ pub enum Statement {
     Break,
     Pass,
     // type id value
-    Let(TType, String, Expr, bool),
+    Let{ttype: TType, identifier: String, expr: Expr, global: bool},
     // type id input output
     Function(TType, String, Vec<Arg>, Vec<Statement>),
     // type id fields

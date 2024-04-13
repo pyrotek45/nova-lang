@@ -59,7 +59,7 @@ impl Compiler {
         for statements in input.program.iter() {
             match statements {
                 common::nodes::Statement::Pass => {}
-                common::nodes::Statement::Let(_, identifier, expr, global) => {
+                common::nodes::Statement::Let {ttype: _, identifier, expr, global}=> {
                     self.compile_expr(expr.clone())?;
 
                     if *global {
