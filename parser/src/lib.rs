@@ -2520,7 +2520,7 @@ impl Parser {
                 Some(pos),
                 SymbolKind::Variable,
             );
-            Ok(Some(Statement::Let(ttype, identifier, expr, global)))
+            Ok(Some(Statement::Let {ttype, identifier, expr, global }))
         }
     }
 
