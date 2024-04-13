@@ -1,4 +1,4 @@
-use crate::tokens::Position;
+use crate::fileposition::FilePosition;
 
 pub struct Code {}
 
@@ -286,7 +286,7 @@ pub enum Asm {
     CALL,
 
     // list operations
-    PIN(Position),
+    PIN(FilePosition),
     LIN,
     NATIVE(usize),
 }

@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use common::{
     code::{Asm, Code},
-    tokens::{self, Position, TokenList},
+    fileposition::FilePosition,
+    tokens::{self, TokenList},
 };
 
 #[derive(Debug)]
 pub struct Assembler {
-    pub runtime_error_table: HashMap<usize, Position>,
+    pub runtime_error_table: HashMap<usize, FilePosition>,
     pub input: Vec<Asm>,
     pub nva: Vec<Asm>,
     pub output: Vec<u8>,
@@ -269,7 +270,7 @@ impl Assembler {
                         }
                         "pin" => {
                             ci += 1;
-                            self.nva.push(Asm::PIN(Position {
+                            self.nva.push(Asm::PIN(FilePosition {
                                 line: 0,
                                 row: 0,
                                 filepath: "asm".to_string(),

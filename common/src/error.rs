@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use crate::tokens::Position;
+use crate::fileposition::FilePosition;
 
 fn read_lines<P>(filename: P) -> std::io::Result<std::io::Lines<std::io::BufReader<std::fs::File>>>
 where
@@ -206,7 +206,7 @@ pub fn runtime_error(msg: String) -> NovaError {
     }
 }
 
-pub fn runtime_error_with_pos(msg: String, pos: Position) -> NovaError {
+pub fn runtime_error_with_pos(msg: String, pos: FilePosition) -> NovaError {
     NovaError {
         error: ErrorType::RuntimeWithPos,
         msg,

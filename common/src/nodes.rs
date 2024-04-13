@@ -1,5 +1,6 @@
 use crate::{
-    tokens::{Operator, Position, Unary},
+    fileposition::FilePosition,
+    tokens::{Operator, Unary},
     ttype::TType,
 };
 
@@ -34,7 +35,7 @@ pub enum SymbolKind {
 pub struct Symbol {
     pub id: String,
     pub ttype: TType,
-    pub pos: Option<Position>,
+    pub pos: Option<FilePosition>,
     pub kind: SymbolKind,
 }
 
@@ -80,8 +81,8 @@ pub enum Atom {
 pub enum Expr {
     Closure(TType, Vec<Arg>, Vec<Statement>, Vec<String>),
     ListConstructor(TType, Vec<Expr>),
-    Field(TType, String, usize, Box<Expr>, Position),
-    Indexed(TType, String, Box<Expr>, Box<Expr>, Position),
+    Field(TType, String, usize, Box<Expr>, FilePosition),
+    Indexed(TType, String, Box<Expr>, Box<Expr>, FilePosition),
     Call(TType, String, Box<Expr>, Vec<Expr>),
     Unary(TType, Unary, Box<Expr>),
     Binop(TType, Operator, Box<Expr>, Box<Expr>),

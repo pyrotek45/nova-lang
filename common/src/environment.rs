@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
+    fileposition::FilePosition,
     nodes::{Symbol, SymbolKind},
     table,
-    tokens::Position,
     ttype::{generate_unique_string, TType},
 };
 
@@ -31,7 +31,7 @@ impl Environment {
         &mut self,
         id: &str,
         ttype: TType,
-        pos: Option<Position>,
+        pos: Option<FilePosition>,
         kind: SymbolKind,
     ) {
         match kind {
