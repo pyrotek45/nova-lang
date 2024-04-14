@@ -2,7 +2,7 @@ use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::{Ast, Atom, Expr};
-use common::ttype::TType;
+use common::ttype::{type_to_string, TType};
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -708,6 +708,12 @@ impl Compiler {
                     "isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
+
+                    "typeof" => {
+                        // unsafe kinda
+                        self.asm
+                            .push(Asm::STRING(type_to_string(&list[0].get_type())));
+                    }
 
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())

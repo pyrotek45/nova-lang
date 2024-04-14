@@ -109,4 +109,56 @@ impl Expr {
             Expr::Closure(t, _, _, _) => t.clone(),
         }
     }
+
+    pub fn cast(&mut self, cast: TType) {
+        match self {
+            Expr::Closure(_, env, params, body) => {
+                // Rebuild expression with the new type
+                *self = Expr::Closure(cast, env.clone(), params.clone(), body.clone());
+            }
+            Expr::ListConstructor(_, elements) => {
+                // Rebuild expression with the new type
+                *self = Expr::ListConstructor(cast, elements.clone());
+            }
+            Expr::Field(_, obj, field_name, index, in_expr) => {
+                // Rebuild expression with the new type
+                *self = Expr::Field(
+                    cast,
+                    obj.clone(),
+                    field_name.clone(),
+                    index.clone(),
+                    in_expr.clone(),
+                );
+            }
+            Expr::Indexed(_, container, index_expr, index, in_expr) => {
+                // Rebuild expression with the new type
+                *self = Expr::Indexed(
+                    cast,
+                    container.clone(),
+                    index_expr.clone(),
+                    index.clone(),
+                    in_expr.clone(),
+                );
+            }
+            Expr::Call(_, func, args, in_expr) => {
+                // Rebuild expression with the new type
+                *self = Expr::Call(cast, func.clone(), args.clone(), in_expr.clone());
+            }
+            Expr::Unary(_, op, operand) => {
+                // Rebuild expression with the new type
+                *self = Expr::Unary(cast, op.clone(), operand.clone());
+            }
+            Expr::Binop(_, op, lhs, rhs) => {
+                // Rebuild expression with the new type
+                *self = Expr::Binop(cast, op.clone(), lhs.clone(), rhs.clone());
+            }
+            Expr::Literal(_, a) => {
+                // Rebuild expression with the new type
+                *self = Expr::Literal(cast, a.clone());
+            }
+            Expr::None => {
+                // No need to change anything for Expr::None
+            }
+        }
+    }
 }

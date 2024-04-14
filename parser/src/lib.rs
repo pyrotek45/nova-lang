@@ -31,6 +31,15 @@ pub struct Parser {
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_environment();
     env.insert_symbol(
+        "typeof",
+        TType::Function(
+            vec![TType::Generic("a".to_string())],
+            Box::new(TType::String),
+        ),
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
         "strlen",
         TType::Function(vec![TType::String], Box::new(TType::Int)),
         None,
@@ -251,14 +260,14 @@ impl Parser {
                             return Err(common::error::parser_error(
                                 format!(
                                     "Type error: Expected {:?}, but found {:?}",
-                                    t2,
                                     mapped_type.clone(),
+                                    t2
                                 ),
                                 // Additional information for debugging the error
                                 format!(
                                     "Mismatched types:\n ~ Expected: {:?}\n ~ Found: {:?}\n ~ In context:\n   ~ {:?} -> {:?}\n   ~ {:?}",
-                                    t2,
                                     mapped_type.clone(),
+                                    t2,
                                     type_list1,
                                     mapped_type.clone(),
                                     type_list2
@@ -849,6 +858,7 @@ impl Parser {
                                         let mut s = self.clone();
                                         if let Some(outerlist) = s.environment.get_type(&rc) {
                                             //dbg!(list,outerlist);
+                                            dbg!(lc, rc);
                                             map = self.check_and_map_types(
                                                 &[list],
                                                 &[outerlist],
@@ -1943,6 +1953,12 @@ impl Parser {
                     break;
                 }
             }
+        }
+
+        if self.current_token().is_id("as") {
+            self.advance();
+            let cast = self.ttype()?;
+            left.cast(cast);
         }
 
         Ok(left)
