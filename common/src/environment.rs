@@ -14,6 +14,8 @@ pub struct Environment {
     pub no_override: table::Table<String>,
     pub values: Vec<HashMap<String, Symbol>>,
     pub type_alias: HashMap<String, TType>,
+    pub generic_type_struct: HashMap<String, Vec<String>>,
+    pub generic_type_map: HashMap<String, String>,
 }
 
 pub fn new_environment() -> Environment {
@@ -23,6 +25,8 @@ pub fn new_environment() -> Environment {
         captured: vec![HashMap::default()],
         values: vec![HashMap::default()],
         type_alias: HashMap::default(),
+        generic_type_struct: HashMap::default(),
+        generic_type_map: HashMap::default(),
     }
 }
 

@@ -56,7 +56,7 @@ pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn clear_screen(state: &mut state::State) -> Result<(), NovaError> {
+pub fn clear_screen(_state: &mut state::State) -> Result<(), NovaError> {
     execute!(stdout(), terminal::Clear(ClearType::All)).unwrap();
     execute!(stdout(), MoveTo(0, 0)).unwrap();
     Ok(())

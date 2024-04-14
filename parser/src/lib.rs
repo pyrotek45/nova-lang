@@ -218,15 +218,11 @@ impl Parser {
         }
         for (t1, t2) in type_list1.iter().zip(type_list2.iter()) {
             match (t1, t2) {
-                (TType::Any, t2) => {
-                    if t2 != &TType::Void {
-                        continue;
-                    } else {
-                        return Err(self.generate_error(
-                            format!("Type error, expecting {:?}, but found {:?}", TType::Any, t2),
-                            format!("expecting input, got void",),
-                        ));
-                    }
+                (TType::Any, _) => {
+                    continue;
+                }
+                (_, TType::Any) => {
+                    continue;
                 }
                 (TType::Generic(name1), _) => {
                     if t2 == &TType::None {
@@ -255,14 +251,14 @@ impl Parser {
                             return Err(common::error::parser_error(
                                 format!(
                                     "Type error: Expected {:?}, but found {:?}",
+                                    t2,
                                     mapped_type.clone(),
-                                    t2
                                 ),
                                 // Additional information for debugging the error
                                 format!(
                                     "Mismatched types:\n ~ Expected: {:?}\n ~ Found: {:?}\n ~ In context:\n   ~ {:?} -> {:?}\n   ~ {:?}",
-                                    mapped_type.clone(),
                                     t2,
+                                    mapped_type.clone(),
                                     type_list1,
                                     mapped_type.clone(),
                                     type_list2
@@ -295,6 +291,22 @@ impl Parser {
 
                     self.check_and_map_types(params1, params2, type_map)?;
                     self.check_and_map_types(&[*ret1.clone()], &[*ret2.clone()], type_map)?;
+                }
+                (TType::Custom(custom1), TType::Custom(custom2)) => {
+                    if custom1 == custom2 {
+                        continue;
+                    }
+
+                    if let Some(subtype) = self.environment.generic_type_map.get(custom2) {
+                        if subtype == custom1 {
+                            continue;
+                        }
+                    } else {
+                        return Err(self.generate_error(
+                            format!("Expecting {:?}, but found {:?}", t2, t1),
+                            "Type error".to_owned(),
+                        ));
+                    }
                 }
                 _ if t1 == t2 => continue,
                 _ => {
@@ -553,18 +565,48 @@ impl Parser {
         // get function type and check arguments
         if let Some((
             TType::Function(function_parameters, mut function_output),
-            function_id,
+            mut function_id,
             function_kind,
         )) = self.environment.get_function_type(&identifier, &inputtypes)
         {
             match function_kind {
                 SymbolKind::GenericFunction => {
-                    let mut map = self.check_and_map_types(
+                    let mut map = HashMap::default();
+
+                    map = self.check_and_map_types(
                         &function_parameters,
                         &inputtypes,
                         &mut HashMap::default(),
                     )?;
+
+                    for (l, r) in function_parameters.iter().zip(inputtypes.iter()) {
+                        if let (TType::Custom(lc), TType::Custom(rc)) = (l, r) {
+                            // dbg!(lc,rc);
+                            // dbg!(self.environment.generic_type_map.get(rc));
+                            if let Some(ic) = self.environment.generic_type_map.get(rc) {
+                                if lc == ic {
+                                    // map the values of rc to lc
+                                    // get list of rc
+                                    if let Some(list) = self.environment.get_type(&lc) {
+                                        //dbg!("outer");
+                                        let mut s = self.clone();
+                                        if let Some(outerlist) = s.environment.get_type(&rc) {
+                                            //dbg!(list,outerlist);
+                                            map = self.check_and_map_types(
+                                                &[list],
+                                                &[outerlist],
+                                                &mut map,
+                                            )?;
+                                            //dbg!(&map);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     function_output = Box::new(self.get_output(*function_output, &mut map)?);
+                    //dbg!(&function_output);
                     return Ok(Expr::Literal(
                         *function_output.clone(),
                         Atom::Call(function_id, arguments),
@@ -589,6 +631,9 @@ impl Parser {
                         &mut HashMap::default(),
                     )?;
                     function_output = Box::new(self.get_output(*function_output, &mut map)?);
+                    if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+                        function_id = subtype.clone();
+                    }
                     return Ok(Expr::Literal(
                         *function_output.clone(),
                         Atom::Call(function_id, arguments),
@@ -622,7 +667,7 @@ impl Parser {
         } else {
             if let Some((
                 TType::Function(function_parameters, mut function_output),
-                function_id,
+                mut function_id,
                 function_kind,
             )) = self.environment.get_type_capture(&identifier)
             {
@@ -641,12 +686,42 @@ impl Parser {
                 );
                 match function_kind {
                     SymbolKind::GenericFunction => {
-                        let mut map = self.check_and_map_types(
+                        let mut map = HashMap::default();
+
+                        map = self.check_and_map_types(
                             &function_parameters,
                             &inputtypes,
                             &mut HashMap::default(),
                         )?;
+
+                        for (l, r) in function_parameters.iter().zip(inputtypes.iter()) {
+                            if let (TType::Custom(lc), TType::Custom(rc)) = (l, r) {
+                                // dbg!(lc,rc);
+                                // dbg!(self.environment.generic_type_map.get(rc));
+                                if let Some(ic) = self.environment.generic_type_map.get(rc) {
+                                    if lc == ic {
+                                        // map the values of rc to lc
+                                        // get list of rc
+                                        if let Some(list) = self.environment.get_type(&lc) {
+                                            //dbg!("outer");
+                                            let mut s = self.clone();
+                                            if let Some(outerlist) = s.environment.get_type(&rc) {
+                                                //dbg!(list,outerlist);
+                                                map = self.check_and_map_types(
+                                                    &[list],
+                                                    &[outerlist],
+                                                    &mut map,
+                                                )?;
+                                                //dbg!(&map);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         function_output = Box::new(self.get_output(*function_output, &mut map)?);
+                        //dbg!(&function_output);
                         return Ok(Expr::Literal(
                             *function_output.clone(),
                             Atom::Call(function_id, arguments),
@@ -659,6 +734,9 @@ impl Parser {
                             &mut HashMap::default(),
                         )?;
                         function_output = Box::new(self.get_output(*function_output, &mut map)?);
+                        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+                            function_id = subtype.clone();
+                        }
                         return Ok(Expr::Literal(
                             *function_output.clone(),
                             Atom::Call(function_id, arguments),
@@ -742,7 +820,7 @@ impl Parser {
         // get function type and check arguments
         if let Some((
             TType::Function(function_parameters, mut function_output),
-            function_id,
+            mut function_id,
             function_kind,
         )) = self
             .environment
@@ -750,11 +828,48 @@ impl Parser {
         {
             match function_kind {
                 SymbolKind::GenericFunction => {
-                    let mut map = self.check_and_map_types(
+                    let mut map = HashMap::default();
+
+                    map = self.check_and_map_types(
                         &function_parameters,
                         &argument_types,
                         &mut HashMap::default(),
                     )?;
+
+                    for (l, r) in function_parameters.iter().zip(argument_types.iter()) {
+                        if let (TType::Custom(lc), TType::Custom(rc)) = (l, r) {
+                            //dbg!(lc, rc);
+                            // dbg!(self.environment.generic_type_map.get(rc));
+                            if let Some(ic) = self.environment.generic_type_map.get(rc) {
+                                if lc == ic {
+                                    // map the values of rc to lc
+                                    // get list of rc
+                                    if let Some(list) = self.environment.get_type(&lc) {
+                                        //dbg!("outer");
+                                        let mut s = self.clone();
+                                        if let Some(outerlist) = s.environment.get_type(&rc) {
+                                            //dbg!(list,outerlist);
+                                            map = self.check_and_map_types(
+                                                &[list],
+                                                &[outerlist],
+                                                &mut map,
+                                            )?;
+                                            //dbg!(&map);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // let new_function_parameters: Vec<TType> = vec![];
+                    // dbg!(&identifier, &function_parameters);
+                    // // check with new param
+                    // map = self.check_and_map_types(
+                    //     &function_parameters,
+                    //     &argument_types,
+                    //     &mut HashMap::default(),
+                    // )?;
+                    //dbg!(&function_id);
                     function_output = Box::new(self.get_output(*function_output, &mut map)?);
                     return Ok(Expr::Literal(
                         *function_output.clone(),
@@ -767,6 +882,9 @@ impl Parser {
                         &argument_types,
                         &mut HashMap::default(),
                     )?;
+                    if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+                        function_id = subtype.clone();
+                    }
                     function_output = Box::new(self.get_output(*function_output, &mut map)?);
                     return Ok(Expr::Literal(
                         *function_output.clone(),
@@ -813,7 +931,7 @@ impl Parser {
         } else {
             if let Some((
                 TType::Function(function_parameters, mut function_output),
-                function_id,
+                mut function_id,
                 function_kind,
             )) = self
                 .environment
@@ -834,11 +952,48 @@ impl Parser {
                 );
                 match function_kind {
                     SymbolKind::GenericFunction => {
-                        let mut map = self.check_and_map_types(
+                        let mut map = HashMap::default();
+
+                        map = self.check_and_map_types(
                             &function_parameters,
                             &argument_types,
                             &mut HashMap::default(),
                         )?;
+
+                        for (l, r) in function_parameters.iter().zip(argument_types.iter()) {
+                            if let (TType::Custom(lc), TType::Custom(rc)) = (l, r) {
+                                //dbg!(lc, rc);
+                                // dbg!(self.environment.generic_type_map.get(rc));
+                                if let Some(ic) = self.environment.generic_type_map.get(rc) {
+                                    if lc == ic {
+                                        // map the values of rc to lc
+                                        // get list of rc
+                                        if let Some(list) = self.environment.get_type(&lc) {
+                                            //dbg!("outer");
+                                            let mut s = self.clone();
+                                            if let Some(outerlist) = s.environment.get_type(&rc) {
+                                                //dbg!(list,outerlist);
+                                                map = self.check_and_map_types(
+                                                    &[list],
+                                                    &[outerlist],
+                                                    &mut map,
+                                                )?;
+                                                //dbg!(&map);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // let new_function_parameters: Vec<TType> = vec![];
+                        // dbg!(&identifier, &function_parameters);
+                        // // check with new param
+                        // map = self.check_and_map_types(
+                        //     &function_parameters,
+                        //     &argument_types,
+                        //     &mut HashMap::default(),
+                        // )?;
+                        //dbg!(&function_id);
                         function_output = Box::new(self.get_output(*function_output, &mut map)?);
                         return Ok(Expr::Literal(
                             *function_output.clone(),
@@ -851,6 +1006,9 @@ impl Parser {
                             &argument_types,
                             &mut HashMap::default(),
                         )?;
+                        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+                            function_id = subtype.clone();
+                        }
                         function_output = Box::new(self.get_output(*function_output, &mut map)?);
                         return Ok(Expr::Literal(
                             *function_output.clone(),
@@ -2306,38 +2464,84 @@ impl Parser {
         Ok(Some(Statement::Pass))
     }
 
-    fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("type"))?;
-        // get type id
-        let (id, pos) = self.identifier()?;
-        if self.environment.custom_types.contains_key(&id) {
-            return Err(common::error::parser_error(
-                format!("Type '{}' is already instantiated", id),
-                "Cannot alias a custom type".to_string(),
-                pos.line,
-                pos.row,
-                self.filepath.clone(),
-                None,
-            ));
-        } else {
-            self.environment.custom_types.insert(id.clone(), vec![]);
-        }
-        // assingment
-        self.consume_operator(Operator::Assignment)?;
-        // get type
-        let ttype = self.ttype()?;
-        // insert into type alias
+    // fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
+    //     self.consume_identifier(Some("type"))?;
+    //     // get type id
+    //     let (id, pos) = self.identifier()?;
+    //     if self.environment.custom_types.contains_key(&id) {
+    //         return Err(common::error::parser_error(
+    //             format!("Type '{}' is already instantiated", id),
+    //             "Cannot alias a custom type".to_string(),
+    //             pos.line,
+    //             pos.row,
+    //             self.filepath.clone(),
+    //             None,
+    //         ));
+    //     } else {
+    //         self.environment.custom_types.insert(id.clone(), vec![]);
+    //     }
+    //     // assingment
+    //     self.consume_operator(Operator::Assignment)?;
+    //     // get type
+    //     let ttype = self.ttype()?;
+    //     // insert into type alias
 
-        let gmap = self.getgen(ttype.clone());
-        if !gmap.is_empty() {
-            return Err(self.generate_error(
-                format!("Type alias cannot contain generic type"),
-                format!("Try removing the generic type"),
-            ));
-        }
+    //     let gmap = self.getgen(ttype.clone());
+    //     if !gmap.is_empty() {
+    //         return Err(self.generate_error(
+    //             format!("Type alias cannot contain generic type"),
+    //             format!("Try removing the generic type"),
+    //         ));
+    //     }
 
-        self.environment.type_alias.insert(id, ttype);
-        Ok(None)
+    //     self.environment.type_alias.insert(id, ttype);
+    //     Ok(None)
+    // }
+
+    fn get_id_list(&mut self) -> Result<Vec<String>, NovaError> {
+        let mut idlist = vec![];
+        self.consume_symbol('(')?;
+        if !self.current_token().is_symbol(')') {
+            idlist.push(self.identifier()?.0);
+        }
+        while self.current_token().is_symbol(',') {
+            self.advance();
+            if self.current_token().is_symbol(')') {
+                break;
+            }
+            idlist.push(self.identifier()?.0);
+        }
+        self.consume_symbol(')')?;
+        Ok(idlist)
+    }
+
+    fn collect_generics(&self, input: &[TType]) -> Table<String> {
+        //dbg!(&input);
+        let mut contracts = table::new();
+        for t in input {
+            match t {
+                TType::Generic(generic) => contracts.insert(generic.clone()),
+                TType::Function(input, output) => {
+                    contracts.extend(self.collect_generics(input));
+                    contracts.extend(self.collect_generics(&[*output.clone()]))
+                }
+                TType::List(list) => contracts.extend(self.collect_generics(&[*list.clone()])),
+                TType::Option(option) => {
+                    contracts.extend(self.collect_generics(&[*option.clone()]))
+                }
+                TType::Custom(custom) => {
+                    // find custom type and import any generic type variables it has.
+                    // if let Some(dict) = self.environment.custom_types.get(custom) {
+                    //     dbg!(custom,dict);
+                    //     for t in dict.iter() {
+                    //         contracts.extend(self.collect_type_contracts(&[t.1.clone()]));
+                    //     }
+                    // }
+                }
+                _ => {}
+            }
+        }
+        return contracts;
     }
 
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2347,20 +2551,42 @@ impl Parser {
         self.environment
             .custom_types
             .insert(identifier.clone(), vec![]);
+
+        let mut idlist = vec![];
+        if let Token::Symbol('(', _) = self.current_token() {
+            idlist = self.get_id_list()?;
+            self.environment
+                .generic_type_struct
+                .insert(identifier.clone(), idlist.clone());
+        }
+
         self.consume_symbol('{')?;
-
         let parameters = self.parameter_list()?;
-
         self.consume_symbol('}')?;
 
         let mut fields: Vec<(String, TType)> = vec![];
         let mut typeinput = vec![];
+        let mut generics: Table<String> = table::new();
+
         for (ttype, identifier) in parameters.clone() {
+            generics.extend(self.collect_generics(&[ttype.clone()]));
             typeinput.push(ttype.clone());
             fields.push((identifier, ttype));
         }
         fields.push(("type".to_string(), TType::String));
-
+        for g in generics.items.iter() {
+            if idlist.contains(g) {
+            } else {
+                return Err(common::error::parser_error(
+                    format!("Struct '{}' is missing generic type {g}", identifier),
+                    "You must include generics types in struct name(...generictypes) ".to_string(),
+                    pos.line,
+                    pos.row,
+                    self.filepath.clone(),
+                    None,
+                ));
+            }
+        }
         let mut input = vec![];
         for (identifier, ttype) in fields.clone() {
             input.push(Field { identifier, ttype })
@@ -2520,8 +2746,117 @@ impl Parser {
                 Some(pos),
                 SymbolKind::Variable,
             );
-            Ok(Some(Statement::Let {ttype, identifier, expr, global }))
+            Ok(Some(Statement::Let {
+                ttype,
+                identifier,
+                expr,
+                global,
+            }))
         }
+    }
+
+    fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("type"))?;
+        // get type id
+        let (id, pos) = self.identifier()?;
+        if self.environment.custom_types.contains_key(&id) {
+            return Err(common::error::parser_error(
+                format!("Type '{}' is already instantiated", id),
+                "Cannot alias a custom type".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        } else {
+            self.environment.custom_types.insert(id.clone(), vec![]);
+        }
+        // assingment
+
+        self.consume_operator(Operator::Assignment)?;
+        // // get type
+        let (generic, pos) = self.identifier()?;
+        self.consume_symbol('(')?;
+        let mut type_annotation = vec![];
+        let ta = self.ttype()?;
+        type_annotation.push(ta);
+        while self.current_token().is_symbol(',') {
+            self.advance();
+            let ta = self.ttype()?;
+            type_annotation.push(ta);
+        }
+        self.consume_symbol(')')?;
+        let mut typelist = vec![];
+        if let Some(list) = self.environment.generic_type_struct.get(&generic) {
+            typelist = list.clone();
+            self.environment
+                .generic_type_map
+                .insert(id.clone(), generic.clone());
+        } else {
+            return Err(self.generate_error("no generic".to_owned(), "".to_owned()));
+        }
+
+        // check if correct number of args
+        //dbg!(&type_annotation,&typelist);
+        if type_annotation.len() != typelist.len() {
+            return Err(common::error::parser_error(
+                format!(
+                    "not enough type arguments. Expecting {}, got {}",
+                    typelist.len(),
+                    type_annotation.len()
+                ),
+                "".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        }
+        let mut gmap: HashMap<String, TType> = HashMap::default();
+        for (gen, t) in typelist.iter().zip(type_annotation.iter()) {
+            gmap.insert(gen.clone(), t.clone());
+        }
+        // create new instance of type
+        // with map
+
+        if let Some(mut fields) = self.environment.custom_types.get(&generic) {
+            let mut newfields = vec![];
+            let mut typeinput = vec![];
+            for (field, ttype) in fields.iter() {
+                if field != "type" {
+                    typeinput.push(self.get_output(ttype.clone(), &mut gmap.clone())?);
+                }
+
+                newfields.push((
+                    field.clone(),
+                    self.get_output(ttype.clone(), &mut gmap.clone())?,
+                ))
+            }
+
+            if !self.environment.has(&id) {
+                self.environment.no_override.insert(id.to_string());
+                self.environment.insert_symbol(
+                    &id,
+                    TType::Function(typeinput, Box::new(TType::Custom(id.clone()))),
+                    Some(pos.clone()),
+                    SymbolKind::Constructor,
+                );
+                self.environment.custom_types.insert(id.clone(), newfields);
+            } else {
+                return Err(common::error::parser_error(
+                    format!("Struct '{}' is already instantiated", id),
+                    "Cannot reinstantiate the same type".to_string(),
+                    pos.line,
+                    pos.row,
+                    self.filepath.clone(),
+                    None,
+                ));
+            }
+        } else {
+            return Err(self.generate_error("broke".to_owned(), "no generic to be made".to_owned()));
+        }
+
+        Ok(None)
     }
 
     fn return_statement(
@@ -2532,6 +2867,46 @@ impl Parser {
         self.consume_identifier(Some("return"))?;
         let expr = self.expr()?;
         Ok(Some(Statement::Return(expr.get_type(), expr, line, row)))
+    }
+
+    fn is_generic(&self, params: &[TType]) -> bool {
+        for t in params {
+            match t {
+                TType::Any => {
+                    return true;
+                }
+                TType::Generic(_) => {
+                    return true;
+                }
+                TType::Function(input, output) => {
+                    if let TType::Generic(_) = **output {
+                        return true;
+                    }
+                    if self.is_generic(&input.clone()) || self.is_generic(&vec![*output.clone()]) {
+                        return true;
+                    }
+                }
+                TType::List(list) => {
+                    if let TType::Generic(_) = **list {
+                        return true;
+                    }
+                    return self.is_generic(&vec![*list.clone()]);
+                }
+                TType::Option(option) => {
+                    if let TType::Generic(_) = **option {
+                        return true;
+                    }
+                    return self.is_generic(&vec![*option.clone()]);
+                }
+                TType::Custom(custom) => {
+                    if self.environment.generic_type_struct.contains_key(custom) {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        return false;
     }
 
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2562,41 +2937,8 @@ impl Parser {
             typeinput.push(arg.0.clone())
         }
         // is function using generics?
-        fn is_generic(params: &[TType]) -> bool {
-            for t in params {
-                match t {
-                    TType::Any => {
-                        return true;
-                    }
-                    TType::Generic(_) => {
-                        return true;
-                    }
-                    TType::Function(input, output) => {
-                        if let TType::Generic(_) = **output {
-                            return true;
-                        }
-                        if is_generic(&input.clone()) || is_generic(&vec![*output.clone()]) {
-                            return true;
-                        }
-                    }
-                    TType::List(list) => {
-                        if let TType::Generic(_) = **list {
-                            return true;
-                        }
-                        return is_generic(&vec![*list.clone()]);
-                    }
-                    TType::Option(option) => {
-                        if let TType::Generic(_) = **option {
-                            return true;
-                        }
-                        return is_generic(&vec![*option.clone()]);
-                    }
-                    _ => {}
-                }
-            }
-            return false;
-        }
-        let generic = is_generic(&typeinput);
+
+        let generic = self.is_generic(&typeinput);
         // build helper vecs
         let mut input = vec![];
         for (ttype, identifier) in parameters.clone() {
