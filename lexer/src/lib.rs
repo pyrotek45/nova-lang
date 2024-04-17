@@ -66,14 +66,21 @@ impl Lexer {
     }
 
     fn current_position_buffer_offset(&self) -> FilePosition {
+        let mut offset = self.buffer.len();
+        if self.buffer.len() > self.row {
+            offset = 0
+        }
         return FilePosition {
             line: self.line,
-            row: self.row - self.buffer.len(),
+            row: self.row - 0,
             filepath: self.filepath.clone(),
         };
     }
 
-    fn current_position_plus_offset(&self, offset: usize) -> FilePosition {
+    fn current_position_plus_offset(&self, mut offset: usize) -> FilePosition {
+        if self.buffer.len() > self.row {
+            offset = 0
+        }
         return FilePosition {
             line: self.line,
             row: self.row + offset,
