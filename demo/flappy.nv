@@ -52,6 +52,7 @@ let points = 0
 
 rawmode(true)
 let alive = true
+println("\l")
 while alive
     clearscreen()
     alive = showscreen(player,wall, points)

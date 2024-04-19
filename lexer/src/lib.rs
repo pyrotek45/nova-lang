@@ -238,6 +238,18 @@ impl Lexer {
             if self.state == LexerState::String {
                 if c == '\\' {
                     match chars.peek() {
+                        Some('l') => {
+                            chars.next();
+                            self.buffer.push_str(" \x1b[?25l");
+                            self.row += 1;
+                            continue;
+                        }
+                        Some('h') => {
+                            chars.next();
+                            self.buffer.push_str(" \x1b[?25h");
+                            self.row += 1;
+                            continue;
+                        }
                         Some('n') => {
                             chars.next();
                             self.buffer.push('\n');
