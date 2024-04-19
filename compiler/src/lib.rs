@@ -272,7 +272,9 @@ impl Compiler {
                             panic!()
                         }
                     },
-                    _ => {}
+                    _ => {
+                        self.compile_expr(*index);
+                    }
                 }
                 self.getref_expr(*from)?;
                 self.asm.push(Asm::PIN(pos));
