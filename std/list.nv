@@ -1,24 +1,22 @@
-struct List {
-    fill: ([$A], $A, Int) -> [$A],
-    initList: ($A, Int) -> [$A]
-}
+fn fill(list: [$A], input: $A, ammount: Int) -> [$A]
+    let i = 0
+    for i = 0; i < ammount; i += 1
+        list.push(input)
+    return list
 
-fn defualtList() -> List {
-    return List {
-        fill: fn(list: [$A], input: $A, ammount: Int) -> [$A] {
-            let i = 0
-            for i = 0; i < ammount; i += 1 {
-                list.push(input)
-            }
-            return list
-        },
-        initList: fn(input: $A, ammount: Int) -> [$A] {
-            let list = []: $A
-            let i = 0
-            for i = 0; i < ammount; i += 1 {
-                list.push(input)
-            }
-            return list
-        }
-    }
-}
+fn initList(input: $A, ammount: Int) -> [$A]
+    let list = []: $A
+    let i = 0
+    for i = 0; i < ammount; i += 1
+        list.push(input)
+    return list
+
+fn forEach(list: [$a], f:($a))
+    for i <- 0; i < list.len(); i += 1
+        f(list[i])
+
+fn range(start: Int, end: Int) -> [Int]
+    let output = []: Int
+    for i <- start; i < end; i += 1
+        output.push(i)
+    return output

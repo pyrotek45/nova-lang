@@ -238,14 +238,17 @@ impl Vm {
                                         print!(", ");
                                     }
                                     print!("{:?}", self.state.deref(*item));
+                                    self.state.free_heap(*item)
                                 }
                                 print!("]");
                                 io::stdout().flush().expect("");
                             }
+                            self.state.free_heap(index);
                         }
                         VmData::String(index) => {
                             if let Heap::String(str) = self.state.deref(index) {
                                 print!("{str}");
+                                self.state.free_heap(index)
                                 //io::stdout().flush().expect("");
                             }
                         }
@@ -813,8 +816,8 @@ impl Vm {
                                             Heap::Char(v) => self.state.stack.push(VmData::Char(v)),
                                         }
                                     }
-                                    _ => {
-                                        todo!()
+                                    a => {
+                                        dbg!(a);
                                     }
                                 }
                             }
@@ -912,7 +915,7 @@ impl Vm {
                     };
                     let index = self.state.allocate_string(string);
                     self.state.stack.push(VmData::String(index));
-                    //self.state.collect_garbage();
+                    self.state.collect_garbage();
                 }
 
                 Code::CHAR => {
@@ -927,6 +930,9 @@ impl Vm {
                                 self.state.free_heap(index);
                             }
                             VmData::List(index) => {
+                                if let Heap::List(list) = self.state.heap[index].clone() {
+                                    list.iter().for_each(|x| self.state.free_heap(*x));
+                                }
                                 self.state.free_heap(index);
                             }
                             _ => {
@@ -1160,7 +1166,8 @@ impl Vm {
                         }
                         VmData::String(index) => {
                             if let Heap::String(str) = self.state.deref(index) {
-                                println!("{str}")
+                                println!("{str}");
+                                self.state.free_heap(index)
                             }
                         }
                         VmData::Closure(_) => todo!(),

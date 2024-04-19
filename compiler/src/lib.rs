@@ -696,7 +696,7 @@ impl Compiler {
                 match caller.as_str() {
                     "println" => {
                         self.asm.push(Asm::PRINT);
-                        self.asm.push(Asm::STRING("\n".to_string()));
+                        self.asm.push(Asm::Char('\n'));
                         self.asm.push(Asm::PRINT);
                     }
                     "print" => {

@@ -479,8 +479,7 @@ impl Parser {
         self.consume_operator(Operator::Colon)?;
         exprs.insert(id.clone(), self.expr()?);
 
-        while self.current_token().is_symbol(',') {
-            self.advance();
+        while self.current_token().is_identifier() {
             if self.current_token().is_symbol('}') {
                 break;
             }
@@ -2388,6 +2387,38 @@ impl Parser {
         Ok(args)
     }
 
+    fn struct_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
+        let mut parameters: Table<String> = table::new();
+        let mut args = vec![];
+        if self.current_token().is_identifier() {
+            let (id, _) = self.identifier()?;
+            parameters.insert(id.clone());
+            self.consume_operator(Operator::Colon)?;
+            let ttype = self.ttype()?;
+            args.push((ttype, id));
+        }
+        while self.current_token().is_identifier() {
+            match self.identifier() {
+                Ok((id, _)) => {
+                    if parameters.has(&id) {
+                        return Err(self.generate_error(
+                            format!("paremeter identifier already defined"),
+                            format!("try using another name"),
+                        ));
+                    }
+                    parameters.insert(id.clone());
+                    self.consume_operator(Operator::Colon)?;
+                    let ttype = self.ttype()?;
+                    args.push((ttype, id));
+                }
+                Err(_) => {
+                    break;
+                }
+            }
+        }
+        Ok(args)
+    }
+
     fn alternative(&mut self) -> Result<Vec<Statement>, NovaError> {
         let test = self.top_expr()?;
         if test.get_type() != TType::Bool {
@@ -2577,7 +2608,7 @@ impl Parser {
         }
 
         self.consume_symbol('{')?;
-        let parameters = self.parameter_list()?;
+        let parameters = self.struct_list()?;
         self.consume_symbol('}')?;
 
         let mut fields: Vec<(String, TType)> = vec![];
@@ -3177,7 +3208,6 @@ impl Parser {
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
         self.consume_symbol('{')?;
-
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
         Ok(statements)

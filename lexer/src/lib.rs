@@ -23,6 +23,8 @@ pub struct Lexer {
     token_list: TokenList,
     buffer: String,
     state: LexerState,
+    currentscope: usize,
+    scopestack: Vec<usize>,
 }
 
 impl Default for Lexer {
@@ -35,6 +37,8 @@ impl Default for Lexer {
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
+            scopestack: vec![1],
+            currentscope: 1,
         }
     }
 }
@@ -54,6 +58,8 @@ impl Lexer {
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
+            scopestack: vec![1],
+            currentscope: 1,
         })
     }
 
@@ -166,6 +172,12 @@ impl Lexer {
                         self.current_position_buffer_offset(),
                     ))
                 }
+                "Void" => {
+                    return Some(Token::Type(
+                        TType::Void,
+                        self.current_position_buffer_offset(),
+                    ))
+                }
                 _ => {
                     return Some(Token::Identifier(
                         self.buffer.to_string(),
@@ -195,11 +207,23 @@ impl Lexer {
                 "".to_string(),
             ));
         }
+        let mut empty = true;
+        let tempstr = self
+            .source_file
+            .clone()
+            .lines()
+            .filter(|&line| !line.trim().is_empty())
+            .collect::<Vec<&str>>()
+            .join("\n");
 
-        let tempstr = self.source_file.clone();
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
+            if c != ' ' && c != '\n' {
+                //dbg!(empty);
+                empty = false;
+                //dbg!(self.line, empty, c);
+            }
             if self.state == LexerState::Comment {
                 if c != '\n' {
                     self.row += 1;
@@ -365,6 +389,57 @@ impl Lexer {
             }
 
             match c {
+                '\\' => {
+                    self.row += 1;
+                    self.check_token();
+                    if let Some('\n') = chars.peek() {
+                        chars.next();
+                        continue;
+                    }
+                }
+                '\n' => {
+                    self.check_token();
+                    let mut i = 1;
+                    while let Some(' ') = chars.peek() {
+                        chars.next();
+                        //dbg!(i);
+                        i += 1;
+                    }
+
+                    let mut depth = self.scopestack.last().unwrap().clone();
+                    if i > depth {
+                        if empty {
+                            //dbg!(self.line);
+                            //println!("im empty");
+                            self.line += 1;
+                            self.row = 0;
+                            empty = true;
+                            continue;
+                        }
+                        self.currentscope = i;
+                        self.scopestack.push(i);
+
+                        self.token_list
+                            .push(Token::Symbol('{', self.current_position()));
+                    } else if i < depth {
+                        self.currentscope = i;
+                        self.scopestack.pop();
+                        self.token_list
+                            .push(Token::Symbol('}', self.current_position()));
+                        while i < depth {
+                            depth = self.scopestack.last().unwrap().clone();
+                            if i == depth {
+                                break;
+                            }
+                            self.scopestack.pop();
+                            self.token_list
+                                .push(Token::Symbol('}', self.current_position()));
+                        }
+                    }
+                    self.line += 1;
+                    self.row = 0;
+                    empty = true;
+                }
                 '\'' => {
                     self.row += 1;
                     self.state = LexerState::Char;
@@ -374,11 +449,7 @@ impl Lexer {
                     self.state = LexerState::String;
                     self.check_token();
                 }
-                '\n' => {
-                    self.check_token();
-                    self.line += 1;
-                    self.row = 0;
-                }
+
                 '.' => {
                     if self.state != LexerState::Float {
                         if let Ok(v) = self.buffer.parse() {
@@ -587,6 +658,11 @@ impl Lexer {
         }
 
         self.check_token();
+        while self.scopestack.len() > 1 {
+            self.scopestack.pop();
+            self.token_list
+                .push(Token::Symbol('}', self.current_position()));
+        }
         self.token_list.push(Token::EOF(self.current_position()));
 
         Ok(self.token_list)

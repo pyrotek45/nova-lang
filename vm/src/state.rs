@@ -78,6 +78,7 @@ pub struct State {
     pub gc_count: usize,
     pub garbage_collected: usize,
     pub gclock: bool,
+    pub gmax: usize,
 }
 
 pub fn new() -> State {
@@ -91,10 +92,11 @@ pub fn new() -> State {
         heap: vec![],
         free_space: vec![],
         used_data: common::table::new(),
-        threshold: 0,
+        threshold: 10,
         gc_count: 0,
         garbage_collected: 0,
         gclock: false,
+        gmax: 0,
     }
 }
 
@@ -158,12 +160,12 @@ impl State {
 
     #[inline(always)]
     pub fn collect_garbage(&mut self) {
-        if self.gclock {
-            return;
-        }
-        // only run when out of free space and over threshold
+        // if self.gclock {
+        //     return;
+        // }
+        //only run when out of free space and over threshold
         if self.threshold <= self.heap.len() {
-            self.threshold = ((self.heap.len() as f64) * 1.1) as usize;
+            self.threshold = self.heap.len() * 2;
             //dbg!(&self.threshold);
         } else {
             return;
@@ -195,12 +197,18 @@ impl State {
                 }
             }
         }
-        //dbg!(&self.garbage_collected);
+        if self.gmax < self.heap.len() {
+            self.gmax = self.heap.len();
+        };
+        //dbg!(&self.gmax);
     }
 
     #[inline(always)]
     pub fn free_heap(&mut self, index: usize) {
-        self.free_space.push(index)
+        //dbg!(&self.heap[index], self.heap.len());
+        //dbg!(&self.heap.len());
+        self.free_space.push(index);
+        //dbg!("freeing", index);
     }
 
     #[inline(always)]
@@ -344,6 +352,7 @@ impl State {
 
     #[inline(always)]
     pub fn allocate_string(&mut self, str: String) -> usize {
+        //dbg!(&self.free_space.len());
         if let Some(space) = self.free_space.pop() {
             self.heap[space] = Heap::String(str);
             space
@@ -386,6 +395,7 @@ impl State {
             }
         }
         self.offset = *self.window.last().unwrap();
+        self.collect_garbage();
     }
 
     #[inline(always)]
@@ -399,5 +409,6 @@ impl State {
         }
         self.offset = *self.window.last().unwrap();
         self.stack.push(returnvalue);
+        self.collect_garbage();
     }
 }
