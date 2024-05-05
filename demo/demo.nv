@@ -34,16 +34,16 @@ for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-import "../std/list.nv" let list = defualtList()
+import "../std/list.nv"
 
 // Array
 let arr = [1,2,3]
 println(arr)
 
-let arr2 = []: Int.list::fill(10,5)
+let arr2 = []: Int.fill(10,5)
 arr2.println()
 
-let arr3 = list::initList(10,5)
+let arr3 = initList(10,5)
 arr3.println()
  
 arr[1] = 4
@@ -68,17 +68,17 @@ let zed = Zed {
 zed::test()
 
 // import iterators
-import "../std/iter.nv" let iter = defualtIter()
+import "../std/iter.nv" 
 
 // import defualt iter functions
 
 
 let myIter = [1,2,3,4,5]
-    .iter::create()
-    .iter::map(fn(x:Int)->Int{return x * x})
+    .create()
+    .map(fn(x:Int)->Int{return x * x})
 
 myIter
-    .iter::printIter()
+    .printIter()
 
 // Function pointers
 struct SomeFunction {
@@ -102,10 +102,10 @@ print("hello again!\n")
 myOtherFunc(4,7).println()
 
 let myIterTwo = [1,2,3,4,5]
-    .iter::create()
-    .iter::map(simpleSquare)
-    .iter::map(simpleSquare)
-    .iter::collect()
+    .create()
+    .map(simpleSquare)
+    .map(simpleSquare)
+    .collect()
 
 println(myIterTwo)
 
@@ -202,8 +202,8 @@ x.do(fn(x:Int) {x.println()})
 // String manipulation
 str <- "hello world!"
     .strToChars()
-    .iter::create() 
-    .iter::filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
+    .create() 
+    .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
     .charsToStr()
 
 str.println()
@@ -239,17 +239,7 @@ curriedmul <- curry(mul@(Int,Int))
 
 curriedmul(5)(5).println()
 
-// Type alias
-type Str = String
-
-let name : Str = "wow"
-
-fn test(x: Str) -> Str {
-    return x
-}
-
-test("hello world").println()
-
+// using IO struct
 import "../std/io.nv" let io = defualtIO()
 
 let input = io::prompt("wow")
