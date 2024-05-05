@@ -1,62 +1,54 @@
-struct Iter {
-    create: ([$A]) -> () -> ?$A,
-    map: (() -> ?$A, ($A) -> $A) -> () -> ?$A,
-    printIter: (() -> ?$A),
-    collect: (() -> ?$A) -> [$A],
-    filter: (() -> ?$A, ($A) -> Bool) -> [$A],
+fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
+    let t: ?$A = it()
+    let list = []:$A
+    while t.isSome() {
+        if t.unwrap().f() {
+            list.push(t.unwrap())
+        }
+        t = it()
+    }
+    return list
 }
 
-fn defualtIter() -> Iter {
-    return Iter {
-        filter: fn(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
-            let t: ?$A = it()
-            let list = []:$A
-            while t.isSome() {
-                if t.unwrap().f() {
-                    list.push(t.unwrap())
-                }
-                t = it()
-            }
-            return list
-        },
-        create: fn(input:[$A]) -> () -> ?$A {
-            let index = #(0)   
-            return fn() -> ?$A {
-                if index:0 >= input.len() {
-                    return ?$A
-                } else {
-                    let result : ?$A = some(input[index:0])
-                    index:0 += 1
-                    return result
-                }
-            }
-        },
-        map: fn(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
-            return fn() -> ?$A {
-                let result: ?$A = it()
-                if result.isSome() {
-                    return some(f(result.unwrap()))
-                } else {
-                    return ?$A
-                }
-            }
-        },
-        printIter: fn(it: () -> ?$A) {
-            let t: ?$A = it()
-            while t.isSome() {
-                print(t.unwrap())
-                print("\n")
-                t = it()
-            }
-        },
-        collect: fn(it: () -> ?$A) -> [$A] {
-            let t: ?$A = it()
-            let list = []:$A
-            while t.isSome() {
-                list.push(t.unwrap())
-                t = it()
-            }
-            return list
+fn create(input:[$A]) -> () -> ?$A {
+    let index = #(0)   
+    return fn() -> ?$A {
+        if index:0 >= input.len() {
+            return ?$A
+        } else {
+            let result : ?$A = some(input[index:0])
+            index:0 += 1
+            return result
         }
     }
+}
+
+fn map(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
+    return fn() -> ?$A {
+        let result: ?$A = it()
+        if result.isSome() {
+            return some(f(result.unwrap()))
+        } else {
+            return ?$A
+        }
+    }
+}
+
+fn printIter(it: () -> ?$A) {
+    let t: ?$A = it()
+    while t.isSome() {
+        print(t.unwrap())
+        print("\n")
+        t = it()
+    }
+}
+
+fn collect(it: () -> ?$A) -> [$A] {
+    let t: ?$A = it()
+    let list = []:$A
+    while t.isSome() {
+        list.push(t.unwrap())
+        t = it()
+    }
+    return list
 }
