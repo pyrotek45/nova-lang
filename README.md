@@ -56,7 +56,7 @@ struct Person {
 println("hello world!")
 
 // Creating instance of type
-let person : Person = Person {name = "bob", age = 42}
+let person : Person = Person {name: "bob", age: 42}
 
 // Optional type annotation
 let person2 = Person("joe", 50)
@@ -73,7 +73,7 @@ fn display(self: Person) {
     println(self.age)
 }
 
-// Using function
+// import function
 person.display()
 display(person2)
 
@@ -82,16 +82,16 @@ for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-using "../std/list.nv"
+import "../std/list.nv"
 
 // Array
 let arr = [1,2,3]
 println(arr)
 
-let arr2 = []: Int.list::fill(10,5)
+let arr2 = []: Int.fill(10,5)
 arr2.println()
 
-let arr3 = list::initList(10,5)
+let arr3 = initList(10,5)
 arr3.println()
  
 arr[1] = 4
@@ -107,7 +107,7 @@ struct Zed {
 
 // Creating an instance from a type
 let zed = Zed {
-    test = fn() {
+    test: fn() {
         print("wow\n")
     }
 }
@@ -115,15 +115,18 @@ let zed = Zed {
 // Now we can access its namespace and call functions directly
 zed::test()
 
-// Using iterators
-using "../std/iter.nv"
+// import iterators
+import "../std/iter.nv" 
+
+// import defualt iter functions
+
 
 let myIter = [1,2,3,4,5]
-    .iter::create()
-    .iter::map(fn(x:Int)->Int{return x * x})
+    .create()
+    .map(fn(x:Int)->Int{return x * x})
 
 myIter
-    .iter::printIter()
+    .printIter()
 
 // Function pointers
 struct SomeFunction {
@@ -147,10 +150,10 @@ print("hello again!\n")
 myOtherFunc(4,7).println()
 
 let myIterTwo = [1,2,3,4,5]
-    .iter::create()
-    .iter::map(simpleSquare)
-    .iter::map(simpleSquare)
-    .iter::collect()
+    .create()
+    .map(simpleSquare)
+    .map(simpleSquare)
+    .collect()
 
 println(myIterTwo)
 
@@ -194,13 +197,13 @@ struct Counter {
 // Creating a init funciton for Counter
 fn CounterInit() -> Counter {
     return Counter {
-        value = 0,
-        count = fn(self: Counter) -> Int {
+        value: 0,
+        count: fn(self: Counter) -> Int {
             result <- self.value
             self.value += 1
             return result
         },
-        reset = fn(self: Counter) {
+        reset: fn(self: Counter) {
             self.value = 0
         }
     }
@@ -225,7 +228,7 @@ mycounter.count().println()
 // Option type ?type lets you represent none
 let x: ?Int = some(20)
 
-// using the isSome() function here
+// import the isSome() function here
 if x.isSome() {
     x.unwrap().println()
 }
@@ -247,8 +250,8 @@ x.do(fn(x:Int) {x.println()})
 // String manipulation
 str <- "hello world!"
     .strToChars()
-    .iter::create() 
-    .iter::filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
+    .create() 
+    .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
     .charsToStr()
 
 str.println()
@@ -284,14 +287,9 @@ curriedmul <- curry(mul@(Int,Int))
 
 curriedmul(5)(5).println()
 
-// Type alias
-type Str = String
+// using IO struct
+import "../std/io.nv" let io = defualtIO()
 
-let name : Str = "wow"
-
-fn test(x: Str) -> Str {
-    return x
-}
-
-test("hello world").println()
+let input = io::prompt("wow")
+input.println()
 ```
