@@ -13,11 +13,11 @@ fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
 fn create(input:[$A]) -> () -> ?$A {
     let index = #(0)   
     return fn() -> ?$A {
-        if index:0 >= input.len() {
+        if index[0] >= input.len() {
             return ?$A
         } else {
-            let result : ?$A = some(input[index:0])
-            index:0 += 1
+            let result : ?$A = some(input[index[0]])
+            index[0] += 1
             return result
         }
     }
