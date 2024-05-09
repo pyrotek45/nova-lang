@@ -1267,32 +1267,65 @@ impl Parser {
         mut lhs: Expr,
         ttype: TType,
     ) -> Result<Expr, NovaError> {
-        self.consume_symbol('[')?;
-        let index = self.mid_expr()?;
-        self.consume_symbol(']')?;
-        if index.get_type() != TType::Int {
-            return Err(self.generate_error(
-                format!("Must index list with an int"),
-                format!("Cannot index into list with {:?}", index.get_type()),
-            ));
-        }
-        if let Some(inner) = ttype.get_inner() {
-            lhs = Expr::Indexed(
-                inner.clone(),
-                identifier.clone(),
-                Box::new(index),
-                Box::new(lhs),
-                self.get_pos(),
-            );
-            if self.current_token().is_symbol('[') {
-                lhs = self.index(identifier.clone(), lhs, inner)?;
+        match ttype {
+            TType::List(inner) => {
+                self.consume_symbol('[')?;
+                let index = self.mid_expr()?;
+                self.consume_symbol(']')?;
+                if index.get_type() != TType::Int {
+                    return Err(self.generate_error(
+                        format!("Must index list with an int"),
+                        format!("Cannot index into list with {:?}", index.get_type()),
+                    ));
+                }
+                lhs = Expr::Indexed(
+                    *inner.clone(),
+                    identifier.clone(),
+                    Box::new(index),
+                    Box::new(lhs),
+                    self.get_pos(),
+                );
+                if self.current_token().is_symbol('[') {
+                    lhs = self.index(identifier.clone(), lhs, *inner)?;
+                }
             }
-        } else {
-            return Err(self.generate_error(
-                format!("Cannot index into non list"),
-                format!("Must be of type list"),
-            ));
+            TType::Tuple(inner) => {
+                self.consume_symbol('[')?;
+                if let Token::Integer(index, _) = self.current_token() {
+                    self.advance();
+                    self.consume_symbol(']')?;
+                    if index as usize >= inner.len() {
+                        return Err(self.generate_error(
+                            format!("Tuple cannot index into {index}"),
+                            format!("Tuple has {} values", inner.len()),
+                        ));
+                    }
+                    let ttype = &inner[index as usize];
+                    lhs = Expr::Indexed(
+                        ttype.clone(),
+                        "anon".to_string(),
+                        Box::new(Expr::Literal(TType::Int, Atom::Integer(index))),
+                        Box::new(lhs),
+                        self.get_pos(),
+                    );
+                    if self.current_token().is_symbol('[') {
+                        lhs = self.index(identifier.clone(), lhs, ttype.clone())?;
+                    }
+                } else {
+                    return Err(self.generate_error(
+                        format!("Cannot index into tuple with {:?}", self.current_token()),
+                        format!(""),
+                    ));
+                }
+            }
+            _ => {
+                return Err(self.generate_error(
+                    format!("Cannot index into non list"),
+                    format!("Must be of type list"),
+                ));
+            }
         }
+
         Ok(lhs)
     }
 
@@ -1838,41 +1871,6 @@ impl Parser {
         }
         loop {
             match self.current_token() {
-                Token::Operator(Operator::Colon, _) => {
-                    self.consume_operator(Operator::Colon)?;
-                    if let TType::Tuple(typelist) = left.get_type() {
-                        if let Token::Integer(index, _) = self.current_token() {
-                            self.advance();
-                            if index as usize >= typelist.len() {
-                                return Err(self.generate_error(
-                                    format!("Tuple cannot index into {index}"),
-                                    format!("Tuple has {} values", typelist.len()),
-                                ));
-                            }
-                            let ttype = &typelist[index as usize];
-                            left = Expr::Indexed(
-                                ttype.clone(),
-                                "anon".to_string(),
-                                Box::new(Expr::Literal(TType::Int, Atom::Integer(index))),
-                                Box::new(left),
-                                self.get_pos(),
-                            )
-                        } else {
-                            return Err(self.generate_error(
-                                format!("Cannot index into tuple with {:?}", self.current_token()),
-                                format!(""),
-                            ));
-                        }
-                    } else {
-                        return Err(self.generate_error(
-                            format!(
-                                "Failed to index into tuple, {} is not a tuple ",
-                                type_to_string(&left.get_type())
-                            ),
-                            format!(""),
-                        ));
-                    }
-                }
                 Token::Operator(Operator::RightArrow, _) => {
                     // mything <- compute()
                     self.consume_operator(Operator::RightArrow)?;
