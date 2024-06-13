@@ -372,6 +372,9 @@ impl Lexer {
                     self.line += 1;
                     self.row = 0;
                 }
+                '\r' => {
+                    self.check_token();
+                }
                 '.' => {
                     if self.state != LexerState::Float {
                         if let Ok(v) = self.buffer.parse() {
