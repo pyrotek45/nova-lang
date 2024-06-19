@@ -580,9 +580,7 @@ impl Parser {
         {
             match function_kind {
                 SymbolKind::GenericFunction => {
-                    let mut map = HashMap::default();
-
-                    map = self.check_and_map_types(
+                    let mut map = self.check_and_map_types(
                         &function_parameters,
                         &inputtypes,
                         &mut HashMap::default(),
@@ -695,9 +693,7 @@ impl Parser {
                 );
                 match function_kind {
                     SymbolKind::GenericFunction => {
-                        let mut map = HashMap::default();
-
-                        map = self.check_and_map_types(
+                        let mut map = self.check_and_map_types(
                             &function_parameters,
                             &inputtypes,
                             &mut HashMap::default(),
@@ -837,9 +833,7 @@ impl Parser {
         {
             match function_kind {
                 SymbolKind::GenericFunction => {
-                    let mut map = HashMap::default();
-
-                    map = self.check_and_map_types(
+                    let mut map = self.check_and_map_types(
                         &function_parameters,
                         &argument_types,
                         &mut HashMap::default(),
@@ -962,9 +956,7 @@ impl Parser {
                 );
                 match function_kind {
                     SymbolKind::GenericFunction => {
-                        let mut map = HashMap::default();
-
-                        map = self.check_and_map_types(
+                        let mut map = self.check_and_map_types(
                             &function_parameters,
                             &argument_types,
                             &mut HashMap::default(),
@@ -1541,12 +1533,12 @@ impl Parser {
                         }
                         // build argument list
                         input.push(Arg {
-                            identifier: identifier,
+                            identifier,
                             ttype: ttype.clone(),
                         });
                     } else {
                         input.push(Arg {
-                            identifier: identifier,
+                            identifier,
                             ttype: ttype.clone(),
                         });
                     }
@@ -2160,7 +2152,7 @@ impl Parser {
         }
         Ok(left)
     }
-
+    #[allow(dead_code)]
     fn getgen(&self, ttype: TType) -> Table<String> {
         let mut gtable = table::new();
         match ttype {
@@ -2543,7 +2535,7 @@ impl Parser {
                 TType::Option(option) => {
                     contracts.extend(self.collect_generics(&[*option.clone()]))
                 }
-                TType::Custom(custom) => {
+                TType::Custom(_custom) => {
                     // find custom type and import any generic type variables it has.
                     // if let Some(dict) = self.environment.custom_types.get(custom) {
                     //     dbg!(custom,dict);
@@ -2802,6 +2794,7 @@ impl Parser {
             type_annotation.push(ta);
         }
         self.consume_symbol(')')?;
+        #[allow(unused_assignments)]
         let mut typelist = vec![];
         if let Some(list) = self.environment.generic_type_struct.get(&generic) {
             typelist = list.clone();
@@ -2975,12 +2968,12 @@ impl Parser {
                 }
                 // build argument list
                 input.push(Arg {
-                    identifier: identifier,
+                    identifier,
                     ttype: ttype.clone(),
                 });
             } else {
                 input.push(Arg {
-                    identifier: identifier,
+                    identifier,
                     ttype: ttype.clone(),
                 });
             }

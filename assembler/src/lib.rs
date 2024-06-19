@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashMap;
 
 use common::{
@@ -552,15 +553,13 @@ impl Assembler {
         for (target, replace) in self.forwardjumps.iter() {
             if let Some(destination) = self.labels.get(&target) {
                 // need to offset - 4 for the jump location
-
                 let t = ((destination - replace - 4) as u32).to_le_bytes();
                 self.output[replace + 0] = t[0];
                 self.output[replace + 1] = t[1];
                 self.output[replace + 2] = t[2];
                 self.output[replace + 3] = t[3];
             } else {
-                println!("Assembly ERROR: No label {target} exist, exiting");
-                std::process::exit(1);
+                panic!("Assembly ERROR: No label {target} exist, exiting");
             }
         }
     }
