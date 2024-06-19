@@ -2608,12 +2608,14 @@ impl Parser {
 
         if !self.environment.has(&identifier) {
             self.environment.no_override.insert(identifier.to_string());
-            self.environment.insert_symbol(
-                &identifier,
-                TType::Function(typeinput, Box::new(TType::Custom(identifier.clone()))),
-                Some(pos.clone()),
-                SymbolKind::Constructor,
-            );
+            if generics.is_empty() {
+                self.environment.insert_symbol(
+                    &identifier,
+                    TType::Function(typeinput, Box::new(TType::Custom(identifier.clone()))),
+                    Some(pos.clone()),
+                    SymbolKind::Constructor,
+                );
+            }
             self.environment
                 .custom_types
                 .insert(identifier.clone(), fields);
