@@ -2833,7 +2833,7 @@ impl Parser {
         // create new instance of type
         // with map
 
-        if let Some(mut fields) = self.environment.custom_types.get(&generic) {
+        if let Some(fields) = self.environment.custom_types.get(&generic) {
             let mut newfields = vec![];
             let mut typeinput = vec![];
             for (field, ttype) in fields.iter() {
