@@ -128,15 +128,15 @@ pub enum Expr {
 impl Expr {
     pub fn get_type(&self) -> TType {
         match self {
-            Expr::Unary(t, _, _) => t.clone(),
-            Expr::Binop(t, _, _, _) => t.clone(),
-            Expr::Literal(t, _) => t.clone(),
-            Expr::Field(t, _, _, _, _) => t.clone(),
-            Expr::ListConstructor(t, _) => t.clone(),
-            Expr::Indexed(t, _, _, _, _) => t.clone(),
+            Expr::Unary(ttype, _, _) => ttype.clone(),
+            Expr::Binop(ttype, _, _, _) => ttype.clone(),
+            Expr::Literal(ttype, _) => ttype.clone(),
+            Expr::Field(ttype, _, _, _, _) => ttype.clone(),
+            Expr::ListConstructor(ttype, _) => ttype.clone(),
+            Expr::Indexed(ttype, _, _, _, _) => ttype.clone(),
             Expr::None => TType::None,
-            Expr::Call(t, _, _, _) => t.clone(),
-            Expr::Closure(t, _, _, _) => t.clone(),
+            Expr::Call(ttype, _, _, _) => ttype.clone(),
+            Expr::Closure(ttype, _, _, _) => ttype.clone(),
         }
     }
 
