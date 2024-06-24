@@ -1,6 +1,7 @@
 use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
+use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
 use common::ttype::{type_to_string, TType};
 
@@ -85,7 +86,12 @@ impl Compiler {
                         }
                     }
                 }
-                common::nodes::Statement::Function(_, identifier, parameters, input) => {
+                Function {
+                    ttype: _,
+                    identifier,
+                    parameters,
+                    body,
+                } => {
                     self.global.insert(identifier.to_string());
                     let mut function_compile = self.clone();
                     function_compile.variables.clear();
@@ -99,7 +105,7 @@ impl Compiler {
                     self.asm.push(Asm::FUNCTION(functionjump));
 
                     let function_body = Ast {
-                        program: input.clone(),
+                        program: body.clone(),
                     };
                     let _ = function_compile.compile_program(
                         function_body,
@@ -120,7 +126,11 @@ impl Compiler {
                     self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
-                common::nodes::Statement::Struct(_, identifier, fields) => {
+                Struct {
+                    ttype: _,
+                    identifier,
+                    fields,
+                } => {
                     self.global.insert(identifier.to_string());
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
@@ -134,7 +144,12 @@ impl Compiler {
                     self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
-                common::nodes::Statement::Return(ttype, expr, _, _) => {
+                Return {
+                    ttype,
+                    expr,
+                    row: _,
+                    line: _,
+                } => {
                     self.compile_expr(expr.clone())?;
                     if ttype != &TType::Void {
                         self.asm.push(Asm::RET(true))
@@ -142,8 +157,13 @@ impl Compiler {
                         self.asm.push(Asm::RET(false))
                     }
                 }
-                common::nodes::Statement::Expression(_, expr) => self.compile_expr(expr.clone())?,
-                common::nodes::Statement::If(_, test, body, alternative) => {
+                Expression { ttype: _, expr } => self.compile_expr(expr.clone())?,
+                If {
+                    ttype: _,
+                    test,
+                    body,
+                    alternative,
+                } => {
                     let (bodyjump, alterjump) = (self.gen.generate(), self.gen.generate());
                     self.compile_expr(test.clone())?;
                     self.asm.push(Asm::JUMPIFFALSE(bodyjump));
@@ -167,7 +187,7 @@ impl Compiler {
                     }
                 }
 
-                common::nodes::Statement::While(test, body) => {
+                While { test, body } => {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
                     self.breaks.push(end);
@@ -185,7 +205,12 @@ impl Compiler {
                     self.breaks.pop();
                     self.continues.pop();
                 }
-                common::nodes::Statement::For(init, test, inc, body) => {
+                For {
+                    init,
+                    test,
+                    inc,
+                    body,
+                } => {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
                     self.breaks.push(end);
@@ -219,7 +244,7 @@ impl Compiler {
                         todo!()
                     }
                 }
-                common::nodes::Statement::Block(body, filepath) => {
+                Block { body, filepath } => {
                     let body = Ast {
                         program: body.clone(),
                     };

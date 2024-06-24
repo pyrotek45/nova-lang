@@ -1657,14 +1657,16 @@ impl Parser {
                 // }
 
                 if output == TType::Void {
-                    if let Some(Statement::Return(_, _, _, _)) = statements.last() {
-                    } else {
-                        statements.push(Statement::Return(
-                            output.clone(),
-                            Expr::None,
-                            self.current_token().line(),
-                            self.current_token().row(),
-                        ));
+                    match statements.last() {
+                        Some(Statement::Return { .. }) => {}
+                        _ => {
+                            statements.push(Statement::Return {
+                                ttype: output.clone(),
+                                expr: Expr::None,
+                                line: self.current_token().line(),
+                                row: self.current_token().row(),
+                            });
+                        }
                     }
                 }
                 left = Expr::Closure(
@@ -2395,12 +2397,12 @@ impl Parser {
             self.consume_identifier(Some("else"))?;
             alternative = Some(self.block()?);
         }
-        return Ok(vec![Statement::If(
-            TType::Void,
+        return Ok(vec![Statement::If {
+            ttype: TType::Void,
             test,
-            statements,
+            body: statements,
             alternative,
-        )]);
+        }]);
     }
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2429,10 +2431,10 @@ impl Parser {
         iparser.input = tokenlist;
         iparser.parse()?;
         self.environment = iparser.environment.clone();
-        Ok(Some(Statement::Block(
-            iparser.ast.program.clone(),
-            newfilepath,
-        )))
+        Ok(Some(Statement::Block {
+            body: iparser.ast.program.clone(),
+            filepath: newfilepath,
+        }))
     }
 
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2622,11 +2624,11 @@ impl Parser {
             ));
         }
 
-        Ok(Some(Statement::Struct(
-            TType::Custom(identifier.clone()),
+        Ok(Some(Statement::Struct {
+            ttype: TType::Custom(identifier.clone()),
             identifier,
-            input,
-        )))
+            fields: input,
+        }))
     }
 
     fn for_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2643,9 +2645,14 @@ impl Parser {
             ));
         }
         self.environment.push_block();
-        let statements = self.block()?;
+        let body = self.block()?;
         self.environment.pop_scope();
-        Ok(Some(Statement::For(init, test, inc, statements)))
+        Ok(Some(Statement::For {
+            init,
+            test,
+            inc,
+            body,
+        }))
     }
 
     fn while_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2661,7 +2668,10 @@ impl Parser {
         let statements = self.block()?;
         self.environment.pop_scope();
 
-        Ok(Some(Statement::While(test, statements)))
+        Ok(Some(Statement::While {
+            test,
+            body: statements,
+        }))
     }
 
     fn if_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2674,7 +2684,7 @@ impl Parser {
             ));
         }
         //self.environment.push_block();
-        let statements = self.block()?;
+        let body = self.block()?;
         //self.environment.pop_block();
         let mut alternative: Option<Vec<Statement>> = None;
         if self.current_token().is_id("elif") {
@@ -2688,12 +2698,12 @@ impl Parser {
             alternative = Some(self.block()?);
             //self.environment.pop_block();
         }
-        Ok(Some(Statement::If(
-            TType::Void,
+        Ok(Some(Statement::If {
+            ttype: TType::Void,
             test,
-            statements,
+            body,
             alternative,
-        )))
+        }))
     }
 
     fn let_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -2875,7 +2885,12 @@ impl Parser {
     ) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("return"))?;
         let expr = self.expr()?;
-        Ok(Some(Statement::Return(expr.get_type(), expr, line, row)))
+        Ok(Some(Statement::Return {
+            ttype: expr.get_type(),
+            expr,
+            line,
+            row,
+        }))
     }
 
     fn is_generic(&self, params: &[TType]) -> bool {
@@ -3065,22 +3080,21 @@ impl Parser {
                 None,
             ));
         }
-
         // if output void, insert return as last statement if one wasnt added
         if output == TType::Void {
-            if let Some(Statement::Return(_, _, _, _)) = statements.last() {
+            if let Some(Statement::Return { .. }) = statements.last() {
             } else {
-                statements.push(Statement::Return(
-                    output.clone(),
-                    Expr::None,
-                    self.current_token().line(),
-                    self.current_token().row(),
-                ));
+                statements.push(Statement::Return {
+                    ttype: output.clone(),
+                    expr: Expr::None,
+                    line: self.current_token().line(),
+                    row: self.current_token().row(),
+                });
             }
         }
 
         // if last statement isnt a return error
-        if let Some(Statement::Return(_, _, _, _)) = statements.last() {
+        if let Some(Statement::Return { .. }) = statements.last() {
         } else {
             return Err(common::error::parser_error(
                 "Function is missing a return statement in a branch".to_string(),
@@ -3092,9 +3106,12 @@ impl Parser {
             ));
         }
 
-        Ok(Some(Statement::Function(
-            output, identifier, input, statements,
-        )))
+        Ok(Some(Statement::Function {
+            ttype: output,
+            identifier,
+            parameters: input,
+            body: statements,
+        }))
     }
 
     fn check_returns(
@@ -3109,7 +3126,7 @@ impl Parser {
         for statement in statements {
             match statement {
                 Statement::Pass => has_return = true,
-                Statement::Return(ttype, _, _, _) => {
+                Statement::Return { ttype, .. } => {
                     self.check_and_map_types(
                         &vec![ttype.clone()],
                         &vec![return_type.clone()],
@@ -3117,10 +3134,12 @@ impl Parser {
                     )?;
                     has_return = true
                 }
-                Statement::If(_, _, if_body, else_body) => {
+                Statement::If {
+                    body, alternative, ..
+                } => {
                     let (bodytype, bhr) =
-                        self.check_returns(if_body, return_type.clone(), line, row, filepath)?;
-                    if let Some(alternative) = else_body {
+                        self.check_returns(body, return_type.clone(), line, row, filepath)?;
+                    if let Some(alternative) = alternative {
                         let (elsetype, ehr) = self.check_returns(
                             &alternative,
                             return_type.clone(),
@@ -3164,7 +3183,10 @@ impl Parser {
         }
         match expr {
             Expr::None => Ok(None),
-            _ => Ok(Some(Statement::Expression(expr.get_type(), expr))),
+            _ => Ok(Some(Statement::Expression {
+                ttype: expr.get_type(),
+                expr,
+            })),
         }
     }
 

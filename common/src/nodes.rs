@@ -9,6 +9,7 @@ pub struct Arg {
     pub identifier: String,
     pub ttype: TType,
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field {
     pub identifier: String,
@@ -49,25 +50,54 @@ pub enum Statement {
     Continue,
     Break,
     Pass,
-    // type id value
     Let {
         ttype: TType,
         identifier: String,
         expr: Expr,
         global: bool,
     },
-    // type id input output
-    Function(TType, String, Vec<Arg>, Vec<Statement>),
-    // type id fields
-    Struct(TType, String, Vec<Field>),
-    // type exression
-    Return(TType, Expr, usize, usize),
-    Expression(TType, Expr),
+    Function {
+        ttype: TType,
+        identifier: String,
+        parameters: Vec<Arg>,
+        body: Vec<Statement>,
+    },
+    Struct {
+        ttype: TType,
+        identifier: String,
+        fields: Vec<Field>,
+    },
+    Return {
+        ttype: TType,
+        expr: Expr,
+        line: usize,
+        row: usize,
+    },
+    Expression {
+        ttype: TType,
+        expr: Expr,
+    },
     // type test body {else}
-    If(TType, Expr, Vec<Statement>, Option<Vec<Statement>>),
-    While(Expr, Vec<Statement>),
-    For(Expr, Expr, Expr, Vec<Statement>),
-    Block(Vec<Statement>, String),
+    If {
+        ttype: TType,
+        test: Expr,
+        body: Vec<Statement>,
+        alternative: Option<Vec<Statement>>,
+    },
+    While {
+        test: Expr,
+        body: Vec<Statement>,
+    },
+    For {
+        init: Expr,
+        test: Expr,
+        inc: Expr,
+        body: Vec<Statement>,
+    },
+    Block {
+        body: Vec<Statement>,
+        filepath: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
