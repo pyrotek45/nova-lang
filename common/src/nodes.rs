@@ -94,6 +94,11 @@ pub enum Statement {
         inc: Expr,
         body: Vec<Statement>,
     },
+    Foreach {
+        identifier: String,
+        expr: Expr,
+        body: Vec<Statement>,
+    },
     Block {
         body: Vec<Statement>,
         filepath: String,

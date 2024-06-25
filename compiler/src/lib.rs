@@ -59,6 +59,103 @@ impl Compiler {
         self.filepath = filepath;
         for statements in input.program.iter() {
             match statements {
+                common::nodes::Statement::Foreach {
+                    identifier,
+                    expr,
+                    body,
+                } => {
+                    /*
+                    push 0
+                    set inc
+                    add id
+                    check len
+                    compile body
+                    */
+
+                    let top = self.gen.generate();
+                    let end = self.gen.generate();
+
+                    let mid = self.gen.generate();
+                    let step = self.gen.generate();
+
+                    self.breaks.push(end);
+                    self.continues.push(top);
+
+                    // insert temp counter
+                    self.variables
+                        .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+                    let tempcounter_index = self.variables.len() - 1;
+                    self.variables
+                        .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                    let array_index = self.variables.len() - 1;
+                    let mut id_index = 0;
+                    if let Some(index) = self.variables.get_index(identifier.clone()) {
+                        id_index = index;
+                    } else {
+                        self.variables.insert(identifier.to_string());
+                        id_index = self.variables.len() - 1;
+                    }
+
+                    // storing counter and expression array
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::STORE(tempcounter_index as u32));
+                    self.compile_expr(expr.clone())?;
+                    self.asm.push(Asm::STORE(array_index as u32));
+
+                    // if array is empty jump to end
+                    self.asm.push(Asm::LABEL(top));
+
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    if let Some(index) = self.native_functions.get_index("len".to_string()) {
+                        self.asm.push(Asm::NATIVE(index))
+                    }
+
+                    self.asm.push(Asm::IGTR);
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::NOT);
+
+                    self.asm.push(Asm::JUMPIFFALSE(step));
+                    self.asm.push(Asm::POP);
+
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    if let Some(index) = self.native_functions.get_index("len".to_string()) {
+                        self.asm.push(Asm::NATIVE(index))
+                    }
+                    self.asm.push(Asm::EQUALS);
+
+                    self.asm.push(Asm::LABEL(step));
+                    self.asm.push(Asm::JUMPIFFALSE(mid));
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(mid));
+
+                    // bind value
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    self.asm.push(Asm::LIN);
+
+                    self.asm.push(Asm::STORE(id_index as u32));
+
+                    // -- body
+                    let foreach_body = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(foreach_body, self.filepath.clone(), false, false, false)?;
+                    self.asm.pop();
+                    // -- body
+
+                    // increment counter
+                    self.asm.push(Asm::INTEGER(1));
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::IADD);
+                    self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+                    self.asm.push(Asm::ASSIGN);
+                    self.asm.push(Asm::BJMP(top));
+                    self.asm.push(Asm::LABEL(end));
+                    self.breaks.pop();
+                    self.continues.pop();
+                }
                 common::nodes::Statement::Pass => {}
                 common::nodes::Statement::Let {
                     ttype: _,

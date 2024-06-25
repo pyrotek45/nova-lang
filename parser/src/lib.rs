@@ -2452,6 +2452,7 @@ impl Parser {
                 "return" => self.return_statement(line, row),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
+                "foreach" => self.foreach_statement(),
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -2651,6 +2652,41 @@ impl Parser {
             init,
             test,
             inc,
+            body,
+        }))
+    }
+
+    fn foreach_statement(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("foreach"))?;
+        let (identifier, position) = self.identifier()?;
+        if self.environment.has(&identifier) {
+            return Err(self.generate_error(
+                format!("identifier already used"),
+                format!("identifier '{identifier}' is already used within this scope"),
+            ));
+        }
+        self.consume_identifier(Some("in"))?;
+        let array = self.expr()?;
+        self.environment.push_block();
+        // check if array has type array and then assign identifier to that type
+        if let TType::List(inner) = array.get_type() {
+            self.environment.insert_symbol(
+                &identifier,
+                *inner,
+                Some(position),
+                SymbolKind::Variable,
+            )
+        } else {
+            return Err(self.generate_error(
+                format!("foreach can only iterate over arrays"),
+                format!("got {:?}", array.get_type().clone()),
+            ));
+        }
+        let body = self.block()?;
+        self.environment.pop_scope();
+        Ok(Some(Statement::Foreach {
+            identifier,
+            expr: array,
             body,
         }))
     }
