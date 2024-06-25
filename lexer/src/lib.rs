@@ -571,16 +571,7 @@ impl Lexer {
                     self.token_list
                         .push(Token::Symbol(c, self.current_position()));
                 }
-                error => {
-                    // consider making this take a position struct
-                    return Err(common::error::lexer_error(
-                        format!("Unknown char {error}"),
-                        format!("Remove char {error}"),
-                        self.line,
-                        self.row,
-                        self.filepath.clone(),
-                    ));
-                }
+                _ => {}
             }
             self.row += 1;
         }
