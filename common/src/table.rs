@@ -44,6 +44,10 @@ impl<T: Eq + Clone> Table<T> {
             self.insert(items.clone())
         }
     }
+    #[inline(always)]
+    pub fn remove(&mut self, item: T) {
+        self.items.remove(self.get_index(item).unwrap());
+    }
 }
 
 impl<T: std::fmt::Debug> fmt::Debug for Table<T> {
