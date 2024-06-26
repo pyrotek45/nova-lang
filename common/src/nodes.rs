@@ -77,12 +77,23 @@ pub enum Statement {
         ttype: TType,
         expr: Expr,
     },
-    // type test body {else}
     If {
         ttype: TType,
         test: Expr,
         body: Vec<Statement>,
         alternative: Option<Vec<Statement>>,
+    },
+    Unwrap {
+        ttype: TType,
+        identifier: String,
+        body: Vec<Statement>,
+    },
+    Bind {
+        ttype: TType,
+        identifier: String,
+        expr: Expr,
+        body: Vec<Statement>,
+        global: bool,
     },
     While {
         test: Expr,
