@@ -2437,12 +2437,48 @@ impl Parser {
         }))
     }
 
+    fn unwrap(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("unwrap"))?;
+        let (identifier, pos) = self.identifier()?;
+        // test if option type
+        self.environment.push_block();
+        if let Some(id_type) = self.environment.get_type(&identifier) {
+            if let TType::Option(inner) = id_type.clone() {
+                self.environment.insert_symbol(
+                    &identifier,
+                    *inner.clone(),
+                    Some(pos),
+                    SymbolKind::Variable,
+                );
+                let body = self.block()?;
+                self.environment.pop_scope();
+                return Ok(Some(common::nodes::Statement::Unwrap {
+                    ttype: id_type,
+                    identifier,
+                    body,
+                }));
+            } else {
+                return Err(self.generate_error(
+                    format!("unwrap expects an option type"),
+                    format!("got {:?}", id_type),
+                ));
+            }
+        } else {
+            return Err(self.generate_error(
+                format!("unknown identifier"),
+                format!("got {:?}", identifier),
+            ));
+        }
+    }
+
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         let (line, row) = self.get_line_and_row();
 
         match self.current_token() {
             Token::Identifier(id, _) => match id.as_str() {
                 "type" => self.typealias(),
+                "bind" => self.bind(),
+                "unwrap" => self.unwrap(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
@@ -2804,6 +2840,56 @@ impl Parser {
                 ttype,
                 identifier,
                 expr,
+                global,
+            }))
+        }
+    }
+
+    fn bind(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("bind"))?;
+        let mut global = false;
+        // refactor out into two parsing ways for ident. one with module and one without
+        let (mut identifier, mut pos) = self.identifier()?;
+        if identifier == "global" {
+            (identifier, pos) = self.identifier()?;
+            global = true
+        }
+        self.consume_operator(Operator::Assignment)?;
+        let expr = self.expr()?;
+        let inner = if let TType::Option(inner) = expr.get_type() {
+            inner
+        } else {
+            return Err(self.generate_error(
+                format!("unwrap expects an option type"),
+                format!("got {:?}", expr.get_type()),
+            ));
+        };
+
+        // make sure symbol doesnt already exist
+        if self.environment.has(&identifier) {
+            return Err(common::error::parser_error(
+                format!("Symbol '{}' is already instantiated", identifier),
+                "Cannot reinstantiate the same symbol in the same scope".to_string(),
+                pos.line,
+                pos.row,
+                self.filepath.clone(),
+                None,
+            ));
+        } else {
+            self.environment.push_block();
+            self.environment.insert_symbol(
+                &identifier,
+                *inner.clone(),
+                Some(pos),
+                SymbolKind::Variable,
+            );
+            let body = self.block()?;
+            self.environment.pop_scope();
+            Ok(Some(Statement::Bind {
+                ttype: expr.get_type(),
+                identifier,
+                expr,
+                body,
                 global,
             }))
         }

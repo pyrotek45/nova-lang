@@ -64,14 +64,6 @@ impl Compiler {
                     expr,
                     body,
                 } => {
-                    /*
-                    push 0
-                    set inc
-                    add id
-                    check len
-                    compile body
-                    */
-
                     let top = self.gen.generate();
                     let end = self.gen.generate();
 
@@ -88,13 +80,13 @@ impl Compiler {
                     self.variables
                         .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
                     let array_index = self.variables.len() - 1;
-                    let mut id_index = 0;
-                    if let Some(index) = self.variables.get_index(identifier.clone()) {
-                        id_index = index;
+                    let id_index = if let Some(index) = self.variables.get_index(identifier.clone())
+                    {
+                        index
                     } else {
                         self.variables.insert(identifier.to_string());
-                        id_index = self.variables.len() - 1;
-                    }
+                        self.variables.len() - 1
+                    };
 
                     // storing counter and expression array
                     self.asm.push(Asm::INTEGER(0));
@@ -347,6 +339,65 @@ impl Compiler {
                     };
                     self.compile_program(body, filepath.clone(), false, false, false)?;
                     self.asm.pop();
+                }
+                common::nodes::Statement::Unwrap {
+                    ttype: _,
+                    identifier,
+                    body,
+                } => {
+                    let end = self.gen.generate();
+                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::GET(index as u32))
+                    }
+                    if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
+                        self.asm.push(Asm::NATIVE(index))
+                    }
+                    self.asm.push(Asm::ISSOME);
+                    self.asm.push(Asm::JUMPIFFALSE(end));
+                    let body = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                    self.asm.pop();
+                    self.asm.push(Asm::LABEL(end));
+                }
+                common::nodes::Statement::Bind {
+                    ttype: _,
+                    identifier,
+                    expr,
+                    body,
+                    global,
+                } => {
+                    let skip = self.gen.generate();
+                    let end = self.gen.generate();
+                    self.compile_expr(expr.clone())?;
+                    if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
+                        self.asm.push(Asm::NATIVE(index))
+                    }
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::ISSOME);
+                    self.asm.push(Asm::JUMPIFFALSE(skip));
+                    let id_index = if let Some(index) = self.variables.get_index(identifier.clone())
+                    {
+                        index
+                    } else {
+                        self.variables.insert(identifier.to_string());
+                        self.variables.len() - 1
+                    };
+                    if *global {
+                        self.asm.push(Asm::STOREGLOBAL(id_index as u32))
+                    } else {
+                        self.asm.push(Asm::STORE(id_index as u32))
+                    }
+                    let body = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                    self.asm.pop();
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(skip));
+                    self.asm.push(Asm::POP);
+                    self.asm.push(Asm::LABEL(end));
                 }
             }
         }
