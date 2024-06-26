@@ -344,7 +344,9 @@ impl Compiler {
                     ttype: _,
                     identifier,
                     body,
+                    alternative,
                 } => {
+                    let skip = self.gen.generate();
                     let end = self.gen.generate();
                     if let Some(index) = self.variables.get_index(identifier.to_string()) {
                         self.asm.push(Asm::GET(index as u32))
@@ -353,12 +355,27 @@ impl Compiler {
                         self.asm.push(Asm::NATIVE(index))
                     }
                     self.asm.push(Asm::ISSOME);
-                    self.asm.push(Asm::JUMPIFFALSE(end));
+                    self.asm.push(Asm::JUMPIFFALSE(skip));
                     let body = Ast {
                         program: body.clone(),
                     };
                     self.compile_program(body, self.filepath.clone(), false, false, false)?;
                     self.asm.pop();
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(skip));
+                    if let Some(alternative) = alternative {
+                        let alternative = Ast {
+                            program: alternative.clone(),
+                        };
+                        self.compile_program(
+                            alternative,
+                            self.filepath.clone(),
+                            false,
+                            false,
+                            false,
+                        )?;
+                        self.asm.pop();
+                    }
                     self.asm.push(Asm::LABEL(end));
                 }
                 common::nodes::Statement::Bind {
@@ -367,6 +384,7 @@ impl Compiler {
                     expr,
                     body,
                     global,
+                    alternative,
                 } => {
                     let skip = self.gen.generate();
                     let end = self.gen.generate();
@@ -397,6 +415,19 @@ impl Compiler {
                     self.asm.push(Asm::JMP(end));
                     self.asm.push(Asm::LABEL(skip));
                     self.asm.push(Asm::POP);
+                    if let Some(alternative) = alternative {
+                        let alternative = Ast {
+                            program: alternative.clone(),
+                        };
+                        self.compile_program(
+                            alternative,
+                            self.filepath.clone(),
+                            false,
+                            false,
+                            false,
+                        )?;
+                        self.asm.pop();
+                    }
                     self.asm.push(Asm::LABEL(end));
                 }
             }
