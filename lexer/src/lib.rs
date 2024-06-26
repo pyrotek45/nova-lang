@@ -301,6 +301,26 @@ impl Lexer {
                             self.buffer.clear();
                             continue;
                         }
+                        Some('h') => {
+                            chars.next();
+                            self.token_list.push(Token::String(
+                                "\x1b[?25h".to_string(),
+                                self.current_position(),
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
+                        Some('l') => {
+                            chars.next();
+                            self.token_list.push(Token::String(
+                                "\x1b[?25l".to_string(),
+                                self.current_position(),
+                            ));
+                            self.row += 1;
+                            self.buffer.clear();
+                            continue;
+                        }
                         Some('\'') => {
                             chars.next();
                             self.token_list

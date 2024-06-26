@@ -51,9 +51,9 @@ fn showscreen(player: Player, wall: Wall, points: Int) -> Bool {
     }
     print("press q to exit, w to jump. Points: "); println(points)
     screen.charsToStr().println()
+    screen.free()
     return true
 }
-
 
 let input = ?Char
 let player = Player(5,5,'@')
@@ -61,6 +61,7 @@ let wall = Wall(35,randomInt(0,14))
 let points = 0
 
 rawmode(true)
+print('\l')
 let alive = true
 while alive {
     clearscreen()
@@ -90,3 +91,4 @@ while alive {
     }
 }
 rawmode(false)
+print('\h')
