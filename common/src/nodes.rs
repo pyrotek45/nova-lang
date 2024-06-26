@@ -87,12 +87,14 @@ pub enum Statement {
         ttype: TType,
         identifier: String,
         body: Vec<Statement>,
+        alternative: Option<Vec<Statement>>,
     },
     Bind {
         ttype: TType,
         identifier: String,
         expr: Expr,
         body: Vec<Statement>,
+        alternative: Option<Vec<Statement>>,
         global: bool,
     },
     While {

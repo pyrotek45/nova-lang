@@ -2451,11 +2451,18 @@ impl Parser {
                     SymbolKind::Variable,
                 );
                 let body = self.block()?;
+                let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
+                    self.consume_identifier(Some("else"))?;
+                    Some(self.block()?)
+                } else {
+                    None
+                };
                 self.environment.pop_scope();
                 return Ok(Some(common::nodes::Statement::Unwrap {
                     ttype: id_type,
                     identifier,
                     body,
+                    alternative,
                 }));
             } else {
                 return Err(self.generate_error(
@@ -2884,12 +2891,19 @@ impl Parser {
                 SymbolKind::Variable,
             );
             let body = self.block()?;
+            let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
+                self.consume_identifier(Some("else"))?;
+                Some(self.block()?)
+            } else {
+                None
+            };
             self.environment.pop_scope();
             Ok(Some(Statement::Bind {
                 ttype: expr.get_type(),
                 identifier,
                 expr,
                 body,
+                alternative,
                 global,
             }))
         }
