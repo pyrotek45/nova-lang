@@ -1,96 +1,100 @@
-#[allow(unused_imports)]
-use std::{
-    process::exit,
-    time::{Duration, Instant},
-};
+use std::process::exit;
+use novacore::NovaCore;
+
 
 fn main() {
-    if let (Some(command), Some(input), Some(filepath)) = (
-        std::env::args().nth(1),
-        std::env::args().nth(2),
-        std::env::args().nth(3),
-    ) {
-        match (command.as_str(), input.as_str()) {
-            ("run", "file") => {
-                let _ = match novacore::NovaCore::new(&filepath) {
-                    Ok(novacore) => match novacore.run() {
-                        Ok(()) => {}
-                        Err(error) => {
-                            error.show();
-                            exit(1)
-                        }
-                    },
-                    Err(error) => {
-                        error.show();
-                        exit(1)
-                    }
-                };
-            }
-            ("dbg", "file") => {
-                let _ = match novacore::NovaCore::new(&filepath) {
-                    Ok(novacore) => match novacore.run_debug() {
-                        Ok(()) => {}
-                        Err(error) => {
-                            error.show();
-                            exit(1)
-                        }
-                    },
-                    Err(error) => {
-                        error.show();
-                        exit(1)
-                    }
-                };
-            }
-            ("dis", "file") => {
-                let _ = match novacore::NovaCore::new(&filepath) {
-                    Ok(novacore) => match novacore.dis_file() {
-                        Ok(()) => {}
-                        Err(error) => {
-                            error.show();
-                            exit(1)
-                        }
-                    },
-                    Err(error) => {
-                        error.show();
-                        exit(1)
-                    }
-                };
-            }
-            ("time", "file") => {
-                let now = std::time::Instant::now();
-                let _ = match novacore::NovaCore::new(&filepath) {
-                    Ok(novacore) => match novacore.run() {
-                        Ok(()) => {}
-                        Err(error) => {
-                            error.show();
-                            exit(1)
-                        }
-                    },
-                    Err(error) => {
-                        error.show();
-                        exit(1)
-                    }
-                };
-                let exectime = now.elapsed();
-                println!("Total time: {:#?}", exectime);
-            }
-            _ => {
-                todo!()
+    if entry_command().is_none() {
+        print_help();
+        // TODO: add a repl
+    }
+}
+
+
+fn entry_command() -> Option<()> {
+    let mut args = std::env::args();
+    let command = args.next()?;
+
+    match command.as_str() {
+        "run" => {
+            let filepath = args.next()?;
+            let novacore = compile_file_or_exit(&filepath);
+
+            if let Err(e) = novacore.run() {
+                e.show();
+                exit(1);
             }
         }
-    } else {
-        if let Some(op) = std::env::args().nth(1) {
-            match op.as_str() {
-                "help" => {
-                    println!("Nova 0.1: by pyrotek45");
-                    println!();
-                    println!("Help menu");
-                    println!("\trun  [file] filepath\n\tdbg  [file] filepath\n\ttime [file] filepath\n\tdis  [file] filepath")
-                }
-                _ => {
-                    // hopefully add a simple repl
-                }
+
+
+        "dbg" => {
+            let filepath = args.next()?;
+            let novacore = compile_file_or_exit(&filepath);
+
+            if let Err(e) = novacore.run_debug() {
+                e.show();
+                exit(1);
             }
+        }
+
+
+        "dis" => {
+            let filepath = args.next()?;
+            let novacore = compile_file_or_exit(&filepath);
+
+            if let Err(e) = novacore.dis_file() {
+                e.show();
+                exit(1);
+            }
+        }
+
+
+        "time" => {
+            let filepath = args.next()?;
+
+            let start = std::time::Instant::now();
+            let novacore = compile_file_or_exit(&filepath);
+            println!("compile time: {}ms", start.elapsed().as_millis());
+
+            let execution_start = std::time::Instant::now();
+            let execution_result = novacore.run();
+            println!("execution time: {}ms", execution_start.elapsed().as_millis());
+
+            println!("total time: {}", start.elapsed().as_millis());
+
+
+            if let Err(e) = execution_result {
+                e.show();
+                exit(1);
+            }
+        }
+        
+
+        // TODO: add repl
+        _ => print_help()
+    }
+
+    Some(())
+}
+
+
+fn print_help() {
+    println!("Nova 0.1.0: by pyrotek45");
+    println!();
+    println!("HELP MENU");
+    println!("\trun  [file]  // runs the file using the nova vm");
+    println!("\tdbg  [file]  // debug the file");
+    println!("\ttime [file]  // time the file");
+    println!("\tdis  [file]  // disassemble the file");
+    println!("\thelp         // displays this menu");
+}
+
+
+fn compile_file_or_exit(file: &str) -> NovaCore {
+    match novacore::NovaCore::new(file) {
+        Ok(novacore) => novacore,
+        Err(error) => {
+            error.show();
+            exit(1);
         }
     }
 }
