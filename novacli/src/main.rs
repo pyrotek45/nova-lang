@@ -1,6 +1,5 @@
-use std::process::exit;
 use novacore::NovaCore;
-
+use std::process::exit;
 
 fn main() {
     if entry_command().is_none() {
@@ -8,7 +7,6 @@ fn main() {
         // TODO: add a repl
     }
 }
-
 
 fn entry_command() -> Option<()> {
     let mut args = std::env::args();
@@ -26,7 +24,6 @@ fn entry_command() -> Option<()> {
             }
         }
 
-
         "dbg" => {
             let filepath = args.next()?;
             let novacore = compile_file_or_exit(&filepath);
@@ -36,7 +33,6 @@ fn entry_command() -> Option<()> {
                 exit(1);
             }
         }
-
 
         "dis" => {
             let filepath = args.next()?;
@@ -48,7 +44,6 @@ fn entry_command() -> Option<()> {
             }
         }
 
-
         "time" => {
             let filepath = args.next()?;
 
@@ -58,25 +53,25 @@ fn entry_command() -> Option<()> {
 
             let execution_start = std::time::Instant::now();
             let execution_result = novacore.run();
-            println!("execution time: {}ms", execution_start.elapsed().as_millis());
+            println!(
+                "execution time: {}ms",
+                execution_start.elapsed().as_millis()
+            );
 
             println!("total time: {}", start.elapsed().as_millis());
-
 
             if let Err(e) = execution_result {
                 e.show();
                 exit(1);
             }
         }
-        
 
         // TODO: add repl
-        _ => print_help()
+        _ => print_help(),
     }
 
     Some(())
 }
-
 
 fn print_help() {
     println!("Nova 0.1.0: by pyrotek45");
@@ -88,7 +83,6 @@ fn print_help() {
     println!("\tdis  [file]  // disassemble the file");
     println!("\thelp         // displays this menu");
 }
-
 
 fn compile_file_or_exit(file: &str) -> NovaCore {
     match novacore::NovaCore::new(file) {
