@@ -12,6 +12,7 @@ fn main() {
 
 fn entry_command() -> Option<()> {
     let mut args = std::env::args();
+    args.next(); // file path
     let command = args.next()?;
 
     match command.as_str() {
