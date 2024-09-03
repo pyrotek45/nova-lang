@@ -6,6 +6,7 @@ struct Person {
 
 // Hello world
 println("hello world!")
+"hello world".println()
 
 // Creating instance of type
 let person : Person = Person {name: "bob", age: 42}
@@ -43,7 +44,7 @@ println(arr)
 let arr2 = []: Int.fill(10,5)
 arr2.println()
 
-let arr3 = initList(10,5)
+let arr3 = Vec(10,5)
 arr3.println()
  
 arr[1] = 4

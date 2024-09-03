@@ -458,26 +458,14 @@ impl Compiler {
                 //self.output.push(Code::NONE)
             }
             Expr::ListConstructor(_, _) => todo!(),
-            Expr::Field(_, _, index, from, pos) => {
+            Expr::Field(_t, _id, index, from, pos) => {
+                //dbg!(id,t);
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.getref_expr(*from)?;
                 self.asm.push(Asm::PIN(pos));
             }
             Expr::Indexed(_, _, index, from, pos) => {
-                match &*index {
-                    Expr::Literal(_, atom) => match atom {
-                        Atom::Id(id) => {
-                            if let Some(index) = self.variables.get_index(id.to_string()) {
-                                self.asm.push(Asm::STACKREF(index as u32));
-                            }
-                        }
-                        Atom::Integer(int) => self.asm.push(Asm::INTEGER(*int)),
-                        _ => {
-                            panic!()
-                        }
-                    },
-                    _ => {}
-                }
+                self.compile_expr(*index)?;
                 self.getref_expr(*from)?;
                 self.asm.push(Asm::PIN(pos));
             }
@@ -559,7 +547,7 @@ impl Compiler {
                 self.asm.push(Asm::LIST(list.len()));
                 Ok(())
             }
-            Expr::Field(_, _, index, field, _) => {
+            Expr::Field(_, _id, index, field, _) => {
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.compile_expr(*field)?;
                 self.asm.push(Asm::LIN);

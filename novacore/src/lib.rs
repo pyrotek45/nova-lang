@@ -152,6 +152,12 @@ impl NovaCore {
             common::nodes::SymbolKind::GenericFunction,
             native::str::chars_to_str,
         );
+        self.add_function(
+            "chr",
+            TType::Function(vec![TType::Int], Box::new(TType::Char)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::char::chr,
+        );
     }
 
     pub fn run(mut self) -> Result<(), NovaError> {
@@ -159,6 +165,7 @@ impl NovaCore {
         let tokenlist = self.lexer.tokenize()?;
         self.parser.input = tokenlist;
         self.parser.parse()?;
+        //dbg!(&self.parser.ast);
         let ast = self.parser.ast;
         let asm = self
             .compiler
@@ -168,6 +175,67 @@ impl NovaCore {
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output;
         self.vm.run()?;
+        Ok(())
+    }
+
+    pub fn run_time(mut self) -> Result<(), NovaError> {
+        let start = std::time::Instant::now();
+        self.initnova();
+        println!("Initialize time: {}ms", start.elapsed().as_millis());
+
+        let tokenlist = self.lexer.tokenize()?;
+        println!("Lexing time: {}ms", start.elapsed().as_millis());
+
+        self.parser.input = tokenlist;
+        self.parser.parse()?;
+        println!(
+            "Parsing + Typechecking time: {}ms",
+            start.elapsed().as_millis()
+        );
+
+        let ast = self.parser.ast;
+        let asm = self
+            .compiler
+            .compile_program(ast, self.filepath, true, true, false)?;
+        println!("Compile time: {}ms", start.elapsed().as_millis());
+
+        self.assembler.input = asm;
+        self.assembler.assemble();
+        println!("Assembler time: {}ms", start.elapsed().as_millis());
+
+        self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
+        self.vm.state.program = self.assembler.output;
+        self.vm.run()?;
+        Ok(())
+    }
+
+    pub fn check(mut self) -> Result<(), NovaError> {
+        let start = std::time::Instant::now();
+        self.initnova();
+        println!("OK | Initialize time: {}ms", start.elapsed().as_millis());
+
+        let tokenlist = self.lexer.tokenize()?;
+        println!("OK | Lexing time: {}ms", start.elapsed().as_millis());
+
+        self.parser.input = tokenlist;
+        self.parser.parse()?;
+        println!(
+            "OK | Parsing + Typechecking time: {}ms",
+            start.elapsed().as_millis()
+        );
+
+        let ast = self.parser.ast;
+        let asm = self
+            .compiler
+            .compile_program(ast, self.filepath, true, true, false)?;
+        println!("OK | Compile time: {}ms", start.elapsed().as_millis());
+
+        self.assembler.input = asm;
+        self.assembler.assemble();
+        println!("OK | Assembler time: {}ms", start.elapsed().as_millis());
+
+        self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
+        self.vm.state.program = self.assembler.output;
         Ok(())
     }
 

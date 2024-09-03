@@ -1,15 +1,13 @@
 fn fill(list: [$A], input: $A, ammount: Int) -> [$A] {
-    let i = 0
-    for i = 0; i < ammount; i += 1 {
+    for i <- 0; i < ammount; i += 1 {
         list.push(input)
     }
     return list
 }
 
-fn initList(input: $A, ammount: Int) -> [$A] {
+fn Vec(input: $A, ammount: Int) -> [$A] {
     let list = []: $A
-    let i = 0
-    for i = 0; i < ammount; i += 1 {
+    for i <- 0; i < ammount; i += 1 {
         list.push(input)
     }
     return list

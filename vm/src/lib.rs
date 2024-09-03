@@ -691,36 +691,36 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            (
-                                VmData::StackAddress(array_index),
-                                VmData::StackAddress(index_to_get),
-                            ) => {
-                                if let VmData::Int(index_to_get) =
-                                    self.state.stack[self.state.offset + index_to_get as usize]
-                                {
-                                    if let VmData::List(newindex) =
-                                        &self.state.stack[self.state.offset + array_index as usize]
-                                    {
-                                        if let Heap::List(array) = self.state.deref(*newindex) {
-                                            if array.len() <= index_to_get as usize {
-                                                if let Some(pos) = self
-                                                    .runtime_errors_table
-                                                    .get(&self.state.current_instruction)
-                                                {
-                                                    return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
-                                                } else {
-                                                    return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
-                                                }
-                                            }
-                                            self.state
-                                                .stack
-                                                .push(VmData::List(array[index_to_get as usize]))
-                                        }
-                                    }
-                                } else {
-                                    todo!()
-                                }
-                            }
+                            // (
+                            //     VmData::StackAddress(array_index),
+                            //     VmData::StackAddress(index_to_get),
+                            // ) => {
+                            //     if let VmData::Int(index_to_get) =
+                            //         self.state.stack[self.state.offset + index_to_get as usize]
+                            //     {
+                            //         if let VmData::List(newindex) =
+                            //             &self.state.stack[self.state.offset + array_index as usize]
+                            //         {
+                            //             if let Heap::List(array) = self.state.deref(*newindex) {
+                            //                 if array.len() <= index_to_get as usize {
+                            //                     if let Some(pos) = self
+                            //                         .runtime_errors_table
+                            //                         .get(&self.state.current_instruction)
+                            //                     {
+                            //                         return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                            //                     } else {
+                            //                         return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                            //                     }
+                            //                 }
+                            //                 self.state
+                            //                     .stack
+                            //                     .push(VmData::List(array[index_to_get as usize]))
+                            //             }
+                            //         }
+                            //     } else {
+                            //         todo!()
+                            //     }
+                            // }
                             (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
                                 if let VmData::List(newindex) =
                                     &self.state.stack[self.state.offset + array_index as usize]

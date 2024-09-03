@@ -49,21 +49,35 @@ fn entry_command() -> Option<()> {
 
             let start = std::time::Instant::now();
             let novacore = compile_file_or_exit(&filepath);
-            println!("compile time: {}ms", start.elapsed().as_millis());
 
             let execution_start = std::time::Instant::now();
-            let execution_result = novacore.run();
+            let execution_result = novacore.run_time();
+
             println!(
                 "execution time: {}ms",
                 execution_start.elapsed().as_millis()
             );
 
-            println!("total time: {}", start.elapsed().as_millis());
+            println!("total time: {}ms", start.elapsed().as_millis());
 
             if let Err(e) = execution_result {
                 e.show();
                 exit(1);
             }
+        }
+
+        "check" => {
+            let filepath = args.next()?;
+
+            let start = std::time::Instant::now();
+            let novacore = compile_file_or_exit(&filepath);
+
+            if let Err(e) = novacore.check() {
+                e.show();
+                exit(1);
+            }
+
+            println!("OK | compile time: {}ms", start.elapsed().as_millis());
         }
 
         // TODO: add repl
@@ -77,11 +91,12 @@ fn print_help() {
     println!("Nova 0.1.0: by pyrotek45");
     println!();
     println!("HELP MENU");
-    println!("\trun  [file]  // runs the file using the nova vm");
-    println!("\tdbg  [file]  // debug the file");
-    println!("\ttime [file]  // time the file");
-    println!("\tdis  [file]  // disassemble the file");
-    println!("\thelp         // displays this menu");
+    println!("\trun   [file]  // runs the file using the nova vm");
+    println!("\tdbg   [file]  // debug the file");
+    println!("\ttime  [file]  // time the file");
+    println!("\tcheck [file]  // check if the file compiles");
+    println!("\tdis   [file]  // disassemble the file");
+    println!("\thelp          // displays this menu");
 }
 
 fn compile_file_or_exit(file: &str) -> NovaCore {
