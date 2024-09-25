@@ -945,8 +945,20 @@ impl Vm {
                                 self.state.stack.push(VmData::String(clone))
                             }
                             VmData::List(index) => {
-                                let clone = self.state.allocate_new_heap();
-                                self.state.copy_heap(index, clone);
+                                let mut newarray = vec![];
+                                match self.state.deref(index) {
+                                    Heap::List(vec) => {
+                                        for item in vec {
+                                            let item_clone_index = self.state.allocate_new_heap();
+                                            self.state.copy_heap(item, item_clone_index);
+                                            newarray.push(item_clone_index);
+                                        }
+                                    },
+                                    _ => {
+                                        todo!()
+                                    }
+                                }
+                                let clone = self.state.allocate_array(newarray);
                                 self.state.stack.push(VmData::List(clone))
                             }
                             _ => {
