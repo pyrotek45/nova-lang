@@ -158,43 +158,43 @@ impl State {
 
     #[inline(always)]
     pub fn collect_garbage(&mut self) {
-        // if self.gclock {
-        //     return;
-        // }
-        // // only run when out of free space and over threshold
-        // if self.threshold <= self.heap.len() {
-        //     self.threshold = ((self.heap.len() as f64) * 1.1) as usize;
-        //     //dbg!(&self.threshold);
-        // } else {
-        //     return;
-        // }
+        if self.gclock {
+            return;
+        }
+        // only run when out of free space and over threshold
+        if self.threshold <= self.heap.len() {
+            self.threshold = ((self.heap.len() as f64) * 1.1) as usize;
+            //dbg!(&self.threshold);
+        } else {
+            return;
+        }
 
-        // self.gc_count += 1;
-        // self.used_data.clear();
-        // for item in self.stack.clone().iter() {
-        //     match item {
-        //         VmData::List(index) => {
-        //             self.check_useage(*index);
-        //         }
-        //         VmData::String(index) => {
-        //             self.check_useage(*index);
-        //         }
-        //         VmData::Closure(index) => {
-        //             self.check_useage(*index);
-        //         }
-        //         _ => {}
-        //     }
-        // }
+        self.gc_count += 1;
+        self.used_data.clear();
+        for item in self.stack.clone().iter() {
+            match item {
+                VmData::List(index) => {
+                    self.check_useage(*index);
+                }
+                VmData::String(index) => {
+                    self.check_useage(*index);
+                }
+                VmData::Closure(index) => {
+                    self.check_useage(*index);
+                }
+                _ => {}
+            }
+        }
 
-        // for i in 0..self.heap.len() {
-        //     if !self.used_data.has(&i) {
-        //         self.free_heap(i);
-        //         self.garbage_collected += 1;
-        //         if i == self.heap.len() {
-        //             self.heap.pop();
-        //         }
-        //     }
-        // }
+        for i in 0..self.heap.len() {
+            if !self.used_data.has(&i) {
+                self.free_heap(i);
+                self.garbage_collected += 1;
+                if i == self.heap.len() {
+                    self.heap.pop();
+                }
+            }
+        }
         //dbg!(&self.garbage_collected);
     }
 
