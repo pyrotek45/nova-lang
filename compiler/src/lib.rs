@@ -757,17 +757,22 @@ impl Compiler {
                         self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::AdditionAssignment => {
-                        self.compile_expr(*rhs.clone())?;
-                        self.compile_expr(*lhs.clone())?;
                         if lhs.get_type() == TType::Int {
+                            self.compile_expr(*rhs.clone())?;
+                            self.compile_expr(*lhs.clone())?;
                             self.asm.push(Asm::IADD);
                         } else if lhs.get_type() == TType::Float {
+                            self.compile_expr(*rhs.clone())?;
+                            self.compile_expr(*lhs.clone())?;
                             self.asm.push(Asm::FADD);
+                        } else if lhs.get_type() == TType::String {
+                            self.compile_expr(*lhs.clone())?;
+                            self.compile_expr(*rhs.clone())?;
+                            self.asm.push(Asm::CONCAT);
                         } else {
                             dbg!(&ttype);
                         }
                         self.getref_expr(*lhs.clone())?;
-
                         self.asm.push(Asm::ASSIGN)
                     }
                     common::tokens::Operator::SubtractionAssignment => {

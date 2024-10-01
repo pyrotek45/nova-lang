@@ -953,7 +953,7 @@ impl Vm {
                                             self.state.copy_heap(item, item_clone_index);
                                             newarray.push(item_clone_index);
                                         }
-                                    },
+                                    }
                                     _ => {
                                         todo!()
                                     }

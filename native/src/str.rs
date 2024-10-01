@@ -44,3 +44,43 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
     }
     Ok(())
 }
+
+pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
+    let data = state.stack.pop().unwrap();
+    let string = match data {
+        VmData::StackAddress(v) => format!("Stack pointer: {v}"),
+        VmData::Function(v) => format!("function pointer: {v}"),
+        VmData::Closure(v) => format!("closure pointer: {v}"),
+        VmData::Int(v) => format!("{v}"),
+        VmData::Float(v) => format!("{v}"),
+        VmData::Bool(v) => format!("{v}"),
+        VmData::Char(v) => format!("{v}"),
+        VmData::List(v) => {
+            let mut sbuild = String::new();
+            if let Heap::List(array) = state.deref(v) {
+                sbuild += &format!("[");
+                for (index, item) in array.iter().enumerate() {
+                    if index > 0 {
+                        sbuild += &format!(", ");
+                    }
+                    sbuild += &format!("{:?}", state.deref(*item));
+                }
+                sbuild += &format!("]");
+            };
+            sbuild
+        }
+        VmData::Struct(v) => format!("Struct pointer: {v}"),
+        VmData::String(v) => {
+            let out = if let Heap::String(str) = state.deref(v) {
+                format!("{str}")
+            } else {
+                todo!()
+            };
+            out
+        }
+        VmData::None => "None".to_string(),
+    };
+    let index = state.allocate_string(string);
+    state.stack.push(VmData::String(index));
+    Ok(())
+}
