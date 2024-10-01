@@ -167,6 +167,12 @@ impl NovaCore {
             common::nodes::SymbolKind::GenericFunction,
             native::char::chr,
         );
+        self.add_function(
+            "readFile",
+            TType::Function(vec![TType::String], Box::new(TType::String)),
+            common::nodes::SymbolKind::GenericFunction,
+            native::io::read_file,
+        );
     }
 
     pub fn run(mut self) -> Result<(), NovaError> {
