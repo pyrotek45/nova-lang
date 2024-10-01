@@ -51,6 +51,15 @@ impl NovaCore {
 
     fn initnova(&mut self) {
         self.add_function(
+            "toStr",
+            TType::Function(
+                vec![TType::Generic("a".to_string())],
+                Box::new(TType::String),
+            ),
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::to_string,
+        );
+        self.add_function(
             "len",
             TType::Function(
                 vec![TType::List(Box::new(TType::Generic("a".to_string())))],

@@ -64,16 +64,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "none",
-        TType::Function(
-            vec![TType::None],
-            Box::new(TType::Option(Box::new(TType::None))),
-        ),
-        None,
-        SymbolKind::GenericFunction,
-    );
-    env.insert_symbol(
-        "some",
+        "Some",
         TType::Function(
             vec![TType::Generic("a".to_string())],
             Box::new(TType::Option(Box::new(TType::Generic("a".to_string())))),
@@ -1446,7 +1437,7 @@ impl Parser {
                             for (i, _) in self.environment.values.last().unwrap().iter() {
                                 lex.insert(i)
                             }
-
+                            dbg!(self.environment.values.last().unwrap());
                             let corrections = lex.corrections_for(&identifier);
                             return Err(common::error::parser_error(
                                 format!("E2 Not a valid symbol: {}", identifier),
@@ -1970,6 +1961,11 @@ impl Parser {
                     && (right.clone().get_type() == TType::Int
                         || right.clone().get_type() == TType::Float)
                 {
+                    self.check_and_map_types(
+                        &[left.clone().get_type()],
+                        &[right.clone().get_type()],
+                        &mut HashMap::default(),
+                    )?;
                     left = Expr::Binop(
                         left.clone().get_type(),
                         operation,
