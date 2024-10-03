@@ -54,6 +54,7 @@ struct Person {
 
 // Hello world
 println("hello world!")
+"hello world".println()
 
 // Creating instance of type
 let person : Person = Person {name: "bob", age: 42}
@@ -91,7 +92,7 @@ println(arr)
 let arr2 = []: Int.fill(10,5)
 arr2.println()
 
-let arr3 = initList(10,5)
+let arr3 = Vec(10,5)
 arr3.println()
  
 arr[1] = 4
@@ -122,7 +123,7 @@ import "../std/iter.nv"
 
 
 let myIter = [1,2,3,4,5]
-    .create()
+    .iter()
     .map(fn(x:Int)->Int{return x * x})
 
 myIter
@@ -150,7 +151,7 @@ print("hello again!\n")
 myOtherFunc(4,7).println()
 
 let myIterTwo = [1,2,3,4,5]
-    .create()
+    .iter()
     .map(simpleSquare)
     .map(simpleSquare)
     .collect()
@@ -226,7 +227,7 @@ mycounter->count().println()
 mycounter.count().println()
 
 // Option type ?type lets you represent none
-let x: ?Int = some(20)
+let x: ?Int = Some(20)
 
 // import the isSome() function here
 if x.isSome() {
@@ -250,7 +251,7 @@ x.do(fn(x:Int) {x.println()})
 // String manipulation
 str <- "hello world!"
     .strToChars()
-    .create() 
+    .iter() 
     .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
     .charsToStr()
 

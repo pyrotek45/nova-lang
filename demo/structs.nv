@@ -10,5 +10,5 @@ struct Two {
 
 // You can use () or {} to construct a struct
 let thingone : One = One("wow",3)
-let thingtwo = One {item1 = "hello",item2 = 30}
+let thingtwo = One {item1: "hello",item2: 30}
 let thingthree = Two(fn(x:Int) -> Int {return x * x})
