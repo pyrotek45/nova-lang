@@ -76,6 +76,7 @@ pub enum Statement {
     Expression {
         ttype: TType,
         expr: Expr,
+        used: bool,
     },
     If {
         ttype: TType,

@@ -115,7 +115,7 @@ impl State {
             Heap::String(_) => todo!(),
             Heap::Struct(_, _) => todo!(),
             Heap::StructAddress(v) => VmData::Struct(v),
-            Heap::Char(_) => todo!(),
+            Heap::Char(v) => VmData::Char(v),
         }
     }
 

@@ -27,7 +27,11 @@ pub fn push(state: &mut state::State) -> Result<(), NovaError> {
 pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
     if let Some(VmData::List(index)) = state.stack.pop() {
         if let Heap::List(mut array) = state.deref(index) {
-            array.pop();
+            if let Some(item) = array.pop() {
+                state.stack.push(state.to_vmdata(item));
+            } else {
+                state.stack.push(VmData::None);
+            }
             state.heap[index] = Heap::List(array);
         } else {
             panic!()

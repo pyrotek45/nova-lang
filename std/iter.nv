@@ -10,13 +10,13 @@ fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
     return list
 }
 
-fn create(input:[$A]) -> () -> ?$A {
+fn iter(input:[$A]) -> () -> ?$A {
     let index = #(0)   
     return fn() -> ?$A {
         if index[0] >= input.len() {
             return ?$A
         } else {
-            let result : ?$A = some(input[index[0]])
+            let result = Some(input[index[0]]);
             index[0] += 1
             return result
         }
@@ -27,7 +27,7 @@ fn map(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
     return fn() -> ?$A {
         let result: ?$A = it()
         if result.isSome() {
-            return some(f(result.unwrap()))
+            return Some(f(result.unwrap()))
         } else {
             return ?$A
         }

@@ -126,7 +126,7 @@ impl NovaCore {
             "pop",
             TType::Function(
                 vec![TType::List(Box::new(TType::Generic("a".to_string())))],
-                Box::new(TType::Void),
+                Box::new(TType::Option(Box::new(TType::Generic("a".to_string())))),
             ),
             common::nodes::SymbolKind::GenericFunction,
             native::list::pop,
@@ -182,6 +182,7 @@ impl NovaCore {
         self.parser.parse()?;
         //dbg!(&self.parser.ast);
         let ast = self.parser.ast;
+        //dbg!(&ast);
         let asm = self
             .compiler
             .compile_program(ast, self.filepath, true, true, false)?;
