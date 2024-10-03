@@ -246,12 +246,16 @@ impl Compiler {
                         self.asm.push(Asm::RET(false))
                     }
                 }
-                Expression { ttype: _, expr, used } => {
+                Expression {
+                    ttype: _,
+                    expr,
+                    used,
+                } => {
                     self.compile_expr(expr.clone())?;
                     if !used {
                         self.asm.push(Asm::POP);
                     }
-                },
+                }
                 If {
                     ttype: _,
                     test,

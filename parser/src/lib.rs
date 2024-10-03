@@ -575,10 +575,7 @@ impl Parser {
         let mut tf = TType::Any;
         let mut varargs = false;
         let mut element = 0;
-        if let Some(_) = self
-            .environment
-            .get_function_type(&identifier, &inputtypes)
-        {
+        if let Some(_) = self.environment.get_function_type(&identifier, &inputtypes) {
             //dbg!(&identifier);
         } else {
             for i in 0..=inputtypes.len() {
@@ -1874,7 +1871,7 @@ impl Parser {
                     let block = self.block_expr()?;
                     if let Some(Statement::Return {
                         ttype,
-                        expr: _ ,
+                        expr: _,
                         line: _,
                         row: _,
                     }) = block.last()
@@ -3612,7 +3609,7 @@ impl Parser {
             return Ok(Some(Statement::Expression {
                 ttype: expr.get_type(),
                 expr,
-                used: false
+                used: false,
             }));
         }
         match expr {
@@ -3620,7 +3617,7 @@ impl Parser {
             _ => Ok(Some(Statement::Expression {
                 ttype: expr.get_type(),
                 expr,
-                used: true
+                used: true,
             })),
         }
     }
@@ -3636,7 +3633,12 @@ impl Parser {
         self.consume_symbol('{')?;
         let mut statements = self.compound_statement()?;
         self.consume_symbol('}')?;
-        if let Some(Statement::Expression { ttype, expr, used: _ }) = statements.pop() {
+        if let Some(Statement::Expression {
+            ttype,
+            expr,
+            used: _,
+        }) = statements.pop()
+        {
             let (line, row) = self.get_line_and_row();
             statements.push(Statement::Return {
                 ttype,
