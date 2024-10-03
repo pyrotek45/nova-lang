@@ -246,7 +246,12 @@ impl Compiler {
                         self.asm.push(Asm::RET(false))
                     }
                 }
-                Expression { ttype: _, expr } => self.compile_expr(expr.clone())?,
+                Expression { ttype: _, expr, used } => {
+                    self.compile_expr(expr.clone())?;
+                    if !used {
+                        self.asm.push(Asm::POP);
+                    }
+                },
                 If {
                     ttype: _,
                     test,
@@ -901,7 +906,7 @@ impl Compiler {
                     }
                     "none" => self.asm.push(Asm::NONE),
                     "unwrap" => self.asm.push(Asm::UNWRAP),
-                    "some" => {}
+                    "Some" => {}
                     "isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),

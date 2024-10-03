@@ -213,7 +213,7 @@ impl Parser {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error(
                 "E2 Incorrect amount of arguments".to_owned(),
-                format!("Got {:?} , but expexting {:?}", type_list2, type_list1),
+                format!("Found {:?} , but expecting {:?}", type_list2, type_list1),
             ));
         }
         for (t1, t2) in type_list1.iter().zip(type_list2.iter()) {
@@ -245,6 +245,16 @@ impl Parser {
                             None,
                         ));
                     }
+                    if let TType::Option(_) = t2 {
+                        return Err(common::error::parser_error(
+                            format!("Type error, expecting some value, but found {:?}", t2),
+                            format!("Cannot bind to a Optional value"),
+                            self.current_token().line(),
+                            self.current_token().row(),
+                            self.filepath.clone(),
+                            None,
+                        ));
+                    }
                     if let Some(mapped_type) = type_map.get(name1) {
                         // If the types are not equal, return an error
                         if mapped_type != t2 {
@@ -256,7 +266,7 @@ impl Parser {
                                 ),
                                 // Additional information for debugging the error
                                 format!(
-                                    "Mismatched types:\n ~ Expected: {:?}\n ~ Found: {:?}\n ~ In context:\n   ~ {:?} -> {:?}\n   ~ {:?}",
+                                    "Mismatched types:\n ~ Expected: {:?}\n ~ found: {:?}\n ~ In context:\n   ~ {:?} -> {:?}\n   ~ {:?}",
                                     mapped_type.clone(),
                                     t2,
                                     type_list1,
@@ -303,7 +313,7 @@ impl Parser {
                         }
                     } else {
                         return Err(self.generate_error(
-                            format!("Expecting {:?}, but found {:?}", t2, t1),
+                            format!("Expecting {:?}, but got {:?}", t2, t1),
                             "Type error".to_owned(),
                         ));
                     }
@@ -562,6 +572,64 @@ impl Parser {
             inputtypes.push(TType::None)
         }
 
+        let mut tf = TType::Any;
+        let mut varargs = false;
+        let mut element = 0;
+        if let Some(_) = self
+            .environment
+            .get_function_type(&identifier, &inputtypes)
+        {
+            //dbg!(&identifier);
+        } else {
+            for i in 0..=inputtypes.len() {
+                //dbg!(&argument_types);
+
+                // Split the list at the current index from the end
+                let (left, right) = inputtypes.split_at(inputtypes.len() - i);
+
+                // Check if all elements in 'right' are the same
+                if let Some(first) = right.get(0) {
+                    tf = first.clone();
+                    let mut check = true;
+                    for ttype in right.iter() {
+                        if ttype != first {
+                            check = false;
+                            break;
+                        }
+                    }
+
+                    // If all elements in 'right' are the same, create a TType::List
+                    if check {
+                        let mut new_right = left.to_vec();
+                        new_right.push(TType::List(Box::new(first.clone())));
+                        if let Some(_) = self
+                            .environment
+                            .get(&generate_unique_string(&identifier, &new_right))
+                        {
+                            inputtypes = new_right;
+                            element = i;
+                            varargs = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if varargs {
+            //println!("wow got it");
+            arguments.reverse();
+            let (leftexpr, rightexpr) = arguments.split_at(element);
+            let mut leftexpr = leftexpr.to_vec();
+            let mut rightexpr = rightexpr.to_vec();
+            arguments = vec![];
+            rightexpr.reverse();
+            arguments.append(&mut rightexpr);
+            leftexpr.reverse();
+            arguments.push(Expr::ListConstructor(tf.clone(), leftexpr.clone()));
+            //dbg!(&argument_types,&arguments);
+        }
+
         // get function type and check arguments
         if let Some((
             TType::Function(function_parameters, mut function_output),
@@ -777,7 +845,7 @@ impl Parser {
                 }
             } else {
                 return Err(common::error::parser_error(
-                    format!("Not a valid call: {}", identifier),
+                    format!("E1 Not a valid call: {}", identifier),
                     format!(
                         "No function signature '{}' with {:?} as arguments",
                         identifier, inputtypes
@@ -792,7 +860,7 @@ impl Parser {
     }
 
     fn call(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
-        let arguments: Vec<Expr>;
+        let mut arguments: Vec<Expr>;
         // constructor
         if let Some(fields) = self.environment.custom_types.get(&identifier) {
             if self.current_token().is_symbol('{') {
@@ -811,6 +879,64 @@ impl Parser {
         // if no arguments, push none
         if argument_types.is_empty() {
             argument_types.push(TType::None)
+        }
+
+        let mut tf = TType::Any;
+        let mut varargs = false;
+        let mut element = 0;
+        if let Some(_) = self
+            .environment
+            .get_function_type(&identifier, &argument_types)
+        {
+            //dbg!(&identifier);
+        } else {
+            for i in 0..=argument_types.len() {
+                //dbg!(&argument_types);
+
+                // Split the list at the current index from the end
+                let (left, right) = argument_types.split_at(argument_types.len() - i);
+
+                // Check if all elements in 'right' are the same
+                if let Some(first) = right.get(0) {
+                    tf = first.clone();
+                    let mut check = true;
+                    for ttype in right.iter() {
+                        if ttype != first {
+                            check = false;
+                            break;
+                        }
+                    }
+
+                    // If all elements in 'right' are the same, create a TType::List
+                    if check {
+                        let mut new_right = left.to_vec();
+                        new_right.push(TType::List(Box::new(first.clone())));
+                        if let Some(_) = self
+                            .environment
+                            .get(&generate_unique_string(&identifier, &new_right))
+                        {
+                            argument_types = new_right;
+                            element = i;
+                            varargs = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if varargs {
+            //println!("wow got it");
+            arguments.reverse();
+            let (leftexpr, rightexpr) = arguments.split_at(element);
+            let mut leftexpr = leftexpr.to_vec();
+            let mut rightexpr = rightexpr.to_vec();
+            arguments = vec![];
+            rightexpr.reverse();
+            arguments.append(&mut rightexpr);
+            leftexpr.reverse();
+            arguments.push(Expr::ListConstructor(tf.clone(), leftexpr.clone()));
+            //dbg!(&argument_types,&arguments);
         }
 
         // get function type and check arguments
@@ -866,6 +992,7 @@ impl Parser {
                     // )?;
                     //dbg!(&function_id);
                     function_output = Box::new(self.get_output(*function_output, &mut map)?);
+
                     return Ok(Expr::Literal(
                         *function_output.clone(),
                         Atom::Call(function_id, arguments),
@@ -932,6 +1059,11 @@ impl Parser {
                 .environment
                 .get_function_type_capture(&identifier, &argument_types)
             {
+                // dbg!(
+                //     &function_id,
+                //     &function_parameters.len() == &argument_types.len()
+                // );
+
                 let pos = self.get_pos();
                 self.environment.captured.last_mut().unwrap().insert(
                     identifier.clone(),
@@ -1664,6 +1796,175 @@ impl Parser {
                     TType::Function(typeinput, Box::new(output)),
                     input,
                     statements,
+                    captured,
+                )
+            }
+            Token::Symbol('|', _) => {
+                let pos = self.get_pos();
+                // get parameters
+                self.consume_symbol('|')?;
+                let parameters = self.parameter_list()?;
+                self.consume_symbol('|')?;
+
+                // retrieve types for input
+                let mut typeinput = vec![];
+                for arg in parameters.iter() {
+                    typeinput.push(arg.0.clone())
+                }
+
+                // build helper vecs
+                let mut input = vec![];
+                for (ttype, identifier) in parameters.clone() {
+                    if let TType::Function(_, _) = ttype.clone() {
+                        // check if generic function exist
+                        if self.environment.has(&identifier) {
+                            return Err(self.generate_error(
+                                format!("Generic Function {} already defined", &identifier),
+                                "Cannot redefine a generic function".to_string(),
+                            ));
+                        }
+                        // check if normal function exist
+                        if self.environment.has(&identifier) {
+                            return Err(self.generate_error(
+                                format!("Function {} already defined", &identifier,),
+                                "Cannot redefine a generic function".to_string(),
+                            ));
+                        }
+                        // build argument list
+                        input.push(Arg {
+                            identifier,
+                            ttype: ttype.clone(),
+                        });
+                    } else {
+                        input.push(Arg {
+                            identifier,
+                            ttype: ttype.clone(),
+                        });
+                    }
+                }
+                // check if no params, place none if empty
+                if typeinput.is_empty() {
+                    typeinput.push(TType::None)
+                }
+
+                self.environment.push_scope();
+
+                // insert params into scope
+                for (ttype, id) in parameters.iter() {
+                    match ttype.clone() {
+                        TType::Function(paraminput, output) => {
+                            self.environment.insert_symbol(
+                                &id,
+                                TType::Function(paraminput.clone(), Box::new(*output.clone())),
+                                Some(pos.clone()),
+                                SymbolKind::Parameter,
+                            );
+                        }
+                        _ => self.environment.insert_symbol(
+                            &id,
+                            ttype.clone(),
+                            Some(pos.clone()),
+                            SymbolKind::Parameter,
+                        ),
+                    };
+                }
+                let mut output = TType::Void;
+                let statement = if let Token::Symbol('{', _) = self.current_token() {
+                    //println!("its a block");
+                    let block = self.block_expr()?;
+                    if let Some(Statement::Return {
+                        ttype,
+                        expr: _ ,
+                        line: _,
+                        row: _,
+                    }) = block.last()
+                    {
+                        output = ttype.clone();
+                    };
+                    block
+                } else {
+                    //println!("its an expression");
+                    let expression = self.expr()?;
+                    output = expression.clone().get_type();
+                    let (line, row) = self.get_line_and_row();
+                    let statement = vec![Statement::Return {
+                        ttype: expression.get_type(),
+                        expr: expression.clone(),
+                        line,
+                        row,
+                    }];
+                    statement
+                };
+
+                let mut captured: Vec<String> = self
+                    .environment
+                    .captured
+                    .last()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.0.clone())
+                    .collect();
+
+                self.environment.pop_scope();
+
+                for c in captured.iter() {
+                    if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+                        let pos = self.get_pos();
+
+                        self.environment.captured.last_mut().unwrap().insert(
+                            c.clone(),
+                            Symbol {
+                                id: mc.1,
+                                ttype: mc.0,
+                                pos: Some(pos),
+                                kind: mc.2,
+                            },
+                        );
+                    }
+                }
+
+                captured = self
+                    .environment
+                    .captured
+                    .last()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.0.clone())
+                    .collect();
+
+                for dc in captured.iter() {
+                    if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
+                        self.environment.captured.last_mut().unwrap().remove(dc);
+                    }
+                }
+
+                //check to see if all generic types in output are present in input
+                // let mut inputtable = table::new();
+                // for i in typeinput.iter() {
+                //     inputtable.extend(self.getgen(i.clone()))
+                // }
+
+                // let outputtable = self.getgen(output.clone());
+                // dbg!(&inputtable, &outputtable);
+
+                // for o in outputtable.items.iter() {
+                //     if inputtable.has(o) {
+                //     } else {
+                //         return Err(error::parser_error(
+                //             format!("Input is missing type {}", o),
+                //             format!("All generic types in output must be present in input"),
+                //             pos.line,
+                //             pos.row,
+                //             self.filepath.clone(),
+                //             None,
+                //         ));
+                //     }
+                // }
+
+                left = Expr::Closure(
+                    TType::Function(typeinput, Box::new(output)),
+                    input,
+                    statement,
                     captured,
                 )
             }
@@ -3308,26 +3609,48 @@ impl Parser {
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         let expr = self.expr()?;
         if expr.get_type() != TType::Void {
-            return Err(self.generate_error(
-                "Expression returns value, but does nothing with it".to_string(),
-                "Remove the expression or assign it to a variable".to_string(),
-            ));
+            return Ok(Some(Statement::Expression {
+                ttype: expr.get_type(),
+                expr,
+                used: false
+            }));
         }
         match expr {
             Expr::None => Ok(None),
             _ => Ok(Some(Statement::Expression {
                 ttype: expr.get_type(),
                 expr,
+                used: true
             })),
         }
     }
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
         self.consume_symbol('{')?;
-
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
         Ok(statements)
+    }
+
+    fn block_expr(&mut self) -> Result<Vec<Statement>, NovaError> {
+        self.consume_symbol('{')?;
+        let mut statements = self.compound_statement()?;
+        self.consume_symbol('}')?;
+        if let Some(Statement::Expression { ttype, expr, used: _ }) = statements.pop() {
+            let (line, row) = self.get_line_and_row();
+            statements.push(Statement::Return {
+                ttype,
+                expr,
+                line,
+                row,
+            });
+            return Ok(statements);
+        } else {
+            return Err(self.generate_error(
+                format!("Block must have expression as last value"),
+                format!(""),
+            ));
+        }
     }
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {
