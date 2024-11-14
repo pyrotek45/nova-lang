@@ -178,6 +178,7 @@ impl NovaCore {
     pub fn run(mut self) -> Result<(), NovaError> {
         self.initnova();
         let tokenlist = self.lexer.tokenize()?;
+        // self.lexer.check();
         self.parser.input = tokenlist;
         self.parser.parse()?;
         //dbg!(&self.parser.ast);

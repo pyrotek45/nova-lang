@@ -111,25 +111,22 @@ pub fn new(filepath: &str) -> Parser {
 
 impl Parser {
     fn eof(&mut self) -> Result<(), NovaError> {
-        if let Token::EOF(_) = self.current_token() {
+        if matches!(self.current_token(), Token::EOF { .. }) {
             Ok(())
         } else {
-            return Err(common::error::parser_error(
-                "Parsing not completed, Left over tokens unparsed".to_string(),
-                "Make sure your statement ends with ';' ".to_string(),
+            Err(common::error::parser_error(
+                "Parsing not completed, left over tokens unparsed".to_string(),
+                "Make sure your statement ends with ';'.".to_string(),
                 self.current_token().line(),
                 self.current_token().row(),
                 self.filepath.clone(),
                 None,
-            ));
+            ))
         }
     }
 
     fn is_current_eof(&mut self) -> bool {
-        match self.current_token() {
-            Token::EOF(_) => true,
-            _ => false,
-        }
+        matches!(self.current_token(), Token::EOF { .. })
     }
 
     fn generate_error(&self, msg: String, note: String) -> NovaError {
@@ -158,8 +155,8 @@ impl Parser {
     }
 
     fn consume_operator(&mut self, op: Operator) -> Result<(), NovaError> {
-        if let Token::Operator(oper, _) = self.current_token() {
-            if op == oper {
+        if let Token::Operator { operator, .. } = self.current_token() {
+            if op == operator {
                 self.advance();
                 return Ok(());
             }
@@ -170,23 +167,22 @@ impl Parser {
         ))
     }
 
-    fn consume_symbol(&mut self, symbol: char) -> Result<(), NovaError> {
-        if let Token::Symbol(sym, _) = self.current_token() {
+    fn consume_symbol(&mut self, sym: char) -> Result<(), NovaError> {
+        if let Token::Symbol { symbol, .. } = self.current_token() {
             if sym == symbol {
                 self.advance();
                 return Ok(());
             }
         }
-
         Err(self.generate_error(
             format!("unexpected symbol, got {:?}", self.current_token()),
-            format!("expecting {:?}", symbol),
+            format!("expecting {:?}", sym),
         ))
     }
 
     fn consume_identifier(&mut self, symbol: Option<&str>) -> Result<(), NovaError> {
         match self.current_token() {
-            Token::Identifier(sym, _) if symbol.map_or(true, |s| sym == s) => {
+            Token::Identifier { name: sym, .. } if symbol.map_or(true, |s| sym == s) => {
                 self.advance();
                 Ok(())
             }
@@ -376,7 +372,7 @@ impl Parser {
 
     fn sign(&mut self) -> Result<Option<Unary>, NovaError> {
         match self.current_token() {
-            Token::Operator(op, _) => match op {
+            Token::Operator { operator, position } => match operator {
                 Operator::Addition => Ok(Some(Unary::Positive)),
                 Operator::Subtraction => Ok(Some(Unary::Negitive)),
                 Operator::Not => Ok(Some(Unary::Not)),
@@ -1260,10 +1256,13 @@ impl Parser {
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
         let (identifier, pos) = self.identifier()?;
         match self.current_token() {
-            Token::Operator(Operator::Colon, _) => {
+            Token::Operator {
+                operator: Operator::Colon,
+                ..
+            } => {
                 self.consume_operator(Operator::Colon)?;
                 if let TType::Tuple(typelist) = lhs.get_type() {
-                    if let Token::Integer(index, _) = self.current_token() {
+                    if let Token::Integer { value: index, .. } = self.current_token() {
                         self.advance();
                         if index as usize >= typelist.len() {
                             return Err(self.generate_error(
@@ -1295,7 +1294,10 @@ impl Parser {
                     ));
                 }
             }
-            Token::Operator(Operator::DoubleColon, _) => {
+            Token::Operator {
+                operator: Operator::DoubleColon,
+                ..
+            } => {
                 let mut rhs = lhs.clone();
                 while self.current_token().is_op(Operator::DoubleColon) {
                     self.consume_operator(Operator::DoubleColon)?;
@@ -1358,10 +1360,10 @@ impl Parser {
                     ));
                 }
             }
-            Token::Symbol('(', _) => {
+            Token::Symbol { symbol: '(', .. } => {
                 lhs = self.method(identifier.clone(), lhs, pos)?;
             }
-            Token::Symbol('[', _) => {
+            Token::Symbol { symbol: '[', .. } => {
                 lhs = self.field(identifier.clone(), lhs, pos)?;
                 lhs = self.index(identifier.clone(), lhs.clone(), lhs.get_type())?;
             }
@@ -1403,7 +1405,7 @@ impl Parser {
             }
             TType::Tuple(inner) => {
                 self.consume_symbol('[')?;
-                if let Token::Integer(index, _) = self.current_token() {
+                if let Token::Integer { value: index, .. } = self.current_token() {
                     self.advance();
                     self.consume_symbol(']')?;
                     if index as usize >= inner.len() {
@@ -1443,7 +1445,10 @@ impl Parser {
 
     fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
-            Token::Operator(Operator::RightArrow, _) => {
+            Token::Operator {
+                operator: Operator::RightArrow,
+                ..
+            } => {
                 self.consume_operator(Operator::RightArrow)?;
                 let (field, pos) = self.identifier()?;
                 if let Some(idtype) = self.environment.get_type(&identifier) {
@@ -1485,7 +1490,7 @@ impl Parser {
                     ));
                 }
             }
-            Token::Symbol('[', _) => {
+            Token::Symbol { symbol: '[', .. } => {
                 if let Some(ttype) = self.environment.get_type(&identifier) {
                     self.index(
                         identifier.clone(),
@@ -1532,7 +1537,7 @@ impl Parser {
                     }
                 }
             }
-            Token::Symbol('(', _) => self.call(identifier.clone(), pos)?,
+            Token::Symbol { symbol: '(', .. } => self.call(identifier.clone(), pos)?,
             _ => {
                 if self.current_token().is_symbol('{')
                     && self.environment.custom_types.contains_key(&identifier)
@@ -1594,7 +1599,7 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token() {
-            Token::Symbol('#', _) => {
+            Token::Symbol { symbol: '#', .. } => {
                 self.consume_symbol('#')?;
                 let mut typelist = vec![];
 
@@ -1604,16 +1609,16 @@ impl Parser {
                 }
                 left = Expr::ListConstructor(TType::Tuple(typelist), expressions);
             }
-            Token::Symbol('?', _) => {
+            Token::Symbol { symbol: '?', .. } => {
                 self.consume_symbol('?')?;
                 let option_type = self.ttype()?;
                 left = Expr::Literal(TType::Option(Box::new(option_type)), Atom::None);
             }
-            Token::Char(char, _) => {
+            Token::Char { value: char, .. } => {
                 self.advance();
                 left = Expr::Literal(TType::Char, Atom::Char(char))
             }
-            Token::Identifier(id, _) if id.as_str() == "fn" => {
+            Token::Identifier { name: id, .. } if id.as_str() == "fn" => {
                 let pos = self.get_pos();
                 self.advance();
                 // get parameters
@@ -1796,7 +1801,7 @@ impl Parser {
                     captured,
                 )
             }
-            Token::Symbol('|', _) => {
+            Token::Symbol { symbol: '|', .. } => {
                 let pos = self.get_pos();
                 // get parameters
                 self.consume_symbol('|')?;
@@ -1866,7 +1871,7 @@ impl Parser {
                     };
                 }
                 let mut output = TType::Void;
-                let statement = if let Token::Symbol('{', _) = self.current_token() {
+                let statement = if let Token::Symbol { symbol: '{', .. } = self.current_token() {
                     //println!("its a block");
                     let block = self.block_expr()?;
                     if let Some(Statement::Return {
@@ -1965,7 +1970,7 @@ impl Parser {
                     captured,
                 )
             }
-            Token::Symbol('[', _) => {
+            Token::Symbol { symbol: '[', .. } => {
                 let expr_list = self.expr_list()?;
                 let mut ttype = TType::None;
                 if !expr_list.is_empty() {
@@ -1980,7 +1985,10 @@ impl Parser {
                     }
                 }
                 match self.current_token() {
-                    Token::Operator(Operator::Colon, _) => {
+                    Token::Operator {
+                        operator: Operator::Colon,
+                        ..
+                    } => {
                         self.consume_operator(Operator::Colon)?;
                         ttype = self.ttype()?;
                         if !expr_list.is_empty() {
@@ -2006,7 +2014,7 @@ impl Parser {
                 }
                 left = Expr::ListConstructor(TType::List(Box::new(ttype)), expr_list)
             }
-            Token::Symbol('(', _) => {
+            Token::Symbol { symbol: '(', .. } => {
                 self.consume_symbol('(')?;
                 let expr = self.expr()?;
                 self.consume_symbol(')')?;
@@ -2023,11 +2031,11 @@ impl Parser {
                     left = Expr::Unary(left.clone().get_type(), sign, Box::new(left));
                 }
             }
-            Token::Identifier(_, _) => {
+            Token::Identifier { .. } => {
                 let (mut identifier, pos) = self.identifier()?;
 
                 match self.current_token() {
-                    Token::Symbol('@', _) => {
+                    Token::Symbol { symbol: '@', .. } => {
                         self.consume_symbol('@')?;
                         self.consume_symbol('(')?;
                         let mut type_annotation = vec![];
@@ -2041,7 +2049,10 @@ impl Parser {
                         self.consume_symbol(')')?;
                         identifier = generate_unique_string(&identifier, &type_annotation);
                     }
-                    Token::Operator(Operator::LeftArrow, _) => {
+                    Token::Operator {
+                        operator: Operator::LeftArrow,
+                        ..
+                    } => {
                         self.consume_operator(Operator::LeftArrow)?;
                         let expr = self.expr()?;
 
@@ -2101,7 +2112,7 @@ impl Parser {
                     left = Expr::Unary(left.clone().get_type(), sign, Box::new(left));
                 }
             }
-            Token::Integer(v, _) => {
+            Token::Integer { value: v, .. } => {
                 self.advance();
                 left = Expr::Literal(TType::Int, Atom::Integer(v));
                 if let Some(sign) = sign {
@@ -2116,7 +2127,7 @@ impl Parser {
                     left = Expr::Unary(left.clone().get_type(), sign, Box::new(left));
                 }
             }
-            Token::Float(v, _) => {
+            Token::Float { value: v, .. } => {
                 self.advance();
                 left = Expr::Literal(TType::Float, Atom::Float(v));
                 if let Some(sign) = sign {
@@ -2131,16 +2142,16 @@ impl Parser {
                     left = Expr::Unary(left.clone().get_type(), sign, Box::new(left));
                 }
             }
-            Token::String(v, _) => {
+            Token::String { value: v, .. } => {
                 self.advance();
                 left = Expr::Literal(TType::String, Atom::String(v))
             }
 
-            Token::Bool(v, _) => {
+            Token::Bool { value: v, .. } => {
                 self.advance();
                 left = Expr::Literal(TType::Bool, Atom::Bool(v))
             }
-            Token::EOF(_) => {
+            Token::EOF { .. } => {
                 return Err(common::error::parser_error(
                     format!("End of file error"),
                     format!("expected expression"),
@@ -2154,7 +2165,10 @@ impl Parser {
         }
         loop {
             match self.current_token() {
-                Token::Operator(Operator::RightArrow, _) => {
+                Token::Operator {
+                    operator: Operator::RightArrow,
+                    ..
+                } => {
                     // mything <- compute()
                     self.consume_operator(Operator::RightArrow)?;
                     let (field, pos) = self.identifier()?;
@@ -2190,16 +2204,19 @@ impl Parser {
                         ));
                     }
                 }
-                Token::Operator(Operator::DoubleColon, _) => {
+                Token::Operator {
+                    operator: Operator::DoubleColon,
+                    ..
+                } => {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.identifier()?;
                     left = self.field(field.clone(), left, pos)?;
                 }
-                Token::Symbol('.', _) => {
+                Token::Symbol { symbol: '.', .. } => {
                     self.consume_symbol('.')?;
                     left = self.chain(left)?;
                 }
-                Token::Symbol('(', _) => {
+                Token::Symbol { symbol: '(', .. } => {
                     // function pointer return call <func()(args)>
                     let mut arguments = self.argument_list()?;
                     if arguments.is_empty() {
@@ -2227,7 +2244,7 @@ impl Parser {
                         ));
                     }
                 }
-                Token::Symbol('[', _) => {
+                Token::Symbol { symbol: '[', .. } => {
                     left = self.index("anon".to_string(), left.clone(), left.get_type().clone())?;
                 }
                 _ => {
@@ -2481,7 +2498,7 @@ impl Parser {
 
     fn ttype(&mut self) -> Result<TType, NovaError> {
         match self.current_token() {
-            Token::Symbol('#', _) => {
+            Token::Symbol { symbol: '#', .. } => {
                 self.consume_symbol('#')?;
                 let mut typelist = vec![];
                 self.consume_symbol('(')?;
@@ -2493,7 +2510,7 @@ impl Parser {
                 self.consume_symbol(')')?;
                 Ok(TType::Tuple(typelist))
             }
-            Token::Symbol('(', _) => {
+            Token::Symbol { symbol: '(', .. } => {
                 self.consume_symbol('(')?;
                 let mut input = vec![];
                 if !self.current_token().is_symbol(')') {
@@ -2566,12 +2583,12 @@ impl Parser {
                     ))
                 }
             }
-            Token::Symbol('$', _) => {
+            Token::Symbol { symbol: '$', .. } => {
                 self.consume_symbol('$')?;
                 let (generictype, _) = self.identifier()?;
                 Ok(TType::Generic(generictype))
             }
-            Token::Symbol('?', _) => {
+            Token::Symbol { symbol: '?', .. } => {
                 self.consume_symbol('?')?;
                 let ttype = self.ttype()?;
                 if let TType::Option(_) = ttype {
@@ -2582,7 +2599,7 @@ impl Parser {
                 }
                 Ok(TType::Option(Box::new(ttype)))
             }
-            Token::Symbol('[', _) => {
+            Token::Symbol { symbol: '[', .. } => {
                 self.consume_symbol('[')?;
                 let mut inner = TType::None;
                 if !self.current_token().is_symbol(']') {
@@ -2591,11 +2608,11 @@ impl Parser {
                 self.consume_symbol(']')?;
                 Ok(TType::List(Box::new(inner)))
             }
-            Token::Type(ttype, _) => {
+            Token::Type { ttype, .. } => {
                 self.advance();
                 Ok(ttype)
             }
-            Token::Identifier(_, _) => {
+            Token::Identifier { .. } => {
                 let (identifier, _) = self.identifier()?;
                 if let Some(ttype) = self.environment.type_alias.get(&identifier) {
                     return Ok(ttype.clone());
@@ -2702,7 +2719,9 @@ impl Parser {
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("import"))?;
         let ifilepath = match self.current_token() {
-            Token::String(filepath, _) => filepath,
+            Token::String {
+                value: filepath, ..
+            } => filepath,
             _ => {
                 panic!()
             }
@@ -2776,7 +2795,7 @@ impl Parser {
         let (line, row) = self.get_line_and_row();
 
         match self.current_token() {
-            Token::Identifier(id, _) => match id.as_str() {
+            Token::Identifier { name: id, .. } => match id.as_str() {
                 "type" => self.typealias(),
                 "bind" => self.bind(),
                 "unwrap" => self.unwrap(),
@@ -2800,7 +2819,7 @@ impl Parser {
                 }
                 _ => self.expression_statement(),
             },
-            Token::EOF(_) => Ok(None),
+            Token::EOF { .. } => Ok(None),
             _ => self.expression_statement(),
         }
     }
@@ -2899,7 +2918,7 @@ impl Parser {
             .insert(identifier.clone(), vec![]);
 
         let mut idlist = vec![];
-        if let Token::Symbol('(', _) = self.current_token() {
+        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
             idlist = self.get_id_list()?;
             self.environment
                 .generic_type_struct
