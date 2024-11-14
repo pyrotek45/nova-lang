@@ -45,8 +45,7 @@ impl Assembler {
         let mut ci = 0;
         while ci < asmfile.len() {
             match &asmfile[ci] {
-                tokens::Token::Type(_, _) => todo!(),
-                tokens::Token::Identifier(command, _) => {
+                tokens::Token::Identifier { name: command, .. } => {
                     match command.as_str() {
                         "main" => {
                             ci += 2;
@@ -326,14 +325,7 @@ impl Assembler {
                         }
                     }
                 }
-                tokens::Token::Integer(_, _) => todo!(),
-                tokens::Token::Float(_, _) => todo!(),
-                tokens::Token::String(_, _) => todo!(),
-                tokens::Token::Char(_, _) => todo!(),
-                tokens::Token::Symbol(_, _) => todo!(),
-                tokens::Token::Bool(_, _) => todo!(),
-                tokens::Token::Operator(_, _) => todo!(),
-                tokens::Token::EOF(_) => ci += 1,
+                _ => todo!(),
             }
         }
     }

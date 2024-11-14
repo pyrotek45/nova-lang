@@ -65,18 +65,10 @@ impl Lexer {
         };
     }
 
-    fn current_position_buffer_offset(&self) -> FilePosition {
+    fn current_position_buffer_row(&self, row: usize) -> FilePosition {
         return FilePosition {
             line: self.line,
-            row: self.row - self.buffer.len(),
-            filepath: self.filepath.clone(),
-        };
-    }
-
-    fn current_position_plus_offset(&self, offset: usize) -> FilePosition {
-        return FilePosition {
-            line: self.line,
-            row: self.row + offset,
+            row: row,
             filepath: self.filepath.clone(),
         };
     }
@@ -86,84 +78,119 @@ impl Lexer {
             if let Ok(v) = self.buffer.parse() {
                 return Some(if self.buffer.contains('.') {
                     self.state = LexerState::Token;
-                    Token::Float(v, self.current_position_buffer_offset())
+                    Token::Float {
+                        value: v,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    }
                 } else {
-                    Token::Integer(v as i64, self.current_position_buffer_offset())
+                    Token::Integer {
+                        value: v as i64,
+                        position: self.current_position(),
+                    }
                 });
             }
-            // splits buffers begining with a number, 1.print()
+
+            // Splits buffers beginning with a number, e.g., 1.print() -> 1 . print
             if self.buffer.contains('.') {
-                let preset = self.row - self.buffer.len();
-                let mut offset = 0;
+                let lastchar = self.buffer.chars().last();
                 let split = self.buffer.split('.');
                 for id in split {
                     if let Ok(v) = id.parse::<i64>() {
                         self.state = LexerState::Token;
-                        self.token_list.push(Token::Integer(
-                            v as i64,
-                            self.current_position_plus_offset(preset + offset),
-                        ));
+                        self.token_list.push(Token::Integer {
+                            value: v as i64,
+                            position: self
+                                .current_position_buffer_row(self.row - id.chars().count()),
+                        });
                     } else {
-                        self.token_list.push(Token::Identifier(
-                            id.to_string(),
-                            self.current_position_plus_offset(preset + offset),
-                        ));
+                        self.token_list.push(Token::Identifier {
+                            name: id.to_string(),
+                            position: self
+                                .current_position_buffer_row(self.row - id.chars().count()),
+                        });
                     }
-                    offset += id.len();
-                    self.token_list.push(Token::Symbol(
-                        '.',
-                        self.current_position_plus_offset(preset + offset),
-                    ));
-                    offset += 1;
+                    self.token_list.push(Token::Symbol {
+                        symbol: '.',
+                        position: self.current_position_buffer_row(self.row - id.chars().count()),
+                    });
                 }
+
                 self.token_list.pop();
+
+                if let Some('.') = lastchar {
+                    self.token_list.push(Token::Symbol {
+                        symbol: '.',
+                        position: self.current_position_buffer_row(self.row + 1),
+                    });
+                }
                 return None;
             }
-            // consider adding keywords like let,if,for,type,fn
+
+            // Consider adding keywords like let, if, for, type, fn
             match self.buffer.as_str() {
-                "false" => return Some(Token::Bool(false, self.current_position_buffer_offset())),
-                "true" => return Some(Token::Bool(true, self.current_position_buffer_offset())),
+                "false" => {
+                    return Some(Token::Bool {
+                        value: false,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "true" => {
+                    return Some(Token::Bool {
+                        value: true,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
                 "Int" => {
-                    return Some(Token::Type(
-                        TType::Int,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::Int,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 "Float" => {
-                    return Some(Token::Type(
-                        TType::Float,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::Float,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 "Bool" => {
-                    return Some(Token::Type(
-                        TType::Bool,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::Bool,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 "String" => {
-                    return Some(Token::Type(
-                        TType::String,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::String,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 "Any" => {
-                    return Some(Token::Type(
-                        TType::Any,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::Any,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 "Char" => {
-                    return Some(Token::Type(
-                        TType::Char,
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Type {
+                        ttype: TType::Char,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
                 _ => {
-                    return Some(Token::Identifier(
-                        self.buffer.to_string(),
-                        self.current_position_buffer_offset(),
-                    ))
+                    return Some(Token::Identifier {
+                        name: self.buffer.to_string(),
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
                 }
             }
         }
@@ -177,12 +204,12 @@ impl Lexer {
         self.buffer.clear();
     }
 
-    pub fn tokenize(mut self) -> Result<TokenList, NovaError> {
+    pub fn tokenize(&mut self) -> Result<TokenList, NovaError> {
         if self.filepath.is_empty() {
-            // consider making the error take a Position struct
+            // Consider making the error take a Position struct
             return Err(lexer_error(
-                format!("Missing filepath "),
-                format!(""),
+                "Missing filepath".to_string(),
+                "".to_string(),
                 0,
                 0,
                 "".to_string(),
@@ -250,12 +277,11 @@ impl Lexer {
                             continue;
                         }
                         _ => {
-                            // consider making the error take a Position struct
                             return Err(common::error::lexer_error(
                                 "Expecting valid escape char".to_string(),
                                 "".to_string(),
                                 self.line,
-                                self.row - self.buffer.len(),
+                                self.row - self.buffer.chars().count(),
                                 self.filepath.clone(),
                             ));
                         }
@@ -266,10 +292,21 @@ impl Lexer {
                     continue;
                 } else {
                     self.state = LexerState::Token;
-                    self.token_list
-                        .push(Token::String(self.buffer.clone(), self.current_position()));
+                    self.row += self.buffer.chars().count();
+                    let invisable_offset = self
+                        .buffer
+                        .chars()
+                        .filter(|opt_char| {
+                            matches!(opt_char, '\n' | '\t' | '\r' | '\\' | '\"' | '\0')
+                        })
+                        .count();
+                    self.token_list.push(Token::String {
+                        value: self.buffer.clone(),
+                        position: self.current_position_buffer_row(
+                            self.row - self.buffer.chars().count() - invisable_offset,
+                        ),
+                    });
                     self.row += 1;
-                    self.row += self.buffer.len();
                     self.buffer.clear();
                     continue;
                 }
@@ -279,77 +316,91 @@ impl Lexer {
                     match chars.peek() {
                         Some('n') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\n', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\n',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('t') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\t', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\t',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('r') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\r', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\r',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('h') => {
                             chars.next();
-                            self.token_list.push(Token::String(
-                                "\x1b[?25h".to_string(),
-                                self.current_position(),
-                            ));
-                            self.row += 1;
+                            self.token_list.push(Token::String {
+                                value: "\x1b[?25h".to_string(),
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('l') => {
                             chars.next();
-                            self.token_list.push(Token::String(
-                                "\x1b[?25l".to_string(),
-                                self.current_position(),
-                            ));
-                            self.row += 1;
+                            self.token_list.push(Token::String {
+                                value: "\x1b[?25l".to_string(),
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\'', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\'',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\"', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\"',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('0') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\0', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\0',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
-                            self.token_list
-                                .push(Token::Char('\\', self.current_position()));
-                            self.row += 1;
+                            self.token_list.push(Token::Char {
+                                value: '\\',
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
                             self.buffer.clear();
                             continue;
                         }
@@ -358,19 +409,22 @@ impl Lexer {
                                 "Expecting valid escape char".to_string(),
                                 "".to_string(),
                                 self.line,
-                                self.row - self.buffer.len(),
+                                self.row - self.buffer.chars().count(),
                                 self.filepath.clone(),
                             ));
                         }
                     }
                 } else if c == '\'' {
                     self.state = LexerState::Token;
+                    // should throw error, cant have ''
                     self.row += 1;
                     self.buffer.clear();
                     continue;
                 } else {
-                    self.token_list
-                        .push(Token::Char(c, self.current_position()));
+                    self.token_list.push(Token::Char {
+                        value: c,
+                        position: self.current_position(),
+                    });
                     self.row += 1;
                     self.buffer.clear();
                     continue;
@@ -379,7 +433,6 @@ impl Lexer {
 
             match c {
                 '\'' => {
-                    self.row += 1;
                     self.state = LexerState::Char;
                     self.check_token();
                 }
@@ -392,195 +445,205 @@ impl Lexer {
                     self.line += 1;
                     self.row = 0;
                 }
-                '\r' => {
-                    self.check_token();
-                }
-                '\t' => {
-                    self.check_token();
-                }
+                '\r' => self.check_token(),
+                '\t' => self.check_token(),
                 '.' => {
                     if self.state != LexerState::Float {
-                        if let Ok(v) = self.buffer.parse() {
-                            let _n: i64 = v;
+                        if let Ok(_v) = self.buffer.parse::<i64>() {
                             self.state = LexerState::Float;
                             self.buffer.push(c);
                         } else {
                             self.check_token();
-                            self.token_list
-                                .push(Token::Symbol(c, self.current_position()));
+                            self.token_list.push(Token::Symbol {
+                                symbol: c,
+                                position: self.current_position(),
+                            });
                         }
                     } else {
                         self.check_token();
-                        self.token_list
-                            .push(Token::Symbol(c, self.current_position()));
+                        self.token_list.push(Token::Symbol {
+                            symbol: c,
+                            position: self.current_position(),
+                        });
                     }
                 }
                 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
                     self.buffer.push(c);
                 }
-                ' ' => {
-                    self.check_token();
-                }
+                ' ' => self.check_token(),
                 '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' | '&' | '|' => {
                     self.check_token();
+                    // Handle multi-character operators and other specific cases
                     match c {
                         ':' => {
                             if let Some(':') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::DoubleColon,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::DoubleColon,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list
-                                    .push(Token::Operator(Operator::Colon, self.current_position()))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Colon,
+                                    position: self.current_position(),
+                                });
                             }
                         }
-                        '%' => self
-                            .token_list
-                            .push(Token::Operator(Operator::Modulo, self.current_position())),
+                        '%' => self.token_list.push(Token::Operator {
+                            operator: Operator::Modulo,
+                            position: self.current_position(),
+                        }),
                         '>' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::GtrOrEqu,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::GtrOrEqu,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::GreaterThan,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::GreaterThan,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '<' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::LssOrEqu,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::LssOrEqu,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                                 continue;
                             }
                             if let Some('-') = chars.peek() {
                                 chars.next();
-
-                                self.token_list.push(Token::Operator(
-                                    Operator::LeftArrow,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::LeftArrow,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::LessThan,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::LessThan,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '+' => {
                             if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::AdditionAssignment,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::AdditionAssignment,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::Addition,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Addition,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '-' => {
                             if let Some('>') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::RightArrow,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::RightArrow,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::SubtractionAssignment,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::SubtractionAssignment,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::Subtraction,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Subtraction,
+                                    position: self.current_position(),
+                                });
                             }
                         }
-                        '*' => self.token_list.push(Token::Operator(
-                            Operator::Multiplication,
-                            self.current_position(),
-                        )),
+                        '*' => self.token_list.push(Token::Operator {
+                            operator: Operator::Multiplication,
+                            position: self.current_position(),
+                        }),
                         '/' => {
                             if let Some('/') = chars.peek() {
                                 chars.next();
                                 self.row += 1;
                                 self.state = LexerState::Comment;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::Division,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Division,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '=' => {
-                            if let Some(&'=') = chars.peek() {
+                            if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::Equality,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Equality,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list.push(Token::Operator(
-                                    Operator::Assignment,
-                                    self.current_position(),
-                                ))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Assignment,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '!' => {
-                            if let Some(&'=') = chars.peek() {
+                            if let Some('=') = chars.peek() {
                                 chars.next();
-                                self.token_list.push(Token::Operator(
-                                    Operator::NotEqual,
-                                    self.current_position(),
-                                ));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::NotEqual,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list
-                                    .push(Token::Operator(Operator::Not, self.current_position()))
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Not,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '&' => {
-                            if let Some(&'&') = chars.peek() {
+                            if let Some('&') = chars.peek() {
                                 chars.next();
-                                self.token_list
-                                    .push(Token::Operator(Operator::And, self.current_position()));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::And,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list
-                                    .push(Token::Symbol(c, self.current_position()));
+                                self.token_list.push(Token::Symbol {
+                                    symbol: c,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         '|' => {
-                            if let Some(&'|') = chars.peek() {
+                            if let Some('|') = chars.peek() {
                                 chars.next();
-                                self.token_list
-                                    .push(Token::Operator(Operator::Or, self.current_position()));
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::Or,
+                                    position: self.current_position(),
+                                });
                                 self.row += 1;
                             } else {
-                                self.token_list
-                                    .push(Token::Symbol(c, self.current_position()));
+                                self.token_list.push(Token::Symbol {
+                                    symbol: c,
+                                    position: self.current_position(),
+                                });
                             }
                         }
                         _ => {}
@@ -588,8 +651,10 @@ impl Lexer {
                 }
                 ';' | '(' | ')' | '[' | ']' | ',' | '{' | '}' | '$' | '@' | '?' | '#' => {
                     self.check_token();
-                    self.token_list
-                        .push(Token::Symbol(c, self.current_position()));
+                    self.token_list.push(Token::Symbol {
+                        symbol: c,
+                        position: self.current_position(),
+                    });
                 }
                 _ => {}
             }
@@ -597,8 +662,21 @@ impl Lexer {
         }
 
         self.check_token();
-        self.token_list.push(Token::EOF(self.current_position()));
+        self.token_list.push(Token::EOF {
+            position: self.current_position(),
+        });
 
-        Ok(self.token_list)
+        Ok(self.token_list.clone())
+    }
+
+    pub fn check(&self) {
+        for token in self.token_list.iter() {
+            common::error::print_line(
+                token.line(),
+                Some(token.row()),
+                &token.file(),
+                &format!("{}", token.to_string()),
+            );
+        }
     }
 }

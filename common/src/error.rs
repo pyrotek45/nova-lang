@@ -10,7 +10,7 @@ where
     Ok(std::io::BufRead::lines(std::io::BufReader::new(file)))
 }
 
-fn print_line(line: usize, row: Option<usize>, file: &str, msg: &str) {
+pub fn print_line(line: usize, row: Option<usize>, file: &str, msg: &str) {
     if let Ok(lines) = read_lines(file) {
         // Consumes the iterator, returns an (Optional) String
         let mut linenumber = 1;
