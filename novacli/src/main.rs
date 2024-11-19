@@ -1,3 +1,4 @@
+use common::error::NovaError;
 use novacore::NovaCore;
 use std::process::exit;
 
@@ -10,77 +11,40 @@ fn main() {
 
 fn entry_command() -> Option<()> {
     let mut args = std::env::args();
-    args.next(); // file path
+    args.next(); // Skip the file path
     let command = args.next()?;
 
+    let handle_error = |result: Result<(), NovaError>| {
+        if let Err(e) = result {
+            e.show();
+            exit(1);
+        }
+    };
+
+    let execute_command = |filepath: String, action: fn(NovaCore) -> Result<(), NovaError>| {
+        let novacore = compile_file_or_exit(&filepath);
+        handle_error(action(novacore));
+    };
+
     match command.as_str() {
-        "run" => {
-            let filepath = args.next()?;
-            let novacore = compile_file_or_exit(&filepath);
-
-            if let Err(e) = novacore.run() {
-                e.show();
-                exit(1);
-            }
-        }
-
-        "dbg" => {
-            let filepath = args.next()?;
-            let novacore = compile_file_or_exit(&filepath);
-
-            if let Err(e) = novacore.run_debug() {
-                e.show();
-                exit(1);
-            }
-        }
-
-        "dis" => {
-            let filepath = args.next()?;
-            let novacore = compile_file_or_exit(&filepath);
-
-            if let Err(e) = novacore.dis_file() {
-                e.show();
-                exit(1);
-            }
-        }
-
+        "run" => execute_command(args.next()?, NovaCore::run),
+        "dbg" => execute_command(args.next()?, NovaCore::run_debug),
+        "dis" => execute_command(args.next()?, NovaCore::dis_file),
         "time" => {
             let filepath = args.next()?;
-
-            let start = std::time::Instant::now();
             let novacore = compile_file_or_exit(&filepath);
-
-            let execution_start = std::time::Instant::now();
-            let execution_result = novacore.run_time();
-
-            println!(
-                "execution time: {}ms",
-                execution_start.elapsed().as_millis()
-            );
-
-            println!("total time: {}ms", start.elapsed().as_millis());
-
-            if let Err(e) = execution_result {
-                e.show();
-                exit(1);
-            }
+            let start_time = std::time::Instant::now();
+            let execution_result = novacore.run();
+            println!("Execution time: {}ms", start_time.elapsed().as_millis());
+            handle_error(execution_result);
         }
-
         "check" => {
             let filepath = args.next()?;
-
-            let start = std::time::Instant::now();
+            let start_time = std::time::Instant::now();
             let novacore = compile_file_or_exit(&filepath);
-
-            if let Err(e) = novacore.check() {
-                e.show();
-                exit(1);
-            }
-
-            println!("OK | compile time: {}ms", start.elapsed().as_millis());
+            handle_error(novacore.check());
+            println!("OK | Compile time: {}ms", start_time.elapsed().as_millis());
         }
-
-        // TODO: add repl
         _ => print_help(),
     }
 
@@ -88,8 +52,7 @@ fn entry_command() -> Option<()> {
 }
 
 fn print_help() {
-    println!("Nova 0.1.0: by pyrotek45");
-    println!();
+    println!("Nova 0.1.0: by pyrotek45\n");
     println!("HELP MENU");
     println!("\trun   [file]  // runs the file using the nova vm");
     println!("\tdbg   [file]  // debug the file");

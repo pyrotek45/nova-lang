@@ -333,6 +333,7 @@ impl Assembler {
     pub fn assemble(&mut self) {
         for instruction in self.input.iter().cloned() {
             match instruction {
+                Asm::EXIT => self.output.push(Code::EXIT),
                 Asm::LABEL(label) => {
                     self.labels.insert(label, self.output.len());
                 }

@@ -82,7 +82,7 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn file(&self) -> String {
+    pub fn position(&self) -> FilePosition {
         match self {
             Token::Type { position, .. }
             | Token::Identifier { position, .. }
@@ -93,7 +93,7 @@ impl Token {
             | Token::Symbol { position, .. }
             | Token::Bool { position, .. }
             | Token::Operator { position, .. }
-            | Token::EOF { position } => position.filepath.clone(),
+            | Token::EOF { position } => position.clone(),
         }
     }
 

@@ -6,7 +6,7 @@ fn defualtIO() -> IO {
     return IO {
         prompt: fn(input: String) -> String {
             print(input + "\n")
-            return readline()
+            return readln()
         }
     }
 }

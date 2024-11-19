@@ -70,13 +70,10 @@ pub enum Statement {
     Return {
         ttype: TType,
         expr: Expr,
-        line: usize,
-        row: usize,
     },
     Expression {
         ttype: TType,
         expr: Expr,
-        used: bool,
     },
     If {
         ttype: TType,
@@ -122,92 +119,77 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
     None,
-    Char(char),
-    Bool(bool),
-    Id(String),
-    Float(f64),
-    String(String),
-    Integer(i64),
-    Call(String, Vec<Expr>),
+    Char { value: char },
+    Bool { value: bool },
+    Id { name: String },
+    Float { value: f64 },
+    String { value: String },
+    Integer { value: i64 },
+    Call { name: String, arguments: Vec<Expr> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Closure(TType, Vec<Arg>, Vec<Statement>, Vec<String>),
-    ListConstructor(TType, Vec<Expr>),
-    Field(TType, String, usize, Box<Expr>, FilePosition),
-    Indexed(TType, String, Box<Expr>, Box<Expr>, FilePosition),
-    Call(TType, String, Box<Expr>, Vec<Expr>),
-    Unary(TType, Unary, Box<Expr>),
-    Binop(TType, Operator, Box<Expr>, Box<Expr>),
-    Literal(TType, Atom),
+    Closure {
+        ttype: TType,
+        args: Vec<Arg>,
+        body: Vec<Statement>,
+        captures: Vec<String>,
+    },
+    ListConstructor {
+        ttype: TType,
+        elements: Vec<Expr>,
+    },
+    Field {
+        ttype: TType,
+        name: String,
+        index: usize,
+        expr: Box<Expr>,
+        position: FilePosition,
+    },
+    Indexed {
+        ttype: TType,
+        name: String,
+        container: Box<Expr>,
+        index: Box<Expr>,
+        position: FilePosition,
+    },
+    Call {
+        ttype: TType,
+        name: String,
+        function: Box<Expr>,
+        args: Vec<Expr>,
+    },
+    Unary {
+        ttype: TType,
+        op: Unary,
+        expr: Box<Expr>,
+    },
+    Binop {
+        ttype: TType,
+        op: Operator,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    Literal {
+        ttype: TType,
+        value: Atom,
+    },
     None,
 }
 
 impl Expr {
     pub fn get_type(&self) -> TType {
         match self {
-            Expr::Unary(ttype, _, _) => ttype.clone(),
-            Expr::Binop(ttype, _, _, _) => ttype.clone(),
-            Expr::Literal(ttype, _) => ttype.clone(),
-            Expr::Field(ttype, _, _, _, _) => ttype.clone(),
-            Expr::ListConstructor(ttype, _) => ttype.clone(),
-            Expr::Indexed(ttype, _, _, _, _) => ttype.clone(),
+            Expr::Unary { ttype, .. } => ttype.clone(),
+            Expr::Binop { ttype, .. } => ttype.clone(),
+            Expr::Literal { ttype, .. } => ttype.clone(),
+            Expr::Field { ttype, .. } => ttype.clone(),
+            Expr::ListConstructor { ttype, .. } => ttype.clone(),
+            Expr::Indexed { ttype, .. } => ttype.clone(),
             Expr::None => TType::None,
-            Expr::Call(ttype, _, _, _) => ttype.clone(),
-            Expr::Closure(ttype, _, _, _) => ttype.clone(),
-        }
-    }
-
-    pub fn cast(&mut self, cast: TType) {
-        match self {
-            Expr::Closure(_, env, params, body) => {
-                // Rebuild expression with the new type
-                *self = Expr::Closure(cast, env.clone(), params.clone(), body.clone());
-            }
-            Expr::ListConstructor(_, elements) => {
-                // Rebuild expression with the new type
-                *self = Expr::ListConstructor(cast, elements.clone());
-            }
-            Expr::Field(_, obj, field_name, index, in_expr) => {
-                // Rebuild expression with the new type
-                *self = Expr::Field(
-                    cast,
-                    obj.clone(),
-                    field_name.clone(),
-                    index.clone(),
-                    in_expr.clone(),
-                );
-            }
-            Expr::Indexed(_, container, index_expr, index, in_expr) => {
-                // Rebuild expression with the new type
-                *self = Expr::Indexed(
-                    cast,
-                    container.clone(),
-                    index_expr.clone(),
-                    index.clone(),
-                    in_expr.clone(),
-                );
-            }
-            Expr::Call(_, func, args, in_expr) => {
-                // Rebuild expression with the new type
-                *self = Expr::Call(cast, func.clone(), args.clone(), in_expr.clone());
-            }
-            Expr::Unary(_, op, operand) => {
-                // Rebuild expression with the new type
-                *self = Expr::Unary(cast, op.clone(), operand.clone());
-            }
-            Expr::Binop(_, op, lhs, rhs) => {
-                // Rebuild expression with the new type
-                *self = Expr::Binop(cast, op.clone(), lhs.clone(), rhs.clone());
-            }
-            Expr::Literal(_, a) => {
-                // Rebuild expression with the new type
-                *self = Expr::Literal(cast, a.clone());
-            }
-            Expr::None => {
-                // No need to change anything for Expr::None
-            }
+            Expr::Call { ttype, .. } => ttype.clone(),
+            Expr::Closure { ttype, .. } => ttype.clone(),
         }
     }
 }

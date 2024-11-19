@@ -51,177 +51,232 @@ impl NovaCore {
 
     fn initnova(&mut self) {
         self.add_function(
+            "hidecursor",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::hide_cursor,
+        );
+        self.add_function(
+            "showcursor",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::show_cursor,
+        );
+        self.add_function(
+            "toInt",
+            TType::Function {
+                parameters: vec![TType::Generic {
+                    name: "a".to_string(),
+                }],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Int),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::to_int,
+        );
+        self.add_function(
             "toStr",
-            TType::Function(
-                vec![TType::Generic("a".to_string())],
-                Box::new(TType::String),
-            ),
+            TType::Function {
+                parameters: vec![TType::Generic {
+                    name: "a".to_string(),
+                }],
+                return_type: Box::new(TType::String),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::str::to_string,
         );
         self.add_function(
             "len",
-            TType::Function(
-                vec![TType::List(Box::new(TType::Generic("a".to_string())))],
-                Box::new(TType::Int),
-            ),
+            TType::Function {
+                parameters: vec![TType::List {
+                    inner: Box::new(TType::Generic {
+                        name: "a".to_string(),
+                    }),
+                }],
+                return_type: Box::new(TType::Int),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::list::len,
         );
         self.add_function(
             "sleep",
-            TType::Function(vec![TType::Int], Box::new(TType::Void)),
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::time::sleep,
         );
         self.add_function(
             "rawmode",
-            TType::Function(vec![TType::Bool], Box::new(TType::Void)),
+            TType::Function {
+                parameters: vec![TType::Bool],
+                return_type: Box::new(TType::Void),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::terminal::rawmode,
         );
         self.add_function(
             "getch",
-            TType::Function(
-                vec![TType::None],
-                Box::new(TType::Option(Box::new(TType::Char))),
-            ),
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Char),
+                }),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::terminal::getch,
         );
         self.add_function(
             "rawread",
-            TType::Function(
-                vec![TType::Int],
-                Box::new(TType::Option(Box::new(TType::Char))),
-            ),
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Char),
+                }),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::terminal::rawread,
         );
         self.add_function(
-            "readline",
-            TType::Function(vec![TType::None], Box::new(TType::String)),
+            "readln",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::String),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::io::read_line,
         );
         self.add_function(
             "clearscreen",
-            TType::Function(vec![TType::None], Box::new(TType::Void)),
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::terminal::clear_screen,
         );
         self.add_function(
             "push",
-            TType::Function(
-                vec![
-                    TType::List(Box::new(TType::Generic("a".to_string()))),
-                    TType::Generic("a".to_string()),
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic {
+                            name: "a".to_string(),
+                        }),
+                    },
+                    TType::Generic {
+                        name: "a".to_string(),
+                    },
                 ],
-                Box::new(TType::Void),
-            ),
+                return_type: Box::new(TType::Void),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::list::push,
         );
         self.add_function(
             "pop",
-            TType::Function(
-                vec![TType::List(Box::new(TType::Generic("a".to_string())))],
-                Box::new(TType::Option(Box::new(TType::Generic("a".to_string())))),
-            ),
+            TType::Function {
+                parameters: vec![TType::List {
+                    inner: Box::new(TType::Generic {
+                        name: "a".to_string(),
+                    }),
+                }],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Generic {
+                        name: "a".to_string(),
+                    }),
+                }),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::list::pop,
         );
         self.add_function(
             "randomInt",
-            TType::Function(vec![TType::Int, TType::Int], Box::new(TType::Int)),
+            TType::Function {
+                parameters: vec![TType::Int, TType::Int],
+                return_type: Box::new(TType::Int),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::rand::random_int,
         );
         self.add_function(
             "strlen",
-            TType::Function(vec![TType::String], Box::new(TType::Int)),
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Int),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::str::strlen,
         );
         self.add_function(
             "strToChars",
-            TType::Function(
-                vec![TType::String],
-                Box::new(TType::List(Box::new(TType::Char))),
-            ),
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::Char),
+                }),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::str::str_to_chars,
         );
         self.add_function(
             "charsToStr",
-            TType::Function(
-                vec![TType::List(Box::new(TType::Char))],
-                Box::new(TType::String),
-            ),
+            TType::Function {
+                parameters: vec![TType::List {
+                    inner: Box::new(TType::Char),
+                }],
+                return_type: Box::new(TType::String),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::str::chars_to_str,
         );
         self.add_function(
             "chr",
-            TType::Function(vec![TType::Int], Box::new(TType::Char)),
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Char),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::char::chr,
         );
         self.add_function(
             "readFile",
-            TType::Function(vec![TType::String], Box::new(TType::String)),
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
             common::nodes::SymbolKind::GenericFunction,
             native::io::read_file,
         );
     }
 
-    pub fn run(mut self) -> Result<(), NovaError> {
+    fn process(&mut self) -> Result<(), NovaError> {
         self.initnova();
         let tokenlist = self.lexer.tokenize()?;
-        // self.lexer.check();
         self.parser.input = tokenlist;
         self.parser.parse()?;
-        //dbg!(&self.parser.ast);
-        let ast = self.parser.ast;
-        //dbg!(&ast);
+        let ast = self.parser.ast.clone();
+        let filepath = self.filepath.clone();
         let asm = self
             .compiler
-            .compile_program(ast, self.filepath, true, true, false)?;
+            .compile_program(ast.clone(), filepath, true, true, false)?;
         self.assembler.input = asm;
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
-        self.vm.state.program = self.assembler.output;
-        self.vm.run()?;
+        self.vm.state.program = self.assembler.output.clone();
         Ok(())
     }
 
-    pub fn run_time(mut self) -> Result<(), NovaError> {
-        let start = std::time::Instant::now();
-        self.initnova();
-        println!("Initialize time: {}ms", start.elapsed().as_millis());
-
-        let tokenlist = self.lexer.tokenize()?;
-        println!("Lexing time: {}ms", start.elapsed().as_millis());
-
-        self.parser.input = tokenlist;
-        self.parser.parse()?;
-        println!(
-            "Parsing + Typechecking time: {}ms",
-            start.elapsed().as_millis()
-        );
-
-        let ast = self.parser.ast;
-        let asm = self
-            .compiler
-            .compile_program(ast, self.filepath, true, true, false)?;
-        println!("Compile time: {}ms", start.elapsed().as_millis());
-
-        self.assembler.input = asm;
-        self.assembler.assemble();
-        println!("Assembler time: {}ms", start.elapsed().as_millis());
-
-        self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
-        self.vm.state.program = self.assembler.output;
+    pub fn run(mut self) -> Result<(), NovaError> {
+        self.process()?;
         self.vm.run()?;
         Ok(())
     }
@@ -232,6 +287,7 @@ impl NovaCore {
         println!("OK | Initialize time: {}ms", start.elapsed().as_millis());
 
         let tokenlist = self.lexer.tokenize()?;
+        self.lexer.check();
         println!("OK | Lexing time: {}ms", start.elapsed().as_millis());
 
         self.parser.input = tokenlist;
@@ -257,17 +313,7 @@ impl NovaCore {
     }
 
     pub fn run_debug(mut self) -> Result<(), NovaError> {
-        self.initnova();
-        let tokenlist = self.lexer.tokenize()?;
-        self.parser.input = tokenlist;
-        self.parser.parse()?;
-        let ast = self.parser.ast;
-        let asm = self
-            .compiler
-            .compile_program(ast, self.filepath, true, true, false)?;
-        self.assembler.input = asm;
-        self.assembler.assemble();
-        self.vm.state.program = self.assembler.output;
+        self.process()?;
         self.vm.run_debug()?;
         Ok(())
     }
@@ -286,223 +332,3 @@ impl NovaCore {
         Ok(())
     }
 }
-
-//                     "compile" => {
-//                         if let Some(filepath) = std::env::args().nth(3) {
-//                             let lexer = match Lexer::new(&filepath) {
-//                                 Ok(lexer) => lexer,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let tokenlist = match lexer.tokenize() {
-//                                 Ok(tokenlist) => tokenlist,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let mut parser = parser::new(&filepath);
-//                             let mut compiler = compiler::new();
-//                             let mut vm = vm::new();
-
-//                             // adding native functions
-//                             parser.environment.insert_symbol(
-//                                 "len",
-//                                 TType::Function(
-//                                     vec![TType::List(Box::new(TType::Generic(
-//                                         "a".to_string(),
-//                                     )))],
-//                                     Box::new(TType::Int),
-//                                 ),
-//                                 None,
-//                                 common::nodes::SymbolKind::GenericFunction,
-//                             );
-//                             compiler.native_functions.insert("len".to_string());
-//                             vm.native_functions.insert(0, native::list::len);
-
-//                             parser.input = tokenlist;
-//                             match parser.parse() {
-//                                 Ok(()) => {
-//                                     //dbg!(parser.ast.clone());
-//                                 }
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             }
-
-//                             let program = compiler
-//                                 .compile_program(parser.ast, filepath, true, true, false);
-//                             let asm = compiler.asm.clone();
-//                             match program {
-//                                 Ok(_) => {
-//                                     let mut assembler = assembler::new(asm);
-//                                     assembler.assemble();
-//                                     let encoded: Vec<u8> =
-//                                         bincode::serialize(&assembler.output.clone()).unwrap();
-//                                     if let Some(outputname) = std::env::args().nth(4) {
-//                                         std::fs::write(format!("{}.nvb", outputname), encoded)
-//                                             .unwrap();
-//                                     } else {
-//                                         println!("Error: No output name specified");
-//                                     }
-//                                 }
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             }
-//                         } else {
-//                             println!("Error: No file path specified");
-//                         }
-//                     }
-//                     _ => {
-//                         println!("Error: Unrecognized option {}", option);
-//                     }
-//                 },
-//                 None => todo!(),
-//             }
-//         }
-//         "bin" => {
-//             match std::env::args().nth(2) {
-//                 Some(option) => match option.as_str() {
-//                     "run" => {
-//                         if let Some(filepath) = std::env::args().nth(3) {
-//                             let encoded = std::fs::read(filepath).unwrap();
-//                             let program = bincode::deserialize(&encoded).unwrap();
-
-//                             let mut vm = vm::new();
-//                             vm.native_functions.insert(0, native::list::len);
-//                             vm.state.program(program);
-
-//                             match vm.run() {
-//                                 Ok(()) => {
-//                                     //dbg!(vm.state.stack);
-//                                 }
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             }
-//                         } else {
-//                             println!("Error: No file path specified");
-//                         }
-//                     }
-//                     "dbg" => {
-//                         if let Some(filepath) = std::env::args().nth(3) {
-//                             let encoded = std::fs::read(filepath).unwrap();
-//                             let program: Vec<u8> = bincode::deserialize(&encoded).unwrap();
-//                             //println!("{}", rhexdump::hexdump(&program.clone()));
-//                             let mut vm = vm::new();
-//                             vm.native_functions.insert(0, native::list::len);
-//                             vm.state.program(program);
-
-//                             match vm.run_debug() {
-//                                 Ok(()) => {
-//                                     //dbg!(vm.state.stack);
-//                                 }
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             }
-//                         } else {
-//                             println!("Error: No file path specified");
-//                         }
-//                     }
-//                     _ => {}
-//                 },
-//                 None => todo!(),
-//             }
-//         }
-//         "asm" => {
-//             match std::env::args().nth(2) {
-//                 Some(option) => match option.as_str() {
-//                     "run" => {
-//                         if let Some(filepath) = std::env::args().nth(3) {
-//                             let lexer = match Lexer::new(&filepath) {
-//                                 Ok(lexer) => lexer,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let tokenlist = match lexer.tokenize() {
-//                                 Ok(tokenlist) => tokenlist,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let mut assembler = assembler::new_empty();
-//                             assembler.assemble_from_nva(tokenlist);
-//                             assembler.input = assembler.nva.clone();
-//                             assembler.assemble();
-
-//                             for o in assembler.nva {
-//                                 println!("{:?}", o)
-//                             }
-//                             let mut vm = vm::new();
-//                             vm.state.program(assembler.output);
-
-//                             match vm.run() {
-//                                 Ok(()) => {
-//                                     //dbg!(vm.state.stack);
-//                                 }
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             }
-//                         } else {
-//                             println!("Error: No file path specified");
-//                         }
-//                     }
-//                     "compile" => {
-//                         if let Some(filepath) = std::env::args().nth(3) {
-//                             let lexer = match Lexer::new(&filepath) {
-//                                 Ok(lexer) => lexer,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let tokenlist = match lexer.tokenize() {
-//                                 Ok(tokenlist) => tokenlist,
-//                                 Err(error) => {
-//                                     error.show();
-//                                     exit(1)
-//                                 }
-//                             };
-
-//                             let mut assembler = assembler::new_empty();
-//                             assembler.assemble_from_nva(tokenlist);
-//                             assembler.input = assembler.nva.clone();
-//                             assembler.assemble();
-//                             let encoded: Vec<u8> =
-//                                 bincode::serialize(&assembler.output.clone()).unwrap();
-//                             if let Some(outputname) = std::env::args().nth(4) {
-//                                 std::fs::write(format!("{}.nvb", outputname), encoded).unwrap();
-//                             } else {
-//                                 println!("Error: No output name specified");
-//                             }
-//                         } else {
-//                             println!("Error: No file path specified");
-//                         }
-//                     }
-//                     _ => {}
-//                 },
-//                 None => todo!(),
-//             }
-//         }
-//         _ => {}
-//     },
-//     None => todo!(),
-// }

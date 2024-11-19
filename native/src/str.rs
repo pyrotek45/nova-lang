@@ -84,3 +84,38 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
     state.stack.push(VmData::String(index));
     Ok(())
 }
+
+pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
+    let data = state.stack.pop().unwrap_or(VmData::None);
+    let int = match data {
+        VmData::Int(value) => value, // Already an integer, no conversion needed
+        VmData::Float(value) => value as i64, // Convert float to integer
+        VmData::Bool(value) => {
+            if value {
+                1
+            } else {
+                0
+            }
+        } // Convert true to 1, false to 0
+        VmData::Char(value) => value as i64, // Convert char to its ASCII value
+        VmData::String(v) => {
+            if let Heap::String(str) = state.deref(v) {
+                if let Ok(parsed) = str.parse::<i64>() {
+                    parsed
+                } else {
+                    state.stack.push(VmData::None);
+                    return Ok(());
+                }
+            } else {
+                state.stack.push(VmData::None);
+                return Ok(());
+            }
+        }
+        _ => {
+            state.stack.push(VmData::None);
+            return Ok(());
+        }
+    };
+    state.stack.push(VmData::Int(int));
+    Ok(())
+}
