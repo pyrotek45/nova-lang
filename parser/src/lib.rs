@@ -206,8 +206,8 @@ impl Parser {
                         // If the types are not equal, return an error
                         if mapped_type != t2 {
                             return Err(NovaError::TypeMismatch {
-                                expected: t1.clone(),
-                                found: t2.clone(),
+                                expected: t2.clone(),
+                                found: mapped_type.clone(),
                                 position: pos.clone(),
                             });
                         }
@@ -917,24 +917,27 @@ impl Parser {
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
             if let Some(fields) = self.environment.custom_types.get(&type_name) {
-                let new_fields = if let Some(x) = self.environment.generic_type_struct.get(&type_name) {
-                    let TType::Custom { type_params, .. } = lhs.get_type()
-                    else { panic!("not a custom type") };
-                    fields.iter()
-                        .map(|(name, ttype)| {
-                            let mut new_ttype = ttype.clone();
-                            if let TType::Generic { name: n } = ttype {
-                                if let Some(index) = x.iter().position(|x| x == n) {
-                                    new_ttype = type_params[index].clone();
+                let new_fields =
+                    if let Some(x) = self.environment.generic_type_struct.get(&type_name) {
+                        let TType::Custom { type_params, .. } = lhs.get_type() else {
+                            panic!("not a custom type")
+                        };
+                        fields
+                            .iter()
+                            .map(|(name, ttype)| {
+                                let mut new_ttype = ttype.clone();
+                                if let TType::Generic { name: n } = ttype {
+                                    if let Some(index) = x.iter().position(|x| x == n) {
+                                        new_ttype = type_params[index].clone();
+                                    }
                                 }
-                            }
-                            (name.clone(), new_ttype)
-                        })
-                        .collect::<Vec<(String, TType)>>()
-                } else {
-                    fields.clone()
-                };
-    
+                                (name.clone(), new_ttype)
+                            })
+                            .collect::<Vec<(String, TType)>>()
+                    } else {
+                        fields.clone()
+                    };
+
                 if let Some((index, field_type)) = self.find_field(&identifier, &new_fields) {
                     lhs = Expr::Field {
                         ttype: field_type.clone(),
@@ -2384,7 +2387,8 @@ impl Parser {
                         }
                         self.consume_symbol(')')?;
                     }
-                    if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier) {
+                    if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier)
+                    {
                         if generic_len.len() != type_annotation.iter().count() {
                             return Err(self.generate_error_with_pos(
                                 format!("Expected {} type parameters", generic_len.len()),
@@ -2393,7 +2397,6 @@ impl Parser {
                             ));
                         }
                     }
-
 
                     Ok(TType::Custom {
                         name: identifier,
