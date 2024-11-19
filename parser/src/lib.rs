@@ -267,16 +267,18 @@ impl Parser {
                         });
                     }
                 }
-                (TType::Custom { name: custom1 }, TType::Custom { name: custom2 }) => {
-                    //self.check_and_map_types(&gen1, &gen2, type_map, pos.clone())?;
+                (
+                    TType::Custom {
+                        name: custom1,
+                        type_params: gen1,
+                    },
+                    TType::Custom {
+                        name: custom2,
+                        type_params: gen2,
+                    },
+                ) => {
                     if custom1 == custom2 {
-                        continue;
-                    }
-
-                    if let Some(subtype) = self.environment.generic_type_map.get(custom2) {
-                        if subtype == custom1 {
-                            continue;
-                        }
+                        self.check_and_map_types(&gen1, &gen2, type_map, pos.clone())?;
                     } else {
                         return Err(NovaError::TypeMismatch {
                             expected: t1.clone(),
@@ -338,6 +340,18 @@ impl Parser {
                 Ok(TType::Function {
                     parameters: mapped_args,
                     return_type: Box::new(mapped_return_type),
+                })
+            }
+            TType::Custom { name, type_params } => {
+                let mut mapped_type_params = Vec::new();
+                for param in type_params {
+                    let mapped_param = self.get_output(param, type_map)?;
+                    mapped_type_params.push(mapped_param);
+                }
+
+                Ok(TType::Custom {
+                    name,
+                    type_params: mapped_type_params,
                 })
             }
             _ => Ok(output.clone()),
@@ -903,7 +917,25 @@ impl Parser {
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
             if let Some(fields) = self.environment.custom_types.get(&type_name) {
-                if let Some((index, field_type)) = self.find_field(&identifier, fields) {
+                let new_fields = if let Some(x) = self.environment.generic_type_struct.get(&type_name) {
+                    let TType::Custom { type_params, .. } = lhs.get_type()
+                    else { panic!("not a custom type") };
+                    fields.iter()
+                        .map(|(name, ttype)| {
+                            let mut new_ttype = ttype.clone();
+                            if let TType::Generic { name: n } = ttype {
+                                if let Some(index) = x.iter().position(|x| x == n) {
+                                    new_ttype = type_params[index].clone();
+                                }
+                            }
+                            (name.clone(), new_ttype)
+                        })
+                        .collect::<Vec<(String, TType)>>()
+                } else {
+                    fields.clone()
+                };
+    
+                if let Some((index, field_type)) = self.find_field(&identifier, &new_fields) {
                     lhs = Expr::Field {
                         ttype: field_type.clone(),
                         name: type_name.clone(),
@@ -912,10 +944,15 @@ impl Parser {
                         position: pos.clone(),
                     };
                 } else {
-                    return self.generate_field_not_found_error(&identifier, &type_name, fields);
+                    return self.generate_field_not_found_error(
+                        &identifier,
+                        &type_name,
+                        fields,
+                        pos,
+                    );
                 }
             } else {
-                return self.generate_field_not_found_error(&identifier, &type_name, &[]);
+                return self.generate_field_not_found_error(&identifier, &type_name, &[], pos);
             }
         }
         Ok(lhs)
@@ -943,15 +980,17 @@ impl Parser {
         identifier: &str,
         type_name: &str,
         fields: &[(String, TType)],
+        pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         let mut lexicon = Lexicon::new();
         for (field_name, _) in fields.iter() {
             lexicon.insert(field_name);
         }
         let corrections = lexicon.corrections_for(identifier);
-        Err(self.generate_error(
+        Err(self.generate_error_with_pos(
             format!("No field '{}' found for {}", identifier, type_name),
             format!("cannot retrieve field\nDid you mean? {:?}", corrections),
+            pos,
         ))
     }
 
@@ -2332,8 +2371,34 @@ impl Parser {
             Token::Identifier { .. } => {
                 let (identifier, pos) = self.get_identifier()?;
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
-                    // add generic support in type definition
-                    Ok(TType::Custom { name: identifier })
+                    let mut type_annotation = vec![];
+                    if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+                        self.consume_symbol('(')?;
+
+                        let ta = self.ttype()?;
+                        type_annotation.push(ta);
+                        while self.current_token().is_symbol(',') {
+                            self.advance();
+                            let ta = self.ttype()?;
+                            type_annotation.push(ta);
+                        }
+                        self.consume_symbol(')')?;
+                    }
+                    if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier) {
+                        if generic_len.len() != type_annotation.iter().count() {
+                            return Err(self.generate_error_with_pos(
+                                format!("Expected {} type parameters", generic_len.len()),
+                                format!("Got {} type parameters", type_annotation.iter().count()),
+                                pos,
+                            ));
+                        }
+                    }
+
+
+                    Ok(TType::Custom {
+                        name: identifier,
+                        type_params: type_annotation,
+                    })
                 } else {
                     return Err(self.generate_error_with_pos(
                         "Expected type annotation".to_string(),
@@ -2570,14 +2635,8 @@ impl Parser {
                 TType::Option { inner: option } => {
                     contracts.extend(self.collect_generics(&[*option.clone()]))
                 }
-                TType::Custom { name: _custom } => {
-                    // find custom type and import any generic type variables it has.
-                    // if let Some(dict) = self.environment.custom_types.get(custom) {
-                    //     dbg!(custom,dict);
-                    //     for t in dict.iter() {
-                    //         contracts.extend(self.collect_type_contracts(&[t.1.clone()]));
-                    //     }
-                    // }
+                TType::Custom { name, type_params } => {
+                    contracts.extend(self.collect_generics(&type_params.clone()))
                 }
                 _ => {}
             }
@@ -2647,6 +2706,25 @@ impl Parser {
                         parameters: type_parameters,
                         return_type: Box::new(TType::Custom {
                             name: struct_name.clone(),
+                            type_params: vec![],
+                        }),
+                    },
+                    Some(position.clone()),
+                    SymbolKind::Constructor,
+                );
+            } else {
+                let genericmap = generic_field_names
+                    .iter()
+                    .map(|x| TType::Generic { name: x.clone() })
+                    .collect::<Vec<TType>>();
+
+                self.environment.insert_symbol(
+                    &struct_name,
+                    TType::Function {
+                        parameters: type_parameters,
+                        return_type: Box::new(TType::Custom {
+                            name: struct_name.clone(),
+                            type_params: genericmap,
                         }),
                     },
                     Some(position.clone()),
@@ -2667,6 +2745,7 @@ impl Parser {
         Ok(Some(Statement::Struct {
             ttype: TType::Custom {
                 name: struct_name.clone(),
+                type_params: vec![],
             },
             identifier: struct_name,
             fields: field_definitions,
@@ -2946,8 +3025,8 @@ impl Parser {
                     }
                     return self.is_generic(&vec![*inner.clone()]);
                 }
-                TType::Custom { name } => {
-                    if self.environment.generic_type_struct.contains_key(name) {
+                TType::Custom { type_params, .. } => {
+                    if self.is_generic(&type_params.clone()) {
                         return true;
                     }
                 }
@@ -3152,8 +3231,8 @@ impl Parser {
                 Statement::Pass => Ok(true),
                 Statement::Return { ttype, .. } => {
                     self.check_and_map_types(
-                        &vec![ttype.clone()],
                         &vec![return_type.clone()],
+                        &vec![ttype.clone()],
                         &mut HashMap::default(),
                         pos.clone(),
                     )?;

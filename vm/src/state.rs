@@ -161,9 +161,10 @@ impl State {
         if self.gclock {
             return;
         }
+
         // only run when out of free space and over threshold
         if self.threshold <= self.heap.len() {
-            self.threshold = ((self.heap.len() as f64) * 1.1) as usize;
+            self.threshold = self.heap.len() * 11 / 10;
             //dbg!(&self.threshold);
         } else {
             return;

@@ -11,6 +11,7 @@ pub enum TType {
     Auto,
     Custom {
         name: String,
+        type_params: Vec<TType>,
     },
     List {
         inner: Box<TType>,
@@ -45,7 +46,10 @@ impl TType {
 
     pub fn custom_to_string(&self) -> Option<String> {
         match self {
-            TType::Custom { name } | TType::Generic { name } => Some(name.clone()),
+            TType::Custom {
+                name, type_params, ..
+            } => Some(name.to_string()),
+            TType::Generic { name, .. } => Some(name.clone()),
             TType::Function { return_type, .. } => return_type.custom_to_string(),
             _ => None,
         }
@@ -63,7 +67,13 @@ impl TType {
             TType::Auto => "Auto".to_string(),
             TType::Char => "Char".to_string(),
             TType::None => "".to_string(),
-            TType::Custom { name } => name.clone(),
+            TType::Custom {
+                name, type_params, ..
+            } => {
+                let type_strings: Vec<String> = type_params.iter().map(TType::to_string).collect();
+                let types_concatenated = type_strings.join(",");
+                format!("{}({})", name, types_concatenated)
+            }
             TType::Generic { name } => format!("${}", name),
             TType::List { inner } => format!("[{}]", inner.to_string()),
             TType::Option { inner } => format!("?{}", inner.to_string()),
