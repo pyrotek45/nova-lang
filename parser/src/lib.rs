@@ -909,6 +909,61 @@ impl Parser {
         }
     }
 
+
+    fn replace_generic_types(&self, ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
+        match ttype {
+            TType::Generic { name: n } => {
+                if let Some(index) = x.iter().position(|x| x == n) {
+                    type_params[index].clone()
+                } else {
+                    ttype.clone()
+                }
+            }
+            TType::None | TType::Any | TType::Int | TType::Float | TType::Bool | TType::String | TType::Char | TType::Void | TType::Auto => {
+                ttype.clone()
+            }
+            TType::Custom { name, type_params: inner_params } => {
+                let new_params = inner_params
+                    .iter()
+                    .map(|param| self.replace_generic_types(param, x, type_params))
+                    .collect();
+                TType::Custom {
+                    name: name.clone(),
+                    type_params: new_params,
+                }
+            }
+            TType::List { inner } => {
+                TType::List {
+                    inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+                }
+            }
+            TType::Function { parameters, return_type } => {
+                let new_params = parameters
+                    .iter()
+                    .map(|param| self.replace_generic_types(param, x, type_params))
+                    .collect();
+                TType::Function {
+                    parameters: new_params,
+                    return_type: Box::new(self.replace_generic_types(return_type, x, type_params)),
+                }
+            }
+            TType::Option { inner } => {
+                TType::Option {
+                    inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+                }
+            }
+            TType::Tuple { elements } => {
+                let new_elements = elements
+                    .iter()
+                    .map(|element| self.replace_generic_types(element, x, type_params))
+                    .collect();
+                TType::Tuple {
+                    elements: new_elements,
+                }
+            }
+        }
+    }
+
     fn field(
         &mut self,
         identifier: String,
@@ -922,18 +977,14 @@ impl Parser {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
                             panic!("not a custom type")
                         };
+                        dbg!(&fields);
                         fields
-                            .iter()
-                            .map(|(name, ttype)| {
-                                let mut new_ttype = ttype.clone();
-                                if let TType::Generic { name: n } = ttype {
-                                    if let Some(index) = x.iter().position(|x| x == n) {
-                                        new_ttype = type_params[index].clone();
-                                    }
-                                }
-                                (name.clone(), new_ttype)
-                            })
-                            .collect::<Vec<(String, TType)>>()
+                        .iter()
+                        .map(|(name, ttype)| {
+                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                            (name.clone(), new_ttype)
+                        })
+                        .collect::<Vec<(String, TType)>>()
                     } else {
                         fields.clone()
                     };
