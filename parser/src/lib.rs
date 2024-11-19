@@ -218,12 +218,21 @@ impl Parser {
                 }
 
                 (TType::List { inner: inner1 }, TType::List { inner: inner2 }) => {
-                    self.check_and_map_types(
+                    match self.check_and_map_types(
                         &[*inner1.clone()],
                         &[*inner2.clone()],
                         type_map,
                         pos.clone(),
-                    )?;
+                    ) {
+                        Ok(_) => continue,
+                        Err(_) => {
+                            return Err(NovaError::TypeMismatch {
+                                expected: t1.clone(),
+                                found: t2.clone(),
+                                position: pos.clone(),
+                            });
+                        }
+                    }
                 }
                 (TType::Option { inner: inner1 }, TType::Option { inner: inner2 }) => {
                     self.check_and_map_types(
@@ -278,7 +287,16 @@ impl Parser {
                     },
                 ) => {
                     if custom1 == custom2 {
-                        self.check_and_map_types(&gen1, &gen2, type_map, pos.clone())?;
+                        match self.check_and_map_types(&gen1, &gen2, type_map, pos.clone()) {
+                            Ok(_) => continue,
+                            Err(_) => {
+                                return Err(NovaError::TypeMismatch {
+                                    expected: t1.clone(),
+                                    found: t2.clone(),
+                                    position: pos.clone(),
+                                });
+                            }
+                        }
                     } else {
                         return Err(NovaError::TypeMismatch {
                             expected: t1.clone(),
@@ -909,7 +927,6 @@ impl Parser {
         }
     }
 
-
     fn replace_generic_types(&self, ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
         match ttype {
             TType::Generic { name: n } => {
@@ -919,10 +936,19 @@ impl Parser {
                     ttype.clone()
                 }
             }
-            TType::None | TType::Any | TType::Int | TType::Float | TType::Bool | TType::String | TType::Char | TType::Void | TType::Auto => {
-                ttype.clone()
-            }
-            TType::Custom { name, type_params: inner_params } => {
+            TType::None
+            | TType::Any
+            | TType::Int
+            | TType::Float
+            | TType::Bool
+            | TType::String
+            | TType::Char
+            | TType::Void
+            | TType::Auto => ttype.clone(),
+            TType::Custom {
+                name,
+                type_params: inner_params,
+            } => {
                 let new_params = inner_params
                     .iter()
                     .map(|param| self.replace_generic_types(param, x, type_params))
@@ -932,12 +958,13 @@ impl Parser {
                     type_params: new_params,
                 }
             }
-            TType::List { inner } => {
-                TType::List {
-                    inner: Box::new(self.replace_generic_types(inner, x, type_params)),
-                }
-            }
-            TType::Function { parameters, return_type } => {
+            TType::List { inner } => TType::List {
+                inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+            },
+            TType::Function {
+                parameters,
+                return_type,
+            } => {
                 let new_params = parameters
                     .iter()
                     .map(|param| self.replace_generic_types(param, x, type_params))
@@ -947,11 +974,9 @@ impl Parser {
                     return_type: Box::new(self.replace_generic_types(return_type, x, type_params)),
                 }
             }
-            TType::Option { inner } => {
-                TType::Option {
-                    inner: Box::new(self.replace_generic_types(inner, x, type_params)),
-                }
-            }
+            TType::Option { inner } => TType::Option {
+                inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+            },
             TType::Tuple { elements } => {
                 let new_elements = elements
                     .iter()
@@ -977,18 +1002,18 @@ impl Parser {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
                             panic!("not a custom type")
                         };
-                        dbg!(&fields);
+                        //dbg!(&fields);
                         fields
-                        .iter()
-                        .map(|(name, ttype)| {
-                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
-                            (name.clone(), new_ttype)
-                        })
-                        .collect::<Vec<(String, TType)>>()
+                            .iter()
+                            .map(|(name, ttype)| {
+                                let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                                (name.clone(), new_ttype)
+                            })
+                            .collect::<Vec<(String, TType)>>()
                     } else {
                         fields.clone()
                     };
-
+                //dbg!(&new_fields);
                 if let Some((index, field_type)) = self.find_field(&identifier, &new_fields) {
                     lhs = Expr::Field {
                         ttype: field_type.clone(),
@@ -1641,12 +1666,24 @@ impl Parser {
                     captures: captured,
                 };
             }
-            Token::Symbol { symbol: '|', .. } => {
+            Token::Symbol { symbol: '|', .. }
+            | Token::Operator {
+                operator: Operator::Or,
+                ..
+            } => {
                 let pos = self.get_current_token_position();
                 // get parameters
-                self.consume_symbol('|')?;
-                let parameters = self.parameter_list()?;
-                self.consume_symbol('|')?;
+                let parameters = match self.consume_symbol('|') {
+                    Ok(_) => {
+                        let p = self.parameter_list()?;
+                        self.consume_symbol('|')?;
+                        p
+                    }
+                    Err(_) => {
+                        self.consume_operator(Operator::Or)?;
+                        vec![]
+                    }
+                };
 
                 // retrieve types for input
                 let mut typeinput = vec![];
@@ -2689,7 +2726,7 @@ impl Parser {
                 TType::Option { inner: option } => {
                     contracts.extend(self.collect_generics(&[*option.clone()]))
                 }
-                TType::Custom { name, type_params } => {
+                TType::Custom { type_params, .. } => {
                     contracts.extend(self.collect_generics(&type_params.clone()))
                 }
                 _ => {}
@@ -3015,6 +3052,7 @@ impl Parser {
         }
         // make sure symbol doesnt already exist
         if self.environment.has(&identifier) {
+            dbg!(&self.environment);
             return Err(self.generate_error_with_pos(
                 format!("Symbol '{}' is already instantiated", identifier),
                 "Cannot reinstantiate the same symbol in the same scope".to_string(),
@@ -3284,13 +3322,15 @@ impl Parser {
             .try_fold(false, |has_return, statement| match statement {
                 Statement::Pass => Ok(true),
                 Statement::Return { ttype, .. } => {
-                    self.check_and_map_types(
-                        &vec![return_type.clone()],
-                        &vec![ttype.clone()],
-                        &mut HashMap::default(),
-                        pos.clone(),
-                    )?;
-                    Ok(true)
+                    if ttype != &return_type {
+                        Err(self.generate_error_with_pos(
+                            "Return type does not match function return type".to_string(),
+                            format!("Expected {:?} got {:?}", return_type, ttype),
+                            pos.clone(),
+                        ))
+                    } else {
+                        Ok(true)
+                    }
                 }
                 Statement::If {
                     body, alternative, ..

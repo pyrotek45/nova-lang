@@ -46,9 +46,7 @@ impl TType {
 
     pub fn custom_to_string(&self) -> Option<String> {
         match self {
-            TType::Custom {
-                name, type_params, ..
-            } => Some(name.to_string()),
+            TType::Custom { name, .. } => Some(name.to_string()),
             TType::Generic { name, .. } => Some(name.clone()),
             TType::Function { return_type, .. } => return_type.custom_to_string(),
             _ => None,
