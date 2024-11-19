@@ -30,6 +30,7 @@ pub struct Parser {
 
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_environment();
+
     env.insert_symbol(
         "exit",
         TType::Function {
@@ -461,39 +462,19 @@ impl Parser {
     fn tuple_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
         self.consume_symbol('(')?;
+
         if !self.current_token().is_symbol(')') {
-            let pos = self.get_current_token_position();
-            let e = self.expr()?;
-            if e.get_type() != TType::Void {
-                exprs.push(e);
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("cannot insert a void expression"),
-                    format!("tuple expressions must not be void"),
-                    pos,
-                ));
-            }
+            self.process_expression(&mut exprs)?;
         }
+
         while self.current_token().is_symbol(',') {
-            if self.current_token().is_symbol(')') {
-                break;
-            }
             self.advance();
-            let pos = self.get_current_token_position();
             if self.current_token().is_symbol(')') {
                 break;
             }
-            let e = self.expr()?;
-            if e.get_type() != TType::Void {
-                exprs.push(e);
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("cannot insert a void expression"),
-                    format!("tuple expressions must not be void"),
-                    pos,
-                ));
-            }
+            self.process_expression(&mut exprs)?;
         }
+
         self.consume_symbol(')')?;
         Ok(exprs)
     }
@@ -501,41 +482,36 @@ impl Parser {
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
         self.consume_symbol('[')?;
+
         if !self.current_token().is_symbol(']') {
-            let pos = self.get_current_token_position();
-            let e = self.expr()?;
-            if e.get_type() != TType::Void {
-                exprs.push(e);
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("cannot insert a void expression"),
-                    format!("List expressions must not be void"),
-                    pos,
-                ));
-            }
+            self.process_expression(&mut exprs)?;
         }
+
         while self.current_token().is_symbol(',') {
-            if self.current_token().is_symbol(']') {
-                break;
-            }
             self.advance();
-            let pos = self.get_current_token_position();
             if self.current_token().is_symbol(']') {
                 break;
             }
-            let e = self.expr()?;
-            if e.get_type() != TType::Void {
-                exprs.push(e);
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("cannot insert a void expression"),
-                    format!("List expressions must not be void"),
-                    pos,
-                ));
-            }
+            self.process_expression(&mut exprs)?;
         }
+
         self.consume_symbol(']')?;
         Ok(exprs)
+    }
+
+    fn process_expression(&mut self, exprs: &mut Vec<Expr>) -> Result<(), NovaError> {
+        let pos = self.get_current_token_position();
+        let e = self.expr()?;
+        if e.get_type() != TType::Void {
+            exprs.push(e);
+            Ok(())
+        } else {
+            Err(self.generate_error_with_pos(
+                format!("cannot insert a void expression"),
+                format!("expressions must not be void"),
+                pos,
+            ))
+        }
     }
 
     fn argument_list(&mut self) -> Result<Vec<Expr>, NovaError> {
@@ -561,80 +537,70 @@ impl Parser {
         fields: Vec<(String, TType)>,
         conpos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
-        let mut exprs: HashMap<String, Expr> = HashMap::default();
-
+        let mut field_exprs: HashMap<String, Expr> = HashMap::default();
         self.consume_symbol('{')?;
-
-        let (id, pos) = self.get_identifier()?;
-        self.consume_operator(Operator::Colon)?;
-        exprs.insert(id.clone(), self.expr()?);
-
+        self.parse_field(&mut field_exprs)?;
         while self.current_token().is_symbol(',') {
             self.advance();
             if self.current_token().is_symbol('}') {
                 break;
             }
-
-            if self.current_token().is_symbol('}') {
-                break;
-            }
-            let (id, _) = self.get_identifier()?;
-            self.consume_operator(Operator::Colon)?;
-            exprs.insert(id.clone(), self.expr()?);
-            if self.current_token().is_symbol('}') {
-                break;
-            }
+            self.parse_field(&mut field_exprs)?;
         }
-
         self.consume_symbol('}')?;
+        self.validate_fields(constructor, &fields, conpos, &field_exprs)
+    }
 
-        let mut new_exprs = vec![];
+    fn parse_field(&mut self, field_exprs: &mut HashMap<String, Expr>) -> Result<(), NovaError> {
+        let (id, _) = self.get_identifier()?;
+        self.consume_operator(Operator::Colon)?;
+        field_exprs.insert(id.clone(), self.expr()?);
+        Ok(())
+    }
 
-        for (fieldname, fieldtype) in fields.iter() {
-            if fieldname == "type" {
+    fn validate_fields(
+        &mut self,
+        constructor: &str,
+        fields: &[(String, TType)],
+        conpos: FilePosition,
+        field_exprs: &HashMap<String, Expr>,
+    ) -> Result<Vec<Expr>, NovaError> {
+        let mut validated_exprs = vec![];
+        for (field_name, field_type) in fields.iter() {
+            if field_name == "type" {
                 continue;
             }
-            if let Some(innerexpr) = exprs.get(fieldname) {
+            if let Some(expr) = field_exprs.get(field_name) {
                 self.check_and_map_types(
-                    &vec![fieldtype.clone()],
-                    &vec![innerexpr.get_type()],
+                    &vec![field_type.clone()],
+                    &vec![expr.get_type()],
                     &mut HashMap::default(),
-                    pos.clone(),
+                    conpos.clone(),
                 )?;
-                new_exprs.push(innerexpr.clone())
+                validated_exprs.push(expr.clone());
             } else {
                 return Err(NovaError::Parsing {
-                    msg: format!("{} is missing field {} ", constructor, fieldname.clone()),
-                    note: format!(""),
-                    position: FilePosition {
-                        line: conpos.line,
-                        row: conpos.row,
-                        filepath: self.filepath.clone(),
-                    },
+                    msg: format!("{} is missing field {}", constructor, field_name),
+                    note: String::new(),
+                    position: conpos.clone(),
                     extra: None,
                 });
             }
         }
-
-        if exprs.len() != fields.len() - 1 {
+        if field_exprs.len() != fields.len() - 1 {
             return Err(NovaError::Parsing {
                 msg: format!(
-                    "{} has {} fields, you have {} ",
+                    "{} has {} fields, you have {}",
                     constructor,
                     fields.len() - 1,
-                    exprs.len()
+                    field_exprs.len()
                 ),
-                note: format!(""),
-                position: FilePosition {
-                    line: conpos.line,
-                    row: conpos.row,
-                    filepath: self.filepath.clone(),
-                },
+                note: String::new(),
+                position: conpos.clone(),
                 extra: None,
             });
         }
-
-        if new_exprs.len() != fields.len() - 1 {
+        if validated_exprs.len() != fields.len() - 1 {
             return Err(NovaError::Parsing {
                 msg: format!(
                     "{} has {} fields, not all of them are covered",
@@ -646,8 +612,7 @@ impl Parser {
                 extra: None,
             });
         }
-
-        Ok(new_exprs)
+        Ok(validated_exprs)
     }
 
     fn method(
@@ -666,177 +631,133 @@ impl Parser {
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
 
-        if let Some((
-            TType::Function {
-                parameters,
-                mut return_type,
-            },
-            mut function_id,
-            function_kind,
-        )) = self
+        if let Some((function_type, function_id, function_kind)) = self
             .environment
             .get_function_type(&identifier, &argument_types)
         {
-            match function_kind {
-                SymbolKind::GenericFunction => {
-                    let mut type_map = self.check_and_map_types(
-                        &parameters,
-                        &argument_types,
-                        &mut HashMap::default(),
-                        pos.clone(),
-                    )?;
-                    for (l, r) in parameters.iter().zip(argument_types.iter()) {
-                        if let (TType::Custom { name: lc, .. }, TType::Custom { name: rc, .. }) =
-                            (l, r)
-                        {
-                            if let Some(ic) = self.environment.generic_type_map.get(rc) {
-                                if lc == ic {
-                                    if let Some(list) = self.environment.get_type(&lc) {
-                                        let mut s = self.clone();
-                                        if let Some(outerlist) = s.environment.get_type(&rc) {
-                                            type_map = self.check_and_map_types(
-                                                &[list],
-                                                &[outerlist],
-                                                &mut type_map,
-                                                pos.clone(),
-                                            )?;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    return Ok(Expr::Literal {
-                        ttype: *return_type.clone(),
-                        value: Atom::Call {
-                            name: function_id,
-                            arguments,
-                        },
-                    });
-                }
-                SymbolKind::Constructor
-                | SymbolKind::Variable
-                | SymbolKind::Parameter
-                | SymbolKind::Function => {
-                    let mut type_map = self.check_and_map_types(
-                        &parameters,
-                        &argument_types,
-                        &mut HashMap::default(),
-                        pos,
-                    )?;
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
-                        function_id = subtype.clone();
-                    }
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    return Ok(Expr::Literal {
-                        ttype: *return_type.clone(),
-                        value: Atom::Call {
-                            name: function_id,
-                            arguments,
-                        },
-                    });
-                }
-            }
-        } else {
-            if let Some((
-                TType::Function {
-                    parameters,
-                    mut return_type,
-                },
-                mut function_id,
+            self.handle_function_call(
+                function_type,
+                function_id,
                 function_kind,
-            )) = self.environment.get_type_capture(&identifier)
+                arguments,
+                argument_types,
+                pos,
+            )
+        } else if let Some((function_type, function_id, function_kind)) =
+            self.environment.get_type_capture(&identifier)
+        {
+            let pos = self.get_current_token_position();
+            self.environment.captured.last_mut().unwrap().insert(
+                identifier.clone(),
+                Symbol {
+                    id: identifier.clone(),
+                    ttype: function_type.clone(),
+                    pos: Some(pos.clone()),
+                    kind: SymbolKind::Parameter,
+                },
+            );
+            self.handle_function_call(
+                function_type,
+                function_id,
+                function_kind,
+                arguments,
+                argument_types,
+                pos,
+            )
+        } else {
+            Err(self.generate_error_with_pos(
+                format!("E1 Not a valid call: {}", identifier),
+                format!(
+                    "No function signature '{}' with {:?} as arguments",
+                    identifier, argument_types
+                ),
+                pos,
+            ))
+        }
+    }
+
+    fn handle_function_call(
+        &mut self,
+        function_type: TType,
+        mut function_id: String,
+        function_kind: SymbolKind,
+        arguments: Vec<Expr>,
+        argument_types: Vec<TType>,
+        pos: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        let (parameters, mut return_type) = match function_type {
+            TType::Function {
+                parameters,
+                return_type,
+            } => (parameters, return_type),
+            _ => {
+                return Err(self.generate_error_with_pos(
+                    format!("E2 Not a valid function type: {:?}", function_type),
+                    String::new(),
+                    pos,
+                ))
+            }
+        };
+
+        let mut type_map = self.check_and_map_types(
+            &parameters,
+            &argument_types,
+            &mut HashMap::default(),
+            pos.clone(),
+        )?;
+
+        if let SymbolKind::GenericFunction = function_kind {
+            self.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
+        }
+
+        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
+
+        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+            function_id = subtype.clone();
+        }
+
+        return Ok(Expr::Literal {
+            ttype: *return_type.clone(),
+            value: Atom::Call {
+                name: function_id,
+                arguments,
+            },
+        });
+    }
+
+    fn map_generic_types(
+        &mut self,
+        parameters: &[TType],
+        argument_types: &[TType],
+        type_map: &mut HashMap<String, TType>,
+        pos: FilePosition,
+    ) -> Result<(), NovaError> {
+        for (param_type, arg_type) in parameters.iter().zip(argument_types.iter()) {
+            if let (
+                TType::Custom {
+                    name: param_name, ..
+                },
+                TType::Custom { name: arg_name, .. },
+            ) = (param_type, arg_type)
             {
-                let pos = self.get_current_token_position();
-                self.environment.captured.last_mut().unwrap().insert(
-                    identifier.clone(),
-                    Symbol {
-                        id: identifier.clone(),
-                        ttype: TType::Function {
-                            parameters: parameters.clone(),
-                            return_type: return_type.clone(),
-                        },
-                        pos: Some(pos.clone()),
-                        kind: SymbolKind::Parameter,
-                    },
-                );
-                match function_kind {
-                    SymbolKind::GenericFunction => {
-                        let mut type_map = self.check_and_map_types(
-                            &parameters,
-                            &argument_types,
-                            &mut HashMap::default(),
-                            pos.clone(),
-                        )?;
-                        for (l, r) in parameters.iter().zip(argument_types.iter()) {
-                            if let (
-                                TType::Custom { name: lc, .. },
-                                TType::Custom { name: rc, .. },
-                            ) = (l, r)
-                            {
-                                if let Some(ic) = self.environment.generic_type_map.get(rc) {
-                                    if lc == ic {
-                                        if let Some(list) = self.environment.get_type(&lc) {
-                                            let mut s = self.clone();
-                                            if let Some(outerlist) = s.environment.get_type(&rc) {
-                                                type_map = self.check_and_map_types(
-                                                    &[list],
-                                                    &[outerlist],
-                                                    &mut type_map,
-                                                    pos.clone(),
-                                                )?;
-                                            }
-                                        }
-                                    }
-                                }
+                if let Some(internal_type) = self.environment.generic_type_map.get(arg_name) {
+                    if param_name == internal_type {
+                        if let Some(param_list) = self.environment.get_type(param_name) {
+                            let mut s = self.clone();
+                            if let Some(arg_list) = s.environment.get_type(arg_name) {
+                                *type_map = self.check_and_map_types(
+                                    &[param_list],
+                                    &[arg_list],
+                                    type_map,
+                                    pos.clone(),
+                                )?;
                             }
                         }
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        return Ok(Expr::Literal {
-                            ttype: *return_type.clone(),
-                            value: Atom::Call {
-                                name: function_id,
-                                arguments,
-                            },
-                        });
-                    }
-                    SymbolKind::Constructor
-                    | SymbolKind::Variable
-                    | SymbolKind::Parameter
-                    | SymbolKind::Function => {
-                        let mut type_map = self.check_and_map_types(
-                            &parameters,
-                            &argument_types,
-                            &mut HashMap::default(),
-                            pos,
-                        )?;
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
-                            function_id = subtype.clone();
-                        }
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        return Ok(Expr::Literal {
-                            ttype: *return_type.clone(),
-                            value: Atom::Call {
-                                name: function_id,
-                                arguments,
-                            },
-                        });
                     }
                 }
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("E1 Not a valid call: {}", identifier),
-                    format!(
-                        "No function signature '{}' with {:?} as arguments",
-                        identifier, argument_types
-                    ),
-                    pos,
-                ));
             }
         }
+        Ok(())
     }
 
     fn varargs(
@@ -904,200 +825,73 @@ impl Parser {
     }
 
     fn call(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
-        let mut arguments: Vec<Expr>;
-        // constructor
-        if let Some(fields) = self.environment.custom_types.get(&identifier) {
-            if self.current_token().is_symbol('{') {
-                arguments = self.field_list(&identifier, fields.to_vec(), pos.clone())?;
-            } else {
-                arguments = self.argument_list()?;
-            }
-        } else {
-            arguments = self.argument_list()?;
-        }
-
-        // normal function call <func(args)>
-        // get list of types from arguments
+        let mut arguments = self.get_arguments(&identifier, pos.clone())?;
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
-        // if no arguments, push none
         if argument_types.is_empty() {
             argument_types.push(TType::None)
         }
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
-        // check if function exists
 
-        if let Some((
-            TType::Function {
-                parameters,
-                mut return_type,
-            },
-            mut function_id,
-            function_kind,
-        )) = self
+        if let Some((function_type, function_id, function_kind)) = self
             .environment
             .get_function_type(&identifier, &argument_types)
         {
-            match function_kind {
-                SymbolKind::GenericFunction => {
-                    let mut type_map = self.check_and_map_types(
-                        &parameters,
-                        &argument_types,
-                        &mut HashMap::default(),
-                        pos.clone(),
-                    )?;
-                    for (l, r) in parameters.iter().zip(argument_types.iter()) {
-                        if let (TType::Custom { name: lc, .. }, TType::Custom { name: rc, .. }) =
-                            (l, r)
-                        {
-                            if let Some(ic) = self.environment.generic_type_map.get(rc) {
-                                if lc == ic {
-                                    if let Some(list) = self.environment.get_type(&lc) {
-                                        let mut s = self.clone();
-                                        if let Some(outerlist) = s.environment.get_type(&rc) {
-                                            type_map = self.check_and_map_types(
-                                                &[list],
-                                                &[outerlist],
-                                                &mut type_map,
-                                                pos.clone(),
-                                            )?;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    return Ok(Expr::Literal {
-                        ttype: *return_type.clone(),
-                        value: Atom::Call {
-                            name: function_id,
-                            arguments,
-                        },
-                    });
-                }
-                SymbolKind::Constructor
-                | SymbolKind::Variable
-                | SymbolKind::Parameter
-                | SymbolKind::Function => {
-                    let mut type_map = self.check_and_map_types(
-                        &parameters,
-                        &argument_types,
-                        &mut HashMap::default(),
-                        pos,
-                    )?;
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
-                        function_id = subtype.clone();
-                    }
-                    return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                    return Ok(Expr::Literal {
-                        ttype: *return_type.clone(),
-                        value: Atom::Call {
-                            name: function_id,
-                            arguments,
-                        },
-                    });
-                }
+            self.handle_function_call(
+                function_type,
+                function_id,
+                function_kind,
+                arguments,
+                argument_types,
+                pos,
+            )
+        } else if let Some((function_type, function_id, function_kind)) =
+            self.environment.get_type_capture(&identifier)
+        {
+            let pos = self.get_current_token_position();
+            self.environment.captured.last_mut().unwrap().insert(
+                identifier.clone(),
+                Symbol {
+                    id: identifier.clone(),
+                    ttype: function_type.clone(),
+                    pos: Some(pos.clone()),
+                    kind: SymbolKind::Parameter,
+                },
+            );
+            self.handle_function_call(
+                function_type,
+                function_id,
+                function_kind,
+                arguments,
+                argument_types,
+                pos,
+            )
+        } else {
+            Err(self.generate_error_with_pos(
+                format!("E1 Not a valid call: {}", identifier),
+                format!(
+                    "No function signature '{}' with {:?} as arguments",
+                    identifier, argument_types
+                ),
+                pos,
+            ))
+        }
+    }
+
+    fn get_arguments(
+        &mut self,
+        identifier: &str,
+        pos: FilePosition,
+    ) -> Result<Vec<Expr>, NovaError> {
+        if let Some(fields) = self.environment.custom_types.get(identifier) {
+            if self.current_token().is_symbol('{') {
+                self.field_list(identifier, fields.to_vec(), pos)
+            } else {
+                self.argument_list()
             }
         } else {
-            if let Some((
-                TType::Function {
-                    parameters,
-                    mut return_type,
-                },
-                mut function_id,
-                function_kind,
-            )) = self.environment.get_type_capture(&identifier)
-            {
-                let pos = self.get_current_token_position();
-                self.environment.captured.last_mut().unwrap().insert(
-                    identifier.clone(),
-                    Symbol {
-                        id: identifier.clone(),
-                        ttype: TType::Function {
-                            parameters: parameters.clone(),
-                            return_type: return_type.clone(),
-                        },
-                        pos: Some(pos.clone()),
-                        kind: SymbolKind::Parameter,
-                    },
-                );
-                match function_kind {
-                    SymbolKind::GenericFunction => {
-                        let mut type_map = self.check_and_map_types(
-                            &parameters,
-                            &argument_types,
-                            &mut HashMap::default(),
-                            pos.clone(),
-                        )?;
-                        for (l, r) in parameters.iter().zip(argument_types.iter()) {
-                            if let (
-                                TType::Custom { name: lc, .. },
-                                TType::Custom { name: rc, .. },
-                            ) = (l, r)
-                            {
-                                if let Some(ic) = self.environment.generic_type_map.get(rc) {
-                                    if lc == ic {
-                                        if let Some(list) = self.environment.get_type(&lc) {
-                                            let mut s = self.clone();
-                                            if let Some(outerlist) = s.environment.get_type(&rc) {
-                                                type_map = self.check_and_map_types(
-                                                    &[list],
-                                                    &[outerlist],
-                                                    &mut type_map,
-                                                    pos.clone(),
-                                                )?;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        return Ok(Expr::Literal {
-                            ttype: *return_type.clone(),
-                            value: Atom::Call {
-                                name: function_id,
-                                arguments,
-                            },
-                        });
-                    }
-                    SymbolKind::Constructor
-                    | SymbolKind::Variable
-                    | SymbolKind::Parameter
-                    | SymbolKind::Function => {
-                        let mut type_map = self.check_and_map_types(
-                            &parameters,
-                            &argument_types,
-                            &mut HashMap::default(),
-                            pos,
-                        )?;
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
-                            function_id = subtype.clone();
-                        }
-                        return_type = Box::new(self.get_output(*return_type, &mut type_map)?);
-                        return Ok(Expr::Literal {
-                            ttype: *return_type.clone(),
-                            value: Atom::Call {
-                                name: function_id,
-                                arguments,
-                            },
-                        });
-                    }
-                }
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("E1 Not a valid call: {}", identifier),
-                    format!(
-                        "No function signature '{}' with {:?} as arguments",
-                        identifier, argument_types
-                    ),
-                    pos,
-                ));
-            }
+            self.argument_list()
         }
     }
 
@@ -1107,46 +901,58 @@ impl Parser {
         mut lhs: Expr,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
-        if let Some(name) = lhs.get_type().custom_to_string() {
-            if let Some(fields) = self.environment.custom_types.get(&name) {
-                let mut found = false;
-                for (index, (field_name, ttype)) in fields.iter().enumerate() {
-                    if &identifier == field_name {
-                        lhs = Expr::Field {
-                            ttype: ttype.clone(),
-                            name: name.clone(),
-                            index,
-                            expr: Box::new(lhs),
-                            position: pos.clone(),
-                        };
-                        found = true;
-                        break;
-                    }
-                }
-                if !found {
-                    let mut lex = Lexicon::new();
-                    for (i, _) in fields.iter() {
-                        lex.insert(i)
-                    }
-                    let corrections = lex.corrections_for(&identifier);
-                    return Err(self.generate_error(
-                        format!("No field '{}' found for {}", identifier, name),
-                        format!("cannot retrieve field\nDid you mean? {:?}", corrections),
-                    ));
+        if let Some(type_name) = lhs.get_type().custom_to_string() {
+            if let Some(fields) = self.environment.custom_types.get(&type_name) {
+                if let Some((index, field_type)) = self.find_field(&identifier, fields) {
+                    lhs = Expr::Field {
+                        ttype: field_type.clone(),
+                        name: type_name.clone(),
+                        index,
+                        expr: Box::new(lhs),
+                        position: pos.clone(),
+                    };
+                } else {
+                    return self.generate_field_not_found_error(&identifier, &type_name, fields);
                 }
             } else {
-                return Err(self.generate_error(
-                    format!("No field '{}' found for {}", identifier, name),
-                    format!("cannot retrieve field"),
-                ));
+                return self.generate_field_not_found_error(&identifier, &type_name, &[]);
             }
-        } else {
-            return Err(self.generate_error(
-                format!("{:?} has no '{}' field", lhs.get_type(), identifier),
-                format!("cannot retrieve field"),
-            ));
         }
         Ok(lhs)
+    }
+
+    fn find_field<'a>(
+        &self,
+        identifier: &str,
+        fields: &'a [(String, TType)],
+    ) -> Option<(usize, &'a TType)> {
+        fields
+            .iter()
+            .enumerate()
+            .find_map(|(index, (field_name, field_type))| {
+                if field_name == identifier {
+                    Some((index, field_type))
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn generate_field_not_found_error(
+        &self,
+        identifier: &str,
+        type_name: &str,
+        fields: &[(String, TType)],
+    ) -> Result<Expr, NovaError> {
+        let mut lexicon = Lexicon::new();
+        for (field_name, _) in fields.iter() {
+            lexicon.insert(field_name);
+        }
+        let corrections = lexicon.corrections_for(identifier);
+        Err(self.generate_error(
+            format!("No field '{}' found for {}", identifier, type_name),
+            format!("cannot retrieve field\nDid you mean? {:?}", corrections),
+        ))
     }
 
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
@@ -1160,11 +966,11 @@ impl Parser {
                 while self.current_token().is_op(Operator::DoubleColon) {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.get_identifier()?;
-                    if let Some(ctype) = self.environment.get_type(&identifier) {
+                    if let Some(custom_type) = self.environment.get_type(&identifier) {
                         rhs = self.field(
                             field.clone(),
                             Expr::Literal {
-                                ttype: ctype,
+                                ttype: custom_type,
                                 value: Atom::Id {
                                     name: identifier.clone(),
                                 },
@@ -1172,27 +978,7 @@ impl Parser {
                             pos,
                         )?;
                     } else {
-                        let mut lex = Lexicon::new();
-                        self.environment.values.last().iter().for_each(|table| {
-                            table.iter().for_each(|value: (&String, &Symbol)| {
-                                if let Symbol {
-                                    kind: SymbolKind::Variable,
-                                    id: _,
-                                    ttype: _,
-                                    pos: _,
-                                } = value.1
-                                {
-                                    lex.insert(value.0)
-                                }
-                            })
-                        });
-
-                        let corrections = lex.corrections_for(&identifier);
-                        return Err(self.generate_error_with_pos(
-                            format!("'{}' does not exist ", identifier),
-                            format!("cannot retrieve field\nDid you mean? {:?}", corrections),
-                            pos,
-                        ));
+                        return self.generate_identifier_not_found_error(&identifier, pos);
                     }
                 }
                 // function pointer return call <func()(args)>
@@ -1205,18 +991,16 @@ impl Parser {
                 {
                     if arguments.len() != parameters.len() {
                         return Err(self.generate_error_with_pos(
-                            format!("E1 Inccorrect number of arguments"),
+                            format!("Incorrect number of arguments"),
                             format!("Got {:?}, expected {:?}", arguments.len(), parameters.len()),
                             pos,
                         ));
                     }
-                    let mut inputtypes = vec![];
-                    for t in arguments.iter() {
-                        inputtypes.push(t.get_type())
-                    }
-                    let mut map: HashMap<String, TType> = HashMap::default();
-                    map = self.check_and_map_types(&parameters, &inputtypes, &mut map, pos)?;
-                    return_type = Box::new(self.get_output(*return_type.clone(), &mut map)?);
+                    let input_types: Vec<_> = arguments.iter().map(|arg| arg.get_type()).collect();
+                    let mut type_map: HashMap<String, TType> = HashMap::default();
+                    type_map =
+                        self.check_and_map_types(&parameters, &input_types, &mut type_map, pos)?;
+                    return_type = Box::new(self.get_output(*return_type.clone(), &mut type_map)?);
                     lhs = Expr::Call {
                         ttype: *return_type,
                         name: "anon".to_string(),
@@ -1225,8 +1009,8 @@ impl Parser {
                     };
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Cant call {:?}", lhs.get_type()),
-                        format!("not a function"),
+                        format!("Cannot call {:?}", lhs.get_type()),
+                        format!("Not a function"),
                         pos,
                     ));
                 }
@@ -1246,75 +1030,113 @@ impl Parser {
         Ok(lhs)
     }
 
+    fn generate_identifier_not_found_error(
+        &self,
+        identifier: &str,
+        pos: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        let mut lexicon = Lexicon::new();
+        self.environment.values.last().iter().for_each(|table| {
+            table.iter().for_each(|(name, symbol)| {
+                if let Symbol {
+                    kind: SymbolKind::Variable,
+                    ..
+                } = symbol
+                {
+                    lexicon.insert(name);
+                }
+            })
+        });
+
+        let corrections = lexicon.corrections_for(identifier);
+        Err(self.generate_error_with_pos(
+            format!("'{}' does not exist", identifier),
+            format!("Cannot retrieve field\nDid you mean? {:?}", corrections),
+            pos,
+        ))
+    }
+
     fn index(
         &mut self,
         identifier: String,
         mut lhs: Expr,
-        ttype: TType,
+        container_type: TType,
     ) -> Result<Expr, NovaError> {
-        match ttype {
-            TType::List { inner } => {
+        match container_type {
+            TType::List {
+                inner: element_type,
+            } => {
                 self.consume_symbol('[')?;
-                let pos = self.get_current_token_position();
-                let index = self.mid_expr()?;
+                let position = self.get_current_token_position();
+                let index_expr = self.mid_expr()?;
                 self.consume_symbol(']')?;
-                if index.get_type() != TType::Int {
+                if index_expr.get_type() != TType::Int {
                     return Err(self.generate_error_with_pos(
-                        format!("Must index list with an int"),
-                        format!("Cannot index into list with {:?}", index.get_type()),
-                        pos,
+                        format!("Must index List with an int"),
+                        format!(
+                            "Cannot index into {} with {}",
+                            lhs.get_type().to_string(),
+                            index_expr.get_type().to_string()
+                        ),
+                        position,
                     ));
                 }
-                lhs = Expr::Indexed {
-                    ttype: *inner.clone(),
-                    name: identifier.clone(),
-                    index: Box::new(index),
-                    container: Box::new(lhs),
-                    position: self.get_current_token_position(),
-                };
+                lhs = self.create_indexed_expr(
+                    identifier.clone(),
+                    lhs,
+                    *element_type.clone(),
+                    index_expr,
+                    position,
+                )?;
                 if self.current_token().is_symbol('[') {
-                    lhs = self.index(identifier.clone(), lhs, *inner)?;
+                    lhs = self.index(identifier.clone(), lhs, *element_type)?;
                 }
             }
-            TType::Tuple { elements: inner } => {
+            TType::Tuple {
+                elements: tuple_elements,
+            } => {
                 self.consume_symbol('[')?;
-                let pos = self.get_current_token_position();
+                let position = self.get_current_token_position();
                 if let Token::Integer { value: index, .. } = self.current_token() {
                     self.advance();
                     self.consume_symbol(']')?;
-                    if index as usize >= inner.len() {
-                        return Err(self.generate_error_with_pos(
-                            format!("Tuple cannot index into {index}"),
-                            format!("Tuple has {} values", inner.len()),
-                            pos,
-                        ));
+                    if index as usize >= tuple_elements.len() {
+                        return self.generate_tuple_index_error(
+                            index,
+                            tuple_elements.len(),
+                            position,
+                        );
                     }
-                    let ttype = &inner[index as usize];
-                    lhs = Expr::Indexed {
-                        ttype: ttype.clone(),
-                        name: "anon".to_string(),
-                        index: Box::new(Expr::Literal {
+                    let element_type = &tuple_elements[index as usize];
+                    lhs = self.create_indexed_expr(
+                        "anon".to_string(),
+                        lhs,
+                        element_type.clone(),
+                        Expr::Literal {
                             ttype: TType::Int,
                             value: Atom::Integer { value: index },
-                        }),
-                        container: Box::new(lhs),
-                        position: self.get_current_token_position(),
-                    };
+                        },
+                        position,
+                    )?;
                     if self.current_token().is_symbol('[') {
-                        lhs = self.index(identifier.clone(), lhs, ttype.clone())?;
+                        lhs = self.index(identifier.clone(), lhs, element_type.clone())?;
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Must index tuple with an int"),
-                        format!("Cannot index into tuple with {:?}", self.current_token()),
-                        pos,
+                        format!("Must index Tuple with an int"),
+                        format!(
+                            "Cannot index into {} with {:?}",
+                            lhs.get_type().to_string(),
+                            self.current_token()
+                        ),
+                        position,
                     ));
                 }
             }
             _ => {
                 return Err(self.generate_error(
-                    format!("Cannot index into non list"),
-                    format!("Must be of type list"),
+                    format!("Cannot index into non-list or non-tuple"),
+                    format!("Must be of type list or tuple"),
                 ));
             }
         }
@@ -1322,195 +1144,209 @@ impl Parser {
         Ok(lhs)
     }
 
-    fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
+    fn generate_tuple_index_error(
+        &self,
+        index: i64,
+        tuple_size: usize,
+        position: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        Err(self.generate_error_with_pos(
+            format!("Tuple cannot index into {index}"),
+            format!("Tuple has {} values", tuple_size),
+            position,
+        ))
+    }
+
+    fn create_indexed_expr(
+        &self,
+        identifier: String,
+        container: Expr,
+        element_type: TType,
+        index_expr: Expr,
+        position: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        Ok(Expr::Indexed {
+            ttype: element_type,
+            name: identifier,
+            index: Box::new(index_expr),
+            container: Box::new(container),
+            position,
+        })
+    }
+
+    fn anchor(&mut self, identifier: String, position: FilePosition) -> Result<Expr, NovaError> {
         let anchor = match self.current_token() {
             Token::Operator {
                 operator: Operator::RightArrow,
                 ..
             } => {
                 self.consume_operator(Operator::RightArrow)?;
-                let (field, pos) = self.get_identifier()?;
-                if let Some(idtype) = self.environment.get_type(&identifier) {
-                    let mut arguments = vec![Expr::Literal {
-                        ttype: idtype.clone(),
-                        value: Atom::Id {
-                            name: identifier.clone(),
-                        },
-                    }];
-
-                    let left = self.field(
+                let (field, field_position) = self.get_identifier()?;
+                if let Some(identifier_type) = self.environment.get_type(&identifier) {
+                    let mut arguments =
+                        vec![self.create_literal_expr(identifier.clone(), identifier_type.clone())];
+                    let left_expr = self.field(
                         field.clone(),
-                        Expr::Literal {
-                            ttype: idtype,
-                            value: Atom::Id {
-                                name: identifier.clone(),
-                            },
-                        },
-                        pos.clone(),
+                        self.create_literal_expr(identifier.clone(), identifier_type.clone()),
+                        field_position.clone(),
                     )?;
                     arguments.extend(self.argument_list()?);
 
                     if let TType::Function {
                         parameters,
                         mut return_type,
-                    } = left.get_type()
+                    } = left_expr.get_type()
                     {
                         if arguments.len() != parameters.len() {
                             return Err(self.generate_error_with_pos(
-                                format!("E3 Inccorrect number of arguments"),
+                                format!("E3 Incorrect number of arguments"),
                                 format!(
                                     "Got {:?}, expected {:?}",
                                     arguments.len(),
-                                    parameters.len(),
+                                    parameters.len()
                                 ),
-                                pos,
+                                field_position,
                             ));
                         }
-                        let mut inputtypes = vec![];
-                        for t in arguments.iter() {
-                            inputtypes.push(t.get_type())
-                        }
-                        let mut map: HashMap<String, TType> = HashMap::default();
-                        map = self.check_and_map_types(
+                        let input_types: Vec<TType> =
+                            arguments.iter().map(|arg| arg.get_type()).collect();
+                        let mut type_map: HashMap<String, TType> = HashMap::default();
+                        type_map = self.check_and_map_types(
                             &parameters,
-                            &inputtypes,
-                            &mut map,
-                            pos.clone(),
+                            &input_types,
+                            &mut type_map,
+                            field_position.clone(),
                         )?;
-                        return_type = Box::new(self.get_output(*return_type.clone(), &mut map)?);
+                        return_type =
+                            Box::new(self.get_output(*return_type.clone(), &mut type_map)?);
                         Expr::Call {
                             ttype: *return_type,
                             name: field.to_string(),
-                            function: Box::new(left),
+                            function: Box::new(left_expr),
                             args: arguments,
                         }
                     } else {
                         return Err(self.generate_error_with_pos(
-                            format!("Cant call {:?}", left.get_type()),
-                            format!("not a function"),
-                            pos,
+                            format!("Cannot call {:?}", left_expr.get_type()),
+                            format!("Not a function"),
+                            field_position,
                         ));
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Cant get {field} from {}", identifier.clone()),
+                        format!("Cannot get {field} from {}", identifier.clone()),
                         format!("{} is not defined", identifier),
-                        pos,
+                        field_position,
                     ));
                 }
             }
             Token::Symbol { symbol: '[', .. } => {
-                if let Some(ttype) = self.environment.get_type(&identifier) {
-                    self.index(
-                        identifier.clone(),
-                        Expr::Literal {
-                            ttype: ttype.clone(),
-                            value: Atom::Id {
-                                name: identifier.clone(),
-                            },
-                        },
-                        ttype.clone(),
-                    )?
-                } else {
-                    if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
-                        self.environment.captured.last_mut().unwrap().insert(
-                            identifier.clone(),
-                            Symbol {
-                                id: identifier.clone(),
-                                ttype: ttype.clone(),
-                                pos: Some(pos.clone()),
-                                kind: kind.clone(),
-                            },
-                        );
-                        self.environment.insert_symbol(
-                            &identifier,
-                            ttype.clone(),
-                            Some(pos.clone()),
-                            kind,
-                        );
-                        self.index(
-                            identifier.clone(),
-                            Expr::Literal {
-                                ttype: ttype.clone(),
-                                value: Atom::Id {
-                                    name: identifier.clone(),
-                                },
-                            },
-                            ttype.clone(),
-                        )?
-                    } else {
-                        let mut lex = Lexicon::new();
-                        for (i, _) in self.environment.values.last().unwrap().iter() {
-                            lex.insert(i)
-                        }
-
-                        let corrections = lex.corrections_for(&identifier);
-                        return Err(self.generate_error_with_pos(
-                            format!("E1 Not a valid symbol: {}", identifier),
-                            format!("Unknown identifier\nDid you mean? {:?}", corrections),
-                            pos,
-                        ));
-                    }
-                }
+                self.handle_indexing(identifier.clone(), position.clone())?
             }
-            Token::Symbol { symbol: '(', .. } => self.call(identifier.clone(), pos)?,
+            Token::Symbol { symbol: '(', .. } => self.call(identifier.clone(), position)?,
             _ => {
                 if self.current_token().is_symbol('{')
                     && self.environment.custom_types.contains_key(&identifier)
                 {
-                    self.call(identifier.clone(), pos.clone())?
+                    self.call(identifier.clone(), position.clone())?
                 } else {
-                    if let Some(ttype) = self.environment.get_type(&identifier) {
-                        Expr::Literal {
-                            ttype: ttype.clone(),
-                            value: Atom::Id {
-                                name: identifier.clone(),
-                            },
-                        }
-                    } else {
-                        if let Some((ttype, _, kind)) =
-                            self.environment.get_type_capture(&identifier)
-                        {
-                            self.environment.captured.last_mut().unwrap().insert(
-                                identifier.clone(),
-                                Symbol {
-                                    id: identifier.clone(),
-                                    ttype: ttype.clone(),
-                                    pos: Some(pos.clone()),
-                                    kind: kind.clone(),
-                                },
-                            );
-                            self.environment.insert_symbol(
-                                &identifier,
-                                ttype.clone(),
-                                Some(pos.clone()),
-                                kind,
-                            );
-                            Expr::Literal {
-                                ttype: ttype.clone(),
-                                value: Atom::Id {
-                                    name: identifier.clone(),
-                                },
-                            }
-                        } else {
-                            let mut lex = Lexicon::new();
-                            for (i, _) in self.environment.values.last().unwrap().iter() {
-                                lex.insert(i)
-                            }
-                            dbg!(self.environment.values.last().unwrap());
-                            let corrections = lex.corrections_for(&identifier);
-                            return Err(self.generate_error_with_pos(
-                                format!("E2 Not a valid symbol: {}", identifier),
-                                format!("Unknown identifier\nDid you mean? {:?}", corrections),
-                                pos,
-                            ));
-                        }
-                    }
+                    self.handle_literal_or_capture(identifier.clone(), position.clone())?
                 }
             }
         };
 
         Ok(anchor)
+    }
+
+    fn create_literal_expr(&self, identifier: String, ttype: TType) -> Expr {
+        Expr::Literal {
+            ttype,
+            value: Atom::Id { name: identifier },
+        }
+    }
+
+    fn handle_indexing(
+        &mut self,
+        identifier: String,
+        position: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        if let Some(ttype) = self.environment.get_type(&identifier) {
+            self.index(
+                identifier.clone(),
+                self.create_literal_expr(identifier.clone(), ttype.clone()),
+                ttype.clone(),
+            )
+        } else if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+            self.environment.captured.last_mut().unwrap().insert(
+                identifier.clone(),
+                Symbol {
+                    id: identifier.clone(),
+                    ttype: ttype.clone(),
+                    pos: Some(position.clone()),
+                    kind: kind.clone(),
+                },
+            );
+            self.environment.insert_symbol(
+                &identifier,
+                ttype.clone(),
+                Some(position.clone()),
+                kind,
+            );
+            self.index(
+                identifier.clone(),
+                self.create_literal_expr(identifier.clone(), ttype.clone()),
+                ttype.clone(),
+            )
+        } else {
+            let mut lexicon = Lexicon::new();
+            for (id, _) in self.environment.values.last().unwrap().iter() {
+                lexicon.insert(id)
+            }
+            let corrections = lexicon.corrections_for(&identifier);
+            Err(self.generate_error_with_pos(
+                format!("E1 Not a valid symbol: {}", identifier),
+                format!("Unknown identifier\nDid you mean? {:?}", corrections),
+                position,
+            ))
+        }
+    }
+
+    fn handle_literal_or_capture(
+        &mut self,
+        identifier: String,
+        position: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        if let Some(ttype) = self.environment.get_type(&identifier) {
+            Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
+        } else if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+            self.environment.captured.last_mut().unwrap().insert(
+                identifier.clone(),
+                Symbol {
+                    id: identifier.clone(),
+                    ttype: ttype.clone(),
+                    pos: Some(position.clone()),
+                    kind: kind.clone(),
+                },
+            );
+            self.environment.insert_symbol(
+                &identifier,
+                ttype.clone(),
+                Some(position.clone()),
+                kind,
+            );
+            Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
+        } else {
+            let mut lexicon = Lexicon::new();
+            for (id, _) in self.environment.values.last().unwrap().iter() {
+                lexicon.insert(id)
+            }
+            let corrections = lexicon.corrections_for(&identifier);
+            Err(self.generate_error_with_pos(
+                format!("E2 Not a valid symbol: {}", identifier),
+                format!("Unknown identifier\nDid you mean? {:?}", corrections),
+                position,
+            ))
+        }
     }
 
     fn factor(&mut self) -> Result<Expr, NovaError> {
@@ -1691,29 +1527,6 @@ impl Parser {
                     ));
                 }
 
-                //check to see if all generic types in output are present in input
-                // let mut inputtable = table::new();
-                // for i in typeinput.iter() {
-                //     inputtable.extend(self.getgen(i.clone()))
-                // }
-
-                // let outputtable = self.getgen(output.clone());
-                // dbg!(&inputtable, &outputtable);
-
-                // for o in outputtable.items.iter() {
-                //     if inputtable.has(o) {
-                //     } else {
-                //         return Err(error::parser_error(
-                //             format!("Input is missing type {}", o),
-                //             format!("All generic types in output must be present in input"),
-                //             pos.line,
-                //             pos.row,
-                //             self.filepath.clone(),
-                //             None,
-                //         ));
-                //     }
-                // }
-
                 if output == TType::Void {
                     match statements.last() {
                         Some(Statement::Return { .. }) => {}
@@ -1824,7 +1637,6 @@ impl Parser {
                     //println!("its an expression");
                     let expression = self.expr()?;
                     output = expression.clone().get_type();
-                    let (line, row) = self.get_line_and_row();
                     let statement = vec![Statement::Return {
                         ttype: expression.get_type(),
                         expr: expression.clone(),
@@ -1873,29 +1685,6 @@ impl Parser {
                         self.environment.captured.last_mut().unwrap().remove(dc);
                     }
                 }
-
-                //check to see if all generic types in output are present in input
-                // let mut inputtable = table::new();
-                // for i in typeinput.iter() {
-                //     inputtable.extend(self.getgen(i.clone()))
-                // }
-
-                // let outputtable = self.getgen(output.clone());
-                // dbg!(&inputtable, &outputtable);
-
-                // for o in outputtable.items.iter() {
-                //     if inputtable.has(o) {
-                //     } else {
-                //         return Err(error::parser_error(
-                //             format!("Input is missing type {}", o),
-                //             format!("All generic types in output must be present in input"),
-                //             pos.line,
-                //             pos.row,
-                //             self.filepath.clone(),
-                //             None,
-                //         ));
-                //     }
-                // }
 
                 left = Expr::Closure {
                     ttype: TType::Function {
@@ -2003,32 +1792,6 @@ impl Parser {
                         self.consume_operator(Operator::LeftArrow)?;
                         let expr = self.expr()?;
 
-                        // check if identifier exists
-                        if self.environment.has(&identifier) {
-                            return Err(self.generate_error_with_pos(
-                                format!("Variable '{}' has already been created", identifier),
-                                "".to_string(),
-                                pos.clone(),
-                            ));
-                        } else {
-                            self.environment.insert_symbol(
-                                &identifier,
-                                expr.get_type(),
-                                Some(pos.clone()),
-                                SymbolKind::Variable,
-                            );
-                            return Ok(Expr::Binop {
-                                ttype: TType::Void,
-                                op: Operator::Assignment,
-                                lhs: Box::new(Expr::Literal {
-                                    ttype: expr.get_type(),
-                                    value: Atom::Id {
-                                        name: identifier.clone(),
-                                    },
-                                }),
-                                rhs: Box::new(expr),
-                            });
-                        }
                         // cant assing a void
                         if expr.get_type() == TType::Void {
                             return Err(self.generate_error_with_pos(
@@ -2157,117 +1920,24 @@ impl Parser {
                     ..
                 } => {
                     self.consume_operator(Operator::RightArrow)?;
-                    let (target_field, pos) = self.get_identifier()?;
-                    let mut arguments = vec![left.clone()];
-                    left = self.field(target_field.clone(), left.clone(), pos.clone())?;
-                    arguments.extend(self.argument_list()?);
-                    if let TType::Function {
-                        parameters,
-                        mut return_type,
-                    } = left.get_type()
-                    {
-                        if arguments.len() != parameters.len() {
-                            return Err(self.generate_error_with_pos(
-                                format!("Incorrect number of arguments"),
-                                format!(
-                                    "Got {:?}, expected {:?}",
-                                    arguments.len(),
-                                    parameters.len()
-                                ),
-                                pos.clone(),
-                            ));
-                        }
-                        let mut input_types = vec![];
-                        for arg in arguments.iter() {
-                            input_types.push(arg.get_type())
-                        }
-                        let mut type_map: HashMap<String, TType> = HashMap::default();
-                        type_map = self.check_and_map_types(
-                            &parameters,
-                            &input_types,
-                            &mut type_map,
-                            pos.clone(),
-                        )?;
-                        return_type =
-                            Box::new(self.get_output(*return_type.clone(), &mut type_map)?);
-                        left = Expr::Call {
-                            ttype: *return_type,
-                            name: target_field.to_string(),
-                            function: Box::new(left),
-                            args: arguments,
-                        };
-                    } else {
-                        return Err(self.generate_error_with_pos(
-                            format!("Cannot call {:?}", left.get_type()),
-                            format!("Not a function"),
-                            pos.clone(),
-                        ));
-                    }
+                    left = self.handle_inner_function_call(left)?;
                 }
                 Token::Operator {
                     operator: Operator::DoubleColon,
                     ..
                 } => {
                     self.consume_operator(Operator::DoubleColon)?;
-                    let (field, pos) = self.get_identifier()?;
-                    left = self.field(field.clone(), left, pos)?;
+                    left = self.handle_field_access(left)?;
                 }
                 Token::Symbol { symbol: '.', .. } => {
                     self.consume_symbol('.')?;
-                    left = self.chain(left)?;
+                    left = self.handle_method_chain(left)?;
                 }
                 Token::Symbol { symbol: '(', .. } => {
-                    // function pointer return call <func()(args)>
-                    let pos = self.get_current_token_position();
-                    let mut arguments = self.argument_list()?;
-                    if arguments.is_empty() {
-                        arguments.push(Expr::None)
-                    }
-                    if let TType::Function {
-                        parameters,
-                        mut return_type,
-                    } = left.get_type()
-                    {
-                        if arguments.len() != parameters.len() {
-                            return Err(self.generate_error_with_pos(
-                                format!("Incorrect number of arguments"),
-                                format!(
-                                    "Got {:?}, expected {:?}",
-                                    arguments.len(),
-                                    parameters.len()
-                                ),
-                                pos.clone(),
-                            ));
-                        }
-                        let mut input_types = vec![];
-                        for arg in arguments.iter() {
-                            input_types.push(arg.get_type())
-                        }
-                        let mut type_map: HashMap<String, TType> = HashMap::default();
-                        type_map = self.check_and_map_types(
-                            &parameters,
-                            &input_types,
-                            &mut type_map,
-                            self.get_current_token_position(),
-                        )?;
-                        return_type =
-                            Box::new(self.get_output(*return_type.clone(), &mut type_map)?);
-                        left = Expr::Call {
-                            ttype: *return_type,
-                            name: "anon".to_string(),
-                            function: Box::new(left),
-                            args: arguments,
-                        };
-                    } else {
-                        return Err(self.generate_error_with_pos(
-                            format!("Cannot call {:?}", left.get_type()),
-                            format!("Not a function"),
-                            pos.clone(),
-                        ));
-                    }
+                    left = self.handle_function_pointer_call(left)?;
                 }
                 Token::Symbol { symbol: '[', .. } => {
-                    left = self.index("anon".to_string(), left.clone(), left.get_type().clone())?;
+                    left = self.handle_chain_indexint(left)?;
                 }
                 _ => {
                     break;
@@ -2278,57 +1948,124 @@ impl Parser {
         Ok(left)
     }
 
-    fn term(&mut self) -> Result<Expr, NovaError> {
-        let mut left = self.factor()?;
+    fn handle_inner_function_call(&mut self, left: Expr) -> Result<Expr, NovaError> {
+        let (target_field, pos) = self.get_identifier()?;
+        let mut arguments = vec![left.clone()];
+        let function_expr = self.field(target_field.clone(), left.clone(), pos.clone())?;
+        arguments.extend(self.argument_list()?);
+        self.create_call_expression(function_expr, target_field, arguments, pos)
+    }
+
+    fn handle_field_access(&mut self, left: Expr) -> Result<Expr, NovaError> {
+        let (field, pos) = self.get_identifier()?;
+        self.field(field.clone(), left, pos)
+    }
+
+    fn handle_method_chain(&mut self, left: Expr) -> Result<Expr, NovaError> {
+        self.chain(left)
+    }
+
+    fn handle_function_pointer_call(&mut self, left: Expr) -> Result<Expr, NovaError> {
         let pos = self.get_current_token_position();
+        let mut arguments = self.argument_list()?;
+        if arguments.is_empty() {
+            arguments.push(Expr::None)
+        }
+        self.create_call_expression(left, "anon".to_string(), arguments, pos)
+    }
+
+    fn handle_chain_indexint(&mut self, left: Expr) -> Result<Expr, NovaError> {
+        self.index("anon".to_string(), left.clone(), left.get_type().clone())
+    }
+
+    fn create_call_expression(
+        &mut self,
+        function_expr: Expr,
+        function_name: String,
+        arguments: Vec<Expr>,
+        pos: FilePosition,
+    ) -> Result<Expr, NovaError> {
+        if let TType::Function {
+            parameters,
+            mut return_type,
+        } = function_expr.get_type()
+        {
+            if arguments.len() != parameters.len() {
+                return Err(self.generate_error_with_pos(
+                    format!("Incorrect number of arguments"),
+                    format!("Got {:?}, expected {:?}", arguments.len(), parameters.len()),
+                    pos.clone(),
+                ));
+            }
+            let mut input_types = vec![];
+            for arg in arguments.iter() {
+                input_types.push(arg.get_type())
+            }
+            let mut type_map: HashMap<String, TType> = HashMap::default();
+            type_map =
+                self.check_and_map_types(&parameters, &input_types, &mut type_map, pos.clone())?;
+            return_type = Box::new(self.get_output(*return_type.clone(), &mut type_map)?);
+            Ok(Expr::Call {
+                ttype: *return_type,
+                name: function_name,
+                function: Box::new(function_expr),
+                args: arguments,
+            })
+        } else {
+            Err(self.generate_error_with_pos(
+                format!("Cannot call {:?}", function_expr.get_type()),
+                format!("Not a function"),
+                pos.clone(),
+            ))
+        }
+    }
+
+    fn term(&mut self) -> Result<Expr, NovaError> {
+        let mut left_expr = self.factor()?;
+        let current_pos = self.get_current_token_position();
         while self.current_token().is_multi_op() {
             if let Some(operation) = self.current_token().get_operator() {
                 self.advance();
-                let right = self.factor()?;
-                if left.clone().get_type() == right.clone().get_type()
-                    && (left.clone().get_type() == TType::Int
-                        || left.clone().get_type() == TType::Float)
-                    && (right.clone().get_type() == TType::Int
-                        || right.clone().get_type() == TType::Float)
+                let right_expr = self.factor()?;
+                if left_expr.clone().get_type() == right_expr.clone().get_type()
+                    && (left_expr.clone().get_type() == TType::Int
+                        || left_expr.clone().get_type() == TType::Float)
+                    && (right_expr.clone().get_type() == TType::Int
+                        || right_expr.clone().get_type() == TType::Float)
                 {
                     self.check_and_map_types(
-                        &[left.clone().get_type()],
-                        &[right.clone().get_type()],
+                        &[left_expr.clone().get_type()],
+                        &[right_expr.clone().get_type()],
                         &mut HashMap::default(),
-                        pos.clone(),
+                        current_pos.clone(),
                     )?;
-                    left = Expr::Binop {
-                        ttype: left.get_type(),
-                        op: operation,
-                        lhs: Box::new(left),
-                        rhs: Box::new(right),
-                    };
+                    left_expr = self.create_binop_expr(
+                        left_expr.clone(),
+                        right_expr,
+                        operation,
+                        left_expr.get_type(),
+                    );
                 } else {
-                    return Err(NovaError::TypeError {
-                        expected: left.clone().get_type().to_string(),
-                        found: right.clone().get_type().to_string(),
-                        position: pos.clone(),
-                        msg: format!(
-                            "Type error, cannot apply operation {:?} to {} and {}",
-                            operation.clone(),
-                            right.get_type().to_string(),
-                            left.get_type().to_string()
-                        ),
-                    });
+                    return Err(self.create_type_error(
+                        left_expr.clone(),
+                        right_expr.clone(),
+                        operation,
+                        current_pos.clone(),
+                    ));
                 }
             }
         }
-        Ok(left)
+        Ok(left_expr)
     }
 
     fn expr(&mut self) -> Result<Expr, NovaError> {
-        let mut left = self.top_expr()?;
-        let pos = self.get_current_token_position();
+        let mut left_expr = self.top_expr()?;
+        let current_pos = self.get_current_token_position();
         while self.current_token().is_assign() {
             if let Some(operation) = self.current_token().get_operator() {
                 self.advance();
-                let right = self.top_expr()?;
-                match left.clone() {
+                let right_expr = self.top_expr()?;
+                match left_expr.clone() {
                     Expr::ListConstructor { .. }
                     | Expr::Binop { .. }
                     | Expr::Call { .. }
@@ -2336,195 +2073,179 @@ impl Parser {
                     | Expr::Closure { .. }
                     | Expr::None => {
                         return Err(self.generate_error_with_pos(
-                            format!("Error: left hand side of `=` must be assignable"),
-                            format!("Cannot assign a value to a literal value"),
-                            pos.clone(),
+                            "Error: left hand side of `=` must be assignable".to_string(),
+                            "Cannot assign a value to a literal value".to_string(),
+                            current_pos.clone(),
                         ));
                     }
                     Expr::Literal { value: v, .. } => match v {
                         Atom::Id { .. } => {
                             self.check_and_map_types(
-                                &vec![left.get_type()],
-                                &vec![right.get_type()],
+                                &vec![left_expr.get_type()],
+                                &vec![right_expr.get_type()],
                                 &mut HashMap::default(),
-                                pos.clone(),
+                                current_pos.clone(),
                             )?;
                         }
                         _ => {
                             return Err(self.generate_error_with_pos(
                                 format!(
                                     "cannot assign {} to {}",
-                                    right.get_type().to_string(),
-                                    left.get_type().to_string()
+                                    right_expr.get_type().to_string(),
+                                    left_expr.get_type().to_string()
                                 ),
-                                format!("Cannot assign a value to a literal value"),
-                                pos.clone(),
+                                "Cannot assign a value to a literal value".to_string(),
+                                current_pos.clone(),
                             ));
                         }
                     },
                     _ => {
-                        if &right.get_type() == &left.get_type() {
-                        } else {
-                            return Err(NovaError::TypeError {
-                                expected: left.clone().get_type().to_string(),
-                                found: right.clone().get_type().to_string(),
-                                position: pos.clone(),
-                                msg: format!(
-                                    "Type error, cannot assign  {} to {}",
-                                    right.get_type().to_string(),
-                                    left.get_type().to_string()
+                        if &right_expr.get_type() != &left_expr.get_type() {
+                            return Err(self.generate_error_with_pos(
+                                format!(
+                                    "cannot assign {} to {}",
+                                    right_expr.get_type().to_string(),
+                                    left_expr.get_type().to_string()
                                 ),
-                            });
+                                "Cannot assign a value to a literal value".to_string(),
+                                current_pos.clone(),
+                            ));
                         }
                     }
                 }
-                left = Expr::Binop {
+                left_expr = Expr::Binop {
                     ttype: TType::Void,
                     op: operation,
-                    lhs: Box::new(left),
-                    rhs: Box::new(right),
+                    lhs: Box::new(left_expr),
+                    rhs: Box::new(right_expr),
                 };
             }
         }
-        Ok(left)
+        Ok(left_expr)
     }
-
     fn top_expr(&mut self) -> Result<Expr, NovaError> {
-        let mut left = self.mid_expr()?;
-        let pos = self.get_current_token_position();
+        let mut left_expr = self.mid_expr()?;
+        let current_pos = self.get_current_token_position();
         while self.current_token().is_relop() {
             if let Some(operation) = self.current_token().get_operator() {
                 self.advance();
-                let right = self.mid_expr()?;
+                let right_expr = self.mid_expr()?;
                 match operation {
                     Operator::And | Operator::Or => {
-                        if (left.get_type() != TType::Bool) || (right.get_type() != TType::Bool) {
+                        if (left_expr.get_type() != TType::Bool)
+                            || (right_expr.get_type() != TType::Bool)
+                        {
                             return Err(self.generate_error_with_pos(
-                                format!("Logical operation expects bool"),
+                                "Logical operation expects bool".to_string(),
                                 format!(
                                     "got {:?} {:?}",
-                                    left.get_type().clone(),
-                                    right.get_type().clone()
+                                    left_expr.get_type().clone(),
+                                    right_expr.get_type().clone()
                                 ),
-                                pos.clone(),
+                                current_pos.clone(),
                             ));
                         }
-                        left = Expr::Binop {
-                            ttype: TType::Bool,
-                            op: operation,
-                            lhs: Box::new(left),
-                            rhs: Box::new(right),
-                        };
+                        left_expr =
+                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
                     Operator::GreaterThan
                     | Operator::GtrOrEqu
                     | Operator::LssOrEqu
                     | Operator::LessThan => {
-                        match (left.get_type(), right.get_type()) {
+                        match (left_expr.get_type(), right_expr.get_type()) {
                             (TType::Int, TType::Int) => {}
                             (TType::Float, TType::Float) => {}
                             _ => {
                                 return Err(self.generate_error_with_pos(
-                                    format!("Comparison operation expects int or float"),
+                                    "Comparison operation expects int or float".to_string(),
                                     format!(
                                         "got {:?} {:?}",
-                                        left.get_type().clone(),
-                                        right.get_type().clone()
+                                        left_expr.get_type().clone(),
+                                        right_expr.get_type().clone()
                                     ),
-                                    pos.clone(),
+                                    current_pos.clone(),
                                 ));
                             }
                         }
-                        left = Expr::Binop {
-                            ttype: TType::Bool,
-                            op: operation,
-                            lhs: Box::new(left),
-                            rhs: Box::new(right),
-                        };
+                        left_expr =
+                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
                     _ => {
-                        left = Expr::Binop {
-                            ttype: TType::Bool,
-                            op: operation,
-                            lhs: Box::new(left),
-                            rhs: Box::new(right),
-                        };
+                        left_expr =
+                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
                 }
             }
         }
-        Ok(left)
+        Ok(left_expr)
     }
 
     fn mid_expr(&mut self) -> Result<Expr, NovaError> {
-        let mut left = self.term()?;
-        let pos = self.get_current_token_position();
+        let mut left_expr = self.term()?;
+        let current_pos = self.get_current_token_position();
         while self.current_token().is_adding_op() {
             if let Some(operation) = self.current_token().get_operator() {
                 self.advance();
-                let right = self.term()?;
+                let right_expr = self.term()?;
 
-                match (left.get_type(), right.get_type()) {
+                match (left_expr.get_type(), right_expr.get_type()) {
                     (TType::Int, TType::Int)
                     | (TType::Float, TType::Float)
                     | (TType::String, TType::String) => {
-                        left = Expr::Binop {
-                            ttype: left.clone().get_type(),
-                            op: operation,
-                            lhs: Box::new(left),
-                            rhs: Box::new(right),
-                        };
+                        left_expr = self.create_binop_expr(
+                            left_expr.clone(),
+                            right_expr,
+                            operation,
+                            left_expr.get_type(),
+                        );
                     }
                     (_, _) => {
-                        return Err(NovaError::TypeError {
-                            expected: left.clone().get_type().to_string(),
-                            found: right.clone().get_type().to_string(),
-                            position: pos.clone(),
-                            msg: format!(
-                                "Type error, cannot apply operation {:?} to {} and {}",
-                                operation.clone(),
-                                right.get_type().to_string(),
-                                left.get_type().to_string()
-                            ),
-                        });
+                        return Err(self.create_type_error(
+                            left_expr.clone(),
+                            right_expr.clone(),
+                            operation,
+                            current_pos.clone(),
+                        ));
                     }
                 }
             }
         }
-        Ok(left)
+        Ok(left_expr)
     }
 
-    fn getgen(&self, ttype: TType) -> Table<String> {
-        let mut gtable = table::new();
-        match ttype {
-            TType::List { inner } | TType::Option { inner } => {
-                let innertable = self.getgen(*inner);
-                gtable.extend(innertable);
-            }
-            TType::Function {
-                parameters,
-                return_type,
-            } => {
-                let mut input_table = table::new();
-                let mut output_table = table::new();
-                for i in parameters.iter() {
-                    input_table.extend(self.getgen(i.clone()));
-                }
-                output_table.extend(self.getgen(*return_type));
-
-                gtable.extend(input_table);
-                gtable.extend(output_table);
-            }
-            TType::Generic { name: gen } => {
-                gtable.insert(gen);
-            }
-            TType::Option { inner } => {
-                let innertable = self.getgen(*inner);
-                gtable.extend(innertable);
-            }
-            _ => {}
+    fn create_binop_expr(
+        &self,
+        left_expr: Expr,
+        right_expr: Expr,
+        operation: Operator,
+        ttype: TType,
+    ) -> Expr {
+        Expr::Binop {
+            ttype,
+            op: operation,
+            lhs: Box::new(left_expr),
+            rhs: Box::new(right_expr),
         }
-        gtable
+    }
+
+    fn create_type_error(
+        &self,
+        left_expr: Expr,
+        right_expr: Expr,
+        operation: Operator,
+        pos: FilePosition,
+    ) -> NovaError {
+        NovaError::TypeError {
+            expected: left_expr.get_type().to_string(),
+            found: right_expr.get_type().to_string(),
+            position: pos,
+            msg: format!(
+                "Type error, cannot apply operation {:?} to {} and {}",
+                operation,
+                right_expr.get_type().to_string(),
+                left_expr.get_type().to_string()
+            ),
+        }
     }
 
     fn ttype(&mut self) -> Result<TType, NovaError> {
@@ -2558,27 +2279,6 @@ impl Parser {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
-
-                    // check to see if all generic types in output are present in input
-                    // let mut inputtable = table::new();
-                    // for i in input.iter() {
-                    //     inputtable.extend(self.getgen(i.clone()))
-                    // }
-
-                    // let outputtable = self.getgen(output.clone());
-                    // dbg!(&inputtable,&outputtable);
-
-                    // for o in outputtable.items.iter() {
-                    //     if inputtable.has(o) {
-
-                    //     } else {
-                    //         return Err(self.generate_error(
-                    //             format!("Input is missing type {}", o),
-                    //             format!("All generic types in output must be present in input"),
-                    //         ));
-                    //     }
-                    // }
-
                     Ok(TType::Function {
                         parameters: *Box::new(input),
                         return_type: Box::new(output),
@@ -2590,27 +2290,6 @@ impl Parser {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
-
-                    //check to see if all generic types in output are present in input
-                    // let mut inputtable = table::new();
-                    // for i in input.iter() {
-                    //     inputtable.extend(self.getgen(i.clone()))
-                    // }
-
-                    // let outputtable = self.getgen(output.clone());
-                    // dbg!(&inputtable,&outputtable);
-
-                    // for o in outputtable.items.iter() {
-                    //     if inputtable.has(o) {
-
-                    //     } else {
-                    //         return Err(self.generate_error(
-                    //             format!("Input is missing type {}", o),
-                    //             format!("All generic types in output must be present in input"),
-                    //         ));
-                    //     }
-                    // }
-                    //dbg!(&output);
                     Ok(TType::Function {
                         parameters: *Box::new(vec![TType::None]),
                         return_type: Box::new(output),
@@ -2652,27 +2331,6 @@ impl Parser {
             }
             Token::Identifier { .. } => {
                 let (identifier, pos) = self.get_identifier()?;
-
-                // let mut type_annotation = vec![];
-                // if let Token::Symbol { symbol: '@', .. } = self.current_token() {
-                //     self.consume_symbol('@')?;
-                //     self.consume_symbol('(')?;
-
-                //     let first_type = self.ttype()?;
-
-                //     type_annotation.push(first_type);
-                //     while self.current_token().is_symbol(',') {
-                //         self.advance();
-                //         let ttype = self.ttype()?;
-                //         type_annotation.push(ttype);
-                //     }
-                //     self.consume_symbol(')')?;
-                //     identifier = generate_unique_string(&identifier, &type_annotation);
-                // }
-
-                // if let Some(ttype) = self.environment.type_alias.get(&identifier) {
-                //     return Ok(ttype.clone());
-                // }
                 if let Some(_) = self.environment.custom_types.get(&identifier) {
                     // add generic support in type definition
                     Ok(TType::Custom { name: identifier })
@@ -2774,35 +2432,30 @@ impl Parser {
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("import"))?;
-        let ifilepath = match self.current_token() {
+        let import_filepath = match self.current_token() {
             Token::String {
                 value: filepath, ..
             } => filepath,
-            _ => {
-                panic!()
-            }
+            _ => panic!(),
         };
         self.advance();
-        let file = ifilepath.clone();
-
-        let newfilepath: String = match extract_current_directory(&self.filepath) {
+        let resolved_filepath: String = match extract_current_directory(&self.filepath) {
             Some(mut current_dir) => {
-                current_dir.push_str(&file);
+                current_dir.push_str(&import_filepath);
                 current_dir
             }
-            _ => file.clone(),
+            None => import_filepath.clone(),
         };
-        let tokenlist = Lexer::new(&newfilepath)?.tokenize()?;
-
-        let mut iparser = self.clone();
-        iparser.index = 0;
-        iparser.filepath = newfilepath.clone();
-        iparser.input = tokenlist;
-        iparser.parse()?;
-        self.environment = iparser.environment.clone();
+        let tokens = Lexer::new(&resolved_filepath)?.tokenize()?;
+        let mut parser = self.clone();
+        parser.index = 0;
+        parser.filepath = resolved_filepath.clone();
+        parser.input = tokens;
+        parser.parse()?;
+        self.environment = parser.environment.clone();
         Ok(Some(Statement::Block {
-            body: iparser.ast.program.clone(),
-            filepath: newfilepath,
+            body: parser.ast.program.clone(),
+            filepath: resolved_filepath,
         }))
     }
 
@@ -2852,8 +2505,6 @@ impl Parser {
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         match self.current_token() {
             Token::Identifier { name: id, .. } => match id.as_str() {
-                "type" => self.typealias(),
-                "bind" => self.bind(),
                 "unwrap" => self.unwrap(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
@@ -2864,7 +2515,6 @@ impl Parser {
                 "return" => self.return_statement(),
                 "fn" => self.function_declaration(),
                 "for" => self.for_statement(),
-                "foreach" => self.foreach_statement(),
                 "break" => {
                     self.consume_identifier(Some("break"))?;
                     Ok(Some(Statement::Break))
@@ -2884,40 +2534,6 @@ impl Parser {
         self.consume_identifier(Some("pass"))?;
         Ok(Some(Statement::Pass))
     }
-
-    // fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
-    //     self.consume_identifier(Some("type"))?;
-    //     // get type id
-    //     let (id, pos) = self.identifier()?;
-    //     if self.environment.custom_types.contains_key(&id) {
-    //         return Err(self.generate_error(
-    //             format!("Type '{}' is already instantiated", id),
-    //             "Cannot alias a custom type".to_string(),
-    //             pos.line,
-    //             pos.row,
-    //             self.filepath.clone(),
-    //             None,
-    //         ));
-    //     } else {
-    //         self.environment.custom_types.insert(id.clone(), vec![]);
-    //     }
-    //     // assingment
-    //     self.consume_operator(Operator::Assignment)?;
-    //     // get type
-    //     let ttype = self.ttype()?;
-    //     // insert into type alias
-
-    //     let gmap = self.getgen(ttype.clone());
-    //     if !gmap.is_empty() {
-    //         return Err(self.generate_error(
-    //             format!("Type alias cannot contain generic type"),
-    //             format!("Try removing the generic type"),
-    //         ));
-    //     }
-
-    //     self.environment.type_alias.insert(id, ttype);
-    //     Ok(None)
-    // }
 
     fn get_id_list(&mut self) -> Result<Vec<String>, NovaError> {
         let mut idlist = vec![];
@@ -2971,67 +2587,69 @@ impl Parser {
 
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("struct"))?;
-        let (struct_name, pos) = self.get_identifier()?;
-        // will overwrite, just needed for recursive types.
+        let (struct_name, position) = self.get_identifier()?;
+
+        // Initialize the struct in the environment for recursive types
         self.environment
             .custom_types
             .insert(struct_name.clone(), vec![]);
 
-        let mut field_names = vec![];
+        let mut generic_field_names = vec![];
         if let Token::Symbol { symbol: '(', .. } = self.current_token() {
-            field_names = self.get_id_list()?;
+            generic_field_names = self.get_id_list()?;
             self.environment
                 .generic_type_struct
-                .insert(struct_name.clone(), field_names.clone());
+                .insert(struct_name.clone(), generic_field_names.clone());
         }
 
         self.consume_symbol('{')?;
-        let parameters = self.parameter_list()?;
+        let parameter_list = self.parameter_list()?;
         self.consume_symbol('}')?;
 
         let mut fields: Vec<(String, TType)> = vec![];
-        let mut type_inputs = vec![];
-        let mut generics: Table<String> = table::new();
+        let mut type_parameters = vec![];
+        let mut generics_table: Table<String> = table::new();
 
-        for (field_type, field_name) in parameters.clone() {
-            generics.extend(self.collect_generics(&[field_type.clone()]));
-            type_inputs.push(field_type.clone());
+        for (field_type, field_name) in parameter_list.clone() {
+            generics_table.extend(self.collect_generics(&[field_type.clone()]));
+            type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
         fields.push(("type".to_string(), TType::String));
-        for generic_type in generics.items.iter() {
-            if field_names.contains(generic_type) {
-            } else {
+
+        for generic_type in generics_table.items.iter() {
+            if !generic_field_names.contains(generic_type) {
                 return Err(self.generate_error_with_pos(
                     format!(
-                        "Struct '{}' is missing generic type {generic_type}",
-                        struct_name
+                        "Struct '{}' is missing generic type {}",
+                        struct_name, generic_type
                     ),
-                    "You must include generics types in struct name(...generictypes) ".to_string(),
-                    pos.clone(),
+                    "You must include generic types in struct name(...generictypes)".to_string(),
+                    position.clone(),
                 ));
             }
         }
-        let mut input = vec![];
+
+        let mut field_definitions = vec![];
         for (field_name, field_type) in fields.clone() {
-            input.push(Field {
+            field_definitions.push(Field {
                 identifier: field_name,
                 ttype: field_type,
-            })
+            });
         }
 
         if !self.environment.has(&struct_name) {
             self.environment.no_override.insert(struct_name.to_string());
-            if generics.is_empty() {
+            if generics_table.is_empty() {
                 self.environment.insert_symbol(
                     &struct_name,
                     TType::Function {
-                        parameters: type_inputs,
+                        parameters: type_parameters,
                         return_type: Box::new(TType::Custom {
                             name: struct_name.clone(),
                         }),
                     },
-                    Some(pos.clone()),
+                    Some(position.clone()),
                     SymbolKind::Constructor,
                 );
             }
@@ -3042,7 +2660,7 @@ impl Parser {
             return Err(self.generate_error_with_pos(
                 format!("Struct '{}' is already instantiated", struct_name),
                 "Cannot reinstantiate the same type".to_string(),
-                pos.clone(),
+                position.clone(),
             ));
         }
 
@@ -3051,68 +2669,71 @@ impl Parser {
                 name: struct_name.clone(),
             },
             identifier: struct_name,
-            fields: input,
+            fields: field_definitions,
         }))
     }
-
     fn for_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("for"))?;
-        let init = self.expr()?;
-        self.consume_symbol(';')?;
-        let testpos = self.get_current_token_position();
-        let test = self.expr()?;
-        self.consume_symbol(';')?;
-        let inc = self.expr()?;
-        if test.get_type() != TType::Bool && test.get_type() != TType::Void {
-            return Err(self.generate_error_with_pos(
-                format!("test expression must return a bool"),
-                format!("got {:?}", test.get_type().clone()),
-                testpos,
-            ));
-        }
-        self.environment.push_block();
-        let body = self.block()?;
-        self.environment.pop_scope();
-        Ok(Some(Statement::For {
-            init,
-            test,
-            inc,
-            body,
-        }))
-    }
 
-    fn foreach_statement(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("foreach"))?;
-        let (identifier, pos) = self.get_identifier()?;
-        if self.environment.has(&identifier) {
-            return Err(self.generate_error_with_pos(
-                format!("identifier already used"),
-                format!("identifier '{identifier}' is already used within this scope"),
-                pos.clone(),
-            ));
-        }
-        self.consume_identifier(Some("in"))?;
-        let arraypos = self.get_current_token_position();
-        let array = self.expr()?;
-        self.environment.push_block();
-        // check if array has type array and then assign identifier to that type
-        if let TType::List { inner } = array.get_type() {
-            self.environment
-                .insert_symbol(&identifier, *inner, Some(pos), SymbolKind::Variable)
+        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+            // Handle foreach statement
+            self.advance(); // consume '('
+            let (identifier, pos) = self.get_identifier()?;
+            if self.environment.has(&identifier) {
+                return Err(self.generate_error_with_pos(
+                    format!("identifier already used"),
+                    format!("identifier '{identifier}' is already used within this scope"),
+                    pos.clone(),
+                ));
+            }
+            self.consume_identifier(Some("in"))?;
+            let arraypos = self.get_current_token_position();
+            let array = self.expr()?;
+            self.consume_symbol(')')?;
+            self.environment.push_block();
+            // check if array has type array and then assign identifier to that type
+            if let TType::List { inner } = array.get_type() {
+                self.environment
+                    .insert_symbol(&identifier, *inner, Some(pos), SymbolKind::Variable)
+            } else {
+                return Err(self.generate_error_with_pos(
+                    format!("foreach can only iterate over arrays"),
+                    format!("got {:?}", array.get_type().clone()),
+                    arraypos.clone(),
+                ));
+            }
+            let body = self.block()?;
+            self.environment.pop_scope();
+            Ok(Some(Statement::Foreach {
+                identifier,
+                expr: array,
+                body,
+            }))
         } else {
-            return Err(self.generate_error_with_pos(
-                format!("foreach can only iterate over arrays"),
-                format!("got {:?}", array.get_type().clone()),
-                arraypos.clone(),
-            ));
+            // Handle regular for statement
+            let init = self.expr()?;
+            self.consume_symbol(';')?;
+            let testpos = self.get_current_token_position();
+            let test = self.expr()?;
+            self.consume_symbol(';')?;
+            let inc = self.expr()?;
+            if test.get_type() != TType::Bool && test.get_type() != TType::Void {
+                return Err(self.generate_error_with_pos(
+                    format!("test expression must return a bool"),
+                    format!("got {:?}", test.get_type().clone()),
+                    testpos,
+                ));
+            }
+            self.environment.push_block();
+            let body = self.block()?;
+            self.environment.pop_scope();
+            Ok(Some(Statement::For {
+                init,
+                test,
+                inc,
+                body,
+            }))
         }
-        let body = self.block()?;
-        self.environment.pop_scope();
-        Ok(Some(Statement::Foreach {
-            identifier,
-            expr: array,
-            body,
-        }))
     }
 
     fn while_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -3138,30 +2759,87 @@ impl Parser {
 
     fn if_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("if"))?;
-        let testpos = self.get_current_token_position();
-        let test = self.top_expr()?;
-        if test.get_type() != TType::Bool {
-            return Err(self.generate_error_with_pos(
-                format!("If statement's expression must return a bool"),
-                format!("got {:?}", test.get_type().clone()),
-                testpos.clone(),
-            ));
+
+        if self.current_token().is_id("let") {
+            // Handle if let statement
+            self.advance(); // consume 'let'
+            let mut global = false;
+            let (mut identifier, mut pos) = self.get_identifier()?;
+            if identifier == "global" {
+                (identifier, pos) = self.get_identifier()?;
+                global = true
+            }
+            self.consume_operator(Operator::Assignment)?;
+            let expr = self.expr()?;
+            let inner = if let TType::Option { inner } = expr.get_type() {
+                inner
+            } else {
+                return Err(self.generate_error_with_pos(
+                    format!("unwrap expects an option type"),
+                    format!("got {:?}", expr.get_type()),
+                    pos.clone(),
+                ));
+            };
+
+            // make sure symbol doesn't already exist
+            if self.environment.has(&identifier) {
+                return Err(self.generate_error_with_pos(
+                    format!("Symbol '{}' is already instantiated", identifier),
+                    "Cannot reinstantiate the same symbol in the same scope".to_string(),
+                    pos.clone(),
+                ));
+            } else {
+                self.environment.push_block();
+                self.environment.insert_symbol(
+                    &identifier,
+                    *inner.clone(),
+                    Some(pos),
+                    SymbolKind::Variable,
+                );
+                let body = self.block()?;
+                let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
+                    self.consume_identifier(Some("else"))?;
+                    Some(self.block()?)
+                } else {
+                    None
+                };
+                self.environment.pop_scope();
+                Ok(Some(Statement::IfLet {
+                    ttype: expr.get_type(),
+                    identifier,
+                    expr,
+                    body,
+                    alternative,
+                    global,
+                }))
+            }
+        } else {
+            // Handle regular if statement
+            let testpos = self.get_current_token_position();
+            let test = self.top_expr()?;
+            if test.get_type() != TType::Bool {
+                return Err(self.generate_error_with_pos(
+                    format!("If statement's expression must return a bool"),
+                    format!("got {:?}", test.get_type().clone()),
+                    testpos.clone(),
+                ));
+            }
+            let body = self.block()?;
+            let mut alternative: Option<Vec<Statement>> = None;
+            if self.current_token().is_id("elif") {
+                self.advance();
+                alternative = Some(self.alternative()?);
+            } else if self.current_token().is_id("else") {
+                self.advance();
+                alternative = Some(self.block()?);
+            }
+            Ok(Some(Statement::If {
+                ttype: TType::Void,
+                test,
+                body,
+                alternative,
+            }))
         }
-        let body = self.block()?;
-        let mut alternative: Option<Vec<Statement>> = None;
-        if self.current_token().is_id("elif") {
-            self.advance();
-            alternative = Some(self.alternative()?);
-        } else if self.current_token().is_id("else") {
-            self.advance();
-            alternative = Some(self.block()?);
-        }
-        Ok(Some(Statement::If {
-            ttype: TType::Void,
-            test,
-            body,
-            alternative,
-        }))
     }
 
     fn let_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -3223,170 +2901,6 @@ impl Parser {
                 global,
             }))
         }
-    }
-
-    fn bind(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("bind"))?;
-        let mut global = false;
-        // refactor out into two parsing ways for ident. one with module and one without
-        let (mut identifier, mut pos) = self.get_identifier()?;
-        if identifier == "global" {
-            (identifier, pos) = self.get_identifier()?;
-            global = true
-        }
-        self.consume_operator(Operator::Assignment)?;
-        let expr = self.expr()?;
-        let inner = if let TType::Option { inner } = expr.get_type() {
-            inner
-        } else {
-            return Err(self.generate_error_with_pos(
-                format!("unwrap expects an option type"),
-                format!("got {:?}", expr.get_type()),
-                pos.clone(),
-            ));
-        };
-
-        // make sure symbol doesnt already exist
-        if self.environment.has(&identifier) {
-            return Err(self.generate_error_with_pos(
-                format!("Symbol '{}' is already instantiated", identifier),
-                "Cannot reinstantiate the same symbol in the same scope".to_string(),
-                pos.clone(),
-            ));
-        } else {
-            self.environment.push_block();
-            self.environment.insert_symbol(
-                &identifier,
-                *inner.clone(),
-                Some(pos),
-                SymbolKind::Variable,
-            );
-            let body = self.block()?;
-            let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
-                self.consume_identifier(Some("else"))?;
-                Some(self.block()?)
-            } else {
-                None
-            };
-            self.environment.pop_scope();
-            Ok(Some(Statement::Bind {
-                ttype: expr.get_type(),
-                identifier,
-                expr,
-                body,
-                alternative,
-                global,
-            }))
-        }
-    }
-
-    fn typealias(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("type"))?;
-        // get type id
-        let (alias_id, alias_pos) = self.get_identifier()?;
-        if self.environment.custom_types.contains_key(&alias_id) {
-            return Err(self.generate_error_with_pos(
-                format!("Type '{}' is already instantiated", alias_id),
-                "Cannot alias a custom type".to_string(),
-                alias_pos.clone(),
-            ));
-        } else {
-            self.environment
-                .custom_types
-                .insert(alias_id.clone(), vec![]);
-        }
-        // assignment
-
-        self.consume_operator(Operator::Assignment)?;
-        // get generic type
-        let (generic_type, generic_pos) = self.get_identifier()?;
-        self.consume_symbol('(')?;
-        let mut type_annotation = vec![];
-        let type_arg = self.ttype()?;
-        type_annotation.push(type_arg);
-        while self.current_token().is_symbol(',') {
-            self.advance();
-            let type_arg = self.ttype()?;
-            type_annotation.push(type_arg);
-        }
-        self.consume_symbol(')')?;
-        #[allow(unused_assignments)]
-        let mut generic_type_list = vec![];
-        if let Some(list) = self.environment.generic_type_struct.get(&generic_type) {
-            generic_type_list = list.clone();
-            self.environment
-                .generic_type_map
-                .insert(alias_id.clone(), generic_type.clone());
-        } else {
-            return Err(self.generate_error_with_pos(
-                "no generic".to_owned(),
-                "".to_owned(),
-                generic_pos,
-            ));
-        }
-
-        // check if correct number of args
-        //dbg!(&type_annotation,&generic_type_list);
-        if type_annotation.len() != generic_type_list.len() {
-            return Err(self.generate_error_with_pos(
-                format!(
-                    "not enough type arguments. Expecting {}, got {}",
-                    generic_type_list.len(),
-                    type_annotation.len()
-                ),
-                "".to_string(),
-                generic_pos,
-            ));
-        }
-        let mut generic_map: HashMap<String, TType> = HashMap::default();
-        for (gen, t) in generic_type_list.iter().zip(type_annotation.iter()) {
-            generic_map.insert(gen.clone(), t.clone());
-        }
-        // create new instance of type
-        // with map
-
-        if let Some(fields) = self.environment.custom_types.get(&generic_type) {
-            let mut new_fields = vec![];
-            let mut type_input = vec![];
-            for (field, field_type) in fields.iter() {
-                if field != "type" {
-                    type_input.push(self.get_output(field_type.clone(), &mut generic_map.clone())?);
-                }
-
-                new_fields.push((
-                    field.clone(),
-                    self.get_output(field_type.clone(), &mut generic_map.clone())?,
-                ))
-            }
-
-            if !self.environment.has(&alias_id) {
-                self.environment.no_override.insert(alias_id.to_string());
-                self.environment.insert_symbol(
-                    &alias_id,
-                    TType::Function {
-                        parameters: type_input,
-                        return_type: Box::new(TType::Custom {
-                            name: alias_id.clone(),
-                        }),
-                    },
-                    Some(alias_pos.clone()),
-                    SymbolKind::Constructor,
-                );
-                self.environment
-                    .custom_types
-                    .insert(alias_id.clone(), new_fields);
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("Struct '{}' is already instantiated", alias_id),
-                    "Cannot reinstantiate the same type".to_string(),
-                    alias_pos.clone(),
-                ));
-            }
-        } else {
-            return Err(self.generate_error("broke".to_owned(), "no generic to be made".to_owned()));
-        }
-
-        Ok(None)
     }
 
     fn return_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -3609,7 +3123,6 @@ impl Parser {
                 });
             }
         }
-
         // if last statement isnt a return error
         if let Some(Statement::Return { .. }) = statements.last() {
         } else {
@@ -3619,7 +3132,6 @@ impl Parser {
                 pos.clone(),
             ));
         }
-
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
@@ -3701,7 +3213,6 @@ impl Parser {
             "".to_string(),
             pos.clone(),
         );
-
         statements.split_last().map_or_else(
             || Err(error.clone()),
             |(last, initial_statements)| {
@@ -3724,7 +3235,6 @@ impl Parser {
         if let Some(statement) = self.statement()? {
             initial_statements.push(statement)
         };
-
         let statements = {
             let mut statements = initial_statements;
             while self.current_token().is_symbol(';') || !self.is_current_eof() {
@@ -3740,7 +3250,6 @@ impl Parser {
             }
             statements
         };
-
         Ok(statements)
     }
 

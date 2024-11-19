@@ -3,7 +3,7 @@ use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
-use common::ttype::{self, TType};
+use common::ttype::TType;
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -57,6 +57,18 @@ impl Compiler {
         function: bool,
     ) -> Result<Vec<Asm>, NovaError> {
         self.filepath = filepath;
+
+        // get command line arguments and store them in the global scope as a list of strings
+        self.global.insert("args".to_string());
+        let cli_args: Vec<String> = std::env::args().skip(3).collect();
+        let arg_count = cli_args.len();
+        for x in cli_args.iter().cloned() {
+            self.asm.push(Asm::STRING(x));
+        }
+        self.asm.push(Asm::LIST(arg_count));
+        if let Some(index) = self.global.get_index("args".to_string()) {
+            self.asm.push(Asm::STOREGLOBAL(index as u32))
+        }
         for statements in input.program.iter() {
             match statements {
                 common::nodes::Statement::Foreach {
@@ -378,7 +390,7 @@ impl Compiler {
                     }
                     self.asm.push(Asm::LABEL(end));
                 }
-                common::nodes::Statement::Bind {
+                common::nodes::Statement::IfLet {
                     ttype: _,
                     identifier,
                     expr,
@@ -433,21 +445,20 @@ impl Compiler {
             }
         }
 
-        if function {
-        } else if alloc {
-            //self.output = self.load_package(self.output.clone());
-            self.asm
-                .insert(0, Asm::ALLOCLOCALS(self.variables.len() as u32));
+        match (function, alloc) {
+            (true, _) => {}
+            (false, true) => {
+                self.asm
+                    .insert(0, Asm::ALLOCLOCALS(self.variables.len() as u32));
+            }
+            _ => {}
         }
 
         if global {
-            //self.output = self.load_global(self.output.clone());
             self.asm
                 .insert(0, Asm::ALLOCGLOBBALS(self.global.len() as u32));
         }
 
-        // self.output.push(Code::RET);
-        // self.output.push(0);
         self.asm.push(Asm::RET(false));
         Ok(self.asm.to_owned())
     }

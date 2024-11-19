@@ -87,7 +87,7 @@ pub enum Statement {
         body: Vec<Statement>,
         alternative: Option<Vec<Statement>>,
     },
-    Bind {
+    IfLet {
         ttype: TType,
         identifier: String,
         expr: Expr,
