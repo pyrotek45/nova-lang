@@ -79,120 +79,127 @@ impl Lexer {
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
-        if self.buffer.is_empty() {
-            return None;
-        }
-        if let Some(token) = self.parse_number() {
-            return Some(token);
-        }
-        if let Some(token) = self.split_buffer_by_dot() {
-            return Some(token);
-        }
-        if let Some(token) = self.identify_token() {
-            return Some(token);
-        }
-        None
-    }
-
-    fn split_buffer_by_dot(&mut self) -> Option<Token> {
-        if !self.buffer.contains('.') {
-            return None;
-        }
-
-        let lastchar = self.buffer.chars().last();
-        let split = self.buffer.split('.');
-        for id in split {
-            if let Ok(v) = id.parse::<i64>() {
-                self.state = LexerState::Token;
-                self.token_list.push(Token::Integer {
-                    value: v,
-                    position: self.current_position_buffer_row(self.row - id.chars().count()),
-                });
-            } else {
-                self.token_list.push(Token::Identifier {
-                    name: id.to_string(),
-                    position: self.current_position_buffer_row(self.row - id.chars().count()),
+        if !self.buffer.is_empty() {
+            if let Ok(v) = self.buffer.parse() {
+                return Some(if self.buffer.contains('.') {
+                    self.state = LexerState::Token;
+                    Token::Float {
+                        value: v,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    }
+                } else {
+                    Token::Integer {
+                        value: v as i64,
+                        position: self.current_position(),
+                    }
                 });
             }
-            self.token_list.push(Token::Symbol {
-                symbol: '.',
-                position: self.current_position_buffer_row(self.row - id.chars().count()),
-            });
-        }
 
-        self.token_list.pop();
-
-        if let Some('.') = lastchar {
-            self.token_list.push(Token::Symbol {
-                symbol: '.',
-                position: self.current_position_buffer_row(self.row + 1),
-            });
-        }
-
-        None
-    }
-
-    fn parse_number(&mut self) -> Option<Token> {
-        if let Ok(v) = self.buffer.parse::<f64>() {
-            return Some(if self.buffer.contains('.') {
-                self.state = LexerState::Token;
-                Token::Float {
-                    value: v,
-                    position: self
-                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+            // Splits buffers beginning with a number, e.g., 1.print() -> 1 . print
+            if self.buffer.contains('.') {
+                let lastchar = self.buffer.chars().last();
+                let split = self.buffer.split('.');
+                for id in split {
+                    if let Ok(v) = id.parse::<i64>() {
+                        self.state = LexerState::Token;
+                        self.token_list.push(Token::Integer {
+                            value: v as i64,
+                            position: self
+                                .current_position_buffer_row(self.row - id.chars().count()),
+                        });
+                    } else {
+                        self.token_list.push(Token::Identifier {
+                            name: id.to_string(),
+                            position: self
+                                .current_position_buffer_row(self.row - id.chars().count()),
+                        });
+                    }
+                    self.token_list.push(Token::Symbol {
+                        symbol: '.',
+                        position: self.current_position_buffer_row(self.row - id.chars().count()),
+                    });
                 }
-            } else {
-                Token::Integer {
-                    value: v as i64,
-                    position: self
-                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+
+                self.token_list.pop();
+
+                if let Some('.') = lastchar {
+                    self.token_list.push(Token::Symbol {
+                        symbol: '.',
+                        position: self.current_position_buffer_row(self.row + 1),
+                    });
                 }
-            });
+                return None;
+            }
+
+            // Consider adding keywords like let, if, for, type, fn
+            match self.buffer.as_str() {
+                "false" => {
+                    return Some(Token::Bool {
+                        value: false,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "true" => {
+                    return Some(Token::Bool {
+                        value: true,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "Int" => {
+                    return Some(Token::Type {
+                        ttype: TType::Int,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "Float" => {
+                    return Some(Token::Type {
+                        ttype: TType::Float,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "Bool" => {
+                    return Some(Token::Type {
+                        ttype: TType::Bool,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "String" => {
+                    return Some(Token::Type {
+                        ttype: TType::String,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "Any" => {
+                    return Some(Token::Type {
+                        ttype: TType::Any,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "Char" => {
+                    return Some(Token::Type {
+                        ttype: TType::Char,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                _ => {
+                    return Some(Token::Identifier {
+                        name: self.buffer.to_string(),
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+            }
         }
         None
-    }
-
-    fn identify_token(&mut self) -> Option<Token> {
-        let token = match self.buffer.as_str() {
-            "false" => Token::Bool {
-                value: false,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "true" => Token::Bool {
-                value: true,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "Int" => Token::Type {
-                ttype: TType::Int,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "Float" => Token::Type {
-                ttype: TType::Float,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "Bool" => Token::Type {
-                ttype: TType::Bool,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "String" => Token::Type {
-                ttype: TType::String,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "Any" => Token::Type {
-                ttype: TType::Any,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            "Char" => Token::Type {
-                ttype: TType::Char,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-            _ => Token::Identifier {
-                name: self.buffer.to_string(),
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
-            },
-        };
-
-        Some(token)
     }
 
     fn check_token(&mut self) {

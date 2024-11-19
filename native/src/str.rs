@@ -2,51 +2,111 @@ use common::error::NovaError;
 use vm::state::{self, Heap, VmData};
 
 pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::String(index)) = state.stack.pop() {
-        if let Heap::String(str) = state.deref(index) {
-            state.stack.push(VmData::Int(str.len() as i64))
-        }
+    match state.stack.pop() {
+        Some(VmData::String(index)) => match state.deref(index) {
+            Heap::String(str) => {
+                state.stack.push(VmData::Int(str.len() as i64));
+                Ok(())
+            }
+            _ => Err(NovaError::Runtime {
+                msg: "Expected a string in the heap".to_string(),
+            }),
+        },
+        Some(_) => Err(NovaError::Runtime {
+            msg: "Expected a string on the stack".to_string(),
+        }),
+        None => Err(NovaError::Runtime {
+            msg: "Stack is empty".to_string(),
+        }),
     }
-    Ok(())
 }
 
 pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::String(index)) = state.stack.pop() {
-        if let Heap::String(str) = state.deref(index) {
-            state.gclock = true;
-            let mut myarray = vec![];
-            for c in str.chars() {
-                myarray.push(state.allocate_vmdata_to_heap(VmData::Char(c)))
+    match state.stack.pop() {
+        Some(VmData::String(index)) => match state.deref(index) {
+            Heap::String(str) => {
+                state.gclock = true;
+                let mut myarray = vec![];
+                for c in str.chars() {
+                    myarray.push(state.allocate_vmdata_to_heap(VmData::Char(c)));
+                }
+                let index = state.allocate_array(myarray);
+                state.stack.push(VmData::List(index));
+                state.gclock = false;
+                Ok(())
             }
-            let index = state.allocate_array(myarray);
-            state.stack.push(VmData::List(index));
-            state.gclock = false;
-        }
+            _ => Err(NovaError::Runtime {
+                msg: "Expected a string in the heap".to_string(),
+            }),
+        },
+        Some(_) => Err(NovaError::Runtime {
+            msg: "Expected a string on the stack".to_string(),
+        }),
+        None => Err(NovaError::Runtime {
+            msg: "Stack is empty".to_string(),
+        }),
     }
-    Ok(())
 }
 
 pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::List(index)) = state.stack.pop() {
-        if let Heap::List(array) = state.deref(index) {
-            state.gclock = true;
-            let mut str = String::new();
-            for item in array.iter() {
-                let char = state.deref(*item);
-                if let Heap::Char(c) = char {
-                    str.push(c)
-                }
+    let data = match state.stack.pop() {
+        Some(data) => data,
+        None => {
+            return Err(NovaError::Runtime {
+                msg: "Stack is empty".to_string(),
+            })
+        }
+    };
+
+    let index = match data {
+        VmData::List(index) => index,
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected a list on the stack".to_string(),
+            })
+        }
+    };
+
+    let array = match state.deref(index) {
+        Heap::List(array) => array,
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected a list in the heap".to_string(),
+            })
+        }
+    };
+
+    state.gclock = true;
+    let mut str = String::new();
+    for item in array.iter() {
+        let char = state.deref(*item);
+        match char {
+            Heap::Char(c) => str.push(c),
+            _ => {
+                state.gclock = false;
+                return Err(NovaError::Runtime {
+                    msg: "Expected a char in the list".to_string(),
+                });
             }
-            let index = state.allocate_string(str);
-            state.stack.push(VmData::String(index));
-            state.gclock = false;
         }
     }
+    let index = state.allocate_string(str);
+    state.stack.push(VmData::String(index));
+    state.gclock = false;
+
     Ok(())
 }
 
 pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
-    let data = state.stack.pop().unwrap();
+    let data = match state.stack.pop() {
+        Some(data) => data,
+        None => {
+            return Err(NovaError::Runtime {
+                msg: "Stack is empty".to_string(),
+            })
+        }
+    };
+
     let string = match data {
         VmData::StackAddress(v) => format!("Stack pointer: {v}"),
         VmData::Function(v) => format!("function pointer: {v}"),
@@ -58,35 +118,49 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
         VmData::List(v) => {
             let mut sbuild = String::new();
             if let Heap::List(array) = state.deref(v) {
-                sbuild += &format!("[");
+                sbuild += "[";
                 for (index, item) in array.iter().enumerate() {
                     if index > 0 {
-                        sbuild += &format!(", ");
+                        sbuild += ", ";
                     }
                     sbuild += &format!("{:?}", state.deref(*item));
                 }
-                sbuild += &format!("]");
-            };
+                sbuild += "]";
+            } else {
+                return Err(NovaError::Runtime {
+                    msg: "Expected a list in the heap".to_string(),
+                });
+            }
             sbuild
         }
         VmData::Struct(v) => format!("Struct pointer: {v}"),
         VmData::String(v) => {
-            let out = if let Heap::String(str) = state.deref(v) {
+            if let Heap::String(str) = state.deref(v) {
                 format!("{str}")
             } else {
-                todo!()
-            };
-            out
+                return Err(NovaError::Runtime {
+                    msg: "Expected a string in the heap".to_string(),
+                });
+            }
         }
         VmData::None => "None".to_string(),
     };
+
     let index = state.allocate_string(string);
     state.stack.push(VmData::String(index));
     Ok(())
 }
 
 pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
-    let data = state.stack.pop().unwrap_or(VmData::None);
+    let data = match state.stack.pop() {
+        Some(data) => data,
+        None => {
+            return Err(NovaError::Runtime {
+                msg: "Stack is empty".to_string(),
+            })
+        }
+    };
+
     let int = match data {
         VmData::Int(value) => value, // Already an integer, no conversion needed
         VmData::Float(value) => value as i64, // Convert float to integer
@@ -116,6 +190,7 @@ pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
             return Ok(());
         }
     };
+
     state.stack.push(VmData::Int(int));
     Ok(())
 }

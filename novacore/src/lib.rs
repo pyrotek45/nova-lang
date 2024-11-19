@@ -51,6 +51,17 @@ impl NovaCore {
 
     fn initnova(&mut self) {
         self.add_function(
+            "cliArgs",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::terminal::retrieve_command_line_args,
+        );
+        self.add_function(
             "hidecursor",
             TType::Function {
                 parameters: vec![TType::None],
@@ -239,13 +250,24 @@ impl NovaCore {
             native::str::chars_to_str,
         );
         self.add_function(
-            "chr",
+            "toStr",
+            TType::Function {
+                parameters: vec![TType::Generic {
+                    name: "A".to_string(),
+                }],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::to_string,
+        );
+        self.add_function(
+            "toChar",
             TType::Function {
                 parameters: vec![TType::Int],
                 return_type: Box::new(TType::Char),
             },
             common::nodes::SymbolKind::GenericFunction,
-            native::char::chr,
+            native::char::int_to_char,
         );
         self.add_function(
             "readFile",

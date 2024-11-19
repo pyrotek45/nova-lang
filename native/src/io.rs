@@ -5,10 +5,11 @@ use vm::state::{self, Heap, VmData};
 
 pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
     let mut input = String::new();
-    match io::stdin().read_line(&mut input) {
-        Ok(_) => {}
-        Err(_) => {}
-    }
+    io::stdin()
+        .read_line(&mut input)
+        .map_err(|e| NovaError::Runtime {
+            msg: format!("Error reading line: {}", e),
+        })?;
     // removing newline token
     input.pop();
     let index = state.allocate_string(input);
@@ -24,10 +25,13 @@ pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
                     let index = state.allocate_string(string);
                     state.stack.push(VmData::String(index));
                 }
-                Err(e) => {}
+                Err(e) => {
+                    return Err(NovaError::Runtime {
+                        msg: format!("Error reading file: {}", e),
+                    })
+                }
             }
         }
     }
-
     Ok(())
 }
