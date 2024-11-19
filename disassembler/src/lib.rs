@@ -19,6 +19,7 @@ impl Disassembler {
         println!("main:");
         for instruction in asm {
             match instruction {
+                Asm::EXIT => println!("    exit"),
                 Asm::ALLOCGLOBBALS(v) => println!("    global: {v}"),
                 Asm::ALLOCLOCALS(v) => println!("    local: {v}"),
                 Asm::OFFSET(v, l) => println!("    offset: {v} {l}"),

@@ -1,231 +1,194 @@
+use crate::{fileposition::FilePosition, ttype::TType};
 use colored::Colorize;
+use std::io::{self, BufRead};
 
-use crate::fileposition::FilePosition;
-
-fn read_lines<P>(filename: P) -> std::io::Result<std::io::Lines<std::io::BufReader<std::fs::File>>>
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<std::fs::File>>>
 where
     P: AsRef<std::path::Path>,
 {
     let file = std::fs::File::open(filename)?;
-    Ok(std::io::BufRead::lines(std::io::BufReader::new(file)))
+    Ok(io::BufReader::new(file).lines())
 }
 
-pub fn print_line(line: usize, row: Option<usize>, file: &str, msg: &str) {
-    if let Ok(lines) = read_lines(file) {
-        // Consumes the iterator, returns an (Optional) String
-        let mut linenumber = 1;
-        for l in lines {
-            if linenumber == line {
-                let spaces = line.to_string().chars().count();
-                if let Some(row) = row {
-                    if let Ok(ip) = l {
-                        for _ in 0..spaces {
-                            print!(" ")
-                        }
-                        println!(" |");
-                        println!("{} |  {} ", line, ip);
+pub fn print_line(position: &FilePosition, msg: &str) {
+    if let Ok(lines) = read_lines(&position.filepath) {
+        let line_number_width = position.line.to_string().chars().count();
 
-                        for _ in 0..spaces {
-                            print!(" ")
-                        }
-                        print!(" |");
+        for (linenumber, line_content) in lines.enumerate() {
+            let current_line = linenumber + 1;
+            if current_line == position.line {
+                if let Ok(line) = line_content {
+                    // Print line number and line content with padding
+                    print!("{:<width$} |\n", "", width = line_number_width);
+                    println!(
+                        "{:width$} | {}",
+                        current_line,
+                        line,
+                        width = line_number_width
+                    );
 
-                        for _ in 0..=row {
-                            print!(" ")
-                        }
-                        print!("{} {}", "^".red(), msg.bright_red());
-
-                        println!();
+                    // Print marker line with padding for alignment
+                    print!("{:<width$} |", "", width = line_number_width);
+                    if let Some(mut row) = position.row.checked_sub(1) {
+                        row += 1;
+                        println!("{: <row$}{} {}", "", "^".red(), msg.bright_red(), row = row);
+                    } else {
+                        println!(" {}", "^".red());
                     }
-                } else if let Ok(ip) = l {
-                    for _ in 0..spaces {
-                        print!(" ")
-                    }
-                    println!(" |");
-                    println!("{} |  {} ", line, ip);
-
-                    for _ in 0..spaces {
-                        print!(" ")
-                    }
-                    print!(" |");
-
-                    println!();
                 }
             }
-            linenumber += 1;
         }
     }
 }
 
-#[derive(Debug)]
-pub enum ErrorType {
-    File,
-    Lexing,
-    Parsing,
-    Compiler,
-    Runtime,
-    RuntimeWithPos,
-}
-
-#[derive(Debug)]
-pub struct NovaError {
-    error: ErrorType,
-    msg: String,
-    note: String,
-    line: usize,
-    row: usize,
-    filepath: String,
-    extra: Option<Vec<(String, usize, usize)>>,
+#[derive(Debug, Clone)]
+pub enum NovaError {
+    File {
+        msg: String,
+    },
+    Lexing {
+        msg: String,
+        note: String,
+        position: FilePosition,
+    },
+    Parsing {
+        msg: String,
+        note: String,
+        position: FilePosition,
+        extra: Option<Vec<(String, FilePosition)>>,
+    },
+    Compiler {
+        note: String,
+        position: FilePosition,
+    },
+    Runtime {
+        msg: String,
+    },
+    RuntimeWithPos {
+        msg: String,
+        position: FilePosition,
+    },
+    TypeError {
+        msg: String,
+        expected: String,
+        found: String,
+        position: FilePosition,
+    },
+    TypeMismatch {
+        expected: TType,
+        found: TType,
+        position: FilePosition,
+    },
 }
 
 impl NovaError {
-    #[inline(always)]
     pub fn show(&self) {
-        match self.error {
-            ErrorType::File => {
-                println!("{}: {}", "File Error".red(), self.msg)
+        match &self {
+            NovaError::File { msg } => {
+                println!("{}: {}", "File Error".red(), msg);
             }
-            ErrorType::Lexing => {
+            NovaError::Lexing {
+                msg,
+                note,
+                position,
+            } => {
                 println!(
-                    "{} in: {}:{}:{}",
+                    "{} in {}:{}:{}",
                     "Lexing Error".bright_red(),
-                    self.filepath,
-                    self.line,
-                    self.row
+                    position.filepath,
+                    position.line,
+                    position.row
                 );
-                print_line(
-                    self.line,
-                    Some(self.row + 1),
-                    &self.filepath,
-                    &self.msg.red(),
-                );
-                println!("{}: {}", "Note".bright_yellow(), self.note.bright_yellow());
+                print_line(position, &msg);
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
             }
-            ErrorType::Parsing => {
+            NovaError::Parsing {
+                msg,
+                note,
+                position,
+                extra,
+            } => {
                 println!(
-                    "{} in: {}:{}:{}",
+                    "{} in {}:{}:{}",
                     "Parsing Error".bright_red(),
-                    self.filepath,
-                    self.line,
-                    self.row
+                    position.filepath,
+                    position.line,
+                    position.row
                 );
-                print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
-                if let Some(extra) = &self.extra {
-                    for (msg, line, row) in extra.iter() {
-                        print_line(*line, Some(*row), &self.filepath, &msg.red());
+                print_line(position, &msg);
+                if let Some(extra_notes) = extra {
+                    for (extra_msg, extra_position) in extra_notes {
+                        print_line(&extra_position, &extra_msg);
                     }
                 }
-                println!("{}: {}", "Note".bright_yellow(), self.note.bright_yellow());
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
             }
-            ErrorType::Runtime => {
-                println!("Runtime Error: {}", self.msg.bright_red())
+            NovaError::Runtime { msg } => {
+                println!("Runtime Error: {}", msg.bright_red());
             }
-            ErrorType::Compiler => {
+            NovaError::Compiler { note, position } => {
                 println!(
-                    "{} in: {}:{}:{}",
+                    "{} in {}:{}",
                     "Compiling Error".bright_red(),
-                    self.filepath,
-                    self.line,
-                    self.row
+                    position.filepath,
+                    position.line
                 );
-                print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
-                println!("{}: {}", "Note".bright_yellow(), self.note.bright_yellow());
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
             }
-            ErrorType::RuntimeWithPos => {
+            NovaError::RuntimeWithPos { msg, position } => {
                 println!(
-                    "{} in: {}:{}:{}",
+                    "{} in {}:{}:{}",
                     "Runtime Error".bright_red(),
-                    self.filepath,
-                    self.line,
-                    self.row
+                    position.filepath,
+                    position.line,
+                    position.row
                 );
-                print_line(self.line, Some(self.row), &self.filepath, &self.msg.red());
+                print_line(position, &msg);
+            }
+            NovaError::TypeError {
+                msg,
+                expected,
+                found,
+                position,
+            } => {
+                println!(
+                    "{} in {}:{}:{}",
+                    "Type Error".bright_red(),
+                    position.filepath,
+                    position.line,
+                    position.row
+                );
+                print_line(
+                    position,
+                    &format!(
+                        "Expected type: {}\nFound type: {}",
+                        expected.to_string(),
+                        found.to_string()
+                    ),
+                );
+                println!("{}: {}", "Note".bright_yellow(), msg.bright_yellow());
+            }
+            NovaError::TypeMismatch {
+                expected,
+                found,
+                position,
+            } => {
+                println!(
+                    "{} in {}:{}:{}",
+                    "Type Mismatch".bright_red(),
+                    position.filepath,
+                    position.line,
+                    position.row
+                );
+                print_line(
+                    position,
+                    &format!(
+                        "Expected type: {}\nFound type: {}",
+                        expected.to_string(),
+                        found.to_string()
+                    ),
+                );
             }
         }
-    }
-}
-
-pub fn file_error(msg: String) -> NovaError {
-    NovaError {
-        error: ErrorType::File,
-        msg,
-        note: String::new(),
-        line: 0,
-        filepath: String::new(),
-        row: 0,
-        extra: None,
-    }
-}
-
-pub fn lexer_error(
-    msg: String,
-    note: String,
-    line: usize,
-    row: usize,
-    filepath: String,
-) -> NovaError {
-    NovaError {
-        error: ErrorType::Lexing,
-        msg,
-        note,
-        line,
-        row,
-        filepath,
-        extra: None,
-    }
-}
-
-pub fn parser_error(
-    msg: String,
-    note: String,
-    line: usize,
-    row: usize,
-    filepath: String,
-    extra: Option<Vec<(String, usize, usize)>>,
-) -> NovaError {
-    NovaError {
-        error: ErrorType::Parsing,
-        msg,
-        note,
-        line,
-        row,
-        filepath,
-        extra,
-    }
-}
-
-pub fn runtime_error(msg: String) -> NovaError {
-    NovaError {
-        error: ErrorType::Runtime,
-        msg,
-        note: String::new(),
-        line: 0,
-        filepath: String::new(),
-        row: 0,
-        extra: None,
-    }
-}
-
-pub fn runtime_error_with_pos(msg: String, pos: FilePosition) -> NovaError {
-    NovaError {
-        error: ErrorType::RuntimeWithPos,
-        msg,
-        note: String::new(),
-        line: pos.line,
-        filepath: pos.filepath,
-        row: pos.row,
-        extra: None,
-    }
-}
-
-pub fn compiler_error(note: String, line: usize, filepath: String) -> NovaError {
-    NovaError {
-        error: ErrorType::Compiler,
-        msg: String::new(),
-        note,
-        line: line + 1,
-        filepath,
-        row: 0,
-        extra: None,
     }
 }

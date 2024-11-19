@@ -1,6 +1,6 @@
 use common::{
-    error::{file_error, lexer_error, NovaError},
-    fileposition::FilePosition,
+    error::NovaError,
+    fileposition::{load_file_content, FilePosition},
     tokens::{Operator, Token, TokenList},
     ttype::TType,
 };
@@ -23,6 +23,8 @@ pub struct Lexer {
     token_list: TokenList,
     buffer: String,
     state: LexerState,
+    string_start_position: Vec<usize>,
+    char_start_position: Vec<usize>,
 }
 
 impl Default for Lexer {
@@ -35,16 +37,17 @@ impl Default for Lexer {
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
+            string_start_position: vec![],
+            char_start_position: vec![],
         }
     }
 }
 
 impl Lexer {
-    // Move opening file into seperate section
     pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
-        let source = match std::fs::read_to_string(filepath) {
-            Ok(content) => content,
-            Err(_) => return Err(file_error(format!(" '{filepath}' is not a valid filepath"))),
+        let source = match load_file_content(filepath) {
+            Ok(value) => value,
+            Err(value) => return Err(value),
         };
         Ok(Lexer {
             line: 1,
@@ -54,6 +57,8 @@ impl Lexer {
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
+            string_start_position: vec![],
+            char_start_position: vec![],
         })
     }
 
@@ -74,127 +79,120 @@ impl Lexer {
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
-        if !self.buffer.is_empty() {
-            if let Ok(v) = self.buffer.parse() {
-                return Some(if self.buffer.contains('.') {
-                    self.state = LexerState::Token;
-                    Token::Float {
-                        value: v,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    }
-                } else {
-                    Token::Integer {
-                        value: v as i64,
-                        position: self.current_position(),
-                    }
-                });
-            }
-
-            // Splits buffers beginning with a number, e.g., 1.print() -> 1 . print
-            if self.buffer.contains('.') {
-                let lastchar = self.buffer.chars().last();
-                let split = self.buffer.split('.');
-                for id in split {
-                    if let Ok(v) = id.parse::<i64>() {
-                        self.state = LexerState::Token;
-                        self.token_list.push(Token::Integer {
-                            value: v as i64,
-                            position: self
-                                .current_position_buffer_row(self.row - id.chars().count()),
-                        });
-                    } else {
-                        self.token_list.push(Token::Identifier {
-                            name: id.to_string(),
-                            position: self
-                                .current_position_buffer_row(self.row - id.chars().count()),
-                        });
-                    }
-                    self.token_list.push(Token::Symbol {
-                        symbol: '.',
-                        position: self.current_position_buffer_row(self.row - id.chars().count()),
-                    });
-                }
-
-                self.token_list.pop();
-
-                if let Some('.') = lastchar {
-                    self.token_list.push(Token::Symbol {
-                        symbol: '.',
-                        position: self.current_position_buffer_row(self.row + 1),
-                    });
-                }
-                return None;
-            }
-
-            // Consider adding keywords like let, if, for, type, fn
-            match self.buffer.as_str() {
-                "false" => {
-                    return Some(Token::Bool {
-                        value: false,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "true" => {
-                    return Some(Token::Bool {
-                        value: true,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Int" => {
-                    return Some(Token::Type {
-                        ttype: TType::Int,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Float" => {
-                    return Some(Token::Type {
-                        ttype: TType::Float,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Bool" => {
-                    return Some(Token::Type {
-                        ttype: TType::Bool,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "String" => {
-                    return Some(Token::Type {
-                        ttype: TType::String,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Any" => {
-                    return Some(Token::Type {
-                        ttype: TType::Any,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Char" => {
-                    return Some(Token::Type {
-                        ttype: TType::Char,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                _ => {
-                    return Some(Token::Identifier {
-                        name: self.buffer.to_string(),
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-            }
+        if self.buffer.is_empty() {
+            return None;
+        }
+        if let Some(token) = self.parse_number() {
+            return Some(token);
+        }
+        if let Some(token) = self.split_buffer_by_dot() {
+            return Some(token);
+        }
+        if let Some(token) = self.identify_token() {
+            return Some(token);
         }
         None
+    }
+
+    fn split_buffer_by_dot(&mut self) -> Option<Token> {
+        if !self.buffer.contains('.') {
+            return None;
+        }
+
+        let lastchar = self.buffer.chars().last();
+        let split = self.buffer.split('.');
+        for id in split {
+            if let Ok(v) = id.parse::<i64>() {
+                self.state = LexerState::Token;
+                self.token_list.push(Token::Integer {
+                    value: v,
+                    position: self.current_position_buffer_row(self.row - id.chars().count()),
+                });
+            } else {
+                self.token_list.push(Token::Identifier {
+                    name: id.to_string(),
+                    position: self.current_position_buffer_row(self.row - id.chars().count()),
+                });
+            }
+            self.token_list.push(Token::Symbol {
+                symbol: '.',
+                position: self.current_position_buffer_row(self.row - id.chars().count()),
+            });
+        }
+
+        self.token_list.pop();
+
+        if let Some('.') = lastchar {
+            self.token_list.push(Token::Symbol {
+                symbol: '.',
+                position: self.current_position_buffer_row(self.row + 1),
+            });
+        }
+
+        None
+    }
+
+    fn parse_number(&mut self) -> Option<Token> {
+        if let Ok(v) = self.buffer.parse::<f64>() {
+            return Some(if self.buffer.contains('.') {
+                self.state = LexerState::Token;
+                Token::Float {
+                    value: v,
+                    position: self
+                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                }
+            } else {
+                Token::Integer {
+                    value: v as i64,
+                    position: self
+                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                }
+            });
+        }
+        None
+    }
+
+    fn identify_token(&mut self) -> Option<Token> {
+        let token = match self.buffer.as_str() {
+            "false" => Token::Bool {
+                value: false,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "true" => Token::Bool {
+                value: true,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "Int" => Token::Type {
+                ttype: TType::Int,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "Float" => Token::Type {
+                ttype: TType::Float,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "Bool" => Token::Type {
+                ttype: TType::Bool,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "String" => Token::Type {
+                ttype: TType::String,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "Any" => Token::Type {
+                ttype: TType::Any,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            "Char" => Token::Type {
+                ttype: TType::Char,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+            _ => Token::Identifier {
+                name: self.buffer.to_string(),
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            },
+        };
+
+        Some(token)
     }
 
     fn check_token(&mut self) {
@@ -207,13 +205,11 @@ impl Lexer {
     pub fn tokenize(&mut self) -> Result<TokenList, NovaError> {
         if self.filepath.is_empty() {
             // Consider making the error take a Position struct
-            return Err(lexer_error(
-                "Missing filepath".to_string(),
-                "".to_string(),
-                0,
-                0,
-                "".to_string(),
-            ));
+            return Err(NovaError::Lexing {
+                msg: String::from("File is missing"),
+                note: String::from("Check the files location was typed correctly"),
+                position: self.current_position(),
+            });
         }
 
         let tempstr = self.source_file.clone();
@@ -227,7 +223,7 @@ impl Lexer {
                 } else {
                     self.state = LexerState::Token;
                     self.line += 1;
-                    self.row = 0;
+                    self.row = 1;
                     continue;
                 }
             }
@@ -237,74 +233,70 @@ impl Lexer {
                         Some('n') => {
                             chars.next();
                             self.buffer.push('\n');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('t') => {
                             chars.next();
                             self.buffer.push('\t');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('r') => {
                             chars.next();
                             self.buffer.push('\r');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
                             self.buffer.push('\'');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
                             self.buffer.push('\"');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('0') => {
                             chars.next();
                             self.buffer.push('\0');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
                             self.buffer.push('\\');
-                            self.row += 1;
+                            self.row += 2;
                             continue;
                         }
                         _ => {
-                            return Err(common::error::lexer_error(
-                                "Expecting valid escape char".to_string(),
-                                "".to_string(),
-                                self.line,
-                                self.row - self.buffer.chars().count(),
-                                self.filepath.clone(),
-                            ));
+                            println!("{}", self.line);
+                            return Err(NovaError::Lexing {
+                                msg: String::from("Expecting valid escape char"),
+                                note: String::from(""),
+                                position: self.current_position(),
+                            });
                         }
                     }
                 }
                 if c != '"' {
+                    if c == '\n' {
+                        self.line += 1;
+                        self.row = 1;
+                    } else {
+                        self.row += 1;
+                    }
                     self.buffer.push(c);
                     continue;
                 } else {
                     self.state = LexerState::Token;
-                    self.row += self.buffer.chars().count();
-                    let invisable_offset = self
-                        .buffer
-                        .chars()
-                        .filter(|opt_char| {
-                            matches!(opt_char, '\n' | '\t' | '\r' | '\\' | '\"' | '\0')
-                        })
-                        .count();
+                    let string_start = self.string_start_position.pop().unwrap();
                     self.token_list.push(Token::String {
                         value: self.buffer.clone(),
-                        position: self.current_position_buffer_row(
-                            self.row - self.buffer.chars().count() - invisable_offset,
-                        ),
+                        position: self.current_position_buffer_row(string_start),
                     });
                     self.row += 1;
                     self.buffer.clear();
@@ -316,117 +308,75 @@ impl Lexer {
                     match chars.peek() {
                         Some('n') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\n',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\n');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('t') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\t',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\t');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('r') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\r',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\r');
                             self.row += 2;
-                            self.buffer.clear();
-                            continue;
-                        }
-                        Some('h') => {
-                            chars.next();
-                            self.token_list.push(Token::String {
-                                value: "\x1b[?25h".to_string(),
-                                position: self.current_position(),
-                            });
-                            self.row += 2;
-                            self.buffer.clear();
-                            continue;
-                        }
-                        Some('l') => {
-                            chars.next();
-                            self.token_list.push(Token::String {
-                                value: "\x1b[?25l".to_string(),
-                                position: self.current_position(),
-                            });
-                            self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\'',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\'');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\"',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\"');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('0') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\0',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\0');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
-                            self.token_list.push(Token::Char {
-                                value: '\\',
-                                position: self.current_position(),
-                            });
+                            self.buffer.push('\\');
                             self.row += 2;
-                            self.buffer.clear();
                             continue;
                         }
                         _ => {
-                            return Err(common::error::lexer_error(
-                                "Expecting valid escape char".to_string(),
-                                "".to_string(),
-                                self.line,
-                                self.row - self.buffer.chars().count(),
-                                self.filepath.clone(),
-                            ));
+                            return Err(NovaError::Lexing {
+                                msg: String::from("Expecting valid escape char"),
+                                note: String::from(""),
+                                position: self.current_position(),
+                            })
                         }
                     }
                 } else if c == '\'' {
                     self.state = LexerState::Token;
                     // should throw error, cant have ''
+                    if self.buffer.is_empty() || self.buffer.chars().count() > 1 {
+                        return Err(NovaError::Lexing {
+                            msg: String::from("Expecting valid char"),
+                            note: String::from(format!("? {}", self.buffer)),
+                            position: self.current_position(),
+                        });
+                    }
+                    let char_start = self.char_start_position.pop().unwrap();
+                    self.token_list.push(Token::Char {
+                        value: self.buffer.chars().next().unwrap(),
+                        position: self.current_position_buffer_row(char_start),
+                    });
                     self.row += 1;
                     self.buffer.clear();
                     continue;
                 } else {
-                    self.token_list.push(Token::Char {
-                        value: c,
-                        position: self.current_position(),
-                    });
+                    self.buffer.push(c);
                     self.row += 1;
-                    self.buffer.clear();
                     continue;
                 }
             }
@@ -435,15 +385,18 @@ impl Lexer {
                 '\'' => {
                     self.state = LexerState::Char;
                     self.check_token();
+                    self.char_start_position.push(self.row);
                 }
                 '"' => {
                     self.state = LexerState::String;
                     self.check_token();
+                    self.string_start_position.push(self.row);
                 }
                 '\n' => {
                     self.check_token();
                     self.line += 1;
-                    self.row = 0;
+                    self.row = 1;
+                    continue;
                 }
                 '\r' => self.check_token(),
                 '\t' => self.check_token(),
@@ -671,12 +624,7 @@ impl Lexer {
 
     pub fn check(&self) {
         for token in self.token_list.iter() {
-            common::error::print_line(
-                token.line(),
-                Some(token.row()),
-                &token.file(),
-                &format!("{}", token.to_string()),
-            );
+            common::error::print_line(&token.position(), &format!("{}", token.to_string()));
         }
     }
 }

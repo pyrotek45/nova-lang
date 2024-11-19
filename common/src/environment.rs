@@ -44,25 +44,30 @@ impl Environment {
                     id.to_string(),
                     Symbol {
                         id: id.to_string(),
-                        ttype: ttype,
-                        pos: pos,
-                        kind: kind,
+                        ttype,
+                        pos,
+                        kind,
                     },
                 );
             }
             SymbolKind::Function => {
-                if let TType::Function(inputtypes, _) = ttype.clone() {
+                if let TType::Function {
+                    parameters: input_types,
+                    ..
+                } = ttype.clone()
+                {
+                    let unique_id = generate_unique_string(id, &input_types);
                     self.values.last_mut().unwrap().insert(
-                        generate_unique_string(&id, &inputtypes),
+                        unique_id.clone(),
                         Symbol {
-                            id: generate_unique_string(&id, &inputtypes),
-                            ttype: ttype,
-                            pos: pos,
-                            kind: kind,
+                            id: unique_id,
+                            ttype,
+                            pos,
+                            kind,
                         },
                     );
                 } else {
-                    panic!("does not have type function")
+                    panic!("does not have type function");
                 }
             }
             _ => {
@@ -70,9 +75,9 @@ impl Environment {
                     id.to_string(),
                     Symbol {
                         id: id.to_string(),
-                        ttype: ttype,
-                        pos: pos,
-                        kind: kind,
+                        ttype,
+                        pos,
+                        kind,
                     },
                 );
             }
@@ -107,7 +112,7 @@ impl Environment {
                 return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
             }
         }
-        return None;
+        None
     }
 
     pub fn get_function_type_capture(
@@ -123,28 +128,26 @@ impl Environment {
                         .unwrap()
                         .insert(s.id.clone(), s.clone());
                 }
-                if let TType::Function(_, _) = s.ttype {
+                if let TType::Function { .. } = s.ttype {
                     return Some((
                         s.ttype.clone(),
                         generate_unique_string(symbol, arguments),
                         s.kind.clone(),
                     ));
                 }
-            } else {
-                if let Some(s) = search.get(symbol) {
-                    if i != 0 {
-                        self.captured
-                            .last_mut()
-                            .unwrap()
-                            .insert(s.id.clone(), s.clone());
-                    }
-                    if let TType::Function(_, _) = s.ttype {
-                        return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
-                    }
+            } else if let Some(s) = search.get(symbol) {
+                if i != 0 {
+                    self.captured
+                        .last_mut()
+                        .unwrap()
+                        .insert(s.id.clone(), s.clone());
+                }
+                if let TType::Function { .. } = s.ttype {
+                    return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
                 }
             }
         }
-        return None;
+        None
     }
 
     pub fn get_function_type(
@@ -153,26 +156,24 @@ impl Environment {
         arguments: &[TType],
     ) -> Option<(TType, String, SymbolKind)> {
         if let Some(s) = self.values.last().unwrap().get(symbol) {
-            if let TType::Function(_, _) = s.ttype {
+            if let TType::Function { .. } = s.ttype {
+                Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
+            } else {
+                None
+            }
+        } else if let Some(s) = self
+            .values
+            .last()
+            .unwrap()
+            .get(&generate_unique_string(symbol, arguments))
+        {
+            if let TType::Function { .. } = s.ttype {
                 Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
             } else {
                 None
             }
         } else {
-            if let Some(s) = self
-                .values
-                .last()
-                .unwrap()
-                .get(&generate_unique_string(symbol, arguments))
-            {
-                if let TType::Function(_, _) = s.ttype {
-                    Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -181,13 +182,7 @@ impl Environment {
         self.captured.push(self.captured.last().unwrap().clone());
         for (id, sym) in self.values.last().unwrap().iter() {
             match sym.kind {
-                SymbolKind::Function => {
-                    scope.insert(id.clone(), sym.clone());
-                }
-                SymbolKind::GenericFunction => {
-                    scope.insert(id.clone(), sym.clone());
-                }
-                SymbolKind::Constructor => {
+                SymbolKind::Function | SymbolKind::GenericFunction | SymbolKind::Constructor => {
                     scope.insert(id.clone(), sym.clone());
                 }
                 _ => {}

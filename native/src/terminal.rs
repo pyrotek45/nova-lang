@@ -61,3 +61,13 @@ pub fn clear_screen(_state: &mut state::State) -> Result<(), NovaError> {
     execute!(stdout(), MoveTo(0, 0)).unwrap();
     Ok(())
 }
+
+pub fn hide_cursor(_state: &mut state::State) -> Result<(), NovaError> {
+    execute!(stdout(), crossterm::cursor::Hide).unwrap();
+    Ok(())
+}
+
+pub fn show_cursor(_state: &mut state::State) -> Result<(), NovaError> {
+    execute!(stdout(), crossterm::cursor::Show).unwrap();
+    Ok(())
+}

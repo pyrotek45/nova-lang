@@ -1,4 +1,5 @@
-use common::error::{runtime_error, NovaError};
+//use common::error::{runtime_error, NovaError};
+use common::error::NovaError;
 use std::{fs, io};
 use vm::state::{self, Heap, VmData};
 
@@ -6,11 +7,7 @@ pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
     let mut input = String::new();
     match io::stdin().read_line(&mut input) {
         Ok(_) => {}
-        Err(_) => {
-            return Err(common::error::runtime_error(
-                "Failed to readline".to_owned(),
-            ))
-        }
+        Err(_) => {}
     }
     // removing newline token
     input.pop();
@@ -27,9 +24,7 @@ pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
                     let index = state.allocate_string(string);
                     state.stack.push(VmData::String(index));
                 }
-                Err(e) => {
-                    return Err(runtime_error(e.to_string()));
-                }
+                Err(e) => {}
             }
         }
     }

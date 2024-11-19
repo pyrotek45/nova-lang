@@ -4,6 +4,7 @@ pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
 use std::{
     collections::HashMap,
     io::{self, Write},
+    process::exit,
 };
 
 use common::{
@@ -38,6 +39,7 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
+                Code::EXIT => exit(0),
                 Code::CONCAT => {
                     if let (Some(VmData::String(s1)), Some(VmData::String(s2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
@@ -269,9 +271,12 @@ impl Vm {
                         let result = v1 + v2;
                         self.state.stack.push(VmData::Float(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer addition".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -282,9 +287,12 @@ impl Vm {
                         let result = v2 - v1;
                         self.state.stack.push(VmData::Float(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer sub".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -295,9 +303,12 @@ impl Vm {
                         let result = v1 * v2;
                         self.state.stack.push(VmData::Float(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer mul".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -308,9 +319,12 @@ impl Vm {
                         let result = v2 / v1;
                         self.state.stack.push(VmData::Float(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -321,9 +335,12 @@ impl Vm {
                         let result = v1 + v2;
                         self.state.stack.push(VmData::Int(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer addition".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -334,9 +351,12 @@ impl Vm {
                         let result = v2 - v1;
                         self.state.stack.push(VmData::Int(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer sub".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -347,9 +367,12 @@ impl Vm {
                         let result = v1 * v2;
                         self.state.stack.push(VmData::Int(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer mul".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -360,9 +383,12 @@ impl Vm {
                         let result = v2 / v1;
                         self.state.stack.push(VmData::Int(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -448,9 +474,12 @@ impl Vm {
                         let result = v2 < v1;
                         self.state.stack.push(VmData::Bool(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for ILSS".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -461,9 +490,12 @@ impl Vm {
                         let result = v2 > v1;
                         self.state.stack.push(VmData::Bool(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for ILSS".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -474,9 +506,12 @@ impl Vm {
                         let result = v2 < v1;
                         self.state.stack.push(VmData::Bool(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for FLSS".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -487,9 +522,12 @@ impl Vm {
                         let result = v2 > v1;
                         self.state.stack.push(VmData::Bool(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for FLSS".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -548,9 +586,12 @@ impl Vm {
                             }
                         }
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for EQ".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -565,9 +606,12 @@ impl Vm {
                                 }
                             }
                             _ => {
-                                return Err(common::error::runtime_error(
-                                    "Cannot 'NOT' a non bool value".to_string(),
-                                ));
+                                return Err(NovaError::Runtime {
+                                    msg: format!(
+                                        "Error on Opcode : {}",
+                                        self.state.current_instruction
+                                    ),
+                                });
                             }
                         }
                     }
@@ -595,9 +639,12 @@ impl Vm {
                             VmData::Int(v) => self.state.stack.push(VmData::Int(-v)),
                             VmData::Float(v) => self.state.stack.push(VmData::Float(-v)),
                             _ => {
-                                return Err(common::error::runtime_error(
-                                    "Cannot 'NEG' a non bool value".to_string(),
-                                ));
+                                return Err(NovaError::Runtime {
+                                    msg: format!(
+                                        "Error on Opcode : {}",
+                                        self.state.current_instruction
+                                    ),
+                                });
                             }
                         }
                     }
@@ -610,9 +657,12 @@ impl Vm {
                         let result = v2.modulo(v1);
                         self.state.stack.push(VmData::Int(result))
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -655,9 +705,12 @@ impl Vm {
                             }
                         }
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for assignment".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -691,36 +744,6 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         match (array, index) {
-                            // (
-                            //     VmData::StackAddress(array_index),
-                            //     VmData::StackAddress(index_to_get),
-                            // ) => {
-                            //     if let VmData::Int(index_to_get) =
-                            //         self.state.stack[self.state.offset + index_to_get as usize]
-                            //     {
-                            //         if let VmData::List(newindex) =
-                            //             &self.state.stack[self.state.offset + array_index as usize]
-                            //         {
-                            //             if let Heap::List(array) = self.state.deref(*newindex) {
-                            //                 if array.len() <= index_to_get as usize {
-                            //                     if let Some(pos) = self
-                            //                         .runtime_errors_table
-                            //                         .get(&self.state.current_instruction)
-                            //                     {
-                            //                         return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
-                            //                     } else {
-                            //                         return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
-                            //                     }
-                            //                 }
-                            //                 self.state
-                            //                     .stack
-                            //                     .push(VmData::List(array[index_to_get as usize]))
-                            //             }
-                            //         }
-                            //     } else {
-                            //         todo!()
-                            //     }
-                            // }
                             (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
                                 if let VmData::List(newindex) =
                                     &self.state.stack[self.state.offset + array_index as usize]
@@ -731,9 +754,9 @@ impl Vm {
                                                 .runtime_errors_table
                                                 .get(&self.state.current_instruction)
                                             {
-                                                return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), position: pos.clone() });
                                             } else {
-                                                return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get) });
                                             }
                                         }
                                         self.state
@@ -752,9 +775,9 @@ impl Vm {
                                                 .runtime_errors_table
                                                 .get(&self.state.current_instruction)
                                             {
-                                                return Err(common::error::runtime_error_with_pos(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), pos.clone()));
+                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), position: pos.clone() });
                                             } else {
-                                                return Err(common::error::runtime_error(format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get)));
+                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get) });
                                             }
                                         }
                                         self.state
@@ -771,9 +794,12 @@ impl Vm {
                             }
                         }
                     } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for assignment".to_string(),
-                        ));
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error Not enough arguments Opcode : {}",
+                                self.state.current_instruction
+                            ),
+                        });
                     }
                 }
 
@@ -1188,10 +1214,6 @@ impl Vm {
                     {
                         let result = v1 + v2;
                         self.state.stack.push(VmData::Float(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer addition".to_string(),
-                        ));
                     }
                 }
 
@@ -1201,10 +1223,6 @@ impl Vm {
                     {
                         let result = v2 - v1;
                         self.state.stack.push(VmData::Float(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer sub".to_string(),
-                        ));
                     }
                 }
 
@@ -1214,10 +1232,6 @@ impl Vm {
                     {
                         let result = v1 * v2;
                         self.state.stack.push(VmData::Float(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer mul".to_string(),
-                        ));
                     }
                 }
 
@@ -1227,10 +1241,6 @@ impl Vm {
                     {
                         let result = v2 / v1;
                         self.state.stack.push(VmData::Float(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
                     }
                 }
 
@@ -1240,10 +1250,6 @@ impl Vm {
                     {
                         let result = v1 + v2;
                         self.state.stack.push(VmData::Int(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer addition".to_string(),
-                        ));
                     }
                 }
 
@@ -1253,10 +1259,6 @@ impl Vm {
                     {
                         let result = v2 - v1;
                         self.state.stack.push(VmData::Int(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer sub".to_string(),
-                        ));
                     }
                 }
 
@@ -1266,10 +1268,6 @@ impl Vm {
                     {
                         let result = v1 * v2;
                         self.state.stack.push(VmData::Int(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer mul".to_string(),
-                        ));
                     }
                 }
 
@@ -1279,10 +1277,6 @@ impl Vm {
                     {
                         let result = v2 / v1;
                         self.state.stack.push(VmData::Int(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
                     }
                 }
 
@@ -1366,10 +1360,6 @@ impl Vm {
                     {
                         let result = v2 < v1;
                         self.state.stack.push(VmData::Bool(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for ILSS".to_string(),
-                        ));
                     }
                 }
 
@@ -1379,10 +1369,6 @@ impl Vm {
                     {
                         let result = v2 > v1;
                         self.state.stack.push(VmData::Bool(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for ILSS".to_string(),
-                        ));
                     }
                 }
 
@@ -1392,10 +1378,6 @@ impl Vm {
                     {
                         let result = v2 < v1;
                         self.state.stack.push(VmData::Bool(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for FLSS".to_string(),
-                        ));
                     }
                 }
 
@@ -1405,10 +1387,6 @@ impl Vm {
                     {
                         let result = v2 > v1;
                         self.state.stack.push(VmData::Bool(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for FLSS".to_string(),
-                        ));
                     }
                 }
 
@@ -1466,10 +1444,6 @@ impl Vm {
                                 self.state.stack.push(VmData::Bool(result))
                             }
                         }
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for EQ".to_string(),
-                        ));
                     }
                 }
 
@@ -1499,11 +1473,7 @@ impl Vm {
                                     self.state.stack.push(VmData::Bool(true))
                                 }
                             }
-                            _ => {
-                                return Err(common::error::runtime_error(
-                                    "Cannot 'NOT' a non bool value".to_string(),
-                                ));
-                            }
+                            _ => {}
                         }
                     }
                 }
@@ -1513,11 +1483,7 @@ impl Vm {
                         match value {
                             VmData::Int(v) => self.state.stack.push(VmData::Int(-v)),
                             VmData::Float(v) => self.state.stack.push(VmData::Float(-v)),
-                            _ => {
-                                return Err(common::error::runtime_error(
-                                    "Cannot 'NEG' a non bool value".to_string(),
-                                ));
-                            }
+                            _ => {}
                         }
                     }
                 }
@@ -1528,10 +1494,6 @@ impl Vm {
                     {
                         let result = v2.modulo(v1);
                         self.state.stack.push(VmData::Int(result))
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for integer div".to_string(),
-                        ));
                     }
                 }
 
@@ -1569,10 +1531,6 @@ impl Vm {
                                 todo!()
                             }
                         }
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for assignment".to_string(),
-                        ));
                     }
                 }
 
@@ -1656,10 +1614,6 @@ impl Vm {
                                 todo!()
                             }
                         }
-                    } else {
-                        return Err(common::error::runtime_error(
-                            "Not enough arguments for assignment".to_string(),
-                        ));
                     }
                 }
 

@@ -3,7 +3,7 @@ use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
-use common::ttype::{type_to_string, TType};
+use common::ttype::{self, TType};
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -233,12 +233,7 @@ impl Compiler {
                     self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
-                Return {
-                    ttype,
-                    expr,
-                    row: _,
-                    line: _,
-                } => {
+                Return { ttype, expr } => {
                     self.compile_expr(expr.clone())?;
                     if ttype != &TType::Void {
                         self.asm.push(Asm::RET(true))
@@ -246,13 +241,9 @@ impl Compiler {
                         self.asm.push(Asm::RET(false))
                     }
                 }
-                Expression {
-                    ttype: _,
-                    expr,
-                    used,
-                } => {
+                Expression { ttype, expr } => {
                     self.compile_expr(expr.clone())?;
-                    if !used {
+                    if ttype != &TType::Void {
                         self.asm.push(Asm::POP);
                     }
                 }
@@ -464,63 +455,69 @@ impl Compiler {
     pub fn getref_expr(&mut self, expr: Expr) -> Result<(), NovaError> {
         match expr {
             Expr::None => {
-                //self.output.push(Code::NONE)
+                // self.output.push(Code::NONE)
             }
-            Expr::ListConstructor(_, _) => todo!(),
-            Expr::Field(_t, _id, index, from, pos) => {
-                //dbg!(id,t);
+            Expr::ListConstructor { .. } => todo!(),
+            Expr::Field {
+                index,
+                expr,
+                position,
+                ..
+            } => {
+                // dbg!(id, t);
                 self.asm.push(Asm::INTEGER(index as i64));
-                self.getref_expr(*from)?;
-                self.asm.push(Asm::PIN(pos));
+                self.getref_expr(*expr)?;
+                self.asm.push(Asm::PIN(position));
             }
-            Expr::Indexed(_, _, index, from, pos) => {
+            Expr::Indexed {
+                container,
+                index,
+                position,
+                ..
+            } => {
                 self.compile_expr(*index)?;
-                self.getref_expr(*from)?;
-                self.asm.push(Asm::PIN(pos));
+                self.getref_expr(*container)?;
+                self.asm.push(Asm::PIN(position));
             }
-            Expr::Call(_, _, _, _) => todo!(),
-            Expr::Unary(_, _, _) => todo!(),
-            Expr::Binop(_, _, _, _) => todo!(),
-            Expr::Literal(_, atom) => {
-                self.getref_atom(atom)?;
+            Expr::Call { .. } => todo!(),
+            Expr::Unary { .. } => todo!(),
+            Expr::Binop { .. } => todo!(),
+            Expr::Literal { value, .. } => {
+                self.getref_atom(value)?;
             }
-            Expr::Closure(_, _, _, _) => todo!(),
+            Expr::Closure { .. } => todo!(),
         }
         Ok(())
     }
 
     pub fn getref_atom(&mut self, atom: Atom) -> Result<(), NovaError> {
         match atom {
-            Atom::Bool(bool) => {
-                if bool {
-                    self.asm.push(Asm::BOOL(true));
-                } else {
-                    self.asm.push(Asm::BOOL(false));
-                }
+            Atom::Bool { value } => {
+                self.asm.push(Asm::BOOL(value));
             }
-            Atom::Id(identifier) => {
-                if let Some(index) = self.variables.get_index(identifier.to_string()) {
+            Atom::Id { name } => {
+                if let Some(index) = self.variables.get_index(name.to_string()) {
                     self.asm.push(Asm::STACKREF(index as u32));
                 } else {
-                    self.variables.insert(identifier.to_string());
+                    self.variables.insert(name.to_string());
                     let index = self.variables.len() - 1;
                     self.asm.push(Asm::STACKREF(index as u32));
                 }
             }
-            Atom::Float(float) => {
+            Atom::Float { value: float } => {
                 self.asm.push(Asm::FLOAT(float));
             }
-            Atom::String(str) => {
+            Atom::String { value: str } => {
                 self.asm.push(Asm::STRING(str.clone()));
             }
-            Atom::Integer(int) => {
+            Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(int));
             }
-            Atom::Call(caller, list) => {
-                for expr in list.iter() {
-                    self.compile_expr(expr.clone())?
+            Atom::Call { name, arguments } => {
+                for expr in arguments.iter() {
+                    self.compile_expr(expr.clone())?;
                 }
-                match caller.as_str() {
+                match name.as_str() {
                     "print" => self.asm.push(Asm::PRINT),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
@@ -537,7 +534,7 @@ impl Compiler {
                     }
                 }
             }
-            Atom::Char(_) => todo!(),
+            Atom::Char { .. } => todo!(),
             Atom::None => todo!(),
         }
         Ok(())
@@ -549,34 +546,36 @@ impl Compiler {
                 //    Ok(self.output.push(Code::NONE))
                 Ok(())
             }
-            Expr::ListConstructor(_, list) => {
-                for x in list.iter().cloned() {
+            Expr::ListConstructor { elements, .. } => {
+                for x in elements.iter().cloned() {
                     self.compile_expr(x)?;
                 }
-                self.asm.push(Asm::LIST(list.len()));
+                self.asm.push(Asm::LIST(elements.len()));
                 Ok(())
             }
-            Expr::Field(_, _id, index, field, _) => {
+            Expr::Field { index, expr, .. } => {
                 self.asm.push(Asm::INTEGER(index as i64));
-                self.compile_expr(*field)?;
+                self.compile_expr(*expr)?;
                 self.asm.push(Asm::LIN);
                 Ok(())
             }
-            Expr::Indexed(_, _, index, from, _) => {
+            Expr::Indexed {
+                container, index, ..
+            } => {
                 self.compile_expr(*index)?;
-                self.compile_expr(*from)?;
+                self.compile_expr(*container)?;
                 self.asm.push(Asm::LIN);
                 Ok(())
             }
-            Expr::Call(_, _, from, arg) => {
-                for e in arg.iter().cloned() {
+            Expr::Call { function, args, .. } => {
+                for e in args.iter().cloned() {
                     self.compile_expr(e)?;
                 }
-                self.compile_expr(*from)?;
+                self.compile_expr(*function)?;
                 self.asm.push(Asm::CALL);
                 Ok(())
             }
-            Expr::Unary(_, unary, expr) => match unary {
+            Expr::Unary { op, expr, .. } => match op {
                 common::tokens::Unary::Positive => {
                     self.compile_expr(*expr)?;
                     Ok(())
@@ -591,8 +590,13 @@ impl Compiler {
                     Ok(self.asm.push(Asm::NOT))
                 }
             },
-            Expr::Binop(ttype, operator, lhs, rhs) => {
-                match operator {
+            Expr::Binop {
+                ttype,
+                op,
+                lhs,
+                rhs,
+            } => {
+                match op {
                     common::tokens::Operator::RightArrow => todo!(),
                     common::tokens::Operator::GreaterThan => {
                         self.compile_expr(*lhs.clone())?;
@@ -811,60 +815,87 @@ impl Compiler {
                 }
                 Ok(())
             }
-            Expr::Literal(_, atom) => self.compile_atom(atom),
-            Expr::Closure(_, parameters, input, captured) => {
+            Expr::Literal {
+                ttype: _,
+                value: atom,
+            } => self.compile_atom(atom),
+
+            Expr::Closure {
+                ttype: _,
+                args: parameters,
+                body: input,
+                captures: captured,
+            } => {
+                // Clone the current state to prepare for function compilation
                 let mut function_compile = self.clone();
                 function_compile.variables.clear();
                 function_compile.asm.clear();
-                for args in parameters.iter() {
+
+                // Register parameter names in the function's local variable scope
+                for param in parameters.iter() {
                     function_compile
                         .variables
-                        .insert(args.identifier.to_string());
+                        .insert(param.identifier.to_string());
                 }
-                for args in captured.iter() {
-                    function_compile.variables.insert(args.to_string());
+
+                // Register captured variables in the function's local variable scope
+                for capture in captured.iter() {
+                    function_compile.variables.insert(capture.to_string());
                 }
-                for x in captured.iter().cloned() {
-                    if let Some(index) = self.variables.get_index(x.to_string()) {
-                        //dbg!(&captured);
+
+                // Compile captured variables for the closure
+                for captured_var in captured.iter().cloned() {
+                    if let Some(index) = self.variables.get_index(captured_var.to_string()) {
+                        // Get the local variable if it exists in the current scope
                         self.asm.push(Asm::GET(index as u32));
+                    } else if let Some(index) = self.global.get_index(captured_var.to_string()) {
+                        // Otherwise, get the global variable if it exists
+                        self.asm.push(Asm::GETGLOBAL(index as u32));
                     } else {
-                        if let Some(index) = self.global.get_index(x.to_string()) {
-                            //dbg!(&captured);
-                            self.asm.push(Asm::GETGLOBAL(index as u32));
-                        } else {
-                            dbg!(&x);
-                            panic!()
-                        }
+                        // Debug output for missing variable
+                        dbg!(&captured_var);
+                        panic!("Captured variable not found in local or global scope.");
                     }
                 }
 
-                let closurejump = function_compile.gen.generate();
-                if captured.len() == 0 {
-                    self.asm.push(Asm::FUNCTION(closurejump));
+                // Generate a jump label for the closure function
+                let closure_jump_label = function_compile.gen.generate();
+
+                // Prepare the closure with a function label or a captured list if necessary
+                if captured.is_empty() {
+                    self.asm.push(Asm::FUNCTION(closure_jump_label));
                 } else {
                     self.asm.push(Asm::LIST(captured.len()));
-                    self.asm.push(Asm::CLOSURE(closurejump));
+                    self.asm.push(Asm::CLOSURE(closure_jump_label));
                 }
 
-                let function_body = Ast {
+                // Compile the function body
+                let function_body_ast = Ast {
                     program: input.clone(),
                 };
                 let _ = function_compile.compile_program(
-                    function_body,
+                    function_body_ast,
                     self.filepath.clone(),
                     true,
                     false,
                     true,
                 )?;
+
+                // Adjust the function's offset to account for parameters and captured variables
+                let num_parameters = parameters.len() as u32;
+                let num_captures = captured.len() as u32;
+                let local_vars = function_compile.variables.len() as u32;
                 self.asm.push(Asm::OFFSET(
-                    (parameters.len() + captured.len()) as u32,
-                    (function_compile.variables.len() - (parameters.len() + captured.len())) as u32,
+                    num_parameters + num_captures,
+                    local_vars - (num_parameters + num_captures),
                 ));
+
+                // Append compiled function instructions to the current scope
                 self.gen = function_compile.gen;
-                function_compile.asm.pop();
+                function_compile.asm.pop(); // Remove the last instruction from function compilation
                 self.asm.extend_from_slice(&function_compile.asm);
-                self.asm.push(Asm::LABEL(closurejump));
+                self.asm.push(Asm::LABEL(closure_jump_label));
+
                 Ok(())
             }
         }
@@ -872,32 +903,31 @@ impl Compiler {
 
     pub fn compile_atom(&mut self, atom: Atom) -> Result<(), NovaError> {
         match atom {
-            Atom::Bool(bool) => {
-                if bool {
-                    self.asm.push(Asm::BOOL(true));
-                } else {
-                    self.asm.push(Asm::BOOL(false));
-                }
+            Atom::Bool { value: bool } => {
+                self.asm.push(Asm::BOOL(bool));
             }
-            Atom::Id(identifier) => {
+            Atom::Id { name: identifier } => {
                 if let Some(index) = self.variables.get_index(identifier.to_string()) {
                     self.asm.push(Asm::GET(index as u32));
                 } else if let Some(index) = self.global.get_index(identifier.to_string()) {
                     self.asm.push(Asm::GETGLOBAL(index as u32));
                 }
             }
-            Atom::Float(float) => {
+            Atom::Float { value: float } => {
                 self.asm.push(Asm::FLOAT(float));
             }
-            Atom::String(str) => {
+            Atom::String { value: str } => {
                 self.asm.push(Asm::STRING(str.clone()));
             }
-            Atom::Integer(int) => {
+            Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(int));
             }
-            Atom::Call(caller, list) => {
+            Atom::Call {
+                name: caller,
+                arguments: list,
+            } => {
                 for expr in list.iter() {
-                    self.compile_expr(expr.clone())?
+                    self.compile_expr(expr.clone())?;
                 }
                 match caller.as_str() {
                     "println" => {
@@ -914,35 +944,29 @@ impl Compiler {
                     "isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
-
+                    "exit" => self.asm.push(Asm::EXIT),
                     "typeof" => {
-                        // unsafe kinda
-                        self.asm
-                            .push(Asm::STRING(type_to_string(&list[0].get_type())));
+                        self.asm.push(Asm::STRING(list[0].get_type().to_string()));
                     }
-
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {
-                            self.asm.push(Asm::NATIVE(index))
+                            self.asm.push(Asm::NATIVE(index));
+                        } else if let Some(index) = self.variables.get_index(identifier.to_string())
+                        {
+                            self.asm.push(Asm::GET(index as u32));
+                            self.asm.push(Asm::CALL);
+                        } else if let Some(index) = self.global.get_index(identifier.to_string()) {
+                            self.asm.push(Asm::DCALL(index as u32));
                         } else {
-                            if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                                self.asm.push(Asm::GET(index as u32));
-                                self.asm.push(Asm::CALL);
-                            } else if let Some(index) =
-                                self.global.get_index(identifier.to_string())
-                            {
-                                self.asm.push(Asm::DCALL(index as u32));
-                            } else {
-                                dbg!(&self.variables);
-                                dbg!(identifier);
-                                todo!()
-                            }
+                            dbg!(&self.variables);
+                            dbg!(identifier);
+                            todo!()
                         }
                     }
                 }
             }
-            Atom::Char(c) => self.asm.push(Asm::Char(c)),
+            Atom::Char { value: c } => self.asm.push(Asm::Char(c)),
             Atom::None => self.asm.push(Asm::NONE),
         }
         Ok(())

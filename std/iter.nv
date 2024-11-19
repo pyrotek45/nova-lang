@@ -1,7 +1,7 @@
 fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
-    let t: ?$A = it()
+    let t: ?$A = it();
     let list = []:$A
-    while t.isSome() {
+    while isSome(t) {
         if t.unwrap().f() {
             list.push(t.unwrap())
         }

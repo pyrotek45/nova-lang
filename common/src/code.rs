@@ -123,6 +123,8 @@ impl Code {
     pub const UNWRAP: u8 = 75;
 
     pub const CONCAT: u8 = 76;
+
+    pub const EXIT: u8 = 77;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -289,4 +291,6 @@ pub enum Asm {
     PIN(FilePosition),
     LIN,
     NATIVE(usize),
+
+    EXIT,
 }
