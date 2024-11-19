@@ -52,15 +52,6 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "strlen",
-        TType::Function {
-            parameters: vec![TType::String],
-            return_type: Box::new(TType::Int),
-        },
-        None,
-        SymbolKind::GenericFunction,
-    );
-    env.insert_symbol(
         "isSome",
         TType::Function {
             parameters: vec![TType::Option {
@@ -99,15 +90,6 @@ pub fn new(filepath: &str) -> Parser {
                     name: "a".to_string(),
                 }),
             }),
-        },
-        None,
-        SymbolKind::GenericFunction,
-    );
-    env.insert_symbol(
-        "free",
-        TType::Function {
-            parameters: vec![TType::Any],
-            return_type: Box::new(TType::Void),
         },
         None,
         SymbolKind::GenericFunction,
@@ -1828,6 +1810,9 @@ impl Parser {
             }
             Token::Symbol { symbol: '[', .. } => {
                 let pos = self.get_current_token_position();
+
+                // add list comprehension using the for keyword
+
                 let expr_list = self.expr_list()?;
                 let mut ttype = TType::None;
                 if !expr_list.is_empty() {
