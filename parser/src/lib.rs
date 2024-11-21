@@ -43,9 +43,7 @@ pub fn new(filepath: &str) -> Parser {
     env.insert_symbol(
         "typeof",
         TType::Function {
-            parameters: vec![TType::Generic {
-                name: "a".to_string(),
-            }],
+            parameters: vec![TType::Any],
             return_type: Box::new(TType::String),
         },
         None,
@@ -54,11 +52,7 @@ pub fn new(filepath: &str) -> Parser {
     env.insert_symbol(
         "isSome",
         TType::Function {
-            parameters: vec![TType::Option {
-                inner: Box::new(TType::Generic {
-                    name: "a".to_string(),
-                }),
-            }],
+            parameters: vec![TType::Any],
             return_type: Box::new(TType::Bool),
         },
         None,
@@ -186,7 +180,9 @@ impl Parser {
                     }
                     if let Some(mapped_type) = type_map.get(name1) {
                         // If the types are not equal, return an error
+                        //println!("Checking {:?} with {:?}", mapped_type, t2);
                         if mapped_type != t2 {
+                            //println!("Error: {:?} != {:?}", mapped_type, t2);
                             return Err(NovaError::TypeMismatch {
                                 expected: t2.clone(),
                                 found: mapped_type.clone(),
@@ -195,6 +191,7 @@ impl Parser {
                         }
                     } else {
                         // If name1 is not in the type_map, insert it with the corresponding type (t2)
+                        //println!("Inserting {} with {:?}", name1, t2);
                         type_map.insert(name1.clone(), t2.clone());
                     }
                 }
@@ -242,7 +239,7 @@ impl Parser {
                         });
                     }
 
-                    if let (Err(_), Err(_)) = (
+                    match (
                         self.check_and_map_types(params1, params2, type_map, pos.clone()),
                         self.check_and_map_types(
                             &[*ret1.clone()],
@@ -251,11 +248,14 @@ impl Parser {
                             pos.clone(),
                         ),
                     ) {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
+                        (Ok(_), Ok(_)) => continue,
+                        _ => {
+                            return Err(NovaError::TypeMismatch {
+                                expected: t1.clone(),
+                                found: t2.clone(),
+                                position: pos.clone(),
+                            });
+                        }
                     }
                 }
                 (
@@ -720,7 +720,7 @@ impl Parser {
             pos.clone(),
         )?;
 
-        if let SymbolKind::GenericFunction = function_kind {
+        if let SymbolKind::GenericFunction | SymbolKind::Constructor = function_kind {
             self.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
         }
 
@@ -979,6 +979,7 @@ impl Parser {
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
             if let Some(fields) = self.environment.custom_types.get(&type_name) {
+                //dbg!(&identifier, lhs.get_type().custom_to_string(), fields);
                 let new_fields =
                     if let Some(x) = self.environment.generic_type_struct.get(&type_name) {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
@@ -1015,6 +1016,12 @@ impl Parser {
             } else {
                 return self.generate_field_not_found_error(&identifier, &type_name, &[], pos);
             }
+        } else {
+            return Err(self.generate_error_with_pos(
+                format!("E1 Not a valid field access: {}", identifier),
+                format!("{} is not a custom type", lhs.get_type().to_string()),
+                pos,
+            ));
         }
         Ok(lhs)
     }
@@ -1291,7 +1298,7 @@ impl Parser {
                         field_position.clone(),
                     )?;
                     arguments.extend(self.argument_list()?);
-
+                    //dbg!(arguments.clone());
                     if let TType::Function {
                         parameters,
                         mut return_type,
@@ -1310,6 +1317,7 @@ impl Parser {
                         }
                         let input_types: Vec<TType> =
                             arguments.iter().map(|arg| arg.get_type()).collect();
+                        //dbg!(input_types.clone());
                         let mut type_map: HashMap<String, TType> = HashMap::default();
                         type_map = self.check_and_map_types(
                             &parameters,
@@ -1711,7 +1719,6 @@ impl Parser {
                 }
 
                 self.environment.push_scope();
-
                 // insert params into scope
                 for (ttype, id) in parameters.iter() {
                     match ttype.clone() {
@@ -1749,6 +1756,7 @@ impl Parser {
                     //println!("its an expression");
                     let expression = self.expr()?;
                     output = expression.clone().get_type();
+                    //dbg!(&typeinput, output.clone());
                     let statement = vec![Statement::Return {
                         ttype: expression.get_type(),
                         expr: expression.clone(),
@@ -2068,11 +2076,13 @@ impl Parser {
         let mut arguments = vec![left.clone()];
         let function_expr = self.field(target_field.clone(), left.clone(), pos.clone())?;
         arguments.extend(self.argument_list()?);
+        //dbg!(arguments.clone());
         self.create_call_expression(function_expr, target_field, arguments, pos)
     }
 
     fn handle_field_access(&mut self, left: Expr) -> Result<Expr, NovaError> {
         let (field, pos) = self.get_identifier()?;
+        //dbg!(&field);
         self.field(field.clone(), left, pos)
     }
 

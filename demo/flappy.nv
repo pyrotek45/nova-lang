@@ -51,7 +51,6 @@ fn showscreen(player: Player, wall: Wall, points: Int) -> Bool {
     }
     print("press q to exit, w to jump. Points: "); println(points)
     screen.charsToStr().println()
-    screen.free()
     return true
 }
 
