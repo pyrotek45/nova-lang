@@ -58,17 +58,6 @@ impl Compiler {
     ) -> Result<Vec<Asm>, NovaError> {
         self.filepath = filepath;
 
-        // get command line arguments and store them in the global scope as a list of strings
-        self.global.insert("args".to_string());
-        let cli_args: Vec<String> = std::env::args().skip(3).collect();
-        let arg_count = cli_args.len();
-        for x in cli_args.iter().cloned() {
-            self.asm.push(Asm::STRING(x));
-        }
-        self.asm.push(Asm::LIST(arg_count));
-        if let Some(index) = self.global.get_index("args".to_string()) {
-            self.asm.push(Asm::STOREGLOBAL(index as u32))
-        }
         for statements in input.program.iter() {
             match statements {
                 common::nodes::Statement::Foreach {
