@@ -321,7 +321,7 @@ impl Parser {
                         return Ok(TType::Generic { name });
                     } else {
                         return Err(NovaError::SimpleTypeError {
-                            msg: format!("Generic type {} could not be innferred", name),
+                            msg: format!("Generic type {} could not be inferred", name),
                             position: pos,
                         });
                     }
@@ -809,9 +809,9 @@ impl Parser {
                         msg: format!(
                             "E1 Type '{}' is already inferred as {}",
                             generic_type,
-                            ttype.to_string()
+                            t.to_string()
                         ),
-                        expected: t.to_string(),
+                        expected: ttype.to_string(),
                         found: generic_type.clone(),
                         position: pos,
                     });
@@ -845,9 +845,9 @@ impl Parser {
                             msg: format!(
                                 "E2 Type '{}' is already inferred as {}",
                                 generic_type,
-                                ttype.to_string()
+                                t.to_string()
                             ),
-                            expected: t.to_string(),
+                            expected: ttype.to_string(),
                             found: generic_type.clone(),
                             position: pos,
                         });
