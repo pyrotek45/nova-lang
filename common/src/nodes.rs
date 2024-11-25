@@ -61,6 +61,7 @@ pub enum Statement {
         identifier: String,
         parameters: Vec<Arg>,
         body: Vec<Statement>,
+        captures: Vec<String>,
     },
     Struct {
         ttype: TType,

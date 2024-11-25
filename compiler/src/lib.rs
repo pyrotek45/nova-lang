@@ -181,19 +181,54 @@ impl Compiler {
                     identifier,
                     parameters,
                     body,
+                    captures: captured,
                 } => {
                     self.global.insert(identifier.to_string());
+                    // Clone the current state to prepare for function compilation
                     let mut function_compile = self.clone();
                     function_compile.variables.clear();
                     function_compile.asm.clear();
-                    for args in parameters.iter() {
+
+                    // Register parameter names in the function's local variable scope
+                    for param in parameters.iter() {
                         function_compile
                             .variables
-                            .insert(args.identifier.to_string());
+                            .insert(param.identifier.to_string());
                     }
-                    let functionjump = function_compile.gen.generate();
-                    self.asm.push(Asm::FUNCTION(functionjump));
 
+                    // Register captured variables in the function's local variable scope
+                    for capture in captured.iter() {
+                        function_compile.variables.insert(capture.to_string());
+                    }
+
+                    // Compile captured variables for the closure
+                    for captured_var in captured.iter().cloned() {
+                        if let Some(index) = self.variables.get_index(captured_var.to_string()) {
+                            // Get the local variable if it exists in the current scope
+                            self.asm.push(Asm::GET(index as u32));
+                        } else if let Some(index) = self.global.get_index(captured_var.to_string())
+                        {
+                            // Otherwise, get the global variable if it exists
+                            self.asm.push(Asm::GETGLOBAL(index as u32));
+                        } else {
+                            // Debug output for missing variable
+                            dbg!(&captured_var);
+                            panic!("Captured variable not found in local or global scope.");
+                        }
+                    }
+
+                    // Generate a jump label for the closure function
+                    let closure_jump_label = function_compile.gen.generate();
+
+                    // Prepare the closure with a function label or a captured list if necessary
+                    if captured.is_empty() {
+                        self.asm.push(Asm::FUNCTION(closure_jump_label));
+                    } else {
+                        self.asm.push(Asm::LIST(captured.len() as u64));
+                        self.asm.push(Asm::CLOSURE(closure_jump_label));
+                    }
+
+                    // Compile the function body
                     let function_body = Ast {
                         program: body.clone(),
                     };
@@ -204,14 +239,23 @@ impl Compiler {
                         false,
                         true,
                     )?;
+
+                    // Adjust the function's offset to account for parameters and captured variables
+                    let num_parameters = parameters.len() as u32;
+                    let num_captures = captured.len() as u32;
+                    let local_vars = function_compile.variables.len() as u32;
                     self.asm.push(Asm::OFFSET(
-                        parameters.len() as u32,
-                        (function_compile.variables.len() - parameters.len()) as u32,
+                        num_parameters + num_captures,
+                        local_vars - (num_parameters + num_captures),
                     ));
+
+                    // Append compiled function instructions to the current scope
                     self.gen = function_compile.gen;
-                    function_compile.asm.pop();
+                    function_compile.asm.pop(); // Remove the last instruction from function compilation
                     self.asm.extend_from_slice(&function_compile.asm);
-                    self.asm.push(Asm::LABEL(functionjump));
+                    self.asm.push(Asm::LABEL(closure_jump_label));
+
+                    // storeing global function
                     let index = self.global.len() - 1;
                     self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
