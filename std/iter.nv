@@ -56,3 +56,4 @@ fn collect(it: () -> ?$A) -> [$A] {
     }
     return list
 }
+
