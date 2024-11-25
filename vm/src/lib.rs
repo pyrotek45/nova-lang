@@ -664,9 +664,28 @@ impl Vm {
                     if let (Some(destination), Some(value)) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
+                        //dbg!(&destination, &value);
+
                         match (value, destination) {
                             (item, VmData::StackAddress(index)) => {
-                                self.state.stack[self.state.offset + index as usize] = item
+                                //dbg!(self.state.stack[self.state.offset + index as usize]);
+                                match (self.state.stack[self.state.offset + index as usize], value)
+                                {
+                                    (VmData::List(d), VmData::Closure(v)) => {
+                                        self.state.heap[d] = self.state.heap[v as usize].clone()
+                                    }
+                                    (VmData::List(d), VmData::List(v)) => {
+                                        self.state.heap[d] = self.state.heap[v as usize].clone()
+                                    }
+                                    (VmData::List(_), VmData::Struct(_)) => todo!(),
+                                    (VmData::List(_), VmData::String(_)) => todo!(),
+                                    (VmData::String(d), VmData::String(v)) => {
+                                        self.state.heap[d] = self.state.heap[v as usize].clone()
+                                    }
+                                    _ => {
+                                        self.state.stack[self.state.offset + index as usize] = item
+                                    }
+                                }
                             }
                             (item, VmData::List(index)) => {
                                 match item {
@@ -1497,7 +1516,21 @@ impl Vm {
                     {
                         match (value, destination) {
                             (item, VmData::StackAddress(index)) => {
-                                self.state.stack[self.state.offset + index as usize] = item
+                                dbg!(self.state.stack[self.state.offset + index as usize]);
+                                match (self.state.stack[self.state.offset + index as usize], value)
+                                {
+                                    (VmData::List(_), VmData::StackAddress(_)) => todo!(),
+                                    (VmData::List(_), VmData::Function(_)) => todo!(),
+                                    (VmData::List(_), VmData::Closure(_)) => todo!(),
+                                    (VmData::List(d), VmData::List(v)) => {
+                                        self.state.heap[d] = self.state.heap[v].clone()
+                                    }
+                                    (VmData::List(_), VmData::Struct(_)) => todo!(),
+                                    _ => {
+                                        self.state.stack[self.state.offset + index as usize] = item
+                                    }
+                                }
+                                //self.state.stack[self.state.offset + index as usize] = item
                             }
                             (item, VmData::List(index)) => {
                                 match item {
