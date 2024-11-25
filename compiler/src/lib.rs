@@ -96,7 +96,7 @@ impl Compiler {
                     self.asm.push(Asm::STORE(array_index as u32));
 
                     // if array is empty jump to end
-                    self.asm.push(Asm::LABEL(top as u64));
+                    self.asm.push(Asm::LABEL(top));
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
@@ -108,7 +108,7 @@ impl Compiler {
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::NOT);
 
-                    self.asm.push(Asm::JUMPIFFALSE(step as u64));
+                    self.asm.push(Asm::JUMPIFFALSE(step));
                     self.asm.push(Asm::POP);
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
@@ -118,10 +118,10 @@ impl Compiler {
                     }
                     self.asm.push(Asm::EQUALS);
 
-                    self.asm.push(Asm::LABEL(step as u64));
-                    self.asm.push(Asm::JUMPIFFALSE(mid as u64));
-                    self.asm.push(Asm::JMP(end as u64));
-                    self.asm.push(Asm::LABEL(mid as u64));
+                    self.asm.push(Asm::LABEL(step));
+                    self.asm.push(Asm::JUMPIFFALSE(mid));
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(mid));
 
                     // bind value
                     self.asm.push(Asm::GET(tempcounter_index as u32));
