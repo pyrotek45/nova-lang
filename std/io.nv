@@ -1,8 +1,10 @@
+module io
+
 struct IO {
     prompt: (String) -> String,
 }
 
-fn defualtIO() -> IO {
+fn DefualtIO() -> IO {
     return IO {
         prompt: fn(input: String) -> String {
             print(input + "\n")

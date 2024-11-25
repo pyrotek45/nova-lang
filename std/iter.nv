@@ -1,3 +1,5 @@
+module iter
+
 struct Box(A) {
     value: $A
 }
