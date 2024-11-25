@@ -4,7 +4,6 @@ use common::{
     environment::{new_environment, Environment},
     error::NovaError,
     fileposition::FilePosition,
-    gen,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
     tokens::{Operator, Token, TokenList, Unary},
@@ -27,6 +26,7 @@ pub struct Parser {
     index: usize,
     pub ast: Ast,
     pub environment: Environment,
+    pub modules: table::Table<String>,
 }
 
 pub fn new(filepath: &str) -> Parser {
@@ -131,6 +131,7 @@ pub fn new(filepath: &str) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
+        modules: table::new(),
     }
 }
 
@@ -2738,10 +2739,35 @@ impl Parser {
         let import_filepath = match self.current_token() {
             Token::String {
                 value: filepath, ..
-            } => filepath,
+            } => {
+                self.advance();
+                filepath.clone()
+            }
+            Token::Identifier { name, .. } => {
+                let mut import_filepath = {
+                    if name == "super" {
+                        "..".to_string()
+                    } else {
+                        name
+                    }
+                };
+                self.advance();
+                while self.current_token().is_symbol('.') {
+                    self.advance();
+                    import_filepath.push_str("/");
+                    let (identifier, _) = self.get_identifier()?;
+                    if identifier == "super" {
+                        import_filepath.push_str("..");
+                    } else {
+                        import_filepath.push_str(&identifier);
+                    }
+                }
+                //dbg!(self.current_token());
+                import_filepath.push_str(".nv");
+                import_filepath
+            }
             _ => panic!(),
         };
-        self.advance();
         let resolved_filepath: String = match extract_current_directory(&self.filepath) {
             Some(mut current_dir) => {
                 current_dir.push_str(&import_filepath);
@@ -2756,6 +2782,7 @@ impl Parser {
         parser.input = tokens;
         parser.parse()?;
         self.environment = parser.environment.clone();
+        self.modules = parser.modules.clone();
         Ok(Some(Statement::Block {
             body: parser.ast.program.clone(),
             filepath: resolved_filepath,
@@ -3611,6 +3638,21 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<(), NovaError> {
+        // parse module <name> and store in self.module and if module is found, return
+        if self.current_token().is_id("module") {
+            self.consume_identifier(Some("module"))?;
+            let (module_name, _) = self.get_identifier()?;
+            //dbg!(&module_name, &self.modules);
+            if self.modules.has(&module_name) {
+                return Ok(());
+            }
+            self.modules.insert(module_name);
+        } else {
+            return Err(self.generate_error(
+                "Expected module declaration".to_string(),
+                "Module declaration must be the first statement".to_string(),
+            ));
+        }
         self.ast.program = self.compound_statement()?;
         self.eof()
     }
