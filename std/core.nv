@@ -1,0 +1,14 @@
+module core
+
+struct Box(A) {
+    value: $A
+}
+
+fn Gen(start: Int) -> () -> Int {
+    let i = Box(start)
+    return fn() -> Int {
+        i.value += 1
+        return i.value - 1
+    }
+}
+

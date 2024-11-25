@@ -1,0 +1,49 @@
+module hashmap
+
+import list
+
+struct HashMap(K,V) {
+    keys: [$K],
+    values: [$V],
+}
+
+fn NewHashMap() -> HashMap($K,$V) {
+    return HashMap {
+        keys: []:$K,
+        values: []:$V,
+    }
+}
+
+fn insert(m: HashMap($K,$V), k: $K, v: $V) {
+    for (key in m.keys) {
+        if key == k {
+            m.values[m.keys.index_of(key)] = v;
+            return;
+        }
+    }
+    m.keys.push(k)
+    m.values.push(v)
+}
+
+fn get(m: HashMap($K,$V), k: $K) -> ?$V {
+    for (key in m.keys) {
+        if key == k {
+            return m.values[m.keys.index_of(key)];
+        }
+    }
+    return ?$V
+}
+
+fn delete(m: HashMap($K,$V), k: $K) {
+    let index = m.keys.index_of(k)
+    if index != -1 {
+        m.keys.remove(index)
+        m.values.remove(index)
+    }
+}
+
+fn show(m: HashMap($K,$V)) {
+    for i <- 0; i < m.keys.len(); i += 1 {
+        println(m.keys[i].toStr() + " -> " + m.values[i].toStr())
+    }
+}
