@@ -14,7 +14,7 @@ use common::{
 };
 
 use modulo::Mod;
-use state::Heap;
+use state::{Heap, State};
 
 use crate::state::VmData;
 
@@ -210,58 +210,52 @@ impl Vm {
 
                 // i think you can figure this one out
                 Code::PRINT => {
-                    let item = self.state.stack.pop().unwrap();
-                    match item {
-                        VmData::Function(v) => {
-                            print!("function pointer: {v}");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::Int(v) => {
-                            print!("{v}");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::Float(v) => {
-                            print!("{v}");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::Bool(v) => {
-                            print!("{v}");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::None => {
-                            print!("None");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::List(index) => {
-                            if let Heap::List(array) = self.state.deref(index) {
-                                print!("[");
-                                for (index, item) in array.iter().enumerate() {
-                                    if index > 0 {
-                                        print!(", ");
-                                    }
-                                    print!("{:?}", self.state.deref(*item));
-                                }
-                                print!("]");
+                    fn print_item(state: &mut State, item: VmData) {
+                        match item {
+                            VmData::Function(v) => {
+                                print!("Function Pointer ({})", v);
+                                io::stdout().flush().expect("");
+                            }
+                            VmData::Int(v) => {
+                                print!("{}", v);
+                                io::stdout().flush().expect("");
+                            }
+                            VmData::Float(v) => {
+                                print!("{}", v);
+                                io::stdout().flush().expect("");
+                            }
+                            VmData::Bool(v) => {
+                                print!("{}", v);
+                                io::stdout().flush().expect("");
+                            }
+                            VmData::None => {
+                                print!("None");
+                                io::stdout().flush().expect("");
+                            }
+                            VmData::List(index) => {
+                                state.print_heap(index);
+                            }
+                            VmData::String(index) => {
+                                state.print_heap(index);
+                            }
+                            VmData::Closure(v) => {
+                                state.print_heap(v);
+                            }
+                            VmData::StackAddress(v) => {
+                                print_item(state, state.stack[state.offset + v]);
+                            }
+                            VmData::Struct(v) => {
+                                state.print_heap(v);
+                            }
+                            VmData::Char(char) => {
+                                print!("{}", char);
                                 io::stdout().flush().expect("");
                             }
                         }
-                        VmData::String(index) => {
-                            if let Heap::String(str) = self.state.deref(index) {
-                                print!("{str}");
-                                //io::stdout().flush().expect("");
-                            }
-                        }
-                        VmData::Closure(v) => {
-                            print!("Closure: {v}");
-                            io::stdout().flush().expect("");
-                        }
-                        VmData::StackAddress(_) => todo!(),
-                        VmData::Struct(_) => todo!(),
-                        VmData::Char(char) => {
-                            print!("{char}");
-                            io::stdout().flush().expect("");
-                        }
                     }
+
+                    let item = self.state.stack.pop().unwrap();
+                    print_item(&mut self.state, item);
                 }
 
                 Code::FADD => {

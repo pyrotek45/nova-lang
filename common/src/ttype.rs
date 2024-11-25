@@ -68,7 +68,11 @@ impl TType {
             } => {
                 let type_strings: Vec<String> = type_params.iter().map(TType::to_string).collect();
                 let types_concatenated = type_strings.join(",");
-                format!("{}({})", name, types_concatenated)
+                if types_concatenated.is_empty() {
+                    name.to_string()
+                } else {
+                    format!("{}({})", name, types_concatenated)
+                }
             }
             TType::Generic { name } => format!("${}", name),
             TType::List { inner } => format!("[{}]", inner.to_string()),
