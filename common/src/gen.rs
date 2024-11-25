@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, Copy)]
 pub struct Gen {
-    value: usize,
+    value: u64,
 }
 
 pub fn new() -> Gen {
@@ -12,7 +12,7 @@ impl Gen {
         self.value = 0;
     }
 
-    pub fn generate(&mut self) -> usize {
+    pub fn generate(&mut self) -> u64 {
         let result = self.value;
         self.value += 1;
         result

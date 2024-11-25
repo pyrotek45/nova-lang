@@ -1,3 +1,5 @@
+module structsDemo
+
 // Structs Creation
 struct One {
     item1: String,

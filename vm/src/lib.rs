@@ -85,7 +85,7 @@ impl Vm {
                     self.state.stack.pop();
                 }
                 Code::NATIVE => {
-                    let index = usize::from_le_bytes([
+                    let index = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -96,7 +96,7 @@ impl Vm {
                         self.state.next(),
                     ]);
 
-                    match self.native_functions[index](&mut self.state) {
+                    match self.native_functions[index as usize](&mut self.state) {
                         Ok(_) => {}
                         Err(error) => return Err(error),
                     }
@@ -709,7 +709,7 @@ impl Vm {
                 }
 
                 Code::NEWLIST => {
-                    let size = usize::from_le_bytes([
+                    let size = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -912,7 +912,7 @@ impl Vm {
 
                 Code::STRING => {
                     let mut string = vec![];
-                    let size = usize::from_le_bytes([
+                    let size = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -1529,7 +1529,7 @@ impl Vm {
                 }
 
                 Code::NEWLIST => {
-                    let size = usize::from_le_bytes([
+                    let size = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -1736,7 +1736,7 @@ impl Vm {
 
                 Code::STRING => {
                     let mut string = vec![];
-                    let size = usize::from_le_bytes([
+                    let size = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -1797,7 +1797,7 @@ impl Vm {
                     self.state.stack.push(VmData::None);
                 }
                 Code::NATIVE => {
-                    let index = usize::from_le_bytes([
+                    let index = u64::from_le_bytes([
                         self.state.next(),
                         self.state.next(),
                         self.state.next(),
@@ -1808,7 +1808,7 @@ impl Vm {
                         self.state.next(),
                     ]);
 
-                    match self.native_functions[index](&mut self.state) {
+                    match self.native_functions[index as usize](&mut self.state) {
                         Ok(_) => {}
                         Err(error) => return Err(error),
                     }

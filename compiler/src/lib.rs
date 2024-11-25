@@ -17,8 +17,8 @@ pub struct Compiler {
     pub entry: usize,
     pub asm: Vec<Asm>,
     pub gen: Gen,
-    pub breaks: Vec<usize>,
-    pub continues: Vec<usize>,
+    pub breaks: Vec<u64>,
+    pub continues: Vec<u64>,
 }
 
 pub fn new() -> Compiler {
@@ -96,32 +96,32 @@ impl Compiler {
                     self.asm.push(Asm::STORE(array_index as u32));
 
                     // if array is empty jump to end
-                    self.asm.push(Asm::LABEL(top));
+                    self.asm.push(Asm::LABEL(top as u64));
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("len".to_string()) {
-                        self.asm.push(Asm::NATIVE(index))
+                        self.asm.push(Asm::NATIVE(index as u64))
                     }
 
                     self.asm.push(Asm::IGTR);
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::NOT);
 
-                    self.asm.push(Asm::JUMPIFFALSE(step));
+                    self.asm.push(Asm::JUMPIFFALSE(step as u64));
                     self.asm.push(Asm::POP);
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("len".to_string()) {
-                        self.asm.push(Asm::NATIVE(index))
+                        self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::EQUALS);
 
-                    self.asm.push(Asm::LABEL(step));
-                    self.asm.push(Asm::JUMPIFFALSE(mid));
-                    self.asm.push(Asm::JMP(end));
-                    self.asm.push(Asm::LABEL(mid));
+                    self.asm.push(Asm::LABEL(step as u64));
+                    self.asm.push(Asm::JUMPIFFALSE(mid as u64));
+                    self.asm.push(Asm::JMP(end as u64));
+                    self.asm.push(Asm::LABEL(mid as u64));
 
                     // bind value
                     self.asm.push(Asm::GET(tempcounter_index as u32));
@@ -227,7 +227,7 @@ impl Compiler {
                     self.asm
                         .push(Asm::OFFSET((fields.len() - 1) as u32, 0 as u32));
                     self.asm.push(Asm::STRING(identifier.clone()));
-                    self.asm.push(Asm::LIST(fields.len()));
+                    self.asm.push(Asm::LIST(fields.len() as u64));
                     self.asm.push(Asm::RET(true));
                     self.asm.push(Asm::LABEL(structjump));
                     let index = self.global.len() - 1;
@@ -353,7 +353,7 @@ impl Compiler {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
-                        self.asm.push(Asm::NATIVE(index))
+                        self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::ISSOME);
                     self.asm.push(Asm::JUMPIFFALSE(skip));
@@ -391,7 +391,7 @@ impl Compiler {
                     let end = self.gen.generate();
                     self.compile_expr(expr.clone())?;
                     if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
-                        self.asm.push(Asm::NATIVE(index))
+                        self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::ISSOME);
@@ -550,7 +550,7 @@ impl Compiler {
                 for x in elements.iter().cloned() {
                     self.compile_expr(x)?;
                 }
-                self.asm.push(Asm::LIST(elements.len()));
+                self.asm.push(Asm::LIST(elements.len() as u64));
                 Ok(())
             }
             Expr::Field { index, expr, .. } => {
@@ -865,7 +865,7 @@ impl Compiler {
                 if captured.is_empty() {
                     self.asm.push(Asm::FUNCTION(closure_jump_label));
                 } else {
-                    self.asm.push(Asm::LIST(captured.len()));
+                    self.asm.push(Asm::LIST(captured.len() as u64));
                     self.asm.push(Asm::CLOSURE(closure_jump_label));
                 }
 
@@ -951,7 +951,7 @@ impl Compiler {
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {
-                            self.asm.push(Asm::NATIVE(index));
+                            self.asm.push(Asm::NATIVE(index as u64));
                         } else if let Some(index) = self.variables.get_index(identifier.to_string())
                         {
                             self.asm.push(Asm::GET(index as u32));

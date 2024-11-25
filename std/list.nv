@@ -7,14 +7,10 @@ fn fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     return list
 }
 
-fn vec(input: $A, ammount: Int) -> [$A] {
+fn Vec(input: $A, ammount: Int) -> [$A] {
     let list = []: $A
     for i <- 0; i < ammount; i += 1 {
         list.push(input)
     }
     return list
-}
-
-fn EmptyList() -> [$A] {
-    return []: $A
 }
