@@ -4,7 +4,7 @@ struct IO {
     prompt: (String) -> String,
 }
 
-fn DefualtIO() -> IO {
+fn defualtIO() -> IO {
     return IO {
         prompt: fn(input: String) -> String {
             print(input + "\n")

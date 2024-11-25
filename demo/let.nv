@@ -1,3 +1,5 @@
+module letDemo
+
 // let identifier : optional type = expression
 let t : Int = 10 + 10
 let v = 50

@@ -1,3 +1,5 @@
+module option_typeDemo
+
 // optional types are created with ?
 let option  : ?Int = Some(10)
 let option2 : ?Int = ?Int // this is a nil value. 

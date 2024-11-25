@@ -1,3 +1,5 @@
+module flappy
+
 struct Player {
     x: Int,
     y: Int,

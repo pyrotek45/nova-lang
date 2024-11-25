@@ -1,3 +1,5 @@
+module demo
+
 // Type declaration
 struct Person {
     name: String,

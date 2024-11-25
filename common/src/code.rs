@@ -232,14 +232,14 @@ pub enum Asm {
     CLONE,
 
     // control flow
-    LABEL(usize),
-    JUMPIFFALSE(usize),
-    JMP(usize),
-    BJMP(usize),
+    LABEL(u64),
+    JUMPIFFALSE(u64),
+    JMP(u64),
+    BJMP(u64),
 
     // large data
     STRING(String),
-    LIST(usize),
+    LIST(u64),
 
     // values
     INTEGER(i64),
@@ -280,8 +280,8 @@ pub enum Asm {
     PRINT,
 
     // functions
-    FUNCTION(usize),
-    CLOSURE(usize),
+    FUNCTION(u64),
+    CLOSURE(u64),
     RET(bool),
     DCALL(u32),
     TCALL(u32),
@@ -290,7 +290,7 @@ pub enum Asm {
     // list operations
     PIN(FilePosition),
     LIN,
-    NATIVE(usize),
+    NATIVE(u64),
 
     EXIT,
 }
