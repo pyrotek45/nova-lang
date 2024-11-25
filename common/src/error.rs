@@ -79,6 +79,10 @@ pub enum NovaError {
         found: TType,
         position: FilePosition,
     },
+    SimpleTypeError {
+        msg: String,
+        position: FilePosition,
+    },
 }
 
 impl NovaError {
@@ -188,6 +192,16 @@ impl NovaError {
                         found.to_string()
                     ),
                 );
+            }
+            NovaError::SimpleTypeError { msg, position } => {
+                println!(
+                    "{} in {}:{}:{}",
+                    "Type Error".bright_red(),
+                    position.filepath,
+                    position.line,
+                    position.row
+                );
+                print_line(position, &msg);
             }
         }
     }

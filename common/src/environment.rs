@@ -16,6 +16,7 @@ pub struct Environment {
     pub type_alias: HashMap<String, TType>,
     pub generic_type_struct: HashMap<String, Vec<String>>,
     pub generic_type_map: HashMap<String, String>,
+    pub live_generics: Vec<table::Table<String>>,
 }
 
 pub fn new_environment() -> Environment {
@@ -27,6 +28,7 @@ pub fn new_environment() -> Environment {
         type_alias: HashMap::default(),
         generic_type_struct: HashMap::default(),
         generic_type_map: HashMap::default(),
+        live_generics: vec![table::new()],
     }
 }
 

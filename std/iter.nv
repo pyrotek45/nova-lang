@@ -1,23 +1,27 @@
+struct Box(A) {
+    value: $A
+}
+
 fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
-    let t: ?$A = it();
+    let t = it()
     let list = []:$A
     while isSome(t) {
         if t.unwrap().f() {
             list.push(t.unwrap())
         }
-        t = it()
+        t = it() 
     }
     return list
 }
 
 fn iter(input:[$A]) -> () -> ?$A {
-    let index = #(0)   
+    let index = Box(0)  
     return fn() -> ?$A {
-        if index[0] >= input.len() {
+        if index.value >= input.len() {
             return ?$A
         } else {
-            let result = Some(input[index[0]]);
-            index[0] += 1
+            let result = Some(input[index.value]);
+            index.value += 1
             return result
         }
     }
@@ -25,7 +29,7 @@ fn iter(input:[$A]) -> () -> ?$A {
 
 fn map(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
     return fn() -> ?$A {
-        let result: ?$A = it()
+        let result: ?$A = it() 
         if result.isSome() {
             return Some(f(result.unwrap()))
         } else {
@@ -35,20 +39,20 @@ fn map(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
 }
 
 fn printIter(it: () -> ?$A) {
-    let t: ?$A = it()
+    let t: ?$A = it() 
     while t.isSome() {
         print(t.unwrap())
         print("\n")
-        t = it()
+        t = it() 
     }
 }
 
 fn collect(it: () -> ?$A) -> [$A] {
-    let t: ?$A = it()
+    let t: ?$A = it() 
     let list = []:$A
     while t.isSome() {
         list.push(t.unwrap())
-        t = it()
+        t = it() 
     }
     return list
 }

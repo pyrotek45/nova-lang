@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,6 +101,79 @@ pub fn new() -> State {
 }
 
 impl State {
+    // recursiely print out data for the Heap type, and ouly print out the value
+
+    pub fn print_heap(&self, index: usize) {
+        // check if the index is out of bounds
+        if index >= self.heap.len() {
+            io::stdout().flush().expect("");
+            return;
+        }
+        match &self.heap[index] {
+            Heap::ClosureAddress(v) => {
+                self.print_heap(*v);
+            }
+            Heap::Function(v) => {
+                print!("Function Pointer ({})", v);
+                io::stdout().flush().expect("");
+            }
+            Heap::Int(v) => {
+                print!("{}", v);
+                io::stdout().flush().expect("");
+            }
+            Heap::Float(v) => {
+                print!("{}", v);
+                io::stdout().flush().expect("");
+            }
+            Heap::Bool(v) => {
+                print!("{}", v);
+                io::stdout().flush().expect("");
+            }
+            Heap::ListAddress(v) => {
+                self.print_heap(*v);
+            }
+            Heap::StringAddress(v) => {
+                self.print_heap(*v);
+            }
+            Heap::None => {
+                print!("None");
+                io::stdout().flush().expect("");
+            }
+            Heap::Closure(function_poiner, capture_index) => {
+                print!("Closure (");
+                print!("Function Pointer: {}", function_poiner);
+                print!(", ");
+                print!("Captures: ");
+                self.print_heap(*capture_index);
+                print!(")");
+            }
+            Heap::List(v) => {
+                print!("[");
+                for (i, item) in v.iter().enumerate() {
+                    self.print_heap(*item);
+                    if i < v.len() - 1 {
+                        print!(",");
+                    }
+                }
+                print!("]");
+            }
+            Heap::String(v) => {
+                print!("{}", v);
+                io::stdout().flush().expect("");
+            }
+            Heap::Struct(_, _) => {
+                todo!()
+            }
+            Heap::StructAddress(v) => {
+                self.print_heap(*v);
+            }
+            Heap::Char(v) => {
+                print!("{}", v);
+                io::stdout().flush().expect("");
+            }
+        }
+    }
+
     #[inline(always)]
     pub fn to_vmdata(&self, index: usize) -> VmData {
         match self.heap[index] {
