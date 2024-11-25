@@ -37,13 +37,13 @@ for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-import "../std/list.nv"
+import super.std.list
 
 // Array
 let arr = [1,2,3]
 println(arr)
 
-let arr2 = []: Int.fill(10,5)
+let arr2 = []: Int
 arr2.println()
 
 let arr3 = Vec(10,5)
