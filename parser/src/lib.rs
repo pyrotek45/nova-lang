@@ -3480,8 +3480,52 @@ impl Parser {
         }
 
         let mut statements = self.block()?;
+
+        // capture variables -----------------------------------
+        let mut captured: Vec<String> = self
+            .environment
+            .captured
+            .last()
+            .unwrap()
+            .iter()
+            .map(|v| v.0.clone())
+            .collect();
+
         self.environment.pop_scope();
         self.environment.live_generics.pop();
+        for c in captured.iter() {
+            if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+                let pos = self.get_current_token_position();
+
+                self.environment.captured.last_mut().unwrap().insert(
+                    c.clone(),
+                    Symbol {
+                        id: mc.1,
+                        ttype: mc.0,
+                        pos: Some(pos),
+                        kind: mc.2,
+                    },
+                );
+            }
+        }
+
+        captured = self
+            .environment
+            .captured
+            .last()
+            .unwrap()
+            .iter()
+            .map(|v| v.0.clone())
+            .collect();
+
+        for dc in captured.iter() {
+            if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
+                self.environment.captured.last_mut().unwrap().remove(dc);
+            }
+        }
+
+        // done capturing variables ----------------------------
+
         // check return types
         let (_, has_return) = self.check_returns(&statements, output.clone(), pos.clone())?;
         if !has_return && output != TType::Void {
@@ -3510,11 +3554,13 @@ impl Parser {
                 pos.clone(),
             ));
         }
+        //dbg!(&captured);
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
             parameters: input,
             body: statements,
+            captures: captured,
         }))
     }
 
