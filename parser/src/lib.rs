@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
 use common::{
     environment::{new_environment, Environment},
@@ -51,7 +51,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "isSome",
+        "Option::isSome",
         TType::Function {
             parameters: vec![TType::Any],
             return_type: Box::new(TType::Bool),
@@ -60,7 +60,7 @@ pub fn new(filepath: &str) -> Parser {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "unwrap",
+        "Option::unwrap",
         TType::Function {
             parameters: vec![TType::Option {
                 inner: Box::new(TType::Generic {
@@ -83,6 +83,19 @@ pub fn new(filepath: &str) -> Parser {
             return_type: Box::new(TType::Option {
                 inner: Box::new(TType::Generic {
                     name: "a".to_string(),
+                }),
+            }),
+        },
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "None",
+        TType::Function {
+            parameters: vec![TType::None],
+            return_type: Box::new(TType::Option {
+                inner: Box::new(TType::Generic {
+                    name: "T".to_string(),
                 }),
             }),
         },
@@ -177,23 +190,33 @@ impl Parser {
                             position: pos.clone(),
                         });
                     }
-                    if let TType::Option { .. } = t2 {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
-                    }
-                    if let Some(mapped_type) = type_map.get(name1) {
+                    // if let TType::Option { .. } = t2 {
+                    //     return Err(NovaError::TypeMismatch {
+                    //         expected: t1.clone(),
+                    //         found: t2.clone(),
+                    //         position: pos.clone(),
+                    //     });
+                    // }
+                    if let Some(mapped_type) = type_map.clone().get(name1) {
                         // If the types are not equal, return an error
-                        //println!("Checking {:?} with {:?}", mapped_type, t2);
-                        if mapped_type != t2 {
-                            //println!("Error: {:?} != {:?}", mapped_type, t2);
-                            return Err(NovaError::TypeMismatch {
-                                expected: mapped_type.clone(),
-                                found: t2.clone(),
-                                position: pos.clone(),
-                            });
+                        // println!("Checking {:?} with {:?}", mapped_type, t2);
+                        if let Ok(returned) = self.get_output(t2.clone(), type_map, pos.clone()) {
+                            if returned != t2.clone() {
+                                return Err(NovaError::TypeMismatch {
+                                    expected: mapped_type.clone(),
+                                    found: returned.clone(),
+                                    position: pos.clone(),
+                                });
+                            }
+                        } else {
+                            if mapped_type != t2 {
+                                // println!("Error: {:?} != {:?}", mapped_type, t2);
+                                return Err(NovaError::TypeMismatch {
+                                    expected: mapped_type.clone(),
+                                    found: t2.clone(),
+                                    position: pos.clone(),
+                                });
+                            }
                         }
                     } else {
                         // If name1 is not in the type_map, insert it with the corresponding type (t2)
@@ -278,6 +301,7 @@ impl Parser {
                         match self.check_and_map_types(&gen1, &gen2, type_map, pos.clone()) {
                             Ok(_) => continue,
                             Err(_) => {
+                                dbg!(gen1.clone(), gen2.clone());
                                 return Err(NovaError::TypeMismatch {
                                     expected: t1.clone(),
                                     found: t2.clone(),
@@ -286,6 +310,7 @@ impl Parser {
                             }
                         }
                     } else {
+                        dbg!(gen1.clone(), gen2.clone());
                         return Err(NovaError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
@@ -295,6 +320,7 @@ impl Parser {
                 }
                 _ if t1 == t2 => continue,
                 _ => {
+                    dbg!(t1.clone(), t2.clone());
                     return Err(NovaError::TypeMismatch {
                         expected: t1.clone(),
                         found: t2.clone(),
@@ -321,6 +347,7 @@ impl Parser {
                     if self.environment.live_generics.last().unwrap().has(&name) {
                         return Ok(TType::Generic { name });
                     } else {
+                        //dbg!(self.environment.live_generics.last().unwrap());
                         return Err(NovaError::SimpleTypeError {
                             msg: format!("Generic type {} could not be inferred", name),
                             position: pos,
@@ -655,7 +682,7 @@ impl Parser {
 
     fn method(
         &mut self,
-        identifier: String,
+        mut identifier: String,
         first_argument: Expr,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
@@ -665,6 +692,62 @@ impl Parser {
 
         if argument_types.is_empty() {
             argument_types.push(TType::None)
+        }
+
+        // if let Some(value) = self.environment.values.last().unwrap().get(&identifier) {
+        //     let first_arg_type = {
+        //         let t = value.ttype.clone();
+        //         match t {
+        //             TType::Function {
+        //                 parameters: args,
+        //                 return_type: _,
+        //             } => args[0].clone(),
+        //             _ => TType::None,
+        //         }
+        //     };
+        //     match first_arg_type {
+        //         TType::Generic { name } => {
+
+        //         }
+        //         _ => {}
+        //     }
+        // }
+
+        if self.environment.custom_types.contains_key(&identifier) {
+        } else if let Some(TType::Custom { name, .. }) = argument_types.get(0) {
+            if self.environment.custom_types.contains_key(name) {
+                //dbg!(&name);
+                identifier = format!("{}::{}", name, identifier);
+            }
+        } else if let Some(ttype) = argument_types.get(0) {
+            match ttype {
+                TType::List { .. } => {
+                    identifier = format!("List::{}", identifier);
+                }
+                TType::Option { .. } => {
+                    identifier = format!("Option::{}", identifier);
+                }
+                TType::Function { .. } => {
+                    identifier = format!("Function::{}", identifier);
+                }
+                TType::Tuple { .. } => {
+                    identifier = format!("Tuple::{}", identifier);
+                }
+                TType::Bool => {
+                    identifier = format!("Bool::{}", identifier);
+                }
+                TType::Int => {
+                    identifier = format!("Int::{}", identifier);
+                }
+                TType::Float => {
+                    identifier = format!("Float::{}", identifier);
+                }
+                TType::String => {
+                    identifier = format!("String::{}", identifier);
+                }
+
+                _ => {}
+            }
         }
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
@@ -744,6 +827,7 @@ impl Parser {
                 ))
             }
         };
+
         let mut generic_list = self.collect_generics(&[*return_type.clone()]);
         generic_list.extend(self.collect_generics(&parameters));
         //dbg!(generic_list.clone());
@@ -798,6 +882,7 @@ impl Parser {
             let generic_list = self.collect_generics(&[ttype.clone()]);
             for generic in generic_list.items {
                 if !self.environment.live_generics.last().unwrap().has(&generic) {
+                    //dbg!(self.environment.live_generics.last().unwrap());
                     return Err(NovaError::SimpleTypeError {
                         msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
                         position: pos,
@@ -967,6 +1052,15 @@ impl Parser {
         if argument_types.is_empty() {
             argument_types.push(TType::None)
         }
+
+        // if self.environment.custom_types.contains_key(&identifier) {
+
+        // } else if let Some(TType::Custom { name, .. }) = argument_types.get(0) {
+        //     if self.environment.custom_types.contains_key(name) {
+        //         //dbg!(&name);
+        //         identifier = format!("{}::{}", name, identifier);
+        //     }
+        // }
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
 
@@ -1694,7 +1788,14 @@ impl Parser {
                 }
                 let mut generic_list = self.collect_generics(&typeinput);
                 generic_list.extend(self.collect_generics(&vec![output.clone()]));
-                self.environment.live_generics.push(generic_list.clone());
+                if let Some(livemap) = self.environment.live_generics.last_mut() {
+                    for generic in generic_list.items.iter() {
+                        // add generics to live map
+                        if !livemap.has(generic) {
+                            livemap.insert(generic.clone());
+                        }
+                    }
+                }
                 self.environment.push_scope();
 
                 // insert params into scope
@@ -1723,6 +1824,7 @@ impl Parser {
                     };
                 }
 
+                //dbg!(self.environment.live_generics.last().unwrap().clone());
                 let mut statements = self.block()?;
 
                 let mut captured: Vec<String> = self
@@ -1734,8 +1836,9 @@ impl Parser {
                     .map(|v| v.0.clone())
                     .collect();
 
+                //dbg!(captured.clone());
                 self.environment.pop_scope();
-                self.environment.live_generics.pop();
+
                 for c in captured.iter() {
                     if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_current_token_position();
@@ -1771,10 +1874,14 @@ impl Parser {
                 let (_, has_return) =
                     self.check_returns(&statements, output.clone(), pos.clone())?;
                 if !has_return && output != TType::Void {
-                    return Err(self.generate_error(
-                        "Function is missing a return statement in a branch".to_string(),
-                        "Function missing return".to_string(),
-                    ));
+                    if let Some(Statement::Pass) = statements.last() {
+                        // do nothing
+                    } else {
+                        return Err(self.generate_error(
+                            "Function is missing a return statement in a branch".to_string(),
+                            "Function missing return".to_string(),
+                        ));
+                    }
                 }
 
                 if output == TType::Void {
@@ -1788,6 +1895,7 @@ impl Parser {
                         }
                     }
                 }
+                //dbg!(&captured);
                 left = Expr::Closure {
                     ttype: TType::Function {
                         parameters: typeinput,
@@ -2003,8 +2111,9 @@ impl Parser {
                 let generic_list = self.collect_generics(&[ttype.clone()]);
                 for generic in generic_list.items {
                     if !self.environment.live_generics.last().unwrap().has(&generic) {
+                        //dbg!(self.environment.live_generics.last().unwrap().clone());
                         return Err(NovaError::SimpleTypeError {
-                            msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
+                            msg: format!("Generic Type '{}' is not live", generic.clone()),
                             position: pos,
                         });
                     }
@@ -2047,6 +2156,20 @@ impl Parser {
             Token::Identifier { .. } => {
                 let (mut identifier, pos) = self.get_identifier()?;
                 match self.current_token() {
+                    Token::Operator {
+                        operator: Operator::DoubleColon,
+                        ..
+                    } => {
+                        if self.environment.custom_types.contains_key(&identifier) {
+                            self.advance();
+                            let (name, _) = self.get_identifier()?;
+                            identifier = format!("{}::{}", identifier, name);
+                        } else if self.modules.has(&identifier) {
+                            self.advance();
+                            let (name, _) = self.get_identifier()?;
+                            identifier = format!("{}::{}", identifier, name);
+                        }
+                    }
                     Token::Symbol { symbol: '@', .. } => {
                         self.consume_symbol('@')?;
                         self.consume_symbol('(')?;
@@ -2437,7 +2560,7 @@ impl Parser {
                                 return Err(self.generate_error_with_pos(
                                     "Comparison operation expects int or float".to_string(),
                                     format!(
-                                        "got {} {}",
+                                        "expected {} , but found {}",
                                         left_expr.get_type().to_string(),
                                         right_expr.get_type().to_string()
                                     ),
@@ -2707,6 +2830,42 @@ impl Parser {
         Ok(arguments)
     }
 
+    fn enum_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
+        let mut parameters: Table<String> = table::new();
+        let mut arguments = vec![];
+
+        while self.current_token().is_identifier() {
+            let (identifier, pos) = self.get_identifier()?;
+            if parameters.has(&identifier) {
+                return Err(self.generate_error_with_pos(
+                    format!("parameter identifier already defined"),
+                    format!("try using another name"),
+                    pos,
+                ));
+            }
+            parameters.insert(identifier.clone());
+            // if no colon, then its a unit variant
+            if !self.current_token().is_op(Operator::Colon) {
+                arguments.push((TType::None, identifier));
+                if !self.current_token().is_symbol(',') {
+                    break;
+                }
+                self.advance();
+                continue;
+            }
+            self.consume_operator(Operator::Colon)?;
+            let ttype = self.ttype()?;
+            arguments.push((ttype, identifier));
+
+            if !self.current_token().is_symbol(',') {
+                break;
+            }
+            self.advance();
+        }
+
+        Ok(arguments)
+    }
+
     fn alternative(&mut self) -> Result<Vec<Statement>, NovaError> {
         let test = self.top_expr()?;
         let pos = self.get_current_token_position();
@@ -2832,9 +2991,174 @@ impl Parser {
         }
     }
 
+    fn match_statement(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("match"))?;
+        let expr = self.expr()?;
+
+        if let Some(custom_type_name) = expr.get_type().custom_to_string() {
+        } else {
+            return Err(self.generate_error_with_pos(
+                format!("Match statement expects an enum type"),
+                format!("got {}", expr.get_type().to_string()),
+                self.get_current_token_position(),
+            ));
+        }
+
+        let pos = self.get_current_token_position();
+        let mut branches = vec![];
+        self.consume_symbol('{')?;
+        let mut default_branch = None;
+        while !self.current_token().is_symbol('}') {
+            let (variant, pos) = self.get_identifier()?;
+            if variant == "_" {
+                // check to see if default branch is already defined
+                if default_branch.is_some() {
+                    return Err(self.generate_error_with_pos(
+                        format!("default branch already defined"),
+                        format!("make sure only one default branch is defined"),
+                        pos,
+                    ));
+                }
+                self.consume_operator(Operator::RightArrow)?;
+                default_branch = Some(self.block()?);
+                continue;
+            }
+            // collect identifiers
+            let mut enum_id = String::new();
+            if self.current_token().is_symbol('(') {
+                self.consume_symbol('(')?;
+                if !self.current_token().is_symbol(')') {
+                    enum_id = self.get_identifier()?.0;
+                }
+                self.consume_symbol(')')?;
+            }
+            self.consume_operator(Operator::RightArrow)?;
+
+            if let Some(fields) = self
+                .environment
+                .custom_types
+                .get(&expr.get_type().custom_to_string().unwrap())
+            {
+                let new_fields = if let Some(x) = self
+                    .environment
+                    .generic_type_struct
+                    .get(&expr.get_type().custom_to_string().unwrap())
+                {
+                    let TType::Custom { type_params, .. } = expr.get_type() else {
+                        panic!("not a custom type")
+                    };
+                    //dbg!(&fields);
+                    fields
+                        .iter()
+                        .map(|(name, ttype)| {
+                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                            (name.clone(), new_ttype)
+                        })
+                        .collect::<Vec<(String, TType)>>()
+                } else {
+                    fields.clone()
+                };
+                let mut tag = 0;
+                // mark if the variant is found
+                let mut found = false;
+                let mut vtype = TType::None;
+
+                for (i, field) in new_fields.iter().enumerate() {
+                    //dbg!(field);
+                    if variant == field.0 {
+                        tag = i;
+                        vtype = field.1.clone();
+                        found = true;
+                    }
+                }
+
+                if vtype != TType::None {
+                    if enum_id.is_empty() {
+                        return Err(self.generate_error_with_pos(
+                            format!("variant '{}' is missing Identifier", variant),
+                            format!("Variant(id), id is missing"),
+                            pos,
+                        ));
+                    }
+                }
+
+                if !found {
+                    return Err(self.generate_error_with_pos(
+                        format!("variant '{}' not found in type", variant),
+                        format!("make sure the variant is in the type"),
+                        pos,
+                    ));
+                }
+
+                self.environment.push_block();
+                self.environment
+                    .insert_symbol(&enum_id, vtype, None, SymbolKind::Variable);
+                let body = self.block()?;
+                self.environment.pop_block();
+                if enum_id.is_empty() {
+                    branches.push((tag, None, body));
+                } else {
+                    branches.push((tag, Some(enum_id.clone()), body));
+                }
+            }
+        }
+        self.consume_symbol('}')?;
+
+        if let Some(default) = default_branch.clone() {
+        } else {
+            // check to see if all variants are covered
+            let mut covered = vec![];
+            for (tag, _, _) in branches.clone() {
+                covered.push(tag);
+            }
+            if let Some(fields) = self
+                .environment
+                .custom_types
+                .get(&expr.get_type().custom_to_string().unwrap())
+            {
+                let new_fields = if let Some(x) = self
+                    .environment
+                    .generic_type_struct
+                    .get(&expr.get_type().custom_to_string().unwrap())
+                {
+                    let TType::Custom { type_params, .. } = expr.get_type() else {
+                        panic!("not a custom type")
+                    };
+                    //dbg!(&fields);
+                    fields
+                        .iter()
+                        .map(|(name, ttype)| {
+                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                            (name.clone(), new_ttype)
+                        })
+                        .collect::<Vec<(String, TType)>>()
+                } else {
+                    fields.clone()
+                };
+                for (i, field) in new_fields.iter().enumerate() {
+                    if field.0 != "type" && !covered.contains(&i) {
+                        return Err(self.generate_error_with_pos(
+                            format!("variant '{}' is not covered", field.0),
+                            format!("make sure all variants are covered"),
+                            pos,
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(Some(Statement::Match {
+            ttype: TType::Void,
+            expr,
+            arms: branches,
+            default: default_branch,
+        }))
+    }
+
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         match self.current_token() {
             Token::Identifier { name: id, .. } => match id.as_str() {
+                "match" => self.match_statement(),
                 "unwrap" => self.unwrap(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
@@ -2844,6 +3168,7 @@ impl Parser {
                 "let" => self.let_statement(),
                 "return" => self.return_statement(),
                 "fn" => self.function_declaration(),
+                "enum" => self.enum_declaration(),
                 "for" => self.for_statement(),
                 "break" => {
                     self.consume_identifier(Some("break"))?;
@@ -2910,6 +3235,124 @@ impl Parser {
             }
         }
         contracts
+    }
+
+    fn enum_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("enum"))?;
+        let (enum_name, position) = self.get_identifier()?;
+
+        // Initialize the struct in the environment for recursive types
+        self.environment
+            .custom_types
+            .insert(enum_name.clone(), vec![]);
+
+        self.environment.enums.insert(enum_name.clone());
+
+        let mut generic_field_names = vec![];
+        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+            generic_field_names = self.get_id_list()?;
+            self.environment
+                .generic_type_struct
+                .insert(enum_name.clone(), generic_field_names.clone());
+        }
+
+        self.consume_symbol('{')?;
+        let parameter_list = self.enum_list()?;
+        self.consume_symbol('}')?;
+        //dbg!(parameter_list.clone());
+        let mut fields: Vec<(String, TType)> = vec![];
+        let mut type_parameters = vec![];
+        let mut generics_table: Table<String> = table::new();
+
+        for (field_type, field_name) in parameter_list.clone() {
+            generics_table.extend(self.collect_generics(&[field_type.clone()]));
+            type_parameters.push(field_type.clone());
+            fields.push((field_name, field_type));
+        }
+        fields.push(("type".to_string(), TType::String));
+
+        for generic_type in generics_table.items.iter() {
+            if !generic_field_names.contains(generic_type) {
+                return Err(self.generate_error_with_pos(
+                    format!(
+                        "enum '{}' is missing generic type {}",
+                        enum_name, generic_type
+                    ),
+                    "You must include generic types in enum name(...generictypes)".to_string(),
+                    position.clone(),
+                ));
+            }
+        }
+
+        let mut field_definitions = vec![];
+        for (field_name, field_type) in fields.clone() {
+            field_definitions.push(Field {
+                identifier: field_name,
+                ttype: field_type,
+            });
+        }
+
+        for variants in field_definitions.clone() {
+            //dbg!(variants.clone());
+
+            if generics_table.is_empty() {
+                dbg!(enum_name.clone());
+                self.environment.insert_symbol(
+                    &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
+                    TType::Function {
+                        parameters: vec![variants.ttype.clone()],
+                        return_type: Box::new(TType::Custom {
+                            name: enum_name.clone(),
+                            type_params: vec![],
+                        }),
+                    },
+                    Some(position.clone()),
+                    SymbolKind::Constructor,
+                );
+            } else {
+                //dbg!(enum_name.clone());
+                let genericmap = generic_field_names
+                    .iter()
+                    .map(|x| TType::Generic { name: x.clone() })
+                    .collect::<Vec<TType>>();
+
+                self.environment.insert_symbol(
+                    &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
+                    TType::Function {
+                        parameters: vec![variants.ttype.clone()],
+                        return_type: Box::new(TType::Custom {
+                            name: enum_name.clone(),
+                            type_params: genericmap,
+                        }),
+                    },
+                    Some(position.clone()),
+                    SymbolKind::Constructor,
+                );
+            }
+        }
+
+        self.environment
+            .custom_types
+            .insert(enum_name.clone(), fields);
+
+        // if !self.environment.has(&enum_name) {
+        //     self.environment.no_override.insert(enum_name.to_string());
+        // } else {
+        //     return Err(self.generate_error_with_pos(
+        //         format!("Enum '{}' is already instantiated", enum_name),
+        //         "Cannot reinstantiate the same type".to_string(),
+        //         position.clone(),
+        //     ));
+        // }
+
+        Ok(Some(Statement::Enum {
+            ttype: TType::Custom {
+                name: enum_name.clone(),
+                type_params: vec![],
+            },
+            identifier: enum_name,
+            fields: field_definitions,
+        }))
     }
 
     fn struct_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -3019,6 +3462,7 @@ impl Parser {
             fields: field_definitions,
         }))
     }
+
     fn for_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("for"))?;
 
@@ -3096,7 +3540,7 @@ impl Parser {
         }
         self.environment.push_block();
         let statements = self.block()?;
-        self.environment.pop_scope();
+        self.environment.pop_block();
 
         Ok(Some(Statement::While {
             test,
@@ -3150,7 +3594,7 @@ impl Parser {
                 } else {
                     None
                 };
-                self.environment.pop_scope();
+                self.environment.pop_block();
                 Ok(Some(Statement::IfLet {
                     ttype: expr.get_type(),
                     identifier,
@@ -3194,6 +3638,14 @@ impl Parser {
         let mut global = false;
         // refactor out into two parsing ways for ident. one with module and one without
         let (mut identifier, mut pos) = self.get_identifier()?;
+        if self.modules.has(&identifier) {
+            // throw error
+            return Err(self.generate_error_with_pos(
+                format!("Cannot use module as identifier"),
+                format!("got {}", identifier),
+                pos.clone(),
+            ));
+        }
         if identifier == "global" {
             (identifier, pos) = self.get_identifier()?;
             global = true
@@ -3328,9 +3780,96 @@ impl Parser {
 
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("fn"))?;
+
+        let mut is_extended = false;
+        let mut is_mod = false;
+        let mut get_first = false;
+        // check to see if next is the extends keyword with a custom type name and get the custom type name
+        let mut custom_type = "".to_string();
+        if self.current_token().is_id("extends") {
+            self.advance();
+            // if current token is ( then get the custom type name , otherwise extend from first argument
+            if self.current_token().is_symbol('(') {
+                self.consume_symbol('(')?;
+                (custom_type, _) = self.get_identifier()?;
+                // check to see if its a valid custom type
+                if !self.environment.custom_types.contains_key(&custom_type) {
+                    return Err(self.generate_error_with_pos(
+                        format!("Custom type {} does not exist", custom_type),
+                        "Cannot extend a non existent custom type".to_string(),
+                        self.get_current_token_position(),
+                    ));
+                }
+                self.consume_symbol(')')?;
+                is_extended = true;
+            } else {
+                get_first = true;
+            }
+        } else if self.current_token().is_id("mod") {
+            self.advance();
+            self.consume_symbol('(')?;
+            (custom_type, _) = self.get_identifier()?;
+            // check to see if its a valid custom type
+            if !self.modules.has(&custom_type) {
+                return Err(self.generate_error_with_pos(
+                    format!("Module {} does not exist", custom_type),
+                    "Cannot extend a non existent module".to_string(),
+                    self.get_current_token_position(),
+                ));
+            }
+            self.consume_symbol(')')?;
+            is_mod = true;
+        }
+
         let (mut identifier, pos) = self.get_identifier()?;
 
-        // check to see if its already defined
+        if is_extended || is_mod {
+            identifier = format!("{}::{}", custom_type, identifier);
+        }
+
+        // get parameters
+        self.consume_symbol('(')?;
+        let parameters = self.parameter_list()?;
+        //dbg!(&parameters);
+        self.consume_symbol(')')?;
+        // get output type
+
+        if !is_extended && get_first {
+            //println!("{} {}", identifier, parameters.len());
+            if let Some((ttype, _)) = parameters.first() {
+                match ttype {
+                    TType::Custom { name, .. } => {
+                        identifier = format!("{}::{}", name, identifier);
+                    }
+                    TType::List { .. } => {
+                        identifier = format!("List::{}", identifier);
+                    }
+                    TType::Option { .. } => {
+                        identifier = format!("Option::{}", identifier);
+                    }
+                    TType::Function { .. } => {
+                        identifier = format!("Function::{}", identifier);
+                    }
+                    TType::Tuple { .. } => {
+                        identifier = format!("Tuple::{}", identifier);
+                    }
+                    TType::Bool => {
+                        identifier = format!("Bool::{}", identifier);
+                    }
+                    TType::Int => {
+                        identifier = format!("Int::{}", identifier);
+                    }
+                    TType::Float => {
+                        identifier = format!("Float::{}", identifier);
+                    }
+                    TType::String => {
+                        identifier = format!("String::{}", identifier);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         if self.environment.has(&identifier) {
             return Err(self.generate_error_with_pos(
                 format!("Generic Function {identifier} already defined"),
@@ -3338,12 +3877,7 @@ impl Parser {
                 pos.clone(),
             ));
         }
-        // get parameters
-        self.consume_symbol('(')?;
-        let parameters = self.parameter_list()?;
-        //dbg!(&parameters);
-        self.consume_symbol(')')?;
-        // get output type
+
         let mut output = TType::Void;
         if self.current_token().is_symbol('{') {
         } else {
@@ -3451,6 +3985,7 @@ impl Parser {
         let mut generic_list = self.collect_generics(&typeinput);
         generic_list.extend(self.collect_generics(&vec![output.clone()]));
         self.environment.live_generics.push(generic_list.clone());
+        //dbg!(generic_list);
         // parse body with scope
         self.environment.push_scope();
         // insert params into scope
@@ -3526,15 +4061,6 @@ impl Parser {
 
         // done capturing variables ----------------------------
 
-        // check return types
-        let (_, has_return) = self.check_returns(&statements, output.clone(), pos.clone())?;
-        if !has_return && output != TType::Void {
-            return Err(self.generate_error_with_pos(
-                "Function is missing a return statement in a branch".to_string(),
-                "Function missing return".to_string(),
-                pos.clone(),
-            ));
-        }
         // if output void, insert return as last statement if one wasnt added
         if output == TType::Void {
             if let Some(Statement::Return { .. }) = statements.last() {
@@ -3546,13 +4072,19 @@ impl Parser {
             }
         }
         // if last statement isnt a return error
-        if let Some(Statement::Return { .. }) = statements.last() {
-        } else {
-            return Err(self.generate_error_with_pos(
-                "Function is missing a return statement in a branch".to_string(),
-                "Function missing return".to_string(),
-                pos.clone(),
-            ));
+        let (_, has_return) = self.check_returns(&statements, output.clone(), pos.clone())?;
+        if !has_return && output != TType::Void {
+            if let Some(Statement::Pass) = statements.last() {
+                // do nothing
+            } else {
+                if !has_return {
+                    return Err(self.generate_error_with_pos(
+                        "Function is missing a return statement in a branch".to_string(),
+                        "Function missing return".to_string(),
+                        pos.clone(),
+                    ));
+                }
+            }
         }
         //dbg!(&captured);
         Ok(Some(Statement::Function {
@@ -3611,6 +4143,48 @@ impl Parser {
                         )),
                         None => Ok(body_has_return),
                     }
+                }
+                Statement::IfLet {
+                    body, alternative, ..
+                } => {
+                    let (body_return_type, body_has_return) =
+                        self.check_returns(body, return_type.clone(), pos.clone())?;
+                    let alternative_result = alternative
+                        .as_ref()
+                        .map(|alt| self.check_returns(alt, return_type.clone(), pos.clone()))
+                        .transpose()?;
+
+                    match alternative_result {
+                        Some((alternative_return_type, alternative_has_return))
+                            if body_return_type == alternative_return_type =>
+                        {
+                            Ok(body_has_return && alternative_has_return)
+                        }
+                        Some(_) => Err(self.generate_error(
+                            "Function is missing a return statement in a branch".to_string(),
+                            "All branches of if-else must have a return statement".to_string(),
+                        )),
+                        None => Ok(body_has_return),
+                    }
+                }
+                Statement::Match {
+                    ttype,
+                    expr,
+                    arms,
+                    default,
+                } => {
+                    let mut has_return = has_return;
+                    for arm in arms {
+                        let (arm_return_type, arm_has_return) =
+                            self.check_returns(&arm.2, return_type.clone(), pos.clone())?;
+                        has_return = has_return && arm_has_return;
+                    }
+                    if let Some(default) = default {
+                        let (default_return_type, default_has_return) =
+                            self.check_returns(default, return_type.clone(), pos.clone())?;
+                        has_return = has_return && default_has_return;
+                    }
+                    Ok(has_return)
                 }
                 _ => Ok(has_return),
             })

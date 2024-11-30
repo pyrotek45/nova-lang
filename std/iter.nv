@@ -2,21 +2,13 @@ module iter
 
 import core
 
-fn filter(it: () -> ?$A, f:($A) -> Bool) -> [$A] {
-    let t = it()
-    let list = []:$A
-    while isSome(t) {
-        if t.unwrap().f() {
-            list.push(t.unwrap())
-        }
-        t = it() 
-    }
-    return list
+struct Iter(A) {
+    next: () -> ?$A
 }
 
-fn iter(input:[$A]) -> () -> ?$A {
+fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
     let index = Box(0)  
-    return fn() -> ?$A {
+    return Iter(fn() -> ?$A {
         if index.value >= input.len() {
             return ?$A
         } else {
@@ -24,36 +16,51 @@ fn iter(input:[$A]) -> () -> ?$A {
             index.value += 1
             return result
         }
-    }
+    })
 }
 
-fn map(it: () -> ?$A, f:($A) -> $A) -> () -> ?$A {
-    return fn() -> ?$A {
-        let result: ?$A = it() 
-        if result.isSome() {
-            return Some(f(result.unwrap()))
-        } else {
-            return ?$A
+fn extends(Iter) fromFn(input: () -> ?$A) -> Iter($A) {
+    return Iter(input)
+}
+
+fn extends filter(it: Iter($A), f:($A) -> Bool) -> Iter($A) {
+    return Iter(fn() -> ?$A {
+        let t = it::next()
+        while t.isSome() {
+            if f(t.unwrap()) {
+                return t
+            }
+            t = it::next() 
         }
-    }
+        return ?$A
+    })
 }
 
-fn printIter(it: () -> ?$A) {
-    let t: ?$A = it() 
+fn extends map(it: Iter($A), f:($A) -> $B) -> Iter($B) {
+    return Iter(fn() -> ?$B {
+        let t = it::next() 
+        if t.isSome() {
+            return Some(f(t.unwrap()))
+        } else {
+            return ?$B
+        }
+    })
+}
+
+fn extends show(it: Iter($A)) {
+    let t: ?$A = it::next() 
     while t.isSome() {
-        print(t.unwrap())
-        print("\n")
-        t = it() 
+        t.unwrap().println()
+        t = it::next() 
     }
 }
 
-fn collect(it: () -> ?$A) -> [$A] {
-    let t: ?$A = it() 
+fn extends collect(it: Iter($A)) -> [$A] {
+    let t: ?$A = it::next() 
     let list = []:$A
     while t.isSome() {
         list.push(t.unwrap())
-        t = it() 
+        t = it::next() 
     }
     return list
 }
-

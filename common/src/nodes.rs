@@ -68,6 +68,11 @@ pub enum Statement {
         identifier: String,
         fields: Vec<Field>,
     },
+    Enum {
+        ttype: TType,
+        identifier: String,
+        fields: Vec<Field>,
+    },
     Return {
         ttype: TType,
         expr: Expr,
@@ -114,6 +119,12 @@ pub enum Statement {
     Block {
         body: Vec<Statement>,
         filepath: String,
+    },
+    Match {
+        ttype: TType,
+        expr: Expr,
+        arms: Vec<(usize, Option<String>, Vec<Statement>)>,
+        default: Option<Vec<Statement>>,
     },
 }
 
