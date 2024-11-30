@@ -62,7 +62,7 @@ impl TType {
             TType::Void => "Void".to_string(),
             TType::Auto => "Auto".to_string(),
             TType::Char => "Char".to_string(),
-            TType::None => "".to_string(),
+            TType::None => "None".to_string(),
             TType::Custom {
                 name, type_params, ..
             } => {

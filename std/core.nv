@@ -4,6 +4,10 @@ struct Box(A) {
     value: $A
 }
 
+fn extends show(self: Box($A)) {
+    println(toStr(self.value))
+}
+
 fn Gen(start: Int) -> () -> Int {
     let i = Box(start)
     return fn() -> Int {
@@ -12,3 +16,28 @@ fn Gen(start: Int) -> () -> Int {
     }
 }
 
+// Option type 
+
+fn extends orError(self: ?$A, msg: String) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    println(msg)
+    exit()
+    // unreachable
+    pass
+}
+
+fn extends orDefault(self: ?$A, default: $A) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    return default
+}
+
+fn extends orDoFn(self: ?$A, f:() -> $A) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    return f()
+}

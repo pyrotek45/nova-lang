@@ -11,6 +11,7 @@ use crate::{
 pub struct Environment {
     pub captured: Vec<HashMap<String, Symbol>>,
     pub custom_types: HashMap<String, Vec<(String, TType)>>,
+    pub enums: table::Table<String>,
     pub no_override: table::Table<String>,
     pub values: Vec<HashMap<String, Symbol>>,
     pub type_alias: HashMap<String, TType>,
@@ -29,6 +30,7 @@ pub fn new_environment() -> Environment {
         generic_type_struct: HashMap::default(),
         generic_type_map: HashMap::default(),
         live_generics: vec![table::new()],
+        enums: table::new(),
     }
 }
 
@@ -181,7 +183,7 @@ impl Environment {
 
     pub fn push_scope(&mut self) {
         let mut scope: HashMap<String, Symbol> = HashMap::default();
-        self.captured.push(self.captured.last().unwrap().clone());
+        //self.captured.push(self.captured.last().unwrap().clone());
         for (id, sym) in self.values.last().unwrap().iter() {
             match sym.kind {
                 SymbolKind::Function | SymbolKind::GenericFunction | SymbolKind::Constructor => {
@@ -195,16 +197,18 @@ impl Environment {
 
     pub fn pop_scope(&mut self) {
         self.values.pop();
-        self.captured.pop();
+        //self.captured.pop();
     }
 
     pub fn push_block(&mut self) {
+        //self.live_generics.push(self.live_generics.last().unwrap().clone());
         self.values.push(self.values.last().unwrap().clone());
-        self.captured.push(self.captured.last().unwrap().clone())
+        //self.captured.push(self.captured.last().unwrap().clone())
     }
 
     pub fn pop_block(&mut self) {
+        //self.live_generics.pop();
         self.values.pop();
-        self.captured.pop();
+        //self.captured.pop();
     }
 }

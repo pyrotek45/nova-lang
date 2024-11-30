@@ -12,12 +12,12 @@ struct Wall {
 }
 
 fn endgame() {
-    rawmode(false)
+    terminal::rawmode(false)
     println("YOU DIED")
 
 }
 
-fn showscreen(player: Player, wall: Wall, points: Int) -> Bool {
+fn extends showscreen(player: Player, wall: Wall, points: Int) -> Bool {
     let screen = []: Char
     screen.push('\n')
     screen.push('\r')
@@ -52,22 +52,22 @@ fn showscreen(player: Player, wall: Wall, points: Int) -> Bool {
         screen.push('\r')
     }
     print("press q to exit, w to jump. Points: "); println(points)
-    screen.charsToStr().println()
+    println(screen.toStr())
     return true
 }
 
-let input = ?Char
+let input = None() @[T: Char]
 let player = Player(5,5,'@')
-let wall = Wall(35,randomInt(0,14))
+let wall = Wall(35,random(0,14))
 let points = 0
 
-rawmode(true)
-hidecursor()
+terminal::rawmode(true)
+terminal::hideCursor()
 let alive = true
 while alive {
-    clearscreen()
-    alive = showscreen(player,wall, points)
-    input = rawread(120);
+    terminal::clearScreen()
+    alive = player.showscreen(wall, points)
+    input = terminal::rawread(120);
     if input.isSome() {
         if input == 'q' {
             break
@@ -85,11 +85,11 @@ while alive {
     }
     if wall.location <= 0 {
         wall.location = 35
-        wall.opening = randomInt(0,14)
+        wall.opening = random(0,14)
         points += 1
     } else {
         wall.location -= 1
     }
 }
-rawmode(false)
-showcursor()
+terminal::rawmode(false)
+terminal::showCursor()

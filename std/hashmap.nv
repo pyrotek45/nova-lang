@@ -1,49 +1,54 @@
 module hashmap
 
 import list
+import core
 
 struct HashMap(K,V) {
     keys: [$K],
     values: [$V],
 }
 
-fn NewHashMap() -> HashMap($K,$V) {
+fn  extends(HashMap) default() -> HashMap($K,$V) {
     return HashMap {
         keys: []:$K,
         values: []:$V,
     }
 }
 
-fn insert(m: HashMap($K,$V), k: $K, v: $V) {
-    for (key in m.keys) {
+fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
+    for (key in self.keys) {
         if key == k {
-            m.values[m.keys.index_of(key)] = v;
+            self.values[List::index_of(self.keys, key)] = v;
             return;
         }
     }
-    m.keys.push(k)
-    m.values.push(v)
+    self.keys.push(k)
+    self.values.push(v)
 }
 
-fn get(m: HashMap($K,$V), k: $K) -> ?$V {
-    for (key in m.keys) {
+fn extends get(self: HashMap($K,$V), k: $K) -> ?$V {
+    for (key in self.keys) {
         if key == k {
-            return m.values[m.keys.index_of(key)];
+            return self.values[List::index_of(self.keys, key)];
         }
     }
     return ?$V
 }
 
-fn delete(m: HashMap($K,$V), k: $K) {
-    let index = m.keys.index_of(k)
+fn extends delete(self: HashMap($K,$V), k: $K) {
+    let index = List::index_of(self.keys, k)
     if index != -1 {
-        m.keys.remove(index)
-        m.values.remove(index)
+        self.keys = List::remove(self.keys, index)
+        self.values = List::remove(self.values, index)
     }
 }
 
-fn show(m: HashMap($K,$V)) {
-    for i <- 0; i < m.keys.len(); i += 1 {
-        println(m.keys[i].toStr() + " -> " + m.values[i].toStr())
+fn extends show(self: HashMap($K,$V)) {
+    if self.keys.len() == 0 {
+        println("Empty HashMap")
+    } else {
+        for i <- 0; i < self.keys.len(); i += 1 {
+            println(toStr(self.keys[i] )+ " -> " + toStr(self.values[i]))
+        }
     }
 }

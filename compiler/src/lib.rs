@@ -1,3 +1,5 @@
+use std::default;
+
 use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
@@ -100,7 +102,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
 
@@ -113,7 +115,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::EQUALS);
@@ -396,7 +398,10 @@ impl Compiler {
                     if let Some(index) = self.variables.get_index(identifier.to_string()) {
                         self.asm.push(Asm::GET(index as u32))
                     }
-                    if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
+                    if let Some(index) = self
+                        .native_functions
+                        .get_index("Option::isSome".to_string())
+                    {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::ISSOME);
@@ -434,7 +439,10 @@ impl Compiler {
                     let skip = self.gen.generate();
                     let end = self.gen.generate();
                     self.compile_expr(expr.clone())?;
-                    if let Some(index) = self.native_functions.get_index("isSome".to_string()) {
+                    if let Some(index) = self
+                        .native_functions
+                        .get_index("Option::isSome".to_string())
+                    {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::DUP);
@@ -471,6 +479,95 @@ impl Compiler {
                             false,
                             false,
                         )?;
+                        self.asm.pop();
+                    }
+                    self.asm.push(Asm::LABEL(end));
+                }
+                common::nodes::Statement::Enum {
+                    identifier, fields, ..
+                } => {
+                    for (tag, field) in fields.iter().enumerate() {
+                        if field.identifier == "type" {
+                            continue;
+                        }
+
+                        self.global
+                            .insert(format!("{}::{}", identifier, field.identifier).to_string());
+
+                        //dbg!(format!("{}::{}", identifier, field.identifier));
+
+                        let structjump = self.gen.generate();
+                        self.asm.push(Asm::FUNCTION(structjump));
+                        // offset is what it will accept
+                        // enum is stored as a tuple [value,tag,type]
+                        if field.ttype != TType::None {
+                            self.asm.push(Asm::OFFSET((1) as u32, 0 as u32));
+                        } else {
+                            self.asm.push(Asm::OFFSET((0) as u32, 0 as u32));
+                            self.asm.push(Asm::NONE);
+                        }
+
+                        self.asm.push(Asm::INTEGER(tag as i64));
+                        self.asm.push(Asm::STRING(identifier.clone()));
+
+                        self.asm.push(Asm::LIST(3 as u64));
+                        self.asm.push(Asm::RET(true));
+
+                        self.asm.push(Asm::LABEL(structjump));
+                        let index = self.global.len() - 1;
+                        self.asm.push(Asm::STOREGLOBAL(index as u32));
+                    }
+                }
+                common::nodes::Statement::Match {
+                    expr,
+                    arms,
+                    default,
+                    ..
+                } => {
+                    // we will do it old school, each arm will make a new if branch
+                    // and if it fails it will jump to the next arm
+                    // if there is a default it will jump to the default
+                    // if there is no default it will jump to the end
+                    let end = self.gen.generate();
+                    for arm in arms.iter() {
+                        let next = self.gen.generate();
+                        self.compile_expr(expr.clone())?;
+                        // will test the expression
+                        self.asm.push(Asm::INTEGER(1 as i64));
+                        self.compile_expr(expr.clone())?;
+                        self.asm.push(Asm::LIN);
+                        // self.asm.push(Asm::DUP);
+                        // self.asm.push(Asm::PRINT);
+                        //dbg!(arm.0);
+                        self.asm.push(Asm::INTEGER(arm.0 as i64));
+                        self.asm.push(Asm::EQUALS);
+                        self.asm.push(Asm::JUMPIFFALSE(next));
+                        if let Some(vid) = &arm.1 {
+                            self.asm.push(Asm::INTEGER(0 as i64));
+                            self.compile_expr(expr.clone())?;
+                            self.asm.push(Asm::LIN);
+                            // store the vid in the variable
+                            if let Some(index) = self.variables.get_index(vid.to_string()) {
+                                self.asm.push(Asm::STORE(index as u32))
+                            } else {
+                                self.variables.insert(vid.to_string());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32))
+                            }
+                        }
+                        let arm = Ast {
+                            program: arm.2.clone(),
+                        };
+                        self.compile_program(arm, self.filepath.clone(), false, false, false)?;
+                        self.asm.pop();
+                        self.asm.push(Asm::JMP(end));
+                        self.asm.push(Asm::LABEL(next));
+                    }
+                    if let Some(default) = default {
+                        let default = Ast {
+                            program: default.clone(),
+                        };
+                        self.compile_program(default, self.filepath.clone(), false, false, false)?;
                         self.asm.pop();
                     }
                     self.asm.push(Asm::LABEL(end));
@@ -970,6 +1067,13 @@ impl Compiler {
                 name: caller,
                 arguments: list,
             } => {
+                match caller.as_str() {
+                    "typeof" => {
+                        self.asm.push(Asm::STRING(list[0].get_type().to_string()));
+                        return Ok(());
+                    }
+                    _ => {}
+                }
                 for expr in list.iter() {
                     self.compile_expr(expr.clone())?;
                 }
@@ -982,16 +1086,13 @@ impl Compiler {
                     "print" => {
                         self.asm.push(Asm::PRINT);
                     }
-                    "none" => self.asm.push(Asm::NONE),
-                    "unwrap" => self.asm.push(Asm::UNWRAP),
+                    "None" => self.asm.push(Asm::NONE),
+                    "Option::unwrap" => self.asm.push(Asm::UNWRAP),
                     "Some" => {}
-                    "isSome" => self.asm.push(Asm::ISSOME),
+                    "Option::isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
-                    "typeof" => {
-                        self.asm.push(Asm::STRING(list[0].get_type().to_string()));
-                    }
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {
