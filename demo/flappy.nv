@@ -52,7 +52,7 @@ fn extends showscreen(player: Player, wall: Wall, points: Int) -> Bool {
         screen.push('\r')
     }
     print("press q to exit, w to jump. Points: "); println(points)
-    println(screen.toStr())
+    println(screen.string())
     return true
 }
 
