@@ -131,13 +131,29 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
     None,
-    Char { value: char },
-    Bool { value: bool },
-    Id { name: String },
-    Float { value: f64 },
-    String { value: String },
-    Integer { value: i64 },
-    Call { name: String, arguments: Vec<Expr> },
+    Char {
+        value: char,
+    },
+    Bool {
+        value: bool,
+    },
+    Id {
+        name: String,
+    },
+    Float {
+        value: f64,
+    },
+    String {
+        value: String,
+    },
+    Integer {
+        value: i64,
+    },
+    Call {
+        name: String,
+        arguments: Vec<Expr>,
+        position: FilePosition,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

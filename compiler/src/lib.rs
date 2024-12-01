@@ -663,7 +663,9 @@ impl Compiler {
             Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(int));
             }
-            Atom::Call { name, arguments } => {
+            Atom::Call {
+                name, arguments, ..
+            } => {
                 for expr in arguments.iter() {
                     self.compile_expr(expr.clone())?;
                 }
@@ -1075,6 +1077,7 @@ impl Compiler {
             Atom::Call {
                 name: caller,
                 arguments: list,
+                position,
             } => {
                 match caller.as_str() {
                     "typeof" => {
@@ -1102,6 +1105,7 @@ impl Compiler {
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
+                    "error" => self.asm.push(Asm::ERROR(position)),
                     identifier => {
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {

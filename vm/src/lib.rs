@@ -39,6 +39,13 @@ impl Vm {
         loop {
             // /dbg!(&self.state.stack, &self.state.program[self.state.current_instruction]);
             match self.state.next() {
+                Code::ERROR => {
+                    return Err(NovaError::RuntimeWithPos {
+                        msg: "Error".to_string(),
+                        position: self.runtime_errors_table[&self.state.current_instruction]
+                            .clone(),
+                    });
+                }
                 Code::EXIT => exit(0),
                 Code::CONCAT => {
                     if let (Some(VmData::String(s1)), Some(VmData::String(s2))) =

@@ -125,6 +125,7 @@ impl Code {
     pub const CONCAT: u8 = 76;
 
     pub const EXIT: u8 = 77;
+    pub const ERROR: u8 = 78;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -293,4 +294,5 @@ pub enum Asm {
     NATIVE(u64),
 
     EXIT,
+    ERROR(FilePosition),
 }

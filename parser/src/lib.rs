@@ -31,7 +31,15 @@ pub struct Parser {
 
 pub fn new(filepath: &str) -> Parser {
     let mut env = new_environment();
-
+    env.insert_symbol(
+        "error",
+        TType::Function {
+            parameters: vec![TType::None],
+            return_type: Box::new(TType::Void),
+        },
+        None,
+        SymbolKind::GenericFunction,
+    );
     env.insert_symbol(
         "exit",
         TType::Function {
@@ -267,7 +275,6 @@ impl Parser {
                         type_map,
                         pos.clone(),
                     )?;
-                    
                 }
                 (
                     TType::Custom {
@@ -692,11 +699,13 @@ impl Parser {
                 TType::Option { .. } => {
                     identifier = format!("Option::{}", identifier);
                 }
-                TType::Function { .. } => {
-                    identifier = format!("Function::{}", identifier);
+                TType::Function { parameters, .. } => {
+                    let repeated_elements: String = "(_)".repeat(parameters.len());
+                    identifier = format!("Tuple{}::{}",repeated_elements, identifier);
                 }
-                TType::Tuple { .. } => {
-                    identifier = format!("Tuple::{}", identifier);
+                TType::Tuple { elements } => {
+                    let repeated_elements: String = "(_)".repeat(elements.len());
+                    identifier = format!("Tuple{}::{}",repeated_elements, identifier);
                 }
                 TType::Bool => {
                     identifier = format!("Bool::{}", identifier);
@@ -827,7 +836,7 @@ impl Parser {
         //dbg!(self.current_token());
         // if current token is @ then parse [T: Type] and replace the generic type and inset that into the type_map
         self.modify_type_map(&mut type_map, pos.clone(), generic_list)?;
-        return_type = Box::new(self.get_output(*return_type, &mut type_map, pos)?);
+        return_type = Box::new(self.get_output(*return_type, &mut type_map, pos.clone())?);
 
         if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
             function_id = subtype.clone();
@@ -838,6 +847,7 @@ impl Parser {
             value: Atom::Call {
                 name: function_id,
                 arguments,
+                position: pos.clone(),
             },
         });
     }
@@ -3824,11 +3834,13 @@ impl Parser {
                     TType::Option { .. } => {
                         identifier = format!("Option::{}", identifier);
                     }
-                    TType::Function { .. } => {
-                        identifier = format!("Function::{}", identifier);
+                    TType::Function { parameters, .. } => {
+                        let repeated_elements: String = "(_)".repeat(parameters.len());
+                        identifier = format!("Tuple{}::{}", repeated_elements, identifier);
                     }
-                    TType::Tuple { .. } => {
-                        identifier = format!("Tuple::{}", identifier);
+                    TType::Tuple { elements } => {
+                        let repeated_elements: String = "(_)".repeat(elements.len());
+                        identifier = format!("Tuple{}::{}", repeated_elements, identifier);
                     }
                     TType::Bool => {
                         identifier = format!("Bool::{}", identifier);

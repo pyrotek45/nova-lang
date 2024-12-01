@@ -75,6 +75,7 @@ impl Disassembler {
                 Asm::UNWRAP => println!("    unwrap"),
                 Asm::CONCAT => println!("    concat"),
                 Asm::Char(v) => println!("    char: {v}"),
+                Asm::ERROR(_) => println!("    error"),
             }
         }
         println!();
