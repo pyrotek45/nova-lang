@@ -46,6 +46,8 @@ Once Cargo has finished building Nova, you can run it using the following comman
 Enjoy this demo!
 
 ```swift
+/module main
+
 // Type declaration
 struct Person {
     name: String,
@@ -54,7 +56,7 @@ struct Person {
 
 // Hello world
 println("hello world!")
-"hello world".println()
+
 
 // Creating instance of type
 let person : Person = Person {name: "bob", age: 42}
@@ -69,31 +71,28 @@ person3 <- Person("bobby", 30)
 person3 = Person("jesse", 25)
 
 // Function for type
-fn display(self: Person) {
+fn extends display(self: Person) {
     println(self.name)
     println(self.age)
 }
 
 // import function
 person.display()
-display(person2)
+Person::display(person2)
 
 // For loop
 for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-import "../std/list.nv"
+import super.std.list
 
 // Array
 let arr = [1,2,3]
 println(arr)
 
 let arr2 = []: Int.fill(10,5)
-arr2.println()
-
-let arr3 = Vec(10,5)
-arr3.println()
+println(arr2)
  
 arr[1] = 4
 println(arr)
@@ -117,17 +116,13 @@ let zed = Zed {
 zed::test()
 
 // import iterators
-import "../std/iter.nv" 
+import super.std.iter
 
-// import defualt iter functions
-
-
-let myIter = [1,2,3,4,5]
-    .iter()
+let myIter = Iter::fromVec([1,2,3,4,5])
     .map(fn(x:Int)->Int{return x * x})
+    .collect()
 
-myIter
-    .printIter()
+println(myIter)
 
 // Function pointers
 struct SomeFunction {
@@ -142,16 +137,15 @@ let myOtherFunc = myMul.function
 let simpleSquare = fn(x: Int) -> Int {return x * x};
 
 // Calling function pointer from a struct
-(myMul.function)(4,99).println()
-myMul::function(4,99).println()
+println((myMul.function)(4,99))
+println(myMul::function(4,99))
 
 // Support for most escape chars
 print("hello again!\n")
 
-myOtherFunc(4,7).println()
+println(myOtherFunc(4,7))
 
-let myIterTwo = [1,2,3,4,5]
-    .iter()
+let myIterTwo = Iter::fromVec([1,2,3,4,5])
     .map(simpleSquare)
     .map(simpleSquare)
     .collect()
@@ -172,16 +166,16 @@ fn add(x:Float,y:Float) -> Float {
     return x + y
 }
 
-add(1,3).println()
-add(1.0,3.0).println()
+println(add(1,3))
+println(add(1.0,3.0))
 
 // Passing an overloaded function
 myIntAdder <- add@(Int,Int)
-myIntAdder(1,4).println()
+println(myIntAdder(1,4))
 
 // Generic functions
 fn generic(x: $A) {
-    x.println()
+    println(x)
 }
 
 generic("hello!")
@@ -211,7 +205,7 @@ fn CounterInit() -> Counter {
 }
 
 // Creating a function for counter outside of the struct
-fn count(self: Counter) -> Int {
+fn extends count(self: Counter) -> Int {
     println("im in a normal function")
     result <- self.value
     self.value += 1
@@ -221,41 +215,40 @@ fn count(self: Counter) -> Int {
 mycounter <- CounterInit()
 
 // The -> takes the function from the struct, and applys it to itself
-mycounter->count().println()
+println(mycounter->count())
 
 // the normal function 'count' will be called here, not from the struct itself
-mycounter.count().println()
+println(mycounter.count())
 
 // Option type ?type lets you represent none
 let x: ?Int = Some(20)
 
 // import the isSome() function here
 if x.isSome() {
-    x.unwrap().println()
+    println(x.unwrap())
 }
 
 x = ?Int
 if x.isSome() {
     println("i never print")
-    x.unwrap().println()
+    println(x.unwrap())
 }
 
-fn do(x: ?$A, f:($A)) {
+fn extends do(x: ?$A, f:($A)) {
     if x.isSome() {
         f(x.unwrap())
     }
 }
 
-x.do(fn(x:Int) {x.println()})
+x.do(fn(x:Int) {println(x)})
 
 // String manipulation
 str <- "hello world!"
-    .strToChars()
-    .iter() 
+    .chars()
     .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
-    .charsToStr()
+    .string()
 
-str.println()
+println(str)
 
 // Currying
 fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {   
@@ -269,7 +262,7 @@ fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {
 }
 
 inc <- add(1)(2)(3)(4)
-inc.println()
+println(inc)
 
 
 fn curry(f:($A,$A) -> $A) -> ($A) -> ($A) -> $A {
@@ -286,11 +279,11 @@ fn mul(x:Int,y:Int) -> Int {
 
 curriedmul <- curry(mul@(Int,Int))
 
-curriedmul(5)(5).println()
+println(curriedmul(5)(5))
 
 // using IO struct
-import "../std/io.nv" let io = defualtIO()
+import super.std.io
 
 let input = io::prompt("wow")
-input.println()
+println(input)
 ```

@@ -50,7 +50,7 @@ fn extends map(it: Iter($A), f:($A) -> $B) -> Iter($B) {
 fn extends show(it: Iter($A)) {
     let t: ?$A = it::next() 
     while t.isSome() {
-        t.unwrap().println()
+        println(t.unwrap())
         t = it::next() 
     }
 }

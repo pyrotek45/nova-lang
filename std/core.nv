@@ -5,7 +5,7 @@ struct Box(A) {
 }
 
 fn extends show(self: Box($A)) {
-    println(toStr(self.value))
+    println(Cast::string(self.value))
 }
 
 fn Gen(start: Int) -> () -> Int {

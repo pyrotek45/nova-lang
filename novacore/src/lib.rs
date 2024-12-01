@@ -265,7 +265,7 @@ impl NovaCore {
             native::str::strlen,
         );
         self.add_function(
-            "List::toChars",
+            "String::chars",
             TType::Function {
                 parameters: vec![TType::String],
                 return_type: Box::new(TType::List {
@@ -276,7 +276,7 @@ impl NovaCore {
             native::str::str_to_chars,
         );
         self.add_function(
-            "List::toStr",
+            "List::string",
             TType::Function {
                 parameters: vec![TType::List {
                     inner: Box::new(TType::Char),
