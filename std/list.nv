@@ -72,13 +72,13 @@ fn extends flatten(input: [[$T]]) -> [$T] {
     return result
 }
 
-fn extends split(input: [Char], delim: Char) -> [[Char]] {
-    let result = []: [Char]
-    let current = []: Char
+fn extends split(input: [$T], delim: $T) -> [[$T]] {
+    let result = []: [$T]
+    let current = []: $T
     for (c in input) {
         if c == delim {
             result.push(clone(current))
-            current = []: Char
+            current = []: $T
         } else {
             current.push(c)
         }

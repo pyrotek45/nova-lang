@@ -332,7 +332,9 @@ impl Assembler {
     pub fn assemble(&mut self) {
         for instruction in self.input.iter().cloned() {
             match instruction {
-                Asm::EXIT => self.output.push(Code::EXIT),
+                Asm::EXIT => {
+                    self.output.push(Code::EXIT);
+                }
                 Asm::LABEL(label) => {
                     self.labels.insert(label, self.output.len() as u64);
                 }
@@ -538,6 +540,11 @@ impl Assembler {
                     self.output.push(Code::CHAR);
                     let cast = v as u8;
                     self.output.push(cast);
+                }
+                Asm::ERROR(file_position) => {
+                    self.output.push(Code::ERROR);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
                 }
             }
         }
