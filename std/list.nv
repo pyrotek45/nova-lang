@@ -61,3 +61,93 @@ fn extends index_of(arr: [$K], k: $K) -> Int {
     }
     return -1;
 }
+
+fn extends flatten(input: [[$T]]) -> [$T] {
+    let result = []: $T
+    for (i in input) {
+        for (c in i) {
+            result.push(c)
+        }
+    }
+    return result
+}
+
+fn extends split(input: [Char], delim: Char) -> [[Char]] {
+    let result = []: [Char]
+    let current = []: Char
+    for (c in input) {
+        if c == delim {
+            result.push(clone(current))
+            current = []: Char
+        } else {
+            current.push(c)
+        }
+    }
+    result.push(clone(current))
+    return result
+}
+
+fn extends sort(input: [Int]) -> [Int] {
+    let result = input
+    for i <- 0; i < result.len(); i += 1 {
+        for j <- i + 1; j < result.len(); j += 1 {
+            if result[i] > result[j] {
+                let temp = result[i]
+                result[i] = result[j]
+                result[j] = temp
+            }
+        }
+    }
+    return result
+}
+
+fn extends concat(input: [$a], arraytwo: [$a]) -> [$a] {
+  for i <- 0; i < arraytwo.len(); i += 1 {
+    input.push(arraytwo[i])
+  }
+  return clone(input)
+}
+
+fn extends quicksort(array: [Int]) -> [Int] {
+  if array.len() < 2 {
+    return array
+  }
+
+  let pivot = array[array.len() / 2]
+    
+  let left = []:Int
+  let right = []:Int
+  let equal = []:Int
+
+  for i <- 0; i < array.len(); i += 1 {
+    
+    if array[i] < pivot {
+      left.push(array[i])
+    } elif array[i] > pivot {
+      right.push(array[i])
+    } else {
+      equal.push(array[i])
+    }
+  }
+
+  left = left.quicksort()
+  right = right.quicksort()
+
+  return left.concat(equal).concat(right)
+}
+
+fn extends foldr(input: [Int], f: (Int,Int) -> Int) -> Int {
+    let result = 0
+    for (i in input) {
+        result = f(i,result)
+    }
+    return result
+}
+
+fn extends foldl(input: [Int], f: (Int,Int) -> Int) -> Int {
+    let result = 0
+    for (i in input) {
+        result = f(result,i)
+    }
+    return result
+}

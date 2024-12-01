@@ -1,0 +1,69 @@
+module tui
+
+struct Option(T) {
+    name: String,
+    kind: String,
+    trigger: ($T) -> String
+}
+
+struct Menu(T) {
+    name: String,
+    screen: ($T) -> String,
+    options: [Option($T)]
+}
+
+struct SceneManager(T) {
+    currentScene: String,
+    state: $T,
+    scenes: [Menu($T)]
+}
+
+fn extends show(self: SceneManager($T)) {
+    let check = true
+    let index = 0
+
+    let showError = fn() {
+        println("not a valid option")
+        readln()
+    }
+
+    let showErrorMsg = fn(msg: String) {
+        println(msg)
+        exit()
+    }
+
+    while check {
+        index = 0
+        let op = []: Option($T)
+        terminal::clearScreen()
+
+        for (scene in self.scenes) {
+            if self.currentScene == scene.name {
+                println(scene::screen(self.state))
+                for (option in scene.options) {
+                    println(Cast::string(index) + " :" + option.name)
+                    op.push(option)
+                    index += 1
+                }
+                break
+            } 
+        }
+
+        print("\n>> ")
+        let input = readln()
+        if let u = Cast::int(input) {
+            if u >= op.len() {
+                showError()
+            } else {
+                if op[u].kind == "goto" {
+                    self.currentScene = op[u]::trigger(self.state)
+                } else {
+                    showErrorMsg("Error: " + op[u].kind + " is not a valid Option kind")
+                }
+            }
+        } else {
+            showError()
+        }
+
+    }
+}

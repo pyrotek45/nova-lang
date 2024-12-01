@@ -502,13 +502,13 @@ impl Vm {
                     }
                 }
 
-                Code::IGTR => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
-                        (self.state.stack.pop(), self.state.stack.pop())
-                    {
+                Code::IGTR => match (self.state.stack.pop(), self.state.stack.pop()) {
+                    (Some(VmData::Int(v1)), Some(VmData::Int(v2))) => {
                         let result = v2 > v1;
                         self.state.stack.push(VmData::Bool(result))
-                    } else {
+                    }
+                    (a, b) => {
+                        dbg!(a, b);
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "IGTR Error Not enough arguments Opcode : {}",
@@ -516,7 +516,7 @@ impl Vm {
                             ),
                         });
                     }
-                }
+                },
 
                 Code::FLSS => {
                     if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
@@ -689,18 +689,15 @@ impl Vm {
                     if let (Some(destination), Some(value)) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
-                        //dbg!(&destination, &value);
-
                         match (value, destination) {
                             (item, VmData::StackAddress(index)) => {
-                                //dbg!(self.state.stack[self.state.offset + index as usize]);
                                 match (self.state.stack[self.state.offset + index as usize], value)
                                 {
                                     (VmData::List(d), VmData::Closure(v)) => {
                                         self.state.heap[d] = self.state.heap[v as usize].clone()
                                     }
                                     (VmData::List(d), VmData::List(v)) => {
-                                        self.state.heap[d] = self.state.heap[v as usize].clone()
+                                        self.state.heap[d] = self.state.heap[v].clone();
                                     }
                                     (VmData::List(_), VmData::Struct(_)) => todo!(),
                                     (VmData::List(_), VmData::String(_)) => todo!(),
@@ -713,6 +710,7 @@ impl Vm {
                                 }
                             }
                             (item, VmData::List(index)) => {
+                                //dbg!(&item, &index);
                                 match item {
                                     VmData::Function(v) => {
                                         self.state.heap[index as usize] = Heap::Function(v)
@@ -723,6 +721,7 @@ impl Vm {
                                     VmData::Float(_) => todo!(),
                                     VmData::Bool(_) => todo!(),
                                     VmData::List(v) => {
+                                        dbg!(&self.state.heap[v]);
                                         self.state.heap[index as usize] = Heap::ListAddress(v)
                                     }
                                     VmData::None => todo!(),

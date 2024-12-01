@@ -1,4 +1,4 @@
-use std::{collections::HashMap, default};
+use std::collections::HashMap;
 
 use common::{
     environment::{new_environment, Environment},
@@ -200,24 +200,24 @@ impl Parser {
                     if let Some(mapped_type) = type_map.clone().get(name1) {
                         // If the types are not equal, return an error
                         // println!("Checking {:?} with {:?}", mapped_type, t2);
-                        if let Ok(returned) = self.get_output(t2.clone(), type_map, pos.clone()) {
-                            if returned != t2.clone() {
-                                return Err(NovaError::TypeMismatch {
-                                    expected: mapped_type.clone(),
-                                    found: returned.clone(),
-                                    position: pos.clone(),
-                                });
-                            }
-                        } else {
-                            if mapped_type != t2 {
-                                // println!("Error: {:?} != {:?}", mapped_type, t2);
-                                return Err(NovaError::TypeMismatch {
-                                    expected: mapped_type.clone(),
-                                    found: t2.clone(),
-                                    position: pos.clone(),
-                                });
-                            }
+                        // if let Ok(returned) = self.get_output(t2.clone(), type_map, pos.clone()) {
+                        //     if returned != t2.clone() {
+                        //         return Err(NovaError::TypeMismatch {
+                        //             expected: mapped_type.clone(),
+                        //             found: returned.clone(),
+                        //             position: pos.clone(),
+                        //         });
+                        //     }
+                        // } else {
+                        if mapped_type != t2 {
+                            // println!("Error: {:?} != {:?}", mapped_type, t2);
+                            return Err(NovaError::TypeMismatch {
+                                expected: mapped_type.clone(),
+                                found: t2.clone(),
+                                position: pos.clone(),
+                            });
                         }
+                        // }
                     } else {
                         // If name1 is not in the type_map, insert it with the corresponding type (t2)
                         //println!("Inserting {} with {:?}", name1, t2);
@@ -226,21 +226,13 @@ impl Parser {
                 }
 
                 (TType::List { inner: inner1 }, TType::List { inner: inner2 }) => {
-                    match self.check_and_map_types(
+                    //dbg!(inner1.clone(), inner2.clone());
+                    self.check_and_map_types(
                         &[*inner1.clone()],
                         &[*inner2.clone()],
                         type_map,
                         pos.clone(),
-                    ) {
-                        Ok(_) => continue,
-                        Err(_) => {
-                            return Err(NovaError::TypeMismatch {
-                                expected: t1.clone(),
-                                found: t2.clone(),
-                                position: pos.clone(),
-                            });
-                        }
-                    }
+                    )?;
                 }
                 (TType::Option { inner: inner1 }, TType::Option { inner: inner2 }) => {
                     self.check_and_map_types(
@@ -268,24 +260,14 @@ impl Parser {
                         });
                     }
 
-                    match (
-                        self.check_and_map_types(params1, params2, type_map, pos.clone()),
-                        self.check_and_map_types(
-                            &[*ret1.clone()],
-                            &[*ret2.clone()],
-                            type_map,
-                            pos.clone(),
-                        ),
-                    ) {
-                        (Ok(_), Ok(_)) => continue,
-                        _ => {
-                            return Err(NovaError::TypeMismatch {
-                                expected: t1.clone(),
-                                found: t2.clone(),
-                                position: pos.clone(),
-                            });
-                        }
-                    }
+                    self.check_and_map_types(params1, params2, type_map, pos.clone())?;
+                    self.check_and_map_types(
+                        &[*ret1.clone()],
+                        &[*ret2.clone()],
+                        type_map,
+                        pos.clone(),
+                    )?;
+                    
                 }
                 (
                     TType::Custom {
@@ -298,24 +280,7 @@ impl Parser {
                     },
                 ) => {
                     if custom1 == custom2 {
-                        match self.check_and_map_types(&gen1, &gen2, type_map, pos.clone()) {
-                            Ok(_) => continue,
-                            Err(_) => {
-                                dbg!(gen1.clone(), gen2.clone());
-                                return Err(NovaError::TypeMismatch {
-                                    expected: t1.clone(),
-                                    found: t2.clone(),
-                                    position: pos.clone(),
-                                });
-                            }
-                        }
-                    } else {
-                        dbg!(gen1.clone(), gen2.clone());
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
+                        self.check_and_map_types(gen1, gen2, type_map, pos.clone())?;
                     }
                 }
                 _ if t1 == t2 => continue,
@@ -742,13 +707,31 @@ impl Parser {
                 TType::Float => {
                     identifier = format!("Float::{}", identifier);
                 }
+                TType::Char => {
+                    identifier = format!("Char::{}", identifier);
+                }
                 TType::String => {
                     identifier = format!("String::{}", identifier);
                 }
-
-                _ => {}
+                _ => {
+                    return Err(self.generate_error_with_pos(
+                        format!("E1 Not a valid call: {}", identifier),
+                        format!(
+                            "No function signature '{}' with {} as arguments, Cant call method on type {}",
+                            identifier,
+                            argument_types
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect::<Vec<String>>()
+                                .join(", "),
+                            ttype.to_string()
+                        ),
+                        pos,
+                    ))
+                }
             }
         }
+        //dbg!(identifier.clone(), argument_types.clone());
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
 
@@ -2995,7 +2978,7 @@ impl Parser {
         self.consume_identifier(Some("match"))?;
         let expr = self.expr()?;
 
-        if let Some(custom_type_name) = expr.get_type().custom_to_string() {
+        if let Some(_) = expr.get_type().custom_to_string() {
         } else {
             return Err(self.generate_error_with_pos(
                 format!("Match statement expects an enum type"),
@@ -3104,7 +3087,7 @@ impl Parser {
         }
         self.consume_symbol('}')?;
 
-        if let Some(default) = default_branch.clone() {
+        if let Some(_) = default_branch.clone() {
         } else {
             // check to see if all variants are covered
             let mut covered = vec![];
@@ -3296,7 +3279,7 @@ impl Parser {
             //dbg!(variants.clone());
 
             if generics_table.is_empty() {
-                dbg!(enum_name.clone());
+                //dbg!(enum_name.clone());
                 self.environment.insert_symbol(
                     &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
                     TType::Function {
@@ -3734,48 +3717,42 @@ impl Parser {
     }
 
     fn is_generic(&self, params: &[TType]) -> bool {
-        for t in params {
-            match t {
-                TType::Any => {
-                    return true;
-                }
-                TType::Generic { .. } => {
-                    return true;
-                }
+        for param in params {
+            match param {
+                TType::Generic { .. } => return true,
                 TType::Function {
-                    parameters: args,
+                    parameters,
                     return_type,
                 } => {
-                    if let TType::Generic { .. } = **return_type {
-                        return true;
-                    }
-                    if self.is_generic(&args.clone())
-                        || self.is_generic(&vec![*return_type.clone()])
-                    {
+                    // dbg!(parameters.clone(), return_type.clone());
+                    if self.is_generic(parameters) || self.is_generic(&[*return_type.clone()]) {
                         return true;
                     }
                 }
                 TType::List { inner } => {
-                    if let TType::Generic { .. } = **inner {
+                    if self.is_generic(&[*inner.clone()]) {
                         return true;
                     }
-                    return self.is_generic(&vec![*inner.clone()]);
                 }
                 TType::Option { inner } => {
-                    if let TType::Generic { .. } = **inner {
+                    if self.is_generic(&[*inner.clone()]) {
                         return true;
                     }
-                    return self.is_generic(&vec![*inner.clone()]);
                 }
                 TType::Custom { type_params, .. } => {
-                    if self.is_generic(&type_params.clone()) {
+                    if self.is_generic(type_params) {
+                        return true;
+                    }
+                }
+                TType::Tuple { elements } => {
+                    if self.is_generic(elements) {
                         return true;
                     }
                 }
                 _ => {}
             }
         }
-        return false;
+        false
     }
 
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -3865,11 +3842,21 @@ impl Parser {
                     TType::String => {
                         identifier = format!("String::{}", identifier);
                     }
-                    _ => {}
+                    TType::Char => {
+                        identifier = format!("Char::{}", identifier);
+                    }
+                    _ => {
+                        // error
+                        return Err(self.generate_error_with_pos(
+                            format!("Cannot extend from type"),
+                            "Cannot extend from this type".to_string(),
+                            pos.clone(),
+                        ));
+                    }
                 }
             }
         }
-
+        //dbg!(identifier.clone(), parameters.clone());
         if self.environment.has(&identifier) {
             return Err(self.generate_error_with_pos(
                 format!("Generic Function {identifier} already defined"),
@@ -3959,6 +3946,7 @@ impl Parser {
                 SymbolKind::Function,
             );
             identifier = generate_unique_string(&identifier, &typeinput);
+            //dbg!(&identifier, self.is_generic(&typeinput));
         } else {
             if self.environment.no_override.has(&identifier) {
                 return Err(self.generate_error_with_pos(
@@ -3981,6 +3969,8 @@ impl Parser {
                 SymbolKind::GenericFunction,
             );
         }
+
+        //dbg!(self.environment.values.clone());
         self.environment.no_override.insert(identifier.clone());
         let mut generic_list = self.collect_generics(&typeinput);
         generic_list.extend(self.collect_generics(&vec![output.clone()]));
@@ -4167,20 +4157,15 @@ impl Parser {
                         None => Ok(body_has_return),
                     }
                 }
-                Statement::Match {
-                    ttype,
-                    expr,
-                    arms,
-                    default,
-                } => {
+                Statement::Match { arms, default, .. } => {
                     let mut has_return = has_return;
                     for arm in arms {
-                        let (arm_return_type, arm_has_return) =
+                        let (_, arm_has_return) =
                             self.check_returns(&arm.2, return_type.clone(), pos.clone())?;
                         has_return = has_return && arm_has_return;
                     }
                     if let Some(default) = default {
-                        let (default_return_type, default_has_return) =
+                        let (_, default_has_return) =
                             self.check_returns(default, return_type.clone(), pos.clone())?;
                         has_return = has_return && default_has_return;
                     }

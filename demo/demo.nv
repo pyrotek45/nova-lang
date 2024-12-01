@@ -37,7 +37,7 @@ for i <- 0; i < 10; i += 1 {
     println(i)
 }
 
-import "../std/list.nv"
+import super.std.list
 
 // Array
 let arr = [1,2,3]
@@ -68,17 +68,13 @@ let zed = Zed {
 zed::test()
 
 // import iterators
-import "../std/iter.nv" 
+import super.std.iter
 
-// import defualt iter functions
-
-
-let myIter = [1,2,3,4,5]
-    .iter()
+let myIter = Iter::fromVec([1,2,3,4,5])
     .map(fn(x:Int)->Int{return x * x})
+    .collect()
 
-myIter
-    .printIter()
+println(myIter)
 
 // Function pointers
 struct SomeFunction {
@@ -101,8 +97,7 @@ print("hello again!\n")
 
 println(myOtherFunc(4,7))
 
-let myIterTwo = [1,2,3,4,5]
-    .iter()
+let myIterTwo = Iter::fromVec([1,2,3,4,5])
     .map(simpleSquare)
     .map(simpleSquare)
     .collect()
@@ -132,7 +127,7 @@ println(myIntAdder(1,4))
 
 // Generic functions
 fn generic(x: $A) {
-    x.println()
+    println(x)
 }
 
 generic("hello!")
@@ -201,10 +196,9 @@ x.do(fn(x:Int) {println(x)})
 
 // String manipulation
 str <- "hello world!"
-    .strToChars()
-    .iter() 
+    .chars()
     .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
-    .charsToStr()
+    .string()
 
 println(str)
 
@@ -240,7 +234,7 @@ curriedmul <- curry(mul@(Int,Int))
 println(curriedmul(5)(5))
 
 // using IO struct
-import "../std/io.nv" let io = defualtIO()
+import super.std.io
 
 let input = io::prompt("wow")
 println(input)

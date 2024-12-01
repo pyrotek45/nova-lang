@@ -170,8 +170,15 @@ pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
             } else {
                 0
             }
-        } // Convert true to 1, false to 0
-        VmData::Char(value) => value as i64, // Convert char to its ASCII value
+        }
+        VmData::Char(value) => {
+            if let Ok(parsed) = value.to_string().parse::<i64>() {
+                parsed
+            } else {
+                state.stack.push(VmData::None);
+                return Ok(());
+            }
+        }
         VmData::String(v) => {
             if let Heap::String(str) = state.deref(v) {
                 if let Ok(parsed) = str.parse::<i64>() {

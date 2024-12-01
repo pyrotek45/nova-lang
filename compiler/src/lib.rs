@@ -1,5 +1,3 @@
-use std::default;
-
 use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
@@ -80,9 +78,11 @@ impl Compiler {
                     self.variables
                         .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
                     let tempcounter_index = self.variables.len() - 1;
+
                     self.variables
                         .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
                     let array_index = self.variables.len() - 1;
+
                     let id_index = if let Some(index) = self.variables.get_index(identifier.clone())
                     {
                         index
@@ -91,11 +91,12 @@ impl Compiler {
                         self.variables.len() - 1
                     };
 
+                    self.compile_expr(expr.clone())?;
+                    self.asm.push(Asm::STORE(array_index as u32));
+
                     // storing counter and expression array
                     self.asm.push(Asm::INTEGER(0));
                     self.asm.push(Asm::STORE(tempcounter_index as u32));
-                    self.compile_expr(expr.clone())?;
-                    self.asm.push(Asm::STORE(array_index as u32));
 
                     // if array is empty jump to end
                     self.asm.push(Asm::LABEL(top));
@@ -104,6 +105,8 @@ impl Compiler {
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
                         self.asm.push(Asm::NATIVE(index as u64))
+                    } else {
+                        todo!()
                     }
 
                     self.asm.push(Asm::IGTR);
@@ -529,13 +532,19 @@ impl Compiler {
                     // if there is a default it will jump to the default
                     // if there is no default it will jump to the end
                     let end = self.gen.generate();
+                    self.compile_expr(expr.clone())?;
+                    // will test the expression
+                    self.asm.push(Asm::INTEGER(1 as i64));
+                    self.compile_expr(expr.clone())?;
+                    self.asm.push(Asm::LIN);
+                    // store in temp variable
+                    self.variables
+                        .insert(format!("__matchexpr__{}", self.gen.generate()).to_string());
+                    let temp_matchexpr = self.variables.len() - 1;
+                    self.asm.push(Asm::STORE(temp_matchexpr as u32));
                     for arm in arms.iter() {
                         let next = self.gen.generate();
-                        self.compile_expr(expr.clone())?;
-                        // will test the expression
-                        self.asm.push(Asm::INTEGER(1 as i64));
-                        self.compile_expr(expr.clone())?;
-                        self.asm.push(Asm::LIN);
+                        self.asm.push(Asm::GET(temp_matchexpr as u32));
                         // self.asm.push(Asm::DUP);
                         // self.asm.push(Asm::PRINT);
                         //dbg!(arm.0);
