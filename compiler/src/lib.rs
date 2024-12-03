@@ -71,8 +71,10 @@ impl Compiler {
                     let mid = self.gen.generate();
                     let step = self.gen.generate();
 
+                    let next = self.gen.generate();
+
                     self.breaks.push(end);
-                    self.continues.push(top);
+                    self.continues.push(next);
 
                     // insert temp counter
                     self.variables
@@ -143,6 +145,7 @@ impl Compiler {
                     self.asm.pop();
                     // -- body
 
+                    self.asm.push(Asm::LABEL(next));
                     // increment counter
                     self.asm.push(Asm::INTEGER(1));
                     self.asm.push(Asm::GET(tempcounter_index as u32));
@@ -151,6 +154,7 @@ impl Compiler {
                     self.asm.push(Asm::ASSIGN);
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
+
                     self.breaks.pop();
                     self.continues.pop();
                 }
@@ -182,7 +186,7 @@ impl Compiler {
                     }
                 }
                 Function {
-                    ttype: _,
+                    ttype,
                     identifier,
                     parameters,
                     body,
@@ -249,6 +253,7 @@ impl Compiler {
                     let num_parameters = parameters.len() as u32;
                     let num_captures = captured.len() as u32;
                     let local_vars = function_compile.variables.len() as u32;
+                    //dbg!(ttype, identifier, num_parameters, num_captures, local_vars);
                     self.asm.push(Asm::OFFSET(
                         num_parameters + num_captures,
                         local_vars - (num_parameters + num_captures),
@@ -352,8 +357,9 @@ impl Compiler {
                 } => {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
+                    let next = self.gen.generate();
                     self.breaks.push(end);
-                    self.continues.push(top);
+                    self.continues.push(next);
                     self.compile_expr(init.clone())?;
                     self.asm.push(Asm::LABEL(top));
                     self.compile_expr(test.clone())?;
@@ -363,6 +369,7 @@ impl Compiler {
                     };
                     self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
                     self.asm.pop();
+                    self.asm.push(Asm::LABEL(next));
                     self.compile_expr(inc.clone())?;
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
@@ -978,11 +985,16 @@ impl Compiler {
                 body: input,
                 captures: captured,
             } => {
+                //dbg!(&captured, &self.variables);
                 // Clone the current state to prepare for function compilation
                 let mut function_compile = self.clone();
+                // track all the varaibles in the function list and match the captured list
+                // with the function list
+                //dbg!(&captured);
                 function_compile.variables.clear();
+                //dbg!(&function_compile.variables);
                 function_compile.asm.clear();
-
+                //dbg!(&parameters, &captured);
                 // Register parameter names in the function's local variable scope
                 for param in parameters.iter() {
                     function_compile
@@ -997,6 +1009,7 @@ impl Compiler {
 
                 // Compile captured variables for the closure
                 for captured_var in captured.iter().cloned() {
+                    //dbg!(&captured);
                     if let Some(index) = self.variables.get_index(captured_var.to_string()) {
                         // Get the local variable if it exists in the current scope
                         self.asm.push(Asm::GET(index as u32));
@@ -1005,11 +1018,11 @@ impl Compiler {
                         self.asm.push(Asm::GETGLOBAL(index as u32));
                     } else {
                         // Debug output for missing variable
-                        dbg!(&captured_var);
+                        // dbg!(&captured_var);
+                        // dbg!(&self.variables);
                         panic!("Captured variable not found in local or global scope.");
                     }
                 }
-
                 // Generate a jump label for the closure function
                 let closure_jump_label = function_compile.gen.generate();
 

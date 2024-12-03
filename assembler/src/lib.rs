@@ -408,8 +408,10 @@ impl Assembler {
                         let t = ((self.output.len() as u64 - destination + 4) as u32).to_le_bytes();
                         self.output.extend_from_slice(&t);
                     } else {
-                        dbg!(target);
-                        panic!()
+                        self.output.push(Code::JMP);
+                        self.forwardjumps.push((target, self.output.len() as u64));
+                        let t = (0 as u32).to_le_bytes();
+                        self.output.extend_from_slice(&t);
                     }
                 }
                 Asm::IADD => self.output.push(Code::IADD),

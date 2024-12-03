@@ -30,6 +30,7 @@ pub enum SymbolKind {
     Variable,
     Constructor,
     Parameter,
+    Captured,
 }
 
 #[derive(Debug, Clone, PartialEq)]
