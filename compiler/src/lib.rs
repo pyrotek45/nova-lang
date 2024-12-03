@@ -186,11 +186,11 @@ impl Compiler {
                     }
                 }
                 Function {
-                    ttype,
                     identifier,
                     parameters,
                     body,
                     captures: captured,
+                    ..
                 } => {
                     self.global.insert(identifier.to_string());
                     // Clone the current state to prepare for function compilation
