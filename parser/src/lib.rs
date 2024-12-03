@@ -3146,7 +3146,28 @@ impl Parser {
                 self.environment.push_block();
                 self.environment
                     .insert_symbol(&enum_id, vtype, None, SymbolKind::Variable);
-                let body = self.block()?;
+                // get expression if no { }
+
+                let body = if self.current_token().is_symbol('{') {
+                    let body = self.block()?;
+                    branches.push((tag, Some(enum_id.clone()), body.clone()));
+                    body.clone()
+                } else {
+                    let body = self.expr()?;
+                    branches.push((
+                        tag,
+                        Some(enum_id.clone()),
+                        vec![Statement::Expression {
+                            ttype: body.clone().get_type(),
+                            expr: body.clone(),
+                        }],
+                    ));
+                    vec![Statement::Expression {
+                        ttype: body.clone().get_type(),
+                        expr: body,
+                    }]
+                };
+
                 self.environment.pop_block();
                 if enum_id.is_empty() {
                     branches.push((tag, None, body));

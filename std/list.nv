@@ -114,6 +114,21 @@ fn extends splitWith(input: [Char], delim: Char, f:([Char]) -> ?$T) -> [$T] {
     return result.flatten()
 }
 
+fn extends splitWhen(input: [$T], f:($T) -> Bool) -> [[$T]] {
+    let result = []: [$T]
+    let current = []: $T
+    for (c in input) {
+        if f(c) {
+            result.push(clone(current))
+            current = []: $T
+        } else {
+            current.push(c)
+        }
+    }
+    result.push(clone(current))
+    return result
+}
+
 fn extends sortWith(input: [$T], f:($T,$T) -> Bool) -> [$T] {
     let result = input
     for i <- 0; i < result.len(); i += 1 {
@@ -548,4 +563,22 @@ fn extends indices(input: [$T]) -> [Int] {
         result.push(i)
     }
     return result
+}
+
+fn extends shuffle(input: [$T]) -> [$T] {
+    let result = clone(input)
+    for i <- 0; i < result.len(); i += 1 {
+        let random = random(i,result.len() - 1)
+        let temp = result[i]
+        result[i] = result[random]
+        result[random] = temp
+    }
+    return result
+}
+
+fn extends get(input: [$T], index: Int) -> ?$T {
+    if (index < 0) || (index >= input.len()) {
+        return None() @[T: $T]
+    }
+    return Some(input[index])
 }
