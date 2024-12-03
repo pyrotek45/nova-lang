@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Arguments};
+use std::collections::HashMap;
 
 use common::{
     environment::{new_environment, Environment},
@@ -4134,7 +4134,6 @@ impl Parser {
                 } else {
                     self.environment.values.last_mut().unwrap().remove(dc);
                 }
-
             }
         }
 
