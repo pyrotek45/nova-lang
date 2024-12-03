@@ -183,7 +183,7 @@ impl Environment {
 
     pub fn push_scope(&mut self) {
         let mut scope: HashMap<String, Symbol> = HashMap::default();
-        //self.captured.push(self.captured.last().unwrap().clone());
+        self.captured.push(self.captured.last().unwrap().clone());
         for (id, sym) in self.values.last().unwrap().iter() {
             match sym.kind {
                 SymbolKind::Function | SymbolKind::GenericFunction | SymbolKind::Constructor => {
@@ -197,7 +197,7 @@ impl Environment {
 
     pub fn pop_scope(&mut self) {
         self.values.pop();
-        //self.captured.pop();
+        self.captured.pop();
     }
 
     pub fn push_block(&mut self) {

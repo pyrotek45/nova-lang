@@ -8,6 +8,8 @@ fn extends show(self: Box($A)) {
     println(Cast::string(self.value))
 }
 
+
+
 fn Gen(start: Int) -> () -> Int {
     let i = Box(start)
     return fn() -> Int {
@@ -16,7 +18,7 @@ fn Gen(start: Int) -> () -> Int {
     }
 }
 
-// Option type 
+// built in Option type 
 
 fn extends orError(self: ?$A, msg: String) -> $A {
     if self.isSome() {
@@ -41,3 +43,49 @@ fn extends orDoFn(self: ?$A, f:() -> $A) -> $A {
     }
     return f()
 }
+
+// Maybe type
+
+enum Maybe(A) {
+    Just: $A,
+    Nothing
+}
+
+fn extends toMaybe(self: ?$A) -> Maybe($A) {
+    if self.isSome() {
+        return Maybe::Just(self.unwrap())
+    }
+    return Maybe::Nothing() @[A: $A]
+}
+
+// math functions
+
+fn extends min(self: Int, other: Int) -> Int {
+    if self < other {
+        return self
+    }
+    return other
+}
+
+fn extends max(self: Int, other: Int) -> Int {
+    if self > other {
+        return self
+    }
+    return other
+}
+
+fn extends abs(self: Int) -> Int {
+    if self < 0 {
+        return -self
+    }
+    return self
+}
+
+fn extends pow(self: Int, other: Int) -> Int {
+    let result = 1
+    for i <- 0; i < other; i += 1 {
+        result = result * self
+    }
+    return result
+}
+

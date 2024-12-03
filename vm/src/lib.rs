@@ -728,7 +728,7 @@ impl Vm {
                                     VmData::Float(_) => todo!(),
                                     VmData::Bool(_) => todo!(),
                                     VmData::List(v) => {
-                                        dbg!(&self.state.heap[v]);
+                                        //dbg!(&self.state.heap[v]);
                                         self.state.heap[index as usize] = Heap::ListAddress(v)
                                     }
                                     VmData::None => todo!(),

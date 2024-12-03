@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Arguments};
 
 use common::{
     environment::{new_environment, Environment},
@@ -183,6 +183,16 @@ impl Parser {
                 (_, TType::Any) => {
                     continue;
                 }
+                (
+                    TType::Tuple {
+                        elements: elements1,
+                    },
+                    TType::Tuple {
+                        elements: elements2,
+                    },
+                ) => {
+                    self.check_and_map_types(elements1, elements2, type_map, pos.clone())?;
+                }
                 (TType::Generic { name: name1 }, _) => {
                     if t2 == &TType::None {
                         return Err(NovaError::TypeMismatch {
@@ -292,7 +302,7 @@ impl Parser {
                 }
                 _ if t1 == t2 => continue,
                 _ => {
-                    dbg!(t1.clone(), t2.clone());
+                    //dbg!(t1.clone(), t2.clone());
                     return Err(NovaError::TypeMismatch {
                         expected: t1.clone(),
                         found: t2.clone(),
@@ -311,6 +321,16 @@ impl Parser {
         pos: FilePosition,
     ) -> Result<TType, NovaError> {
         match output.clone() {
+            TType::Tuple { elements } => {
+                let mut mapped_elements = Vec::new();
+                for element in elements {
+                    let mapped_element = self.get_output(element, type_map, pos.clone())?;
+                    mapped_elements.push(mapped_element);
+                }
+                Ok(TType::Tuple {
+                    elements: mapped_elements,
+                })
+            }
             TType::Generic { name } => {
                 if let Some(mapped_type) = type_map.get(&name) {
                     Ok(mapped_type.clone())
@@ -759,6 +779,7 @@ impl Parser {
         } else if let Some((function_type, function_id, function_kind)) =
             self.environment.get_type_capture(&identifier)
         {
+            //println!("captured id {}", identifier);
             let pos = self.get_current_token_position();
             self.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
@@ -766,7 +787,7 @@ impl Parser {
                     id: identifier.clone(),
                     ttype: function_type.clone(),
                     pos: Some(pos.clone()),
-                    kind: SymbolKind::Parameter,
+                    kind: SymbolKind::Captured,
                 },
             );
             self.handle_function_call(
@@ -1072,6 +1093,7 @@ impl Parser {
         } else if let Some((function_type, function_id, function_kind)) =
             self.environment.get_type_capture(&identifier)
         {
+            //println!("captured id: call {}", identifier);
             let pos = self.get_current_token_position();
             self.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
@@ -1079,7 +1101,7 @@ impl Parser {
                     id: identifier.clone(),
                     ttype: function_type.clone(),
                     pos: Some(pos.clone()),
-                    kind: SymbolKind::Parameter,
+                    kind: SymbolKind::Captured,
                 },
             );
             self.handle_function_call(
@@ -1612,7 +1634,7 @@ impl Parser {
                     id: identifier.clone(),
                     ttype: ttype.clone(),
                     pos: Some(position.clone()),
-                    kind: kind.clone(),
+                    kind: SymbolKind::Captured,
                 },
             );
             self.environment.insert_symbol(
@@ -1649,15 +1671,21 @@ impl Parser {
         position: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(ttype) = self.environment.get_type(&identifier) {
+            //println!("identifier hloc-not-capture {}", identifier);
             Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
         } else if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+            // println!("identifier hloc-capture {}", identifier);
+            // println!(
+            //     "environment {:?}",
+            //     self.environment.captured.last().unwrap()
+            // );
             self.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
                     ttype: ttype.clone(),
                     pos: Some(position.clone()),
-                    kind: kind.clone(),
+                    kind: SymbolKind::Captured,
                 },
             );
             self.environment.insert_symbol(
@@ -1829,13 +1857,12 @@ impl Parser {
                     .map(|v| v.0.clone())
                     .collect();
 
-                //dbg!(captured.clone());
                 self.environment.pop_scope();
 
                 for c in captured.iter() {
                     if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_current_token_position();
-
+                        //dbg!(c);
                         self.environment.captured.last_mut().unwrap().insert(
                             c.clone(),
                             Symbol {
@@ -1857,11 +1884,27 @@ impl Parser {
                     .map(|v| v.0.clone())
                     .collect();
 
-                for dc in captured.iter() {
-                    if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
-                        self.environment.captured.last_mut().unwrap().remove(dc);
+                for arg in parameters.iter() {
+                    let name = arg.1.clone();
+                    // check if name is in captured
+                    if captured.contains(&name) {
+                        captured = captured
+                            .iter()
+                            .filter(|&x| x != &name)
+                            .map(|x| x.clone())
+                            .collect();
                     }
                 }
+
+                for dc in captured.iter() {
+                    if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                        if let SymbolKind::Captured = v.kind {
+                        } else {
+                            self.environment.values.last_mut().unwrap().remove(dc);
+                        }
+                    }
+                }
+
                 // check return types
 
                 let (_, has_return) =
@@ -2045,9 +2088,26 @@ impl Parser {
                     .map(|v| v.0.clone())
                     .collect();
 
+                for arg in parameters.iter() {
+                    let name = arg.1.clone();
+                    // check if name is in captured
+                    if captured.contains(&name) {
+                        // remove from captured
+                        // remove from captured variable
+                        captured = captured
+                            .iter()
+                            .filter(|&x| x != &name)
+                            .map(|x| x.clone())
+                            .collect();
+                    }
+                }
                 for dc in captured.iter() {
-                    if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
-                        self.environment.captured.last_mut().unwrap().remove(dc);
+                    if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                        if let SymbolKind::Captured = v.kind {
+                        } else {
+                            //println!("removing---: {}", dc);
+                            self.environment.values.last_mut().unwrap().remove(dc);
+                        }
                     }
                 }
 
@@ -2961,7 +3021,7 @@ impl Parser {
                 } else {
                     None
                 };
-                self.environment.pop_scope();
+                self.environment.pop_block();
                 return Ok(Some(common::nodes::Statement::Unwrap {
                     ttype: id_type,
                     identifier,
@@ -3487,7 +3547,7 @@ impl Parser {
                 ));
             }
             let body = self.block()?;
-            self.environment.pop_scope();
+            self.environment.pop_block();
             Ok(Some(Statement::Foreach {
                 identifier,
                 expr: array,
@@ -3510,7 +3570,7 @@ impl Parser {
             }
             self.environment.push_block();
             let body = self.block()?;
-            self.environment.pop_scope();
+            self.environment.pop_block();
             Ok(Some(Statement::For {
                 init,
                 test,
@@ -4054,10 +4114,27 @@ impl Parser {
             .iter()
             .map(|v| v.0.clone())
             .collect();
+        for arg in parameters.iter() {
+            let name = arg.1.clone();
+            // check if name is in captured
+            if captured.contains(&name) {
+                // remove from captured
+                // remove from captured variable
+                captured = captured
+                    .iter()
+                    .filter(|&x| x != &name)
+                    .map(|x| x.clone())
+                    .collect();
+            }
+        }
 
         for dc in captured.iter() {
-            if let Some(_v) = self.environment.values.last().unwrap().get(dc) {
-                self.environment.captured.last_mut().unwrap().remove(dc);
+            if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                if let SymbolKind::Captured = v.kind {
+                } else {
+                    self.environment.values.last_mut().unwrap().remove(dc);
+                }
+
             }
         }
 
