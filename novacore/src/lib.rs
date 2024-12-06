@@ -287,7 +287,7 @@ impl NovaCore {
             native::str::chars_to_str,
         );
         self.add_function(
-            "Int::toChar",
+            "chr",
             TType::Function {
                 parameters: vec![TType::Int],
                 return_type: Box::new(TType::Char),

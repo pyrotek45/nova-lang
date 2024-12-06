@@ -643,6 +643,7 @@ impl Compiler {
                 self.getref_atom(value)?;
             }
             Expr::Closure { .. } => todo!(),
+            Expr::ListCompConstructor { .. } => todo!(),
         }
         Ok(())
     }
@@ -1061,6 +1062,129 @@ impl Compiler {
                 self.asm.extend_from_slice(&function_compile.asm);
                 self.asm.push(Asm::LABEL(closure_jump_label));
 
+                Ok(())
+            }
+            Expr::ListCompConstructor {
+                ttype,
+                list,
+                expr,
+                guards,
+                identifier,
+            } => {
+                let top = self.gen.generate();
+                let end = self.gen.generate();
+
+                let mid = self.gen.generate();
+                let step = self.gen.generate();
+
+                let next = self.gen.generate();
+
+                self.breaks.push(end);
+                self.continues.push(next);
+                // create temp list to hold new values
+
+                self.variables
+                    .insert(format!("__listexpr__{}", self.gen.generate()).to_string());
+                let list_index = self.variables.len() - 1;
+                self.asm.push(Asm::LIST(0));
+                self.asm.push(Asm::STORE(list_index as u32));
+
+                // insert temp counter
+                self.variables
+                    .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+                let tempcounter_index = self.variables.len() - 1;
+
+                self.variables
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                let array_index = self.variables.len() - 1;
+
+                let id_index = if let Some(index) = self.variables.get_index(identifier.clone()) {
+                    index
+                } else {
+                    self.variables.insert(identifier.to_string());
+                    self.variables.len() - 1
+                };
+                // compile list expr
+                self.compile_expr(*list.clone())?;
+                self.asm.push(Asm::STORE(array_index as u32));
+
+                // storing counter and expression array
+                self.asm.push(Asm::INTEGER(0));
+                self.asm.push(Asm::STORE(tempcounter_index as u32));
+
+                // if array is empty jump to end
+                self.asm.push(Asm::LABEL(top));
+
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+
+                self.asm.push(Asm::IGTR);
+                self.asm.push(Asm::DUP);
+                self.asm.push(Asm::NOT);
+
+                self.asm.push(Asm::JUMPIFFALSE(step));
+                self.asm.push(Asm::POP);
+
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                }
+                self.asm.push(Asm::EQUALS);
+
+                self.asm.push(Asm::LABEL(step));
+                self.asm.push(Asm::JUMPIFFALSE(mid));
+                self.asm.push(Asm::JMP(end));
+                self.asm.push(Asm::LABEL(mid));
+
+                // bind value to identifier
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                self.asm.push(Asm::LIN);
+
+                self.asm.push(Asm::STORE(id_index as u32));
+
+                // -- expr and then push to temp array
+                self.compile_expr(*expr.clone())?;
+                self.asm.push(Asm::STORE(id_index as u32));
+
+                // store value in identifier
+
+                // // compile guards
+                for guard in guards.iter() {
+                    self.compile_expr(guard.clone())?;
+                    self.asm.push(Asm::JUMPIFFALSE(next));
+                }
+
+                self.asm.push(Asm::GET(list_index as u32));
+                self.asm.push(Asm::GET(id_index as u32));
+
+                if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+
+                self.asm.push(Asm::LABEL(next));
+                // increment counter
+                self.asm.push(Asm::INTEGER(1));
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::IADD);
+                self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+                self.asm.push(Asm::ASSIGN);
+                self.asm.push(Asm::BJMP(top));
+                self.asm.push(Asm::LABEL(end));
+
+                // return the list
+                self.asm.push(Asm::GET(list_index as u32));
+
+                self.breaks.pop();
+                self.continues.pop();
                 Ok(())
             }
         }
