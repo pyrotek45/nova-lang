@@ -622,6 +622,7 @@ impl Compiler {
                 ..
             } => {
                 // dbg!(id, t);
+
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.getref_expr(*expr)?;
                 self.asm.push(Asm::PIN(position));
@@ -633,6 +634,28 @@ impl Compiler {
                 ..
             } => {
                 self.compile_expr(*index)?;
+                let negitive_step = self.gen.generate();
+                let negitive_step_end = self.gen.generate();
+
+                self.compile_expr(*container.clone())?;
+                self.variables
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                let array_index = self.variables.len() - 1;
+                self.asm.push(Asm::STORE(array_index as u32));
+
+                self.asm.push(Asm::DUP);
+                self.asm.push(Asm::INTEGER(0));
+                self.asm.push(Asm::ILSS);
+                self.asm.push(Asm::JUMPIFFALSE(negitive_step));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+                self.asm.push(Asm::IADD);
+                self.asm.push(Asm::LABEL(negitive_step));
+
                 self.getref_expr(*container)?;
                 self.asm.push(Asm::PIN(position));
             }
@@ -644,6 +667,15 @@ impl Compiler {
             }
             Expr::Closure { .. } => todo!(),
             Expr::ListCompConstructor { .. } => todo!(),
+            Expr::Sliced {
+                ttype,
+                name,
+                container,
+                start: index,
+                end,
+                step,
+                position,
+            } => todo!(),
         }
         Ok(())
     }
@@ -723,7 +755,32 @@ impl Compiler {
                 container, index, ..
             } => {
                 self.compile_expr(*index)?;
+                let negitive_step = self.gen.generate();
+                let negitive_step_end = self.gen.generate();
+
                 self.compile_expr(*container)?;
+                self.variables
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                let array_index = self.variables.len() - 1;
+                self.asm.push(Asm::STORE(array_index as u32));
+
+                self.asm.push(Asm::DUP);
+                self.asm.push(Asm::INTEGER(0));
+                self.asm.push(Asm::ILSS);
+                self.asm.push(Asm::JUMPIFFALSE(negitive_step));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+                self.asm.push(Asm::IADD);
+                self.asm.push(Asm::JMP(negitive_step_end));
+                self.asm.push(Asm::LABEL(negitive_step));
+                self.asm.push(Asm::POP);
+                self.asm.push(Asm::LABEL(negitive_step_end));
+
+                self.asm.push(Asm::GET(array_index as u32));
                 self.asm.push(Asm::LIN);
                 Ok(())
             }
@@ -1065,11 +1122,11 @@ impl Compiler {
                 Ok(())
             }
             Expr::ListCompConstructor {
-                ttype,
                 list,
                 expr,
                 guards,
                 identifier,
+                ..
             } => {
                 let top = self.gen.generate();
                 let end = self.gen.generate();
@@ -1173,6 +1230,190 @@ impl Compiler {
                 self.asm.push(Asm::LABEL(next));
                 // increment counter
                 self.asm.push(Asm::INTEGER(1));
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::IADD);
+                self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+                self.asm.push(Asm::ASSIGN);
+                self.asm.push(Asm::BJMP(top));
+                self.asm.push(Asm::LABEL(end));
+
+                // return the list
+                self.asm.push(Asm::GET(list_index as u32));
+
+                self.breaks.pop();
+                self.continues.pop();
+                Ok(())
+            }
+            Expr::Sliced {
+                ttype,
+                name,
+                container,
+                start: startstep,
+                end: endstep,
+                step: stepstep,
+                position,
+            } => {
+                let top = self.gen.generate();
+                let end = self.gen.generate();
+
+                let mid = self.gen.generate();
+                let step = self.gen.generate();
+
+                let next = self.gen.generate();
+
+                let negitive_start = self.gen.generate();
+                let negitive_start_end = self.gen.generate();
+
+                let negitive_end = self.gen.generate();
+                let negitive_end_end = self.gen.generate();
+
+                let negitive_step = self.gen.generate();
+                let negitive_step_end = self.gen.generate();
+
+                self.breaks.push(end);
+                self.continues.push(next);
+                // create temp list to hold new values
+
+                self.variables
+                    .insert(format!("__listexpr__{}", self.gen.generate()).to_string());
+                let list_index = self.variables.len() - 1;
+                self.asm.push(Asm::LIST(0));
+                self.asm.push(Asm::STORE(list_index as u32));
+
+                // insert temp counter
+                self.variables
+                    .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+                let tempcounter_index = self.variables.len() - 1;
+
+                self.variables
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                let array_index = self.variables.len() - 1;
+
+                self.variables
+                    .insert(format!("__tempexpr__{}", self.gen.generate()).to_string());
+                let id_index = self.variables.len() - 1;
+
+                // compile list expr
+                self.compile_expr(*container.clone())?;
+                self.asm.push(Asm::STORE(array_index as u32));
+
+                // compiling start as integer
+                if let Some(startstep) = startstep.clone() {
+                    self.compile_expr(*startstep.clone())?;
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::ILSS);
+                    self.asm.push(Asm::JUMPIFFALSE(negitive_start));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                        self.asm.push(Asm::NATIVE(index as u64))
+                    } else {
+                        todo!()
+                    }
+                    self.asm.push(Asm::IADD);
+                    self.asm.push(Asm::JMP(negitive_start_end));
+                    self.asm.push(Asm::LABEL(negitive_start));
+                    self.asm.push(Asm::POP);
+                    self.asm.push(Asm::LABEL(negitive_start_end));
+                } else {
+                    self.asm.push(Asm::INTEGER(0));
+                }
+
+                self.asm.push(Asm::STORE(tempcounter_index as u32));
+
+                // if array is empty jump to end
+                self.asm.push(Asm::LABEL(top));
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+
+                self.asm.push(Asm::IGTR);
+                self.asm.push(Asm::DUP);
+                self.asm.push(Asm::NOT);
+
+                self.asm.push(Asm::JUMPIFFALSE(step));
+                self.asm.push(Asm::POP);
+
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                }
+                self.asm.push(Asm::EQUALS);
+
+                self.asm.push(Asm::LABEL(step));
+                self.asm.push(Asm::JUMPIFFALSE(mid));
+                self.asm.push(Asm::JMP(end));
+                self.asm.push(Asm::LABEL(mid));
+
+                // compile upper bound check
+                if let Some(endstep) = endstep {
+                    self.compile_expr(*endstep.clone())?;
+
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::ILSS);
+                    self.asm.push(Asm::JUMPIFFALSE(negitive_end));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                        self.asm.push(Asm::NATIVE(index as u64))
+                    } else {
+                        todo!()
+                    }
+                    self.asm.push(Asm::IADD);
+                    self.asm.push(Asm::JMP(negitive_end_end));
+                    self.asm.push(Asm::LABEL(negitive_end));
+                    self.asm.push(Asm::POP);
+                    self.asm.push(Asm::LABEL(negitive_end_end));
+
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::IGTR);
+                    self.asm.push(Asm::JUMPIFFALSE(end));
+                }
+
+                // bind value to identifier for (x in list) // x is identifier
+                self.asm.push(Asm::GET(tempcounter_index as u32));
+                self.asm.push(Asm::GET(array_index as u32));
+                self.asm.push(Asm::LIN);
+                self.asm.push(Asm::STORE(id_index as u32));
+
+                // -- expr and then push to temp array
+                self.asm.push(Asm::GET(list_index as u32));
+                self.asm.push(Asm::GET(id_index as u32));
+
+                if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
+                    self.asm.push(Asm::NATIVE(index as u64))
+                } else {
+                    todo!()
+                }
+
+                self.asm.push(Asm::LABEL(next));
+                // increment counter
+                if let Some(stepstep) = stepstep {
+                    self.compile_expr(*stepstep.clone())?;
+
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::ILSS);
+                    self.asm.push(Asm::JUMPIFFALSE(negitive_step));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                        self.asm.push(Asm::NATIVE(index as u64))
+                    } else {
+                        todo!()
+                    }
+                    self.asm.push(Asm::IADD);
+                    self.asm.push(Asm::JMP(negitive_step_end));
+                    self.asm.push(Asm::LABEL(negitive_step));
+                    self.asm.push(Asm::POP);
+                    self.asm.push(Asm::LABEL(negitive_step_end));
+                } else {
+                    self.asm.push(Asm::INTEGER(1));
+                }
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::IADD);
                 self.asm.push(Asm::STACKREF(tempcounter_index as u32));
