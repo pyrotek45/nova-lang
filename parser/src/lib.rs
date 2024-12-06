@@ -1988,8 +1988,9 @@ impl Parser {
                         self.consume_operator(Operator::Colon)?;
 
                         // insert id with expr type
-                        self.environment.push_block();
+
                         if let Some(innertype) = listexpr.get_type().get_inner() {
+                            self.environment.push_block();
                             self.environment.insert_symbol(
                                 &ident,
                                 innertype.clone(),
@@ -1997,6 +1998,14 @@ impl Parser {
                                 SymbolKind::Variable,
                             );
                             let outexpr = self.expr()?;
+                            self.environment.pop_block();
+                            self.environment.push_block();
+                            self.environment.insert_symbol(
+                                &ident,
+                                outexpr.get_type().clone(),
+                                Some(pos.clone()),
+                                SymbolKind::Variable,
+                            );
                             let mut guards = vec![];
                             // now grab list of guards seprerated by bar
                             while self.current_token().is_symbol('|') {
@@ -2016,8 +2025,9 @@ impl Parser {
                                     ));
                                 }
                             }
-                            self.consume_symbol(']')?;
                             self.environment.pop_block();
+                            self.consume_symbol(']')?;
+
                             left = Expr::ListCompConstructor {
                                 ttype: TType::List {
                                     inner: Box::new(outexpr.get_type()),
