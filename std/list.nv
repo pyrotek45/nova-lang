@@ -1,5 +1,23 @@
 module List
 
+import core
+
+fn extends clear(list: [$T]) {
+    list = []: $T
+}
+
+fn extends equals(a: [$T], b: [$T]) -> Bool {
+    if a.len() != b.len() {
+        return false
+    }
+    for (i in 0.to(a.len())) {
+        if a[i] != b[i] {
+            return false
+        }
+    }
+    return true
+}
+
 fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     for i <- 0; i < ammount; i += 1 {
         list.push(input)

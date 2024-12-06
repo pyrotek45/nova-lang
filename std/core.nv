@@ -44,6 +44,10 @@ fn extends orDoFn(self: ?$A, f:() -> $A) -> $A {
     return f()
 }
 
+fn extends isNone(self: ?$A) -> Bool {
+    return !(self.isSome())
+}
+
 // Maybe type
 
 enum Maybe(A) {
@@ -56,6 +60,28 @@ fn extends toMaybe(self: ?$A) -> Maybe($A) {
         return Maybe::Just(self.unwrap())
     }
     return Maybe::Nothing() @[A: $A]
+}
+
+fn extends isJust(self: Maybe($A)) -> Bool {
+    match self {
+        Just(x) -> {return true}
+        Nothing() -> {return false}
+    }
+    return false
+}
+
+// result type
+
+enum Result(A, B) {
+    Ok: $A,
+    Err: $B
+}
+
+fn extends toResult(self: ?$A, err: $B) -> Result($A, $B) {
+    if self.isSome() {
+        return Result::Ok(self.unwrap())
+    }
+    return Result::Err(err)
 }
 
 // math functions
@@ -89,7 +115,7 @@ fn extends pow(self: Int, other: Int) -> Int {
     return result
 }
 
-// basic stuff
+// basic list functions
 
 fn extends iota(n: Int) -> [Int] {
     let result = []: Int
@@ -101,7 +127,7 @@ fn extends iota(n: Int) -> [Int] {
 
 fn extends toStep(start: Int, end: Int, step: Int) -> [Int] {
     let result = []: Int
-    for i <- start; i <= end; i += step {
+    for i <- start; i < end; i += step {
         result.push(i)
     }
     return result
@@ -109,8 +135,44 @@ fn extends toStep(start: Int, end: Int, step: Int) -> [Int] {
 
 fn extends to(self: Int, end: Int) -> [Int] {
     let result = []: Int
-    for i <- self; i <= end; i += 1 {
+    for i <- self; i < end; i += 1 {
         result.push(i)
     }
     return result
+}
+
+// Core functions // like pythons basic functions
+
+fn range(start: Int, end: Int) -> [Int] {
+    let result = []: Int
+    for i <- start; i < end; i += 1 {
+        result.push(i)
+    }
+    return result
+}
+
+fn range(end: Int) -> [Int] {
+    return range(0, end)
+}
+
+fn bin(n: Int) -> String {
+    if n < 0 {
+        return "-" + bin(-n)
+    }
+    let result = ""
+    let i = n
+    while i > 0 {
+        result = Cast::string(i % 2) + result
+        i = i / 2
+    }
+    return result
+}
+
+fn divmod(n: Int, d: Int) -> #(Int, Int) {
+    return #(n / d, n % d)
+}
+
+fn round(n: Float) -> Int {
+    // since its a Float, should be safe to cast
+    return Cast::int(n + 0.5).unwrap()
 }

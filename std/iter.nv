@@ -19,6 +19,20 @@ fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
     })
 }
 
+fn extends(Iter) enumerate(it: Iter($A)) -> Iter(#(Int,$A)) {
+    let index = Box(0)  
+    return Iter(fn() -> ?#(Int,$A) {
+        let t = it::next()
+        if t.isSome() {
+            let result = #(index.value, t.unwrap())
+            index.value += 1
+            return Some(result)
+        } else {
+            return ?#(Int,$A)
+        }
+    })
+}
+
 fn extends(Iter) fromFn(input: () -> ?$A) -> Iter($A) {
     return Iter(input)
 }

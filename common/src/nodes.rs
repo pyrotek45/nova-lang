@@ -169,6 +169,13 @@ pub enum Expr {
         ttype: TType,
         elements: Vec<Expr>,
     },
+    ListCompConstructor {
+        ttype: TType,
+        identifier: String,
+        list: Box<Expr>,
+        expr: Box<Expr>,
+        guards: Vec<Expr>,
+    },
     Field {
         ttype: TType,
         name: String,
@@ -219,6 +226,7 @@ impl Expr {
             Expr::None => TType::None,
             Expr::Call { ttype, .. } => ttype.clone(),
             Expr::Closure { ttype, .. } => ttype.clone(),
+            Expr::ListCompConstructor { ttype, .. } => ttype.clone(),
         }
     }
 }
