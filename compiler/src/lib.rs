@@ -622,7 +622,6 @@ impl Compiler {
                 ..
             } => {
                 // dbg!(id, t);
-
                 self.asm.push(Asm::INTEGER(index as i64));
                 self.getref_expr(*expr)?;
                 self.asm.push(Asm::PIN(position));
@@ -635,8 +634,6 @@ impl Compiler {
             } => {
                 self.compile_expr(*index)?;
                 let negitive_step = self.gen.generate();
-                let negitive_step_end = self.gen.generate();
-
                 self.compile_expr(*container.clone())?;
                 self.variables
                     .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
@@ -667,15 +664,7 @@ impl Compiler {
             }
             Expr::Closure { .. } => todo!(),
             Expr::ListCompConstructor { .. } => todo!(),
-            Expr::Sliced {
-                ttype,
-                name,
-                container,
-                start: index,
-                end,
-                step,
-                position,
-            } => todo!(),
+            Expr::Sliced { .. } => todo!(),
         }
         Ok(())
     }
@@ -756,7 +745,6 @@ impl Compiler {
             } => {
                 self.compile_expr(*index)?;
                 let negitive_step = self.gen.generate();
-                let negitive_step_end = self.gen.generate();
 
                 self.compile_expr(*container)?;
                 self.variables
@@ -775,10 +763,7 @@ impl Compiler {
                     todo!()
                 }
                 self.asm.push(Asm::IADD);
-                self.asm.push(Asm::JMP(negitive_step_end));
                 self.asm.push(Asm::LABEL(negitive_step));
-                self.asm.push(Asm::POP);
-                self.asm.push(Asm::LABEL(negitive_step_end));
 
                 self.asm.push(Asm::GET(array_index as u32));
                 self.asm.push(Asm::LIN);
