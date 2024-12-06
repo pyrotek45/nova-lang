@@ -190,6 +190,15 @@ pub enum Expr {
         index: Box<Expr>,
         position: FilePosition,
     },
+    Sliced {
+        ttype: TType,
+        name: String,
+        container: Box<Expr>,
+        start: Option<Box<Expr>>,
+        end: Option<Box<Expr>>,
+        step: Option<Box<Expr>>,
+        position: FilePosition,
+    },
     Call {
         ttype: TType,
         name: String,
@@ -227,6 +236,7 @@ impl Expr {
             Expr::Call { ttype, .. } => ttype.clone(),
             Expr::Closure { ttype, .. } => ttype.clone(),
             Expr::ListCompConstructor { ttype, .. } => ttype.clone(),
+            Expr::Sliced { ttype, .. } => ttype.clone(),
         }
     }
 }

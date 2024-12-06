@@ -1431,27 +1431,117 @@ impl Parser {
                 inner: element_type,
             } => {
                 self.consume_symbol('[')?;
+
+                let mut is_slice = false;
+                let mut end_expr = None;
+                let mut step = None;
+
                 let position = self.get_current_token_position();
-                let index_expr = self.mid_expr()?;
-                self.consume_symbol(']')?;
-                if index_expr.get_type() != TType::Int {
-                    return Err(self.generate_error_with_pos(
-                        format!("Must index List with an int"),
-                        format!(
-                            "Cannot index into {} with {}",
-                            lhs.get_type().to_string(),
-                            index_expr.get_type().to_string()
-                        ),
-                        position,
-                    ));
+                let mut start_expr: Option<Box<Expr>> = None;
+                if !self.current_token().is_op(Operator::Colon) {
+                    start_expr = Some(Box::new(self.expr()?));
                 }
-                lhs = self.create_indexed_expr(
-                    identifier.clone(),
-                    lhs,
-                    *element_type.clone(),
-                    index_expr,
-                    position,
-                )?;
+                // do list slice if next token is a colon
+                // dbg!(self.current_token());
+                if self.current_token().is_op(Operator::Colon) {
+                    self.advance();
+                    if !self.current_token().is_symbol(']') {
+                        if self.current_token().is_symbol('$') {
+                            self.advance();
+
+                            step = Some(Box::new(self.expr()?));
+                        } else {
+                            end_expr = Some(Box::new(self.expr()?));
+                            if self.current_token().is_symbol('$') {
+                                self.advance();
+                                step = Some(Box::new(self.expr()?));
+                            }
+                        }
+                    }
+                    self.consume_symbol(']')?;
+
+                    if let Some(start_expr) = &start_expr {
+                        if start_expr.get_type() != TType::Int {
+                            return Err(self.generate_error_with_pos(
+                                format!("Must index List with an int"),
+                                format!(
+                                    "Cannot index into {} with {}",
+                                    lhs.get_type().to_string(),
+                                    start_expr.get_type().to_string()
+                                ),
+                                position,
+                            ));
+                        }
+                    }
+
+                    if let Some(step_expr) = &step {
+                        if step_expr.get_type() != TType::Int {
+                            return Err(self.generate_error_with_pos(
+                                format!("Must index List with an int"),
+                                format!(
+                                    "Cannot index into {} with {}",
+                                    lhs.get_type().to_string(),
+                                    step_expr.get_type().to_string()
+                                ),
+                                position,
+                            ));
+                        }
+                    }
+
+                    if let Some(end_expr) = &end_expr {
+                        if end_expr.get_type() != TType::Int {
+                            return Err(self.generate_error_with_pos(
+                                format!("Must index List with an int"),
+                                format!(
+                                    "Cannot index into {} with {}",
+                                    lhs.get_type().to_string(),
+                                    end_expr.get_type().to_string()
+                                ),
+                                position,
+                            ));
+                        }
+                    }
+
+                    is_slice = true;
+                } else {
+                    self.consume_symbol(']')?;
+                }
+
+                if is_slice {
+                    lhs = Expr::Sliced {
+                        ttype: TType::List {
+                            inner: element_type.clone(),
+                        },
+                        name: identifier.clone(),
+                        start: start_expr,
+                        end: end_expr,
+                        step: step,
+                        container: Box::new(lhs),
+                        position,
+                    };
+                } else {
+                    if let Some(start_expr) = start_expr {
+                        // typecheck
+                        if start_expr.get_type() != TType::Int {
+                            return Err(self.generate_error_with_pos(
+                                format!("Must index List with an int"),
+                                format!(
+                                    "Cannot index into {} with {}",
+                                    lhs.get_type().to_string(),
+                                    start_expr.get_type().to_string()
+                                ),
+                                position,
+                            ));
+                        }
+                        lhs = Expr::Indexed {
+                            ttype: *element_type.clone(),
+                            name: identifier.clone(),
+                            index: start_expr,
+                            container: Box::new(lhs),
+                            position,
+                        };
+                    }
+                }
                 if self.current_token().is_symbol('[') {
                     lhs = self.index(identifier.clone(), lhs, *element_type)?;
                 }
@@ -1472,16 +1562,16 @@ impl Parser {
                         );
                     }
                     let element_type = &tuple_elements[index as usize];
-                    lhs = self.create_indexed_expr(
-                        "anon".to_string(),
-                        lhs,
-                        element_type.clone(),
-                        Expr::Literal {
+                    lhs = Expr::Indexed {
+                        ttype: element_type.clone(),
+                        name: identifier.clone(),
+                        index: Box::new(Expr::Literal {
                             ttype: TType::Int,
                             value: Atom::Integer { value: index },
-                        },
+                        }),
+                        container: Box::new(lhs),
                         position,
-                    )?;
+                    };
                     if self.current_token().is_symbol('[') {
                         lhs = self.index(identifier.clone(), lhs, element_type.clone())?;
                     }
@@ -1519,23 +1609,6 @@ impl Parser {
             format!("Tuple has {} values", tuple_size),
             position,
         ))
-    }
-
-    fn create_indexed_expr(
-        &self,
-        identifier: String,
-        container: Expr,
-        element_type: TType,
-        index_expr: Expr,
-        position: FilePosition,
-    ) -> Result<Expr, NovaError> {
-        Ok(Expr::Indexed {
-            ttype: element_type,
-            name: identifier,
-            index: Box::new(index_expr),
-            container: Box::new(container),
-            position,
-        })
     }
 
     fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
@@ -1985,9 +2058,7 @@ impl Parser {
                         let (ident, pos) = self.get_identifier()?;
                         self.consume_identifier(Some("in"))?;
                         let listexpr = self.expr()?;
-                        self.consume_operator(Operator::Colon)?;
-
-                        // insert id with expr type
+                        self.consume_symbol('|')?;
 
                         if let Some(innertype) = listexpr.get_type().get_inner() {
                             self.environment.push_block();
