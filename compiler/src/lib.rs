@@ -831,14 +831,14 @@ impl Compiler {
                     common::tokens::Operator::Addition => {
                         self.compile_expr(*lhs.clone())?;
                         self.compile_expr(*rhs)?;
-                        if lhs.get_type() == TType::Int {
-                            self.asm.push(Asm::IADD);
-                        } else if lhs.get_type() == TType::Float {
-                            self.asm.push(Asm::FADD);
-                        } else if lhs.get_type() == TType::String {
-                            self.asm.push(Asm::CONCAT)
-                        } else {
-                            dbg!(&ttype);
+                        match lhs.get_type() {
+                            TType::Int => self.asm.push(Asm::IADD),
+                            TType::Float => self.asm.push(Asm::FADD),
+                            TType::String => self.asm.push(Asm::CONCAT),
+                            TType::List { .. } => self.asm.push(Asm::CONCAT),
+                            _ => {
+                                dbg!(&ttype);
+                            }
                         }
                     }
                     common::tokens::Operator::Subtraction => {
@@ -960,7 +960,6 @@ impl Compiler {
                     }
                     common::tokens::Operator::Or => {
                         let sc = self.gen.generate();
-
                         // if lhs is true, return its value
                         // else return the other value
                         self.compile_expr(*lhs)?;
@@ -972,20 +971,30 @@ impl Compiler {
                         self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::AdditionAssignment => {
-                        if lhs.get_type() == TType::Int {
-                            self.compile_expr(*rhs.clone())?;
-                            self.compile_expr(*lhs.clone())?;
-                            self.asm.push(Asm::IADD);
-                        } else if lhs.get_type() == TType::Float {
-                            self.compile_expr(*rhs.clone())?;
-                            self.compile_expr(*lhs.clone())?;
-                            self.asm.push(Asm::FADD);
-                        } else if lhs.get_type() == TType::String {
-                            self.compile_expr(*lhs.clone())?;
-                            self.compile_expr(*rhs.clone())?;
-                            self.asm.push(Asm::CONCAT);
-                        } else {
-                            dbg!(&ttype);
+                        match lhs.get_type() {
+                            TType::Int => {
+                                self.compile_expr(*rhs.clone())?;
+                                self.compile_expr(*lhs.clone())?;
+                                self.asm.push(Asm::IADD);
+                            }
+                            TType::Float => {
+                                self.compile_expr(*rhs.clone())?;
+                                self.compile_expr(*lhs.clone())?;
+                                self.asm.push(Asm::FADD);
+                            }
+                            TType::String => {
+                                self.compile_expr(*lhs.clone())?;
+                                self.compile_expr(*rhs.clone())?;
+                                self.asm.push(Asm::CONCAT);
+                            }
+                            TType::List { .. } => {
+                                self.compile_expr(*lhs.clone())?;
+                                self.compile_expr(*rhs.clone())?;
+                                self.asm.push(Asm::CONCAT);
+                            }
+                            _ => {
+                                dbg!(&lhs.get_type());
+                            }
                         }
                         self.getref_expr(*lhs.clone())?;
                         self.asm.push(Asm::ASSIGN)
@@ -1192,7 +1201,9 @@ impl Compiler {
                 self.asm.push(Asm::STORE(id_index as u32));
 
                 // -- expr and then push to temp array
-                self.compile_expr(*expr.clone())?;
+                for expr in expr.iter() {
+                    self.compile_expr(expr.clone())?;
+                }
                 self.asm.push(Asm::STORE(id_index as u32));
 
                 // store value in identifier

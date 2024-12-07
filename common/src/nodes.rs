@@ -173,7 +173,7 @@ pub enum Expr {
         ttype: TType,
         identifier: String,
         list: Box<Expr>,
-        expr: Box<Expr>,
+        expr: Vec<Expr>,
         guards: Vec<Expr>,
     },
     Field {
