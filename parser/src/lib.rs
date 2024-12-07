@@ -2068,12 +2068,24 @@ impl Parser {
                                 Some(pos.clone()),
                                 SymbolKind::Variable,
                             );
-                            let outexpr = self.expr()?;
-                            self.environment.pop_block();
+                            let mut outexpr = vec![self.expr()?];
+                            // continue parsing expr if there is a comma after the outexpr
+                            if self.current_token().is_symbol(',') {
+                                self.advance();
+                                outexpr.push(self.expr()?);
+                            }
+                            // typecheck taht outexpr is not void
+                            if outexpr.last().unwrap().get_type() == TType::Void {
+                                return Err(self.generate_error_with_pos(
+                                    format!("List comprehension must return a value"),
+                                    format!("Return expression is Void"),
+                                    pos,
+                                ));
+                            }
                             self.environment.push_block();
                             self.environment.insert_symbol(
                                 &ident,
-                                outexpr.get_type().clone(),
+                                outexpr.last().unwrap().get_type().clone(),
                                 Some(pos.clone()),
                                 SymbolKind::Variable,
                             );
@@ -2098,14 +2110,19 @@ impl Parser {
                             }
                             self.environment.pop_block();
                             self.consume_symbol(']')?;
-
+                            // remove ident from scope
+                            if let Some(v) = self.environment.values.last_mut() {
+                                if let Some(_) = v.get(&ident) {
+                                    v.remove(&ident);
+                                }
+                            }
                             left = Expr::ListCompConstructor {
                                 ttype: TType::List {
-                                    inner: Box::new(outexpr.get_type()),
+                                    inner: Box::new(outexpr.last().unwrap().get_type()),
                                 },
                                 identifier: ident,
                                 list: Box::new(listexpr),
-                                expr: Box::new(outexpr),
+                                expr: outexpr,
                                 guards,
                             };
                         } else {
@@ -2803,6 +2820,23 @@ impl Parser {
                             operation,
                             left_expr.get_type(),
                         );
+                    }
+                    (TType::List { inner }, TType::List { inner: inner2 }) => {
+                        if inner == inner2 {
+                            left_expr = self.create_binop_expr(
+                                left_expr.clone(),
+                                right_expr,
+                                operation,
+                                left_expr.get_type(),
+                            );
+                        } else {
+                            return Err(self.create_type_error(
+                                left_expr.clone(),
+                                right_expr.clone(),
+                                operation,
+                                current_pos.clone(),
+                            ));
+                        }
                     }
                     (_, _) => {
                         return Err(self.create_type_error(

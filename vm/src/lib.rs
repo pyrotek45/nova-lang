@@ -47,23 +47,39 @@ impl Vm {
                     });
                 }
                 Code::EXIT => exit(0),
-                Code::CONCAT => {
-                    if let (Some(VmData::String(s1)), Some(VmData::String(s2))) =
-                        (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        if let (Heap::String(str2), Heap::String(mut str1)) =
-                            (self.state.deref(s1), self.state.deref(s2))
-                        {
-                            str1.push_str(&str2);
-                            let index = self.state.allocate_string(str1);
-                            self.state.stack.push(VmData::String(index));
-                        } else {
-                            panic!()
+                Code::CONCAT => match (self.state.stack.pop(), self.state.stack.pop()) {
+                    (Some(VmData::String(s1)), Some(VmData::String(s2))) => {
+                        match (self.state.deref(s1), self.state.deref(s2)) {
+                            (Heap::String(str2), Heap::String(mut str1)) => {
+                                str1.push_str(&str2);
+                                let index = self.state.allocate_string(str1);
+                                self.state.stack.push(VmData::String(index));
+                            }
+
+                            _ => panic!(),
                         }
-                    } else {
-                        panic!()
                     }
-                }
+                    (Some(VmData::List(l1)), Some(VmData::List(l2))) => {
+                        // make new list from both after getting lists from heap
+                        match (self.state.deref(l1), self.state.deref(l2)) {
+                            (Heap::List(list1), Heap::List(list2)) => {
+                                let mut newlist = vec![];
+                                self.state.gclock = true;
+                                for i in list2.iter() {
+                                    newlist.push(*i);
+                                }
+                                for i in list1.iter() {
+                                    newlist.push(*i);
+                                }
+                                let index = self.state.allocate_array(newlist);
+                                self.state.gclock = false;
+                                self.state.stack.push(VmData::List(index));
+                            }
+                            _ => panic!(),
+                        }
+                    }
+                    _ => panic!(),
+                },
                 Code::ISSOME => {
                     if let Some(value) = self.state.stack.pop() {
                         match value {
