@@ -1230,13 +1230,11 @@ impl Compiler {
                 Ok(())
             }
             Expr::Sliced {
-                ttype,
-                name,
                 container,
                 start: startstep,
                 end: endstep,
                 step: stepstep,
-                position,
+                ..
             } => {
                 let top = self.gen.generate();
                 let end = self.gen.generate();
@@ -1251,9 +1249,6 @@ impl Compiler {
 
                 let negitive_end = self.gen.generate();
                 let negitive_end_end = self.gen.generate();
-
-                let negitive_step = self.gen.generate();
-                let negitive_step_end = self.gen.generate();
 
                 self.breaks.push(end);
                 self.continues.push(next);
