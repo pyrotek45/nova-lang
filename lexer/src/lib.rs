@@ -431,7 +431,7 @@ impl Lexer {
                     self.buffer.push(c);
                 }
                 ' ' => self.check_token(),
-                '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' | '&' | '|' => {
+                '+' | '*' | '/' | '-' | '=' | '<' | '>' | '%' | '!' | ':' | '&' | '|' | '~' => {
                     self.check_token();
                     // Handle multi-character operators and other specific cases
                     match c {
@@ -596,6 +596,21 @@ impl Lexer {
                                 chars.next();
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Or,
+                                    position: self.current_position(),
+                                });
+                                self.row += 1;
+                            } else {
+                                self.token_list.push(Token::Symbol {
+                                    symbol: c,
+                                    position: self.current_position(),
+                                });
+                            }
+                        }
+                        '~' => {
+                            if let Some('>') = chars.peek() {
+                                chars.next();
+                                self.token_list.push(Token::Operator {
+                                    operator: Operator::RightTilde,
                                     position: self.current_position(),
                                 });
                                 self.row += 1;

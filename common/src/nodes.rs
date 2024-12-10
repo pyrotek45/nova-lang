@@ -171,8 +171,7 @@ pub enum Expr {
     },
     ListCompConstructor {
         ttype: TType,
-        identifier: String,
-        list: Box<Expr>,
+        loops: Vec<(String, Expr)>,
         expr: Vec<Expr>,
         guards: Vec<Expr>,
     },
@@ -220,6 +219,12 @@ pub enum Expr {
         ttype: TType,
         value: Atom,
     },
+    StoreExpr {
+        ttype: TType,
+        name: String,
+        expr: Box<Expr>,
+        body: Vec<Statement>,
+    },
     None,
 }
 
@@ -237,6 +242,7 @@ impl Expr {
             Expr::Closure { ttype, .. } => ttype.clone(),
             Expr::ListCompConstructor { ttype, .. } => ttype.clone(),
             Expr::Sliced { ttype, .. } => ttype.clone(),
+            Expr::StoreExpr { ttype, .. } => ttype.clone(),
         }
     }
 }

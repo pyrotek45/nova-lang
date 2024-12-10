@@ -699,7 +699,7 @@ impl Parser {
         if argument_types.is_empty() {
             argument_types.push(TType::None)
         }
-
+        let old_identifier = identifier.clone();
         if self.environment.custom_types.contains_key(&identifier) {
         } else if let Some(TType::Custom { name, .. }) = argument_types.get(0) {
             if self.environment.custom_types.contains_key(name) {
@@ -794,19 +794,55 @@ impl Parser {
                 pos,
             )
         } else {
-            Err(self.generate_error_with_pos(
-                format!("E1 Not a valid call: {}", identifier),
-                format!(
-                    "No function signature '{}' with {} as arguments",
-                    identifier,
-                    argument_types
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ),
-                pos,
-            ))
+            if let Some((function_type, function_id, function_kind)) = self
+                .environment
+                .get_function_type(&old_identifier, &argument_types)
+            {
+                self.handle_function_call(
+                    function_type,
+                    function_id,
+                    function_kind,
+                    arguments,
+                    argument_types,
+                    pos,
+                )
+            } else if let Some((function_type, function_id, function_kind)) =
+                self.environment.get_type_capture(&old_identifier)
+            {
+                //println!("captured id {}", identifier);
+                let pos = self.get_current_token_position();
+                self.environment.captured.last_mut().unwrap().insert(
+                    identifier.clone(),
+                    Symbol {
+                        id: old_identifier.clone(),
+                        ttype: function_type.clone(),
+                        pos: Some(pos.clone()),
+                        kind: SymbolKind::Captured,
+                    },
+                );
+                self.handle_function_call(
+                    function_type,
+                    function_id,
+                    function_kind,
+                    arguments,
+                    argument_types,
+                    pos,
+                )
+            } else {
+                Err(self.generate_error_with_pos(
+                    format!("E1 Not a valid call: {}", identifier),
+                    format!(
+                        "No function signature '{}' with {} as arguments",
+                        identifier,
+                        argument_types
+                            .iter()
+                            .map(|t| t.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ),
+                    pos,
+                ))
+            }
         }
     }
 
@@ -2052,79 +2088,21 @@ impl Parser {
                         operator: Operator::Colon,
                         ..
                     }) => {
+                        let mut loops = vec![];
                         self.consume_symbol('[')?;
                         self.consume_operator(Operator::Colon)?;
                         // first get ident, then in keyword, then expr, and then any guards
-                        let (ident, pos) = self.get_identifier()?;
+                        let (ident, mut pos) = self.get_identifier()?;
                         self.consume_identifier(Some("in"))?;
                         let listexpr = self.expr()?;
-                        self.consume_symbol('|')?;
 
-                        if let Some(innertype) = listexpr.get_type().get_inner() {
-                            self.environment.push_block();
+                        if let TType::List { inner } = listexpr.get_type() {
                             self.environment.insert_symbol(
                                 &ident,
-                                innertype.clone(),
+                                *inner.clone(),
                                 Some(pos.clone()),
                                 SymbolKind::Variable,
                             );
-                            let mut outexpr = vec![self.expr()?];
-                            // continue parsing expr if there is a comma after the outexpr
-                            if self.current_token().is_symbol(',') {
-                                self.advance();
-                                outexpr.push(self.expr()?);
-                            }
-                            // typecheck taht outexpr is not void
-                            if outexpr.last().unwrap().get_type() == TType::Void {
-                                return Err(self.generate_error_with_pos(
-                                    format!("List comprehension must return a value"),
-                                    format!("Return expression is Void"),
-                                    pos,
-                                ));
-                            }
-                            self.environment.push_block();
-                            self.environment.insert_symbol(
-                                &ident,
-                                outexpr.last().unwrap().get_type().clone(),
-                                Some(pos.clone()),
-                                SymbolKind::Variable,
-                            );
-                            let mut guards = vec![];
-                            // now grab list of guards seprerated by bar
-                            while self.current_token().is_symbol('|') {
-                                self.consume_symbol('|')?;
-                                guards.push(self.expr()?);
-                            }
-                            // check that all the guard types are bool
-                            for guard in guards.iter() {
-                                if guard.get_type() != TType::Bool {
-                                    return Err(self.generate_error_with_pos(
-                                        format!("Guard must be a boolean"),
-                                        format!(
-                                            "{} is not a boolean",
-                                            guard.get_type().to_string()
-                                        ),
-                                        pos,
-                                    ));
-                                }
-                            }
-                            self.environment.pop_block();
-                            self.consume_symbol(']')?;
-                            // remove ident from scope
-                            if let Some(v) = self.environment.values.last_mut() {
-                                if let Some(_) = v.get(&ident) {
-                                    v.remove(&ident);
-                                }
-                            }
-                            left = Expr::ListCompConstructor {
-                                ttype: TType::List {
-                                    inner: Box::new(outexpr.last().unwrap().get_type()),
-                                },
-                                identifier: ident,
-                                list: Box::new(listexpr),
-                                expr: outexpr,
-                                guards,
-                            };
                         } else {
                             return Err(self.generate_error_with_pos(
                                 format!("List comprehension must be a list"),
@@ -2132,6 +2110,85 @@ impl Parser {
                                 pos,
                             ));
                         }
+
+                        loops.push((ident.clone(), listexpr.clone()));
+                        // while comma is present, get ident, in keyword, expr
+                        while self.current_token().is_symbol(',') {
+                            self.consume_symbol(',')?;
+                            let (ident, _) = self.get_identifier()?;
+                            self.consume_identifier(Some("in"))?;
+                            let listexpr = self.expr()?;
+                            // insert identifer into scope for typechecking
+                            if let TType::List { inner } = listexpr.get_type() {
+                                self.environment.insert_symbol(
+                                    &ident,
+                                    *inner.clone(),
+                                    Some(pos.clone()),
+                                    SymbolKind::Variable,
+                                );
+                            } else {
+                                return Err(self.generate_error_with_pos(
+                                    format!("List comprehension must be a list"),
+                                    format!("{} is not a list", listexpr.get_type().to_string()),
+                                    pos,
+                                ));
+                            }
+                            loops.push((ident.clone(), listexpr.clone()));
+                        }
+                        self.consume_symbol('|')?;
+
+                        self.environment.push_block();
+                        let mut outexpr = vec![self.expr()?];
+                        // continue parsing expr if there is a comma after the outexpr
+                        if self.current_token().is_symbol(',') {
+                            self.advance();
+                            outexpr.push(self.expr()?);
+                        }
+                        // typecheck taht outexpr is not void
+                        if outexpr.last().unwrap().get_type() == TType::Void {
+                            return Err(self.generate_error_with_pos(
+                                format!("List comprehension must return a value"),
+                                format!("Return expression is Void"),
+                                pos,
+                            ));
+                        }
+
+                        let mut guards = vec![];
+                        // now grab list of guards seprerated by bar
+                        while self.current_token().is_symbol('|') {
+                            pos = self.get_current_token_position();
+                            self.consume_symbol('|')?;
+                            guards.push(self.expr()?);
+                        }
+
+                        // check that all the guard types are bool
+                        for guard in guards.iter() {
+                            if guard.get_type() != TType::Bool {
+                                return Err(self.generate_error_with_pos(
+                                    format!("Guard must be a boolean"),
+                                    format!("{} is not a boolean", guard.get_type().to_string()),
+                                    pos,
+                                ));
+                            }
+                        }
+                        self.environment.pop_block();
+                        self.consume_symbol(']')?;
+                        // remove ident from scope
+                        for (ident, _) in loops.iter().cloned() {
+                            if let Some(v) = self.environment.values.last_mut() {
+                                if let Some(_) = v.get(&ident) {
+                                    v.remove(&ident);
+                                }
+                            }
+                        }
+                        left = Expr::ListCompConstructor {
+                            ttype: TType::List {
+                                inner: Box::new(outexpr.last().unwrap().get_type()),
+                            },
+                            loops,
+                            expr: outexpr,
+                            guards,
+                        };
                     }
                     _ => {
                         let expr_list = self.expr_list()?;
@@ -2742,6 +2799,75 @@ impl Parser {
                     rhs: Box::new(right_expr),
                 };
             }
+        }
+
+        match self.current_token() {
+            Token::Operator {
+                operator: Operator::RightTilde,
+                ..
+            } => {
+                //dbg!("right tilde");
+                //dbg!(left_expr.clone());
+                // the syntax is expr ~> id { statements }
+                self.consume_operator(Operator::RightTilde)?;
+                let (identifier, pos) = self.get_identifier()?;
+
+                // if current token is { else its expr,
+                match self.current_token() {
+                    Token::Symbol { symbol: '{', .. } => {
+                        // cant assing a void
+                        if left_expr.get_type() == TType::Void {
+                            return Err(self.generate_error_with_pos(
+                                format!("Variable '{}' cannot be assinged to void", identifier),
+                                "Make sure the expression returns a value".to_string(),
+                                pos.clone(),
+                            ));
+                        }
+
+                        if self.environment.has(&identifier) {
+                            return Err(self.generate_error_with_pos(
+                                format!("Variable '{}' has already been created", identifier),
+                                "".to_string(),
+                                pos.clone(),
+                            ));
+                        } else {
+                            self.environment.push_block();
+                            self.environment.insert_symbol(
+                                &identifier,
+                                left_expr.get_type(),
+                                Some(pos.clone()),
+                                SymbolKind::Variable,
+                            );
+                            let expr_block = self.block_expr_inline()?;
+                            self.environment.pop_block();
+
+                            if let Some(Statement::Expression { ttype, .. }) = expr_block.last() {
+                                left_expr = Expr::StoreExpr {
+                                    ttype: ttype.clone(),
+                                    name: identifier.clone(),
+                                    expr: Box::new(left_expr),
+                                    body: expr_block,
+                                };
+                            } else {
+                                return Err(self.generate_error_with_pos(
+                                    format!("Variable '{}' must return a value", identifier),
+                                    "Make sure the expression returns a value".to_string(),
+                                    pos.clone(),
+                                ));
+                            }
+                        }
+                    }
+                    _ => {
+                        // return error
+                        return Err(self.generate_error_with_pos(
+                            format!("Expected block after `~>`"),
+                            "Make sure to use a block after `~>`".to_string(),
+                            pos.clone(),
+                        ));
+                    }
+                }
+            }
+            _ => {}
         }
         Ok(left_expr)
     }
@@ -4511,6 +4637,23 @@ impl Parser {
                 }
             },
         )
+    }
+
+    fn block_expr_inline(&mut self) -> Result<Vec<Statement>, NovaError> {
+        let pos = self.get_current_token_position();
+        self.consume_symbol('{')?;
+        let statements = self.compound_statement()?;
+        self.consume_symbol('}')?;
+        // check if last statement is an expression
+        if let Some(Statement::Expression { .. }) = statements.last() {
+            Ok(statements)
+        } else {
+            Err(self.generate_error_with_pos(
+                "Block must have expression as last value".to_string(),
+                "".to_string(),
+                pos.clone(),
+            ))
+        }
     }
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {
