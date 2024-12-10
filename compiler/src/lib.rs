@@ -633,6 +633,7 @@ impl Compiler {
                 ..
             } => {
                 self.compile_expr(*index)?;
+
                 let negitive_step = self.gen.generate();
                 self.compile_expr(*container.clone())?;
                 self.variables
@@ -665,6 +666,7 @@ impl Compiler {
             Expr::Closure { .. } => todo!(),
             Expr::ListCompConstructor { .. } => todo!(),
             Expr::Sliced { .. } => todo!(),
+            Expr::StoreExpr { .. } => todo!(),
         }
         Ok(())
     }
@@ -1023,6 +1025,8 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::LeftArrow => todo!(),
+                    common::tokens::Operator::RightTilde => todo!(),
+                    common::tokens::Operator::LeftTilde => todo!(),
                 }
                 Ok(())
             }
@@ -1116,22 +1120,13 @@ impl Compiler {
                 Ok(())
             }
             Expr::ListCompConstructor {
-                list,
                 expr,
                 guards,
-                identifier,
+                mut loops,
                 ..
             } => {
-                let top = self.gen.generate();
-                let end = self.gen.generate();
-
-                let mid = self.gen.generate();
-                let step = self.gen.generate();
-
-                let next = self.gen.generate();
-
-                self.breaks.push(end);
-                self.continues.push(next);
+                loops.reverse();
+                let (identifier, list) = loops.pop().unwrap();
                 // create temp list to hold new values
 
                 self.variables
@@ -1140,104 +1135,11 @@ impl Compiler {
                 self.asm.push(Asm::LIST(0));
                 self.asm.push(Asm::STORE(list_index as u32));
 
-                // insert temp counter
-                self.variables
-                    .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
-                let tempcounter_index = self.variables.len() - 1;
-
-                self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
-                let array_index = self.variables.len() - 1;
-
-                let id_index = if let Some(index) = self.variables.get_index(identifier.clone()) {
-                    index
-                } else {
-                    self.variables.insert(identifier.to_string());
-                    self.variables.len() - 1
-                };
-                // compile list expr
-                self.compile_expr(*list.clone())?;
-                self.asm.push(Asm::STORE(array_index as u32));
-
-                // storing counter and expression array
-                self.asm.push(Asm::INTEGER(0));
-                self.asm.push(Asm::STORE(tempcounter_index as u32));
-
-                // if array is empty jump to end
-                self.asm.push(Asm::LABEL(top));
-
-                self.asm.push(Asm::GET(tempcounter_index as u32));
-                self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
-                    self.asm.push(Asm::NATIVE(index as u64))
-                } else {
-                    todo!()
-                }
-
-                self.asm.push(Asm::IGTR);
-                self.asm.push(Asm::DUP);
-                self.asm.push(Asm::NOT);
-
-                self.asm.push(Asm::JUMPIFFALSE(step));
-                self.asm.push(Asm::POP);
-
-                self.asm.push(Asm::GET(tempcounter_index as u32));
-                self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
-                    self.asm.push(Asm::NATIVE(index as u64))
-                }
-                self.asm.push(Asm::EQUALS);
-
-                self.asm.push(Asm::LABEL(step));
-                self.asm.push(Asm::JUMPIFFALSE(mid));
-                self.asm.push(Asm::JMP(end));
-                self.asm.push(Asm::LABEL(mid));
-
-                // bind value to identifier
-                self.asm.push(Asm::GET(tempcounter_index as u32));
-                self.asm.push(Asm::GET(array_index as u32));
-                self.asm.push(Asm::LIN);
-
-                self.asm.push(Asm::STORE(id_index as u32));
-
-                // -- expr and then push to temp array
-                for expr in expr.iter() {
-                    self.compile_expr(expr.clone())?;
-                }
-                self.asm.push(Asm::STORE(id_index as u32));
-
-                // store value in identifier
-
-                // // compile guards
-                for guard in guards.iter() {
-                    self.compile_expr(guard.clone())?;
-                    self.asm.push(Asm::JUMPIFFALSE(next));
-                }
-
-                self.asm.push(Asm::GET(list_index as u32));
-                self.asm.push(Asm::GET(id_index as u32));
-
-                if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
-                    self.asm.push(Asm::NATIVE(index as u64))
-                } else {
-                    todo!()
-                }
-
-                self.asm.push(Asm::LABEL(next));
-                // increment counter
-                self.asm.push(Asm::INTEGER(1));
-                self.asm.push(Asm::GET(tempcounter_index as u32));
-                self.asm.push(Asm::IADD);
-                self.asm.push(Asm::STACKREF(tempcounter_index as u32));
-                self.asm.push(Asm::ASSIGN);
-                self.asm.push(Asm::BJMP(top));
-                self.asm.push(Asm::LABEL(end));
+                self.for_in_loop(identifier, list, expr, guards, list_index, loops)?;
 
                 // return the list
                 self.asm.push(Asm::GET(list_index as u32));
 
-                self.breaks.pop();
-                self.continues.pop();
                 Ok(())
             }
             Expr::Sliced {
@@ -1403,7 +1305,145 @@ impl Compiler {
                 self.continues.pop();
                 Ok(())
             }
+            Expr::StoreExpr {
+                ttype,
+                name,
+                expr,
+                body,
+            } => {
+                self.compile_expr(*expr)?;
+                if let Some(index) = self.variables.get_index(name.to_string()) {
+                    self.asm.push(Asm::STORE(index as u32))
+                } else {
+                    self.variables.insert(name.to_string());
+                    let index = self.variables.len() - 1;
+                    self.asm.push(Asm::STORE(index as u32))
+                }
+
+                let body = Ast {
+                    program: body.clone(),
+                };
+                self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                self.asm.pop();
+                // total hack, happens when last statement gets autopopped when compiling a statement expr
+                // so we need to pop it again
+                if TType::Void != ttype {
+                    self.asm.pop();
+                }
+                //self.asm.pop();
+                Ok(())
+            }
         }
+    }
+
+    fn for_in_loop(
+        &mut self,
+        identifier: String,
+        list: Expr,
+        expr: Vec<Expr>,
+        guards: Vec<Expr>,
+        list_index: usize,
+        mut loops: Vec<(String, Expr)>,
+    ) -> Result<(), NovaError> {
+        // compile list and create counter
+        self.variables
+            .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+        let tempcounter_index = self.variables.len() - 1;
+        self.variables
+            .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+        let array_index = self.variables.len() - 1;
+        let id_index = if let Some(index) = self.variables.get_index(identifier.clone()) {
+            index
+        } else {
+            self.variables.insert(identifier.to_string());
+            self.variables.len() - 1
+        };
+        // generate labels
+        let top = self.gen.generate();
+        let end = self.gen.generate();
+        let mid = self.gen.generate();
+        let step = self.gen.generate();
+        let next = self.gen.generate();
+        self.breaks.push(end);
+        self.continues.push(next);
+
+        // compile list expr
+        self.compile_expr(list)?;
+        self.asm.push(Asm::STORE(array_index as u32));
+        self.asm.push(Asm::INTEGER(0));
+        self.asm.push(Asm::STORE(tempcounter_index as u32));
+        self.asm.push(Asm::LABEL(top));
+        self.asm.push(Asm::GET(tempcounter_index as u32));
+        self.asm.push(Asm::GET(array_index as u32));
+        if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+            self.asm.push(Asm::NATIVE(index as u64))
+        } else {
+            todo!()
+        }
+        self.asm.push(Asm::IGTR);
+        self.asm.push(Asm::DUP);
+        self.asm.push(Asm::NOT);
+        self.asm.push(Asm::JUMPIFFALSE(step));
+        self.asm.push(Asm::POP);
+        self.asm.push(Asm::GET(tempcounter_index as u32));
+        self.asm.push(Asm::GET(array_index as u32));
+        if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+            self.asm.push(Asm::NATIVE(index as u64))
+        }
+        self.asm.push(Asm::EQUALS);
+        self.asm.push(Asm::LABEL(step));
+        self.asm.push(Asm::JUMPIFFALSE(mid));
+        self.asm.push(Asm::JMP(end));
+        self.asm.push(Asm::LABEL(mid));
+
+        // bind value from list to identifier
+        self.asm.push(Asm::GET(tempcounter_index as u32));
+        self.asm.push(Asm::GET(array_index as u32));
+        self.asm.push(Asm::LIN);
+        self.asm.push(Asm::STORE(id_index as u32));
+        let nextloop = loops.pop();
+        if let Some((identifier, list)) = nextloop {
+            self.for_in_loop(identifier, list, expr, guards, list_index, loops)?;
+        } else {
+            // create new label for guards
+            let skipcurrent = self.gen.generate();
+            // check guards
+            for guard in guards.iter() {
+                self.compile_expr(guard.clone())?;
+                self.asm.push(Asm::JUMPIFFALSE(skipcurrent));
+            }
+
+            // -- expr and then push to temp array
+            for expr in expr.iter() {
+                self.compile_expr(expr.clone())?;
+            }
+            self.asm.push(Asm::STORE(id_index as u32));
+
+            self.asm.push(Asm::GET(list_index as u32));
+            self.asm.push(Asm::GET(id_index as u32));
+            if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
+                self.asm.push(Asm::NATIVE(index as u64))
+            } else {
+                todo!()
+            }
+
+            // skip current label
+            self.asm.push(Asm::LABEL(skipcurrent));
+        }
+
+        // increment counter
+        self.asm.push(Asm::LABEL(next));
+        self.asm.push(Asm::INTEGER(1));
+        self.asm.push(Asm::GET(tempcounter_index as u32));
+        self.asm.push(Asm::IADD);
+        self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+        self.asm.push(Asm::ASSIGN);
+        self.asm.push(Asm::BJMP(top));
+        self.asm.push(Asm::LABEL(end));
+
+        self.breaks.pop();
+        self.continues.pop();
+        Ok(())
     }
 
     pub fn compile_atom(&mut self, atom: Atom) -> Result<(), NovaError> {

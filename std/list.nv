@@ -600,3 +600,86 @@ fn extends get(input: [$T], index: Int) -> ?$T {
     }
     return Some(input[index])
 }
+
+fn extends enumurate(input: [$T]) -> [#($T,Int)] {
+    let result = []: #($T,Int)
+    for i <- 0; i < input.len(); i += 1 {
+        result.push(#(input[i],i))
+    }
+    return result
+}
+
+fn extends join(input: [$T], delim: $T) -> [$T] {
+    let result = []:$T
+    for i <- 0; i < input.len(); i += 1 {
+        result.push(input[i])
+        if i != input.len()-1 {
+            result.push(delim)
+        }
+    }
+    return result
+}
+
+// bitmask
+
+struct Bitmask {
+    data: [Int]
+}
+
+fn extends bitmask(input: [$T], f:($T) -> Bool) -> Bitmask {
+    let result = []: Int
+    for (x in input) {
+        if f(x) {
+            result.push(1)
+        } else {
+            result.push(0)
+        }
+    }
+    return Bitmask{data: result}
+}
+
+fn extends mask(input: [Int]) -> Bitmask {    
+    let result = []: Int
+    for (x in input) {
+        if x == 1 {
+            result.push(1)
+        } else {
+            result.push(0)
+        }
+    }
+    return Bitmask{data: result}
+}
+
+fn extends inverse(input: Bitmask) -> Bitmask {
+    let result = []: Int
+    for (x in input.data) {
+        if x == 1 {
+            result.push(0)
+        } else {
+            result.push(1)
+        }
+    }
+    return Bitmask{data: result}
+}
+
+fn extends selection(input: [$T], mask: Bitmask) -> [$T] {
+    let result = []: $T
+    for i <- 0; i < input.len(); i += 1 {
+        if mask.data[i] == 1 {
+            result.push(input[i])
+        }
+    }
+    return result
+}
+
+fn extends membership(input: [$T], elements: [$T]) -> Bitmask {
+    let result = []: Int
+    for (x in input) {
+        if elements.contains(x) {
+            result.push(1)
+        } else {
+            result.push(0)
+        }
+    }
+    return Bitmask{data: result}
+}

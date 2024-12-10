@@ -36,6 +36,9 @@ pub enum Operator {
     Call,
     Modulo,
     Not,
+    // special operators
+    RightTilde,
+    LeftTilde,
 }
 
 #[derive(Debug, Clone, PartialEq)]
