@@ -1,9 +1,32 @@
 module main
 
-import super.std.core
+import super.std.math
 
 let x = 6.sqrt()
-let y = 6.9.sqrt()
+println(x) // 2.44948...
 
-println(x)
-println(y)
+let y = 6.9.sqrt()
+println(y) // 2.62678...
+
+
+let z = 1.clamp(2, 3);
+println(z) // 2
+
+z = 5.clamp(2, 3);
+println(z) // 3
+
+
+let fac = 10.factorial()
+println(fac) // 3628800
+
+
+let gcd = 60.gcd(7)
+println(gcd) // 1
+
+
+let lcm = 69.lcm(5)
+println(lcm) // 345
+
+
+let exp = 6.9.exp()
+println(exp) // 992.23844...
