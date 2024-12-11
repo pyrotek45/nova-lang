@@ -2,37 +2,38 @@ module speedtest
 
 println("speedtest")
 
-
-// let num = 20000
-// let v = num
-// let i = 1
-// let j = 1
-// let sum = 0
-
-// for i = 1; i < v; i += 1 {
-
-//     if num == sum {
-//         println(sum)
-//     }
-//     sum = 0
-//     num -= 1
-// }
-
-import std.list
-
-let sum = 0
+// fast version
 let num = 20000
+let v = num
+let i = 1
+let j = 1
+let sum = 0
 
-println("started...")
-for i in range(1, num) {
-    for j in range(1, num)  {
-        if num % j == 0 {
-            sum += j
-        }
-    }
+for i = 1; i < v; i += 1 {
+
     if num == sum {
         println(sum)
     }
     sum = 0
     num -= 1
 }
+
+// slow version
+// import std.list
+
+// let sum = 0
+// let num = 20000
+
+// println("started...")
+// for i in range(1, num) {
+//     for j in range(1, num)  {
+//         if num % j == 0 {
+//             sum += j
+//         }
+//     }
+//     if num == sum {
+//         println(sum)
+//     }
+//     sum = 0
+//     num -= 1
+// }
