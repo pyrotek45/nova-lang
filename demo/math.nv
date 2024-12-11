@@ -1,0 +1,9 @@
+module main
+
+import super.std.core
+
+let x = 6.sqrt()
+let y = 6.9.sqrt()
+
+println(x)
+println(y)
