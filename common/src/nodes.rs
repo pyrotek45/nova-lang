@@ -117,6 +117,14 @@ pub enum Statement {
         expr: Expr,
         body: Vec<Statement>,
     },
+    ForRange {
+        identifier: String,
+        start: Expr,
+        end: Expr,
+        inclusive: bool,
+        step: Option<Expr>,
+        body: Vec<Statement>,
+    },
     Block {
         body: Vec<Statement>,
         filepath: String,

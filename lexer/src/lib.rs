@@ -91,7 +91,8 @@ impl Lexer {
                 } else {
                     Token::Integer {
                         value: v as i64,
-                        position: self.current_position(),
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
                     }
                 });
             }
@@ -415,6 +416,27 @@ impl Lexer {
                 '\r' => self.check_token(),
                 '\t' => self.check_token(),
                 '.' => {
+                    if let Some('.') = chars.peek() {
+                        chars.next();
+                        if let Some('=') = chars.peek() {
+                            chars.next();
+                            self.check_token();
+                            self.token_list.push(Token::Operator {
+                                operator: Operator::ExclusiveRange,
+                                position: self.current_position(),
+                            });
+                            self.row += 3;
+                            continue;
+                        } else {
+                            self.check_token();
+                            self.token_list.push(Token::Operator {
+                                operator: Operator::InclusiveRange,
+                                position: self.current_position(),
+                            });
+                            self.row += 2;
+                            continue;
+                        }
+                    }
                     if self.state != LexerState::Float {
                         if let Ok(_v) = self.buffer.parse::<i64>() {
                             self.state = LexerState::Float;
