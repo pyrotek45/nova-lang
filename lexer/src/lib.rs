@@ -1,7 +1,7 @@
 use common::{
     error::NovaError,
     fileposition::{load_file_content, FilePosition},
-    tokens::{Operator, Token, TokenList},
+    tokens::{KeyWord, Operator, Token, TokenList},
     ttype::TType,
 };
 
@@ -186,6 +186,13 @@ impl Lexer {
                 "Char" => {
                     return Some(Token::Type {
                         ttype: TType::Char,
+                        position: self
+                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                    })
+                }
+                "in" => {
+                    return Some(Token::Keyword {
+                        keyword: KeyWord::In,
                         position: self
                             .current_position_buffer_row(self.row - self.buffer.chars().count()),
                     })

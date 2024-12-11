@@ -58,8 +58,8 @@ pub enum NovaError {
         extra: Option<Vec<(String, FilePosition)>>,
     },
     Compiler {
+        msg: String,
         note: String,
-        position: FilePosition,
     },
     Runtime {
         msg: String,
@@ -130,14 +130,9 @@ impl NovaError {
             NovaError::Runtime { msg } => {
                 println!("Runtime Error: {}", msg.bright_red());
             }
-            NovaError::Compiler { note, position } => {
-                println!(
-                    "{} in {}:{}",
-                    "Compiling Error".bright_red(),
-                    position.filepath,
-                    position.line
-                );
-                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+            NovaError::Compiler { msg, note } => {
+                println!("{}", "Compiling Error".bright_red(),);
+                println!("{}\n{}", msg.bright_red(), note.bright_yellow());
             }
             NovaError::RuntimeWithPos { msg, position } => {
                 println!(

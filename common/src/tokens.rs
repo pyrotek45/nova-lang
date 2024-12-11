@@ -40,9 +40,17 @@ pub enum Operator {
     RightTilde,
     LeftTilde,
 }
+#[derive(Debug, Clone, PartialEq)]
+pub enum KeyWord {
+    In,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
+    Keyword {
+        keyword: KeyWord,
+        position: FilePosition,
+    },
     Type {
         ttype: TType,
         position: FilePosition,
@@ -97,6 +105,7 @@ impl Token {
             | Token::Bool { position, .. }
             | Token::Operator { position, .. }
             | Token::EOF { position } => position.clone(),
+            Token::Keyword { position, .. } => position.clone(),
         }
     }
 
@@ -172,6 +181,7 @@ impl Token {
             | Token::Bool { position, .. }
             | Token::Operator { position, .. }
             | Token::EOF { position } => position.line,
+            Token::Keyword { position, .. } => position.line,
         }
     }
 
@@ -187,6 +197,7 @@ impl Token {
             | Token::Bool { position, .. }
             | Token::Operator { position, .. }
             | Token::EOF { position } => position.row,
+            Token::Keyword { position, .. } => position.row,
         }
     }
 
@@ -283,6 +294,7 @@ impl Token {
             Token::Bool { value, .. } => format!("Bool({})", value),
             Token::Operator { operator, .. } => format!("Operator({:?})", operator),
             Token::EOF { .. } => "EOF".to_string(),
+            Token::Keyword { keyword, .. } => format!("Keyword({:?})", keyword),
         }
     }
 }

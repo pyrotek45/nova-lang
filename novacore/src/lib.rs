@@ -53,7 +53,7 @@ impl NovaCore {
 
                 self.parser.environment.insert_symbol(
                     function_id,
-                    function_type,
+                    function_type.clone(),
                     None,
                     function_kind,
                 );
@@ -61,6 +61,9 @@ impl NovaCore {
                 self.compiler
                     .native_functions
                     .insert(compiler_id.to_string());
+                self.compiler
+                    .native_functions_types
+                    .insert(function_id.to_string(), function_type.clone());
                 self.vm
                     .native_functions
                     .insert(self.vm.native_functions.len(), function_pointer);
@@ -68,7 +71,7 @@ impl NovaCore {
             _ => {
                 self.parser.environment.insert_symbol(
                     function_id,
-                    function_type,
+                    function_type.clone(),
                     None,
                     function_kind,
                 );
@@ -76,6 +79,9 @@ impl NovaCore {
                 self.compiler
                     .native_functions
                     .insert(function_id.to_string());
+                self.compiler
+                    .native_functions_types
+                    .insert(function_id.to_string(), function_type.clone());
                 self.vm
                     .native_functions
                     .insert(self.vm.native_functions.len(), function_pointer);
@@ -87,12 +93,29 @@ impl NovaCore {
     }
 
     fn initnova(&mut self) {
+        // add printf function
+        self.add_function(
+            "printf",
+            TType::Function {
+                parameters: vec![
+                    TType::String,
+                    TType::List {
+                        inner: Box::new(TType::String),
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::printf,
+        );
         self.add_function(
             "terminal::args",
             TType::Function {
                 parameters: vec![TType::None],
-                return_type: Box::new(TType::List {
-                    inner: Box::new(TType::String),
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::List {
+                        inner: Box::new(TType::String),
+                    }),
                 }),
             },
             common::nodes::SymbolKind::Function,
@@ -313,6 +336,7 @@ impl NovaCore {
         self.parser.parse()?;
         let ast = self.parser.ast.clone();
         let filepath = self.filepath.clone();
+        self.compiler.init();
         let asm = self
             .compiler
             .compile_program(ast.clone(), filepath, true, true, false)?;
@@ -346,6 +370,7 @@ impl NovaCore {
         );
 
         let ast = self.parser.ast;
+        self.compiler.init();
         let asm = self
             .compiler
             .compile_program(ast, self.filepath, true, true, false)?;

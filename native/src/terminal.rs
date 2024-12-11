@@ -4,8 +4,7 @@ use common::error::NovaError;
 use crossterm::{
     cursor::MoveTo,
     event::{self, Event, KeyCode, KeyEvent},
-    execute,
-    terminal::{self, ClearType},
+    execute, terminal,
 };
 use vm::state::{self, VmData};
 
@@ -57,7 +56,7 @@ pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn clear_screen(_state: &mut state::State) -> Result<(), NovaError> {
-    execute!(stdout(), terminal::Clear(ClearType::All)).unwrap();
+    execute!(stdout(), terminal::Clear(terminal::ClearType::All)).unwrap();
     execute!(stdout(), MoveTo(0, 0)).unwrap();
     Ok(())
 }
@@ -76,12 +75,17 @@ pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaEr
     let args: Vec<String> = std::env::args().skip(3).collect();
     let mut myarray = vec![];
     state.gclock = true;
-    for arg in args {
-        let string_pos = state.allocate_string(arg);
+    for arg in args.iter() {
+        let string_pos = state.allocate_string(arg.clone());
         myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
     }
-    let index = state.allocate_array(myarray);
-    state.gclock = false;
-    state.stack.push(VmData::List(index));
+    if args.is_empty() {
+        state.stack.push(VmData::None);
+    } else {
+        let index = state.allocate_array(myarray);
+        state.gclock = false;
+        state.stack.push(VmData::List(index));
+    }
+
     Ok(())
 }

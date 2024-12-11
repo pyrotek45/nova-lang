@@ -6,7 +6,7 @@ use common::{
     fileposition::FilePosition,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
-    tokens::{Operator, Token, TokenList, Unary},
+    tokens::{KeyWord, Operator, Token, TokenList, Unary},
     ttype::{generate_unique_string, TType},
 };
 use dym::Lexicon;
@@ -113,9 +113,7 @@ pub fn new(filepath: &str) -> Parser {
     env.insert_symbol(
         "print",
         TType::Function {
-            parameters: vec![TType::Generic {
-                name: "a".to_string(),
-            }],
+            parameters: vec![TType::Any],
             return_type: Box::new(TType::Void),
         },
         None,
@@ -124,9 +122,7 @@ pub fn new(filepath: &str) -> Parser {
     env.insert_symbol(
         "println",
         TType::Function {
-            parameters: vec![TType::Generic {
-                name: "a".to_string(),
-            }],
+            parameters: vec![TType::Any],
             return_type: Box::new(TType::Void),
         },
         None,
@@ -451,6 +447,23 @@ impl Parser {
         ))
     }
 
+    // consume a keyword
+    fn consume_keyword(&mut self, kind: KeyWord) -> Result<(), NovaError> {
+        if let Token::Keyword { keyword, .. } = self.current_token() {
+            if kind == keyword {
+                self.advance();
+                return Ok(());
+            }
+        }
+        Err(self.generate_error(
+            format!(
+                "unexpected keyword, got {}",
+                self.current_token().to_string()
+            ),
+            format!("expecting {:?}", kind),
+        ))
+    }
+
     fn consume_identifier(&mut self, symbol: Option<&str>) -> Result<(), NovaError> {
         match self.current_token() {
             Token::Identifier { name: sym, .. } if symbol.map_or(true, |s| sym == s) => {
@@ -478,9 +491,10 @@ impl Parser {
         self.input[self.index].clone()
     }
 
-    fn peek(&self) -> Option<Token> {
-        if self.index + 1 < self.input.len() {
-            Some(self.input[self.index + 1].clone())
+    // peek with offset
+    fn peek_offset(&self, offset: usize) -> Option<Token> {
+        if self.index + offset < self.input.len() {
+            Some(self.input[self.index + offset].clone())
         } else {
             None
         }
@@ -2083,17 +2097,16 @@ impl Parser {
 
                 // add list comprehension using the for keyword
                 // if symbol is colon operator then it is a list comprehension
-                match self.peek() {
-                    Some(Token::Operator {
-                        operator: Operator::Colon,
+                match self.peek_offset(2) {
+                    Some(Token::Keyword {
+                        keyword: KeyWord::In,
                         ..
                     }) => {
                         let mut loops = vec![];
                         self.consume_symbol('[')?;
-                        self.consume_operator(Operator::Colon)?;
                         // first get ident, then in keyword, then expr, and then any guards
                         let (ident, mut pos) = self.get_identifier()?;
-                        self.consume_identifier(Some("in"))?;
+                        self.consume_keyword(KeyWord::In)?;
                         let listexpr = self.expr()?;
 
                         if let TType::List { inner } = listexpr.get_type() {
@@ -2116,7 +2129,7 @@ impl Parser {
                         while self.current_token().is_symbol(',') {
                             self.consume_symbol(',')?;
                             let (ident, _) = self.get_identifier()?;
-                            self.consume_identifier(Some("in"))?;
+                            self.consume_keyword(KeyWord::In)?;
                             let listexpr = self.expr()?;
                             // insert identifer into scope for typechecking
                             if let TType::List { inner } = listexpr.get_type() {
@@ -2849,11 +2862,12 @@ impl Parser {
                                     body: expr_block,
                                 };
                             } else {
-                                return Err(self.generate_error_with_pos(
-                                    format!("Variable '{}' must return a value", identifier),
-                                    "Make sure the expression returns a value".to_string(),
-                                    pos.clone(),
-                                ));
+                                left_expr = Expr::StoreExpr {
+                                    ttype: TType::Void,
+                                    name: identifier.clone(),
+                                    expr: Box::new(left_expr),
+                                    body: expr_block,
+                                };
                             }
                         }
                     }
@@ -3851,9 +3865,13 @@ impl Parser {
     fn for_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("for"))?;
 
-        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+        if let Some(Token::Keyword {
+            keyword: KeyWord::In,
+            ..
+        }) = self.peek_offset(1)
+        {
             // Handle foreach statement
-            self.advance(); // consume '('
+
             let (identifier, pos) = self.get_identifier()?;
             if self.environment.has(&identifier) {
                 return Err(self.generate_error_with_pos(
@@ -3862,10 +3880,10 @@ impl Parser {
                     pos.clone(),
                 ));
             }
-            self.consume_identifier(Some("in"))?;
+            self.consume_keyword(KeyWord::In)?;
             let arraypos = self.get_current_token_position();
             let array = self.expr()?;
-            self.consume_symbol(')')?;
+
             self.environment.push_block();
             // check if array has type array and then assign identifier to that type
             if let TType::List { inner } = array.get_type() {
@@ -4640,20 +4658,10 @@ impl Parser {
     }
 
     fn block_expr_inline(&mut self) -> Result<Vec<Statement>, NovaError> {
-        let pos = self.get_current_token_position();
         self.consume_symbol('{')?;
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
-        // check if last statement is an expression
-        if let Some(Statement::Expression { .. }) = statements.last() {
-            Ok(statements)
-        } else {
-            Err(self.generate_error_with_pos(
-                "Block must have expression as last value".to_string(),
-                "".to_string(),
-                pos.clone(),
-            ))
-        }
+        Ok(statements)
     }
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {

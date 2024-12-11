@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use common::code::Asm;
 use common::error::NovaError;
 use common::gen::Gen;
@@ -12,6 +14,7 @@ pub struct Compiler {
     pub variables: common::table::Table<String>,
     pub upvalues: common::table::Table<String>,
     pub native_functions: common::table::Table<String>,
+    pub native_functions_types: HashMap<String, TType>,
     pub output: Vec<u8>,
     pub filepath: String,
     pub entry: usize,
@@ -35,6 +38,7 @@ pub fn new() -> Compiler {
         gen: common::gen::new(),
         breaks: vec![],
         continues: vec![],
+        native_functions_types: HashMap::default(),
     }
 }
 
@@ -47,6 +51,65 @@ impl Compiler {
         self.entry
     }
 
+    pub fn init(&mut self) {
+        //dbg!("init");
+        // compile wrapper functions into global scope
+        // print function
+        self.global.insert("print".to_string());
+        let w_index = self.global.len() - 1;
+        let jump = self.gen.generate();
+        self.asm.push(Asm::FUNCTION(jump as u64));
+        self.asm.push(Asm::OFFSET(1, 0));
+        self.asm.push(Asm::PRINT);
+        self.asm.push(Asm::RET(false));
+        self.asm.push(Asm::LABEL(jump));
+        self.asm.push(Asm::STOREGLOBAL(w_index as u32));
+
+        // println function
+        self.global.insert("println".to_string());
+        let w_index = self.global.len() - 1;
+        let jump = self.gen.generate();
+        self.asm.push(Asm::FUNCTION(jump as u64));
+        self.asm.push(Asm::OFFSET(1, 0));
+        self.asm.push(Asm::PRINT);
+        self.asm.push(Asm::STRING("\n".to_string()));
+        self.asm.push(Asm::PRINT);
+        self.asm.push(Asm::RET(false));
+        self.asm.push(Asm::LABEL(jump));
+        self.asm.push(Asm::STOREGLOBAL(w_index as u32));
+
+        for (index, native) in self.native_functions.items.iter().enumerate() {
+            if let Some(ntype) = self.native_functions_types.get(native) {
+                match ntype {
+                    TType::Function {
+                        parameters,
+                        return_type,
+                    } => {
+                        self.global.insert(native.to_string());
+                        let w_index = self.global.len() - 1;
+                        let jump = self.gen.generate();
+                        self.asm.push(Asm::FUNCTION(jump as u64));
+                        self.asm.push(Asm::OFFSET(parameters.len() as u32, 0));
+                        self.asm.push(Asm::NATIVE(index as u64));
+                        if **return_type != TType::Void {
+                            self.asm.push(Asm::RET(true));
+                        } else {
+                            self.asm.push(Asm::RET(false));
+                        }
+                        self.asm.push(Asm::LABEL(jump));
+                        self.asm.push(Asm::STOREGLOBAL(w_index as u32));
+                    }
+                    _ => {
+                        todo!("not implemented");
+                    }
+                }
+            } else {
+                // dbg!(native);
+                // todo!( "not implemented" );
+            }
+        }
+    }
+
     #[inline(always)]
     pub fn compile_program(
         &mut self,
@@ -57,6 +120,8 @@ impl Compiler {
         function: bool,
     ) -> Result<Vec<Asm>, NovaError> {
         self.filepath = filepath;
+        // create wrapper functions for builtin functions
+        //dbg!(&self.native_functions);
 
         for statements in input.program.iter() {
             match statements {
@@ -1456,6 +1521,11 @@ impl Compiler {
                     self.asm.push(Asm::GET(index as u32));
                 } else if let Some(index) = self.global.get_index(identifier.to_string()) {
                     self.asm.push(Asm::GETGLOBAL(index as u32));
+                } else {
+                    return Err(NovaError::Compiler {
+                        msg: format!("Identifier \"{}\" not found", identifier),
+                        note: "Identifier could not be loaded".to_string(),
+                    });
                 }
             }
             Atom::Float { value: float } => {
@@ -1470,7 +1540,7 @@ impl Compiler {
             Atom::Call {
                 name: caller,
                 arguments: list,
-                position,
+                ..
             } => {
                 match caller.as_str() {
                     "typeof" => {
@@ -1483,14 +1553,14 @@ impl Compiler {
                     self.compile_expr(expr.clone())?;
                 }
                 match caller.as_str() {
-                    "println" => {
-                        self.asm.push(Asm::PRINT);
-                        self.asm.push(Asm::STRING("\n".to_string()));
-                        self.asm.push(Asm::PRINT);
-                    }
-                    "print" => {
-                        self.asm.push(Asm::PRINT);
-                    }
+                    // "println" => {
+                    //     self.asm.push(Asm::PRINT);
+                    //     self.asm.push(Asm::STRING("\n".to_string()));
+                    //     self.asm.push(Asm::PRINT);
+                    // }
+                    // "print" => {
+                    //     self.asm.push(Asm::PRINT);
+                    // }
                     "None" => self.asm.push(Asm::NONE),
                     "Option::unwrap" => self.asm.push(Asm::UNWRAP),
                     "Some" => {}
@@ -1498,8 +1568,9 @@ impl Compiler {
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
-                    "error" => self.asm.push(Asm::ERROR(position)),
+                    //"error" => self.asm.push(Asm::ERROR(position)),
                     identifier => {
+                        //dbg!(identifier);
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
                         {
                             self.asm.push(Asm::NATIVE(index as u64));
@@ -1510,9 +1581,10 @@ impl Compiler {
                         } else if let Some(index) = self.global.get_index(identifier.to_string()) {
                             self.asm.push(Asm::DCALL(index as u32));
                         } else {
-                            dbg!(&self.variables);
-                            dbg!(identifier);
-                            todo!()
+                            return Err(NovaError::Compiler {
+                                msg: format!("Function \"{}\" not found", identifier),
+                                note: "Function could not be loaded".to_string(),
+                            });
                         }
                     }
                 }
