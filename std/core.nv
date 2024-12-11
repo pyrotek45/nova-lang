@@ -115,6 +115,8 @@ fn extends pow(self: Int, other: Int) -> Int {
     return result
 }
 
+// approximation method to calculate square root
+// sorry if it's not 100% accurate
 fn extends sqrt(self: Float) -> Float {
     let x = Cast::float(self).unwrap()
     let y = (x + 1.0) / 2.0
