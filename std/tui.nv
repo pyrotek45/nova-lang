@@ -37,10 +37,10 @@ fn extends show(self: SceneManager($T)) {
         let op = []: Option($T)
         terminal::clearScreen()
 
-        for (scene in self.scenes) {
+        for scene in self.scenes {
             if self.currentScene == scene.name {
                 println(scene::screen(self.state))
-                for (option in scene.options) {
+                for option in scene.options {
                     println(Cast::string(index) + " :" + option.name)
                     op.push(option)
                     index += 1

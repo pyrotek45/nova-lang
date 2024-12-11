@@ -135,7 +135,7 @@ fn extends toStep(start: Int, end: Int, step: Int) -> [Int] {
 
 fn extends to(self: Int, end: Int) -> [Int] {
     let result = []: Int
-    for i <- self; i <= end; i += 1 {
+    for i <- self; i < end; i += 1 {
         result.push(i)
     }
     return result

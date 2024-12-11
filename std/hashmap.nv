@@ -16,9 +16,9 @@ fn  extends(HashMap) default() -> HashMap($K,$V) {
 }
 
 fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
-    for (key in self.keys) {
+    for key in self.keys {
         if key == k {
-            self.values[List::index_of(self.keys, key)] = v;
+            self.values[List::indexOf(self.keys, key)] = v;
             return;
         }
     }
@@ -27,16 +27,16 @@ fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
 }
 
 fn extends get(self: HashMap($K,$V), k: $K) -> ?$V {
-    for (key in self.keys) {
+    for key in self.keys {
         if key == k {
-            return self.values[List::index_of(self.keys, key)];
+            return self.values[List::indexOf(self.keys, key)];
         }
     }
     return ?$V
 }
 
 fn extends delete(self: HashMap($K,$V), k: $K) {
-    let index = List::index_of(self.keys, k)
+    let index = List::indexOf(self.keys, k)
     if index != -1 {
         self.keys = List::remove(self.keys, index)
         self.values = List::remove(self.values, index)
@@ -48,7 +48,7 @@ fn extends show(self: HashMap($K,$V)) {
         println("Empty HashMap")
     } else {
         for i <- 0; i < self.keys.len(); i += 1 {
-            println(toStr(self.keys[i] )+ " -> " + toStr(self.values[i]))
+            println(Cast::string(self.keys[i] )+ " -> " + Cast::string(self.values[i]))
         }
     }
 }
