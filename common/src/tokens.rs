@@ -39,6 +39,8 @@ pub enum Operator {
     // special operators
     RightTilde,
     LeftTilde,
+    InclusiveRange,
+    ExclusiveRange,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum KeyWord {

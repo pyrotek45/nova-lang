@@ -653,6 +653,84 @@ impl Compiler {
                     }
                     self.asm.push(Asm::LABEL(end));
                 }
+                common::nodes::Statement::ForRange {
+                    identifier,
+                    start: start_expr,
+                    end: end_expr,
+                    inclusive,
+                    step,
+                    body,
+                } => {
+                    let top = self.gen.generate();
+                    let end = self.gen.generate();
+                    let next = self.gen.generate();
+
+                    self.breaks.push(end);
+                    self.continues.push(next);
+
+                    // start of range
+                    self.compile_expr(start_expr.clone())?;
+                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::STORE(index as u32))
+                    } else {
+                        self.variables.insert(identifier.to_string());
+                        let index = self.variables.len() - 1;
+                        self.asm.push(Asm::STORE(index as u32))
+                    }
+
+                    // top of loop
+                    self.asm.push(Asm::LABEL(top));
+                    // test if we are at the end
+                    self.compile_expr(end_expr.clone())?;
+                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::GET(index as u32))
+                    }
+                    // todo inclusive
+                    if *inclusive {
+                        self.asm.push(Asm::IGTR);
+                    } else {
+                        let sc = self.gen.generate();
+                        self.asm.push(Asm::IGTR);
+                        self.asm.push(Asm::DUP);
+                        self.asm.push(Asm::NOT);
+                        self.asm.push(Asm::JUMPIFFALSE(sc));
+                        self.asm.push(Asm::POP);
+                        self.compile_expr(end_expr.clone())?;
+                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                            self.asm.push(Asm::GET(index as u32))
+                        }
+                        self.asm.push(Asm::EQUALS);
+                        self.asm.push(Asm::LABEL(sc))
+                    }
+                    
+                    self.asm.push(Asm::JUMPIFFALSE(end));
+
+                    let whilebody = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
+                    self.asm.pop();
+
+                    self.asm.push(Asm::LABEL(next));
+                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::GET(index as u32))
+                    }
+                    if let Some(step) = step {
+                        self.compile_expr(step.clone())?;
+                        self.asm.push(Asm::IADD);
+                    } else {
+                        self.asm.push(Asm::INTEGER(1));
+                        self.asm.push(Asm::IADD);
+                    }
+                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::STORE(index as u32))
+                    }
+                    self.asm.push(Asm::BJMP(top));
+                    self.asm.push(Asm::LABEL(end));
+                    
+                    self.breaks.pop();
+                    self.continues.pop();
+                }
             }
         }
 
@@ -1092,6 +1170,8 @@ impl Compiler {
                     common::tokens::Operator::LeftArrow => todo!(),
                     common::tokens::Operator::RightTilde => todo!(),
                     common::tokens::Operator::LeftTilde => todo!(),
+                    common::tokens::Operator::InclusiveRange => todo!(),
+                    common::tokens::Operator::ExclusiveRange => todo!(),
                 }
                 Ok(())
             }

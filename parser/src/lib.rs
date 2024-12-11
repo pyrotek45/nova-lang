@@ -3883,26 +3883,86 @@ impl Parser {
             self.consume_keyword(KeyWord::In)?;
             let arraypos = self.get_current_token_position();
             let array = self.expr()?;
+            //dbg!(self.current_token());
+            // check for inclusiverange operator
+            match self.current_token() {
+                Token::Operator {
+                    operator: Operator::InclusiveRange,
+                    ..
+                } => {
+                    let start_range = array;
+                    self.consume_operator(Operator::InclusiveRange)?;
+                    let end_range = self.expr()?;
+                    self.environment.push_block();
+                    self.environment.insert_symbol(
+                        &identifier,
+                        TType::Int,
+                        Some(pos),
+                        SymbolKind::Variable,
+                    );
+                    let body = self.block()?;
+                    self.environment.pop_block();
+                    Ok(Some(Statement::ForRange {
+                        identifier,
+                        body,
+                        start: start_range,
+                        end: end_range,
+                        inclusive: true,
+                        step: None,
+                    }))
+                }
+                Token::Operator {
+                    operator: Operator::ExclusiveRange,
+                    ..
+                } => {
+                    let start_range = array;
+                    self.consume_operator(Operator::ExclusiveRange)?;
+                    let end_range = self.expr()?;
+                    self.environment.push_block();
+                    self.environment.insert_symbol(
+                        &identifier,
+                        TType::Int,
+                        Some(pos),
+                        SymbolKind::Variable,
+                    );
+                    let body = self.block()?;
+                    self.environment.pop_block();
+                    Ok(Some(Statement::ForRange {
+                        identifier,
+                        body,
+                        start: start_range,
+                        end: end_range,
+                        inclusive: false,
+                        step: None,
+                    }))
+                }
+                _ => {
+                    self.environment.push_block();
+                    // check if array has type array and then assign identifier to that type
+                    if let TType::List { inner } = array.get_type() {
+                        self.environment.insert_symbol(
+                            &identifier,
+                            *inner,
+                            Some(pos),
+                            SymbolKind::Variable,
+                        )
+                    } else {
+                        return Err(self.generate_error_with_pos(
+                            format!("foreach can only iterate over arrays"),
+                            format!("got {}", array.get_type().to_string()),
+                            arraypos.clone(),
+                        ));
+                    }
+                    let body = self.block()?;
+                    self.environment.pop_block();
 
-            self.environment.push_block();
-            // check if array has type array and then assign identifier to that type
-            if let TType::List { inner } = array.get_type() {
-                self.environment
-                    .insert_symbol(&identifier, *inner, Some(pos), SymbolKind::Variable)
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("foreach can only iterate over arrays"),
-                    format!("got {}", array.get_type().to_string()),
-                    arraypos.clone(),
-                ));
+                    Ok(Some(Statement::Foreach {
+                        identifier,
+                        expr: array,
+                        body,
+                    }))
+                }
             }
-            let body = self.block()?;
-            self.environment.pop_block();
-            Ok(Some(Statement::Foreach {
-                identifier,
-                expr: array,
-                body,
-            }))
         } else {
             // Handle regular for statement
             let init = self.expr()?;
