@@ -115,6 +115,22 @@ fn extends pow(self: Int, other: Int) -> Int {
     return result
 }
 
+fn extends sqrt(self: Float) -> Float {
+    let x = Cast::float(self).unwrap()
+    let y = (x + 1.0) / 2.0
+
+    while y < x {
+        x = y
+        y = (x + Cast::float(self).unwrap() / x) / 2.0
+    }
+
+    return x
+}
+
+fn extends sqrt(self: Int) -> Float {
+    return Cast::float().unwrap().sqrt()
+}
+
 // basic list functions
 
 fn extends iota(n: Int) -> [Int] {

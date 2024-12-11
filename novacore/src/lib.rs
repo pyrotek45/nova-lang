@@ -164,6 +164,17 @@ impl NovaCore {
             native::str::to_string,
         );
         self.add_function(
+            "Cast::float",
+            TType::Function {
+                parameters: vec![TType::Any],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Float),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::float::int_to_float,
+        );
+        self.add_function(
             "List::len",
             TType::Function {
                 parameters: vec![TType::List {
