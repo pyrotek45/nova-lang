@@ -3333,6 +3333,7 @@ impl Parser {
         };
         let tokens = Lexer::new(&resolved_filepath)?.tokenize()?;
         let mut parser = self.clone();
+        parser.repl = false;
         parser.index = 0;
         parser.filepath = resolved_filepath.clone();
         parser.input = tokens;

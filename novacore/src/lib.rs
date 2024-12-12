@@ -409,6 +409,7 @@ impl NovaCore {
 
         self.parser = parser::default();
         self.parser.repl = true;
+        self.initnova();
         self.parser.input = self.lexer.tokenize()?;
         self.parser.parse()?;
 
