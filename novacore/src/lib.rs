@@ -416,6 +416,7 @@ impl NovaCore {
         let filepath = self.filepath.clone();
 
         self.compiler = compiler::new();
+        self.initnova();
         self.compiler.init();
         let asm = self
             .compiler
@@ -426,6 +427,7 @@ impl NovaCore {
         self.assembler.assemble();
 
         self.vm = vm::new();
+        self.initnova();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
 
