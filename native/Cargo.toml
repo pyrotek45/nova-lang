@@ -10,3 +10,4 @@ crossterm = "0.27.0"
 common = { path = "../common" }
 vm = { path = "../vm"}
 rand = "0.8.5"
+regex = "1.11.1"

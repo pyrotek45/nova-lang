@@ -702,7 +702,7 @@ impl Compiler {
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::LABEL(sc))
                     }
-                    
+
                     self.asm.push(Asm::JUMPIFFALSE(end));
 
                     let whilebody = Ast {
@@ -727,7 +727,7 @@ impl Compiler {
                     }
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
-                    
+
                     self.breaks.pop();
                     self.continues.pop();
                 }
@@ -1303,10 +1303,7 @@ impl Compiler {
                 let next = self.gen.generate();
 
                 let negitive_start = self.gen.generate();
-                let negitive_start_end = self.gen.generate();
-
                 let negitive_end = self.gen.generate();
-                let negitive_end_end = self.gen.generate();
 
                 self.breaks.push(end);
                 self.continues.push(next);
@@ -1342,6 +1339,7 @@ impl Compiler {
                     self.asm.push(Asm::INTEGER(0));
                     self.asm.push(Asm::ILSS);
                     self.asm.push(Asm::JUMPIFFALSE(negitive_start));
+
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
                         self.asm.push(Asm::NATIVE(index as u64))
@@ -1349,10 +1347,7 @@ impl Compiler {
                         todo!()
                     }
                     self.asm.push(Asm::IADD);
-                    self.asm.push(Asm::JMP(negitive_start_end));
                     self.asm.push(Asm::LABEL(negitive_start));
-                    self.asm.push(Asm::POP);
-                    self.asm.push(Asm::LABEL(negitive_start_end));
                 } else {
                     self.asm.push(Asm::INTEGER(0));
                 }
@@ -1403,10 +1398,7 @@ impl Compiler {
                         todo!()
                     }
                     self.asm.push(Asm::IADD);
-                    self.asm.push(Asm::JMP(negitive_end_end));
                     self.asm.push(Asm::LABEL(negitive_end));
-                    self.asm.push(Asm::POP);
-                    self.asm.push(Asm::LABEL(negitive_end_end));
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::IGTR);
