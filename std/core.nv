@@ -84,55 +84,6 @@ fn extends toResult(self: ?$A, err: $B) -> Result($A, $B) {
     return Result::Err(err)
 }
 
-// math functions
-
-fn extends min(self: Int, other: Int) -> Int {
-    if self < other {
-        return self
-    }
-    return other
-}
-
-fn extends max(self: Int, other: Int) -> Int {
-    if self > other {
-        return self
-    }
-    return other
-}
-
-fn extends abs(self: Int) -> Int {
-    if self < 0 {
-        return -self
-    }
-    return self
-}
-
-fn extends pow(self: Int, other: Int) -> Int {
-    let result = 1
-    for i <- 0; i < other; i += 1 {
-        result = result * self
-    }
-    return result
-}
-
-// approximation method to calculate square root
-// sorry if it's not 100% accurate
-fn extends sqrt(self: Float) -> Float {
-    let x = Cast::float(self).unwrap()
-    let y = (x + 1.0) / 2.0
-
-    while y < x {
-        x = y
-        y = (x + Cast::float(self).unwrap() / x) / 2.0
-    }
-
-    return x
-}
-
-fn extends sqrt(self: Int) -> Float {
-    return Cast::float().unwrap().sqrt()
-}
-
 // basic list functions
 
 fn extends iota(n: Int) -> [Int] {
@@ -171,26 +122,4 @@ fn range(start: Int, end: Int) -> [Int] {
 
 fn range(end: Int) -> [Int] {
     return range(0, end)
-}
-
-fn bin(n: Int) -> String {
-    if n < 0 {
-        return "-" + bin(-n)
-    }
-    let result = ""
-    let i = n
-    while i > 0 {
-        result = Cast::string(i % 2) + result
-        i = i / 2
-    }
-    return result
-}
-
-fn divmod(n: Int, d: Int) -> #(Int, Int) {
-    return #(n / d, n % d)
-}
-
-fn round(n: Float) -> Int {
-    // since its a Float, should be safe to cast
-    return Cast::int(n + 0.5).unwrap()
 }
