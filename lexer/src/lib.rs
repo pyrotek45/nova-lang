@@ -5,7 +5,7 @@ use common::{
     ttype::TType,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum LexerState {
     Token,
     Char,
@@ -15,18 +15,19 @@ enum LexerState {
     StringLiteral,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexer {
     line: usize,
     row: usize,
     filepath: String,
-    source_file: String,
+    pub source_file: String,
     token_list: TokenList,
     buffer: String,
     state: LexerState,
     string_start_position: Vec<usize>,
     char_start_position: Vec<usize>,
     literal_pound_count: Vec<usize>,
+    pub repl: bool,
 }
 
 impl Default for Lexer {
@@ -42,6 +43,7 @@ impl Default for Lexer {
             string_start_position: vec![],
             char_start_position: vec![],
             literal_pound_count: vec![],
+            repl: false,
         }
     }
 }
@@ -63,6 +65,7 @@ impl Lexer {
             string_start_position: vec![],
             char_start_position: vec![],
             literal_pound_count: vec![],
+            repl: false,
         })
     }
 
@@ -202,7 +205,7 @@ impl Lexer {
                             .current_position_buffer_row(self.row - self.buffer.chars().count()),
                     })
                 }
-                a => {
+                _ => {
                     //dbg!(a);
                     return Some(Token::Identifier {
                         name: self.buffer.to_string(),
@@ -223,13 +226,15 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self) -> Result<TokenList, NovaError> {
-        if self.filepath.is_empty() {
-            // Consider making the error take a Position struct
-            return Err(NovaError::Lexing {
-                msg: String::from("File is missing"),
-                note: String::from("Check the files location was typed correctly"),
-                position: self.current_position(),
-            });
+        if !self.repl {
+            if self.filepath.is_empty() {
+                // Consider making the error take a Position struct
+                return Err(NovaError::Lexing {
+                    msg: String::from("File is missing"),
+                    note: String::from("Check the files location was typed correctly"),
+                    position: self.current_position(),
+                });
+            }
         }
 
         let tempstr = self.source_file.clone();

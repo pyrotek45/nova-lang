@@ -10,8 +10,9 @@ use optimizer::Optimizer;
 use parser::Parser;
 use vm::{state::State, Vm};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NovaCore {
+    current_repl: String,
     filepath: String,
     lexer: Lexer,
     parser: Parser,
@@ -22,6 +23,20 @@ pub struct NovaCore {
 }
 
 impl NovaCore {
+    pub fn repl() -> NovaCore {
+        let nova = NovaCore {
+            filepath: "repl".to_string(),
+            lexer: Lexer::default(),
+            parser: parser::default(),
+            compiler: compiler::new(),
+            _optimizer: optimizer::new(),
+            assembler: assembler::new_empty(),
+            vm: vm::new(),
+            current_repl: "".to_string(),
+        };
+        nova
+    }
+
     pub fn new(filepath: &str) -> Result<NovaCore, NovaError> {
         Ok(NovaCore {
             filepath: filepath.to_string(),
@@ -31,6 +46,7 @@ impl NovaCore {
             _optimizer: optimizer::new(),
             assembler: assembler::new_empty(),
             vm: vm::new(),
+            current_repl: String::new(),
         })
     }
 
@@ -378,6 +394,47 @@ impl NovaCore {
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
+        Ok(())
+    }
+
+    pub fn run_line(&mut self, line: &str) -> Result<(), NovaError> {
+        let oldrepl = self.current_repl.clone();
+
+        self.current_repl.push_str(line);
+        self.initnova();
+
+        self.lexer = Lexer::default();
+        self.lexer.source_file = self.current_repl.clone();
+        self.lexer.repl = true;
+
+        self.parser = parser::default();
+        self.parser.repl = true;
+        self.parser.input = self.lexer.tokenize()?;
+        self.parser.parse()?;
+
+        let ast = self.parser.ast.clone();
+        let filepath = self.filepath.clone();
+
+        self.compiler = compiler::new();
+        self.compiler.init();
+        let asm = self
+            .compiler
+            .compile_program(ast, filepath, true, true, false)?;
+
+        self.assembler = assembler::new_empty();
+        self.assembler.input = asm;
+        self.assembler.assemble();
+
+        self.vm = vm::new();
+        self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
+        self.vm.state.program = self.assembler.output.clone();
+
+        self.vm.run()?;
+
+        if line.contains("println") || line.contains("print") {
+            self.current_repl = oldrepl;
+        }
+
         Ok(())
     }
 

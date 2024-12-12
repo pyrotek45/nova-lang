@@ -1,5 +1,5 @@
 use common::code::Asm;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Optimizer {
     pub optimizations: usize,
 }

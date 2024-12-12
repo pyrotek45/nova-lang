@@ -27,9 +27,36 @@ pub struct Parser {
     pub ast: Ast,
     pub environment: Environment,
     pub modules: table::Table<String>,
+    pub repl: bool,
+}
+
+pub fn default() -> Parser {
+    let env = create_environment();
+    Parser {
+        filepath: String::new(),
+        ast: Ast { program: vec![] },
+        input: vec![],
+        index: 0,
+        environment: env,
+        modules: table::new(),
+        repl: false,
+    }
 }
 
 pub fn new(filepath: &str) -> Parser {
+    let env = create_environment();
+    Parser {
+        filepath: filepath.to_string(),
+        ast: Ast { program: vec![] },
+        input: vec![],
+        index: 0,
+        environment: env,
+        modules: table::new(),
+        repl: false,
+    }
+}
+
+fn create_environment() -> Environment {
     let mut env = new_environment();
     env.insert_symbol(
         "error",
@@ -141,15 +168,7 @@ pub fn new(filepath: &str) -> Parser {
         None,
         SymbolKind::GenericFunction,
     );
-
-    Parser {
-        filepath: filepath.to_string(),
-        ast: Ast { program: vec![] },
-        input: vec![],
-        index: 0,
-        environment: env,
-        modules: table::new(),
-    }
+    env
 }
 
 impl Parser {
@@ -4756,21 +4775,26 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<(), NovaError> {
-        if self.current_token().is_id("module") {
-            self.consume_identifier(Some("module"))?;
-            let (module_name, _) = self.get_identifier()?;
-            //dbg!(module_name.clone());
-            if self.modules.has(&module_name) {
-                return Ok(());
-            }
-            self.modules.insert(module_name);
+        // if repl mode no need to parse module
+        if self.repl {
+            self.ast.program = self.compound_statement()?;
+            return self.eof();
         } else {
-            return Err(self.generate_error(
-                "Expected module declaration".to_string(),
-                "Module declaration must be the first statement".to_string(),
-            ));
+            if self.current_token().is_id("module") {
+                self.consume_identifier(Some("module"))?;
+                let (module_name, _) = self.get_identifier()?;
+                if self.modules.has(&module_name) {
+                    return Ok(());
+                }
+                self.modules.insert(module_name);
+            } else {
+                return Err(self.generate_error(
+                    "Expected module declaration".to_string(),
+                    "Module declaration must be the first statement".to_string(),
+                ));
+            }
+            self.ast.program = self.compound_statement()?;
+            return self.eof();
         }
-        self.ast.program = self.compound_statement()?;
-        self.eof()
     }
 }
