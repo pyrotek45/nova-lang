@@ -90,9 +90,32 @@ impl NovaCore {
 
         self.parser.modules.insert("terminal".to_string());
         self.parser.modules.insert("Cast".to_string());
+        self.parser.modules.insert("Regex".to_string());
     }
 
     fn initnova(&mut self) {
+        // add regex captures function, takes two strings and returns a list of strings
+        self.add_function(
+            "Regex::captures",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::regex::regex_captures,
+        );
+        // add regex match, takes two strings and returns a bool
+        self.add_function(
+            "Regex::matches",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::regex::regex_match,
+        );
         // add printf function
         self.add_function(
             "printf",

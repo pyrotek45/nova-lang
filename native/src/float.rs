@@ -1,5 +1,5 @@
-use vm::state::Heap;
 use common::error::NovaError;
+use vm::state::Heap;
 use vm::state::{self, VmData};
 
 pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {

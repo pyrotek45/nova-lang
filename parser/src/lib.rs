@@ -4759,6 +4759,7 @@ impl Parser {
         if self.current_token().is_id("module") {
             self.consume_identifier(Some("module"))?;
             let (module_name, _) = self.get_identifier()?;
+            //dbg!(module_name.clone());
             if self.modules.has(&module_name) {
                 return Ok(());
             }

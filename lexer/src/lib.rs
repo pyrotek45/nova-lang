@@ -12,6 +12,7 @@ enum LexerState {
     String,
     Comment,
     Float,
+    StringLiteral,
 }
 
 #[derive(Debug)]
@@ -25,6 +26,7 @@ pub struct Lexer {
     state: LexerState,
     string_start_position: Vec<usize>,
     char_start_position: Vec<usize>,
+    literal_pound_count: Vec<usize>,
 }
 
 impl Default for Lexer {
@@ -39,6 +41,7 @@ impl Default for Lexer {
             state: LexerState::Token,
             string_start_position: vec![],
             char_start_position: vec![],
+            literal_pound_count: vec![],
         }
     }
 }
@@ -59,6 +62,7 @@ impl Lexer {
             state: LexerState::Token,
             string_start_position: vec![],
             char_start_position: vec![],
+            literal_pound_count: vec![],
         })
     }
 
@@ -198,12 +202,13 @@ impl Lexer {
                             .current_position_buffer_row(self.row - self.buffer.chars().count()),
                     })
                 }
-                _ => {
+                a => {
+                    //dbg!(a);
                     return Some(Token::Identifier {
                         name: self.buffer.to_string(),
                         position: self
                             .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
+                    });
                 }
             }
         }
@@ -231,6 +236,48 @@ impl Lexer {
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
+            // check for r and if so check for " and then parse for string literal
+            if self.state == LexerState::StringLiteral {
+                if c != '"' {
+                    if c == '\n' {
+                        self.line += 1;
+                        self.row = 1;
+                    } else {
+                        self.row += 1;
+                    }
+                    self.buffer.push(c);
+                    continue;
+                } else {
+                    // need to be able to recover if the string literal is not closed with the same number of pound signs
+                    let mut current_iter = chars.clone();
+                    if let Some(pound_count) = self.literal_pound_count.last().cloned() {
+                        let mut pound_count2 = 0;
+                        while let Some('#') = current_iter.peek() {
+                            current_iter.next();
+                            pound_count2 += 1;
+                        }
+                        if pound_count == pound_count2 {
+                            self.state = LexerState::Token;
+                            //dbg!("String Literal End");
+                            let string_start = self.string_start_position.pop().unwrap();
+                            self.token_list.push(Token::String {
+                                value: self.buffer.clone(),
+                                position: self.current_position_buffer_row(string_start),
+                            });
+                            self.literal_pound_count.pop();
+                            self.row += 1;
+                            self.buffer.clear();
+                            chars = current_iter;
+                            continue;
+                        } else {
+                            self.row += 1;
+                            self.buffer.push(c);
+                            continue;
+                        }
+                    }
+                }
+            }
+
             if self.state == LexerState::Comment {
                 if c != '\n' {
                     self.row += 1;
@@ -457,6 +504,33 @@ impl Lexer {
                     }
                 }
                 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
+                    // Check for raw strings
+                    if c == 'r' {
+                        // Check for pound signs and count them, then check for "
+                        let mut pound_count = 0;
+                        while let Some('#') = chars.peek() {
+                            chars.next();
+                            pound_count += 1;
+                        }
+                        if let Some(&'"') = chars.peek() {
+                            chars.next();
+                            self.literal_pound_count.push(pound_count);
+                            self.state = LexerState::StringLiteral;
+                            self.check_token();
+                            self.string_start_position.push(self.row);
+                            continue;
+                        } else {
+                            // If not a raw string, push 'r' and any pound signs to the buffer
+                            self.row += 1;
+                            self.buffer.push(c);
+                            for _ in 0..pound_count {
+                                self.row += 1;
+                                self.buffer.push('#');
+                            }
+                            continue;
+                        }
+                    }
+                    // If not 'r', push the character to the buffer
                     self.buffer.push(c);
                 }
                 ' ' => self.check_token(),
@@ -663,6 +737,25 @@ impl Lexer {
                 _ => {}
             }
             self.row += 1;
+        }
+
+        // check state and throw error if not token
+        match self.state {
+            LexerState::String => {
+                return Err(NovaError::Lexing {
+                    msg: String::from("Expecting valid string"),
+                    note: String::from(format!("? {}", self.buffer)),
+                    position: self.current_position(),
+                });
+            }
+            LexerState::StringLiteral => {
+                return Err(NovaError::Lexing {
+                    msg: String::from("Expecting valid string literal"),
+                    note: String::from(""),
+                    position: self.current_position(),
+                });
+            }
+            _ => {}
         }
 
         self.check_token();

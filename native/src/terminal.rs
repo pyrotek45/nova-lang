@@ -83,9 +83,8 @@ pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaEr
         state.stack.push(VmData::None);
     } else {
         let index = state.allocate_array(myarray);
-        state.gclock = false;
         state.stack.push(VmData::List(index));
     }
-
+    state.gclock = false;
     Ok(())
 }
