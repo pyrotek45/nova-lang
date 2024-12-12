@@ -70,6 +70,14 @@ fn entry_command() -> Option<()> {
                                     println!("Goodbye!");
                                     exit(0);
                                 }
+                                "clear" => {
+                                    line_editor.clear_screen().unwrap();
+                                    continue;
+                                }
+                                "new" => {
+                                    novarepl = NovaCore::repl();
+                                    continue;
+                                }
                                 "help" => {
                                     print_help();
                                     continue;
