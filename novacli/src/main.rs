@@ -1,5 +1,6 @@
 use common::error::NovaError;
 use novacore::NovaCore;
+use reedline::DefaultValidator;
 use std::{
     io::{self, Write},
     process::exit,
@@ -53,7 +54,9 @@ fn entry_command() -> Option<()> {
             loop {
                 use reedline::{DefaultPrompt, Reedline, Signal};
 
-                let mut line_editor = Reedline::create();
+                let validator = Box::new(DefaultValidator);
+
+                let mut line_editor = Reedline::create().with_validator(validator);
                 let prompt = DefaultPrompt::default();
 
                 loop {
