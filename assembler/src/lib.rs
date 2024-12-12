@@ -6,7 +6,7 @@ use common::{
     fileposition::FilePosition,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Assembler {
     pub runtime_error_table: HashMap<usize, FilePosition>,
     pub input: Vec<Asm>,

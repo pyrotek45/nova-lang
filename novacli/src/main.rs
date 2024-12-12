@@ -1,6 +1,9 @@
 use common::error::NovaError;
 use novacore::NovaCore;
-use std::process::exit;
+use std::{
+    io::{self, Write},
+    process::exit,
+};
 
 fn main() {
     if entry_command().is_none() {
@@ -45,6 +48,57 @@ fn entry_command() -> Option<()> {
             handle_error(novacore.check());
             println!("OK | Compile time: {}ms", start_time.elapsed().as_millis());
         }
+        "repl" => {
+            let mut novarepl = NovaCore::repl(); // Assuming NovaRepl is defined elsewhere
+            loop {
+                use reedline::{DefaultPrompt, Reedline, Signal};
+
+                let mut line_editor = Reedline::create();
+                let prompt = DefaultPrompt::default();
+
+                loop {
+                    let sig = line_editor.read_line(&prompt);
+                    match sig {
+                        Ok(Signal::Success(mut line)) => {
+                            io::stdout().flush().unwrap();
+                            //dbg!(line.clone());
+                            match line.as_str() {
+                                "exit" => {
+                                    println!("Goodbye!");
+                                    exit(0);
+                                }
+                                "help" => {
+                                    print_help();
+                                    continue;
+                                }
+                                _ => {}
+                            }
+
+                            if line.is_empty() {
+                                continue;
+                            }
+                            line.push('\n');
+                            // make a copy of the current repl and reload on error
+                            let last_save = novarepl.clone();
+                            match novarepl.run_line(&line) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    e.show();
+                                    novarepl = last_save
+                                }
+                            }
+                        }
+                        Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
+                            println!("Goodbye!");
+                            exit(0);
+                        }
+                        x => {
+                            println!("Event: {:?}", x);
+                        }
+                    }
+                }
+            }
+        }
         _ => print_help(),
     }
 
@@ -71,3 +125,5 @@ fn compile_file_or_exit(file: &str) -> NovaCore {
         }
     }
 }
+
+// repl code
