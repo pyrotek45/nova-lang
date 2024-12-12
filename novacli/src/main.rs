@@ -1,10 +1,12 @@
 use common::error::NovaError;
 use novacore::NovaCore;
-use reedline::DefaultValidator;
+use reedline::{DefaultPromptSegment, DefaultValidator};
 use std::{
     io::{self, Write},
+    os::linux::raw::stat,
     process::exit,
 };
+use vm::state;
 
 fn main() {
     if entry_command().is_none() {
@@ -57,7 +59,12 @@ fn entry_command() -> Option<()> {
                 let validator = Box::new(DefaultValidator);
 
                 let mut line_editor = Reedline::create().with_validator(validator);
-                let prompt = DefaultPrompt::default();
+                let mut prompt = DefaultPrompt::default();
+                let mut states = vec![novarepl.clone()];
+                prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                    "Session: {}  $",
+                    states.len().to_string()
+                ));
 
                 loop {
                     let sig = line_editor.read_line(&prompt);
@@ -75,14 +82,37 @@ fn entry_command() -> Option<()> {
                                     continue;
                                 }
                                 "new" => {
+                                    states.clear();
                                     novarepl = NovaCore::repl();
+                                    states.push(novarepl.clone());
+                                    prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                        "Session: {}  $",
+                                        states.len().to_string()
+                                    ));
                                     continue;
                                 }
                                 "help" => {
                                     print_help();
                                     continue;
                                 }
-                                _ => {}
+                                pline => {
+                                    if pline.starts_with("session") {
+                                        let session =
+                                            pline.split_whitespace().collect::<Vec<&str>>()[1]
+                                                .parse::<usize>()
+                                                .unwrap();
+                                        if session < states.len() {
+                                            novarepl = states[session].clone();
+                                            states.truncate(session + 1);
+                                            prompt.left_prompt = DefaultPromptSegment::Basic(
+                                                format!("Session: {}  $", states.len().to_string()),
+                                            );
+                                        } else {
+                                            println!("Session not found");
+                                        }
+                                        continue;
+                                    }
+                                }
                             }
 
                             if line.is_empty() {
@@ -90,14 +120,23 @@ fn entry_command() -> Option<()> {
                             }
                             line.push('\n');
                             // make a copy of the current repl and reload on error
+
                             let last_save = novarepl.clone();
                             match novarepl.run_line(&line) {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                    if !(line.contains("println") || line.contains("print")) {
+                                        states.push(novarepl.clone());
+                                    }
+                                }
                                 Err(e) => {
                                     e.show();
                                     novarepl = last_save
                                 }
                             }
+                            prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                "Session: {}  $",
+                                states.len().to_string()
+                            ));
                         }
                         Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
                             println!("Goodbye!");
@@ -125,6 +164,7 @@ fn print_help() {
     println!("\tcheck [file]  // check if the file compiles");
     println!("\tdis   [file]  // disassemble the file");
     println!("\thelp          // displays this menu");
+    println!("\trepl          // starts the repl");
 }
 
 fn compile_file_or_exit(file: &str) -> NovaCore {
