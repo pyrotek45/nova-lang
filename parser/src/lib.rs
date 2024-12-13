@@ -3159,11 +3159,15 @@ impl Parser {
                         type_params: type_annotation,
                     })
                 } else {
-                    return Err(self.generate_error_with_pos(
-                        "Expected type annotation".to_string(),
-                        format!("Unknown type '{identifier}' "),
-                        pos,
-                    ));
+                    if let Some(alias) = self.environment.type_alias.get(&identifier) {
+                        return Ok(alias.clone());
+                    } else {
+                        return Err(self.generate_error_with_pos(
+                            "Unknown type".to_string(),
+                            format!("Unknown type '{identifier}' "),
+                            pos,
+                        ));
+                    }
                 }
             }
             _ => {
@@ -3574,11 +3578,30 @@ impl Parser {
         }))
     }
 
+    // new statement for making type aliases
+    // alias identifer = <type>
+    fn type_alias(&mut self) -> Result<Option<Statement>, NovaError> {
+        self.consume_identifier(Some("alias"))?;
+        let (alias, _) = self.get_identifier()?;
+        if let Some(_) = self.environment.custom_types.get(&alias) {
+            return Err(self.generate_error_with_pos(
+                format!("type '{}' already defined", alias),
+                format!("try using another name"),
+                self.get_current_token_position(),
+            ));
+        }
+        self.consume_operator(Operator::Assignment)?;
+        let ttype = self.ttype()?;
+        self.environment.type_alias.insert(alias, ttype.clone());
+        Ok(None)
+    }
+
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         match self.current_token() {
             Token::Identifier { name: id, .. } => match id.as_str() {
                 "match" => self.match_statement(),
-                "unwrap" => self.unwrap(),
+                //"unwrap" => self.unwrap(), depricated
+                "alias" => self.type_alias(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),

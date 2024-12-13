@@ -12,7 +12,7 @@ use vm::{state::State, Vm};
 
 #[derive(Debug, Clone)]
 pub struct NovaCore {
-    current_repl: String,
+    pub current_repl: String,
     filepath: String,
     lexer: Lexer,
     parser: Parser,
@@ -326,7 +326,7 @@ impl NovaCore {
                 return_type: Box::new(TType::Int),
             },
             common::nodes::SymbolKind::Function,
-            native::rand::random_int,
+            native::random::random_int,
         );
         self.add_function(
             "String::len",
@@ -397,7 +397,7 @@ impl NovaCore {
         Ok(())
     }
 
-    pub fn run_line(&mut self, line: &str) -> Result<(), NovaError> {
+    pub fn run_line(&mut self, line: &str, store: bool) -> Result<(), NovaError> {
         let oldrepl = self.current_repl.clone();
 
         self.current_repl.push_str(line);
@@ -433,10 +433,12 @@ impl NovaCore {
         self.vm.state.program = self.assembler.output.clone();
 
         self.vm.run()?;
-
-        if line.contains("println") || line.contains("print") {
-            self.current_repl = oldrepl;
+        if !store  {
+            if line.contains("println") || line.contains("print") {
+                self.current_repl = oldrepl;
+            }
         }
+
 
         Ok(())
     }
