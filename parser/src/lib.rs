@@ -3579,7 +3579,6 @@ impl Parser {
         match self.current_token() {
             Token::Identifier { name: id, .. } => match id.as_str() {
                 "match" => self.match_statement(),
-                //"unwrap" => self.unwrap(), depricated
                 "alias" => self.type_alias(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
