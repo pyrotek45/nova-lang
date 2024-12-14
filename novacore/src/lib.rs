@@ -15,7 +15,7 @@ pub struct NovaCore {
     pub current_repl: String,
     filepath: String,
     lexer: Lexer,
-    parser: Parser,
+    pub parser: Parser,
     compiler: Compiler,
     _optimizer: Optimizer,
     assembler: Assembler,
@@ -409,6 +409,7 @@ impl NovaCore {
 
         self.parser = parser::default();
         self.parser.repl = true;
+
         self.initnova();
         self.parser.input = self.lexer.tokenize()?;
         self.parser.parse()?;
@@ -429,16 +430,16 @@ impl NovaCore {
 
         self.vm = vm::new();
         self.initnova();
+
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
 
         self.vm.run()?;
-        if !store  {
+        if !store {
             if line.contains("println") || line.contains("print") {
                 self.current_repl = oldrepl;
             }
         }
-
 
         Ok(())
     }

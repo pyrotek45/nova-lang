@@ -1612,7 +1612,7 @@ impl Compiler {
             Atom::Call {
                 name: caller,
                 arguments: list,
-                ..
+                position,
             } => {
                 match caller.as_str() {
                     "typeof" => {
@@ -1633,6 +1633,14 @@ impl Compiler {
                     // "print" => {
                     //     self.asm.push(Asm::PRINT);
                     // }
+                    "unreachable" => self.asm.push(Asm::ERROR(position)),
+                    "todo" => {
+                        // show a panic message before exiting
+                        self.asm
+                            .push(Asm::STRING("Not yet implemented\n".to_string()));
+                        self.asm.push(Asm::PRINT);
+                        self.asm.push(Asm::ERROR(position));
+                    }
                     "None" => self.asm.push(Asm::NONE),
                     "Option::unwrap" => self.asm.push(Asm::UNWRAP),
                     "Some" => {}
@@ -1640,7 +1648,7 @@ impl Compiler {
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
-                    //"error" => self.asm.push(Asm::ERROR(position)),
+                    "error" => self.asm.push(Asm::ERROR(position)),
                     identifier => {
                         //dbg!(identifier);
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
