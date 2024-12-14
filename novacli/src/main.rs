@@ -1,8 +1,11 @@
 use common::error::NovaError;
-use native::random;
 use novacore::NovaCore;
 use rand::Rng;
-use reedline::{DefaultPromptSegment, DefaultValidator};
+use reedline::{
+    default_emacs_keybindings, ColumnarMenu, DefaultCompleter, DefaultPromptSegment,
+    DefaultValidator, Emacs, FileBackedHistory, KeyCode, KeyModifiers, MenuBuilder, ReedlineEvent,
+    ReedlineMenu,
+};
 use std::{
     io::{self, Write},
     process::exit,
@@ -60,7 +63,7 @@ fn entry_command() -> Option<()> {
 fn repl_session() -> ! {
     let mut novarepl = NovaCore::repl();
     // print pretty welcome message in ascii art
-   let banners = vec![
+    let banners = vec![
         r#"
      _______   ____________   _________   
      \      \  \_____  \   \ /   /  _  \  
@@ -69,7 +72,7 @@ fn repl_session() -> ! {
     \____|__  /\_______  /\___/\____|__  /
             \/         \/              \/
     "#,
-    r#"
+        r#"
     _        _______           _______ 
     ( (    /|(  ___  )|\     /|(  ___  )
     |  \  ( || (   ) || )   ( || (   ) |
@@ -79,7 +82,7 @@ fn repl_session() -> ! {
     | )  \  || (___) |  \   /  | )   ( |
     |/    )_)(_______)   \_/   |/     \|
     "#,
-    r#"
+        r#"
         .-') _                    (`-.     ('-.     
         ( OO ) )                 _(OO  )_  ( OO ).-. 
     ,--./ ,--,'  .-'),-----. ,--(_/   ,. \ / . --. / 
@@ -90,7 +93,7 @@ fn repl_session() -> ! {
     |  | \   |     `'  '-'  '    \   /     |  | |  | 
     `--'  `--'       `-----'      `-'      `--' `--' 
     "#,
-    r#"
+        r#"
     ::::    :::  ::::::::  :::     :::     :::     
     :+:+:   :+: :+:    :+: :+:     :+:   :+: :+:   
     :+:+:+  +:+ +:+    +:+ +:+     +:+  +:+   +:+  
@@ -99,7 +102,7 @@ fn repl_session() -> ! {
     #+#   #+#+# #+#    #+#   #+#+#+#   #+#     #+# 
     ###    ####  ########      ###     ###     ### 
     "#,
-    r#"
+        r#"
     888b    |   ,88~-_   Y88b      /      e      
     |Y88b   |  d888   \   Y88b    /      d8b     
     | Y88b  | 88888    |   Y88b  /      /Y88b    
@@ -107,14 +110,14 @@ fn repl_session() -> ! {
     |   Y88b|  Y888   /      Y8/      /____Y88b  
     |    Y888   `88_-~        Y      /      Y88b
     "#,
-    r#"                      
+        r#"                      
     @@@  @@@  @@@@@@  @@@  @@@  @@@@@@  
     @@!@!@@@ @@!  @@@ @@!  @@@ @@!  @@@ 
     @!@@!!@! @!@  !@! @!@  !@! @!@!@!@! 
     !!:  !!! !!:  !!!  !: .:!  !!:  !!! 
     ::    :   : :. :     ::     :   : :
     "#,
-    r#"
+        r#"
     [...     [..    [....     [..         [..      [.       
     [. [..   [..  [..    [..   [..       [..      [. ..     
     [.. [..  [..[..        [..  [..     [..      [.  [..    
@@ -123,7 +126,7 @@ fn repl_session() -> ! {
     [..    [. ..  [..     [..      [....      [..       [.. 
     [..      [..    [....           [..      [..         [..
     "#,
-    r#"                                                     
+        r#"                                                     
     888b      88    ,ad8888ba,   8b           d8   db         
     8888b     88   d8"'    `"8b  `8b         d8'  d88b        
     88 `8b    88  d8'        `8b  `8b       d8'  d8'`8b       
@@ -133,7 +136,7 @@ fn repl_session() -> ! {
     88     `8888   Y8a.    .a8P       `888'  d8'        `8b   
     88      `888    `"Y8888Y"'         `8'  d8'          `8b  
     "#,
-    r#"
+        r#"
     `...     `..    `....     `..         `..      `.       
     `. `..   `..  `..    `..   `..       `..      `. ..     
     `.. `..  `..`..        `..  `..     `..      `.  `..    
@@ -142,7 +145,7 @@ fn repl_session() -> ! {
     `..    `. ..  `..     `..      `....      `..       `.. 
     `..      `..    `....           `..      `..         `..
     "#,
-    r#"
+        r#"
     ===========================================
     =  =======  ====    ====  ====  =====  ====
     =   ======  ===  ==  ===  ====  ====    ===
@@ -155,7 +158,7 @@ fn repl_session() -> ! {
     =  =======  ====    =======  =====  ====  =
     ===========================================
     "#,
-    r#"
+        r#"
     _           _    _  _  _  _    _           _       _          
    (_) _       (_) _(_)(_)(_)(_)_ (_)         (_)    _(_)_        
    (_)(_)_     (_)(_)          (_)(_)         (_)  _(_) (_)_      
@@ -164,28 +167,73 @@ fn repl_session() -> ! {
    (_)      (_)(_)(_)          (_)   (_)   (_)  (_)(_)(_)(_)(_)   
    (_)         (_)(_)_  _  _  _(_)    (_)_(_)   (_)         (_)   
    (_)         (_)  (_)(_)(_)(_)        (_)     (_)         (_)
-    "#];
+    "#,
+    ];
     // print a random banner from the list
-    
-    println!("{}", banners[rand::thread_rng().gen_range(0..banners.len())]);
-    println!("Welcome to Nova 0.1.0 <3");
+
+    println!(
+        "{}",
+        banners[rand::thread_rng().gen_range(0..banners.len())]
+    );
+    println!("Welcome to Nova 0.1.0: Made with Love <3 : Pyrotek45 ");
     println!("Type 'help' for a list of commands");
     // Assuming NovaRepl is defined elsewhere
     loop {
         use reedline::{DefaultPrompt, Reedline, Signal};
 
         let validator = Box::new(DefaultValidator);
+        let history = Box::new(
+            FileBackedHistory::with_file(100, "history.txt".into())
+                .expect("Error configuring history with file"),
+        );
 
-        let mut line_editor = Reedline::create().with_validator(validator);
+        let commands = vec![
+            "exit".into(),
+            "show".into(),
+            "clear".into(),
+            "new".into(),
+            "help".into(),
+            "session".into(),
+            "save".into(),
+            "keep".into(),
+            "banner".into(),
+            "back".into(),
+            "ast".into(),
+            // common functions
+            "println".into(),
+        ];
+        let completer = Box::new(DefaultCompleter::new_with_wordlen(commands.clone(), 2));
+        // Use the interactive menu to select options from the completer
+        let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
+        // Set up the required keybindings
+        let mut keybindings = default_emacs_keybindings();
+        keybindings.add_binding(
+            KeyModifiers::NONE,
+            KeyCode::Tab,
+            ReedlineEvent::UntilFound(vec![
+                ReedlineEvent::Menu("completion_menu".to_string()),
+                ReedlineEvent::MenuNext,
+            ]),
+        );
+
+        let edit_mode = Box::new(Emacs::new(keybindings));
+        let mut line_editor = Reedline::create()
+            .with_validator(validator)
+            .with_history(history)
+            .with_completer(completer)
+            .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
+            .with_edit_mode(edit_mode);
+
         let mut prompt = DefaultPrompt::default();
         let mut states = vec![novarepl.clone()];
         prompt.left_prompt =
             DefaultPromptSegment::Basic(format!("Session: {}  $", states.len().to_string()));
-        prompt.right_prompt = DefaultPromptSegment::Basic("Made with Love <3 : Pyrotek45 ".to_string());
+        prompt.right_prompt = DefaultPromptSegment::WorkingDirectory;
         loop {
             let sig = line_editor.read_line(&prompt);
             match sig {
                 Ok(Signal::Success(mut line)) => {
+                    line_editor.sync_history().unwrap();
                     io::stdout().flush().unwrap();
                     //dbg!(line.clone());
                     match line.as_str() {
@@ -214,6 +262,26 @@ fn repl_session() -> ! {
                         }
                         "help" => {
                             print_help();
+                            continue;
+                        }
+                        "banner" => {
+                            println!(
+                                "{}",
+                                banners[rand::thread_rng().gen_range(0..banners.len())]
+                            );
+                            continue;
+                        }
+                        "back" => {
+                            if states.len() > 1 {
+                                states.pop();
+                                novarepl = states.last().unwrap().clone();
+                                prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                    "Session: {}  $",
+                                    states.len().to_string()
+                                ));
+                            } else {
+                                println!("No more sessions to go back to");
+                            }
                             continue;
                         }
                         pline => {
@@ -275,7 +343,39 @@ fn repl_session() -> ! {
                                         ));
                                     }
                                     Err(e) => {
-                                        e.show();
+                                        e.show_without_position();
+                                        novarepl = last_save
+                                    }
+                                }
+
+                                continue;
+                            }
+                            // store state even if println | print is used
+                            if pline.starts_with("ast") {
+                                // strip the store command
+                                let mut line =
+                                    pline.split_whitespace().collect::<Vec<&str>>()[1..].join(" ");
+
+                                // dbg!(line.clone());
+                                if line.is_empty() {
+                                    continue;
+                                }
+
+                                line.push('\n');
+                                // make a copy of the current repl and reload on error
+
+                                let last_save = novarepl.clone();
+                                match novarepl.run_line(&line, true) {
+                                    Ok(_) => {
+                                        println!("{:#?}", novarepl.parser.ast.clone());
+                                        states.push(novarepl.clone());
+                                        prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                            "Session: {}  $",
+                                            states.len().to_string()
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        e.show_without_position();
                                         novarepl = last_save
                                     }
                                 }
@@ -292,7 +392,7 @@ fn repl_session() -> ! {
                     // make a copy of the current repl and reload on error
 
                     let last_save = novarepl.clone();
-                    match novarepl.run_line(&line,false) {
+                    match novarepl.run_line(&line, false) {
                         Ok(_) => {
                             if !(line.contains("println") || line.contains("print")) {
                                 states.push(novarepl.clone());
@@ -303,11 +403,10 @@ fn repl_session() -> ! {
                             ));
                         }
                         Err(e) => {
-                            e.show();
+                            e.show_without_position();
                             novarepl = last_save
                         }
                     }
-
                 }
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
                     println!("Goodbye!");
@@ -341,7 +440,9 @@ fn print_help() {
     println!("\tsession [num]  // switch to a session");
     println!("\tsave [file]    // save the current session to a file");
     println!("\tkeep [code]    // keep the current session");
-    
+    println!("\tbanner         // print a random banner");
+    println!("\tast [code]     // print the ast of the code");
+    println!("\tback           // go back to the previous session");
 }
 
 fn compile_file_or_exit(file: &str) -> NovaCore {

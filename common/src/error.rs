@@ -86,6 +86,69 @@ pub enum NovaError {
 }
 
 impl NovaError {
+    pub fn show_without_position(&self) {
+        match &self {
+            NovaError::File { msg } => {
+                println!("{}: {}", "File Error".red(), msg);
+            }
+            NovaError::Lexing { msg, note, .. } => {
+                println!("{}: {}", "Lexing Error".bright_red(), msg);
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+            }
+            NovaError::Parsing {
+                msg, note, extra, ..
+            } => {
+                println!("{}: {}", "Parsing Error".bright_red(), msg);
+                if let Some(extra_notes) = extra {
+                    for (extra_msg, _) in extra_notes {
+                        println!("{}: {}", "Note".bright_yellow(), extra_msg.bright_yellow());
+                    }
+                }
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+            }
+            NovaError::Runtime { msg } => {
+                println!("Runtime Error: {}", msg.bright_red());
+            }
+            NovaError::Compiler { msg, note } => {
+                println!("{}: {}", "Compiling Error".bright_red(), msg.bright_red());
+                println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+            }
+            NovaError::RuntimeWithPos { msg, .. } => {
+                println!("{}: {}", "Runtime Error".bright_red(), msg.bright_red());
+            }
+            NovaError::TypeError {
+                msg,
+                expected,
+                found,
+                ..
+            } => {
+                println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
+                println!(
+                    "Expected type: {}\nFound type: {}",
+                    expected.to_string(),
+                    found.to_string()
+                );
+            }
+            NovaError::TypeMismatch {
+                expected, found, ..
+            } => {
+                println!(
+                    "{}: {}",
+                    "Type Mismatch".bright_red(),
+                    "Type Mismatch".bright_red()
+                );
+                println!(
+                    "Expected type: {}\nFound type: {}",
+                    expected.to_string(),
+                    found.to_string()
+                );
+            }
+            NovaError::SimpleTypeError { msg, .. } => {
+                println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
+            }
+        }
+    }
+
     pub fn show(&self) {
         match &self {
             NovaError::File { msg } => {

@@ -68,6 +68,28 @@ fn create_environment() -> Environment {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
+        "todo",
+        TType::Function {
+            parameters: vec![TType::None],
+            return_type: Box::new(TType::Generic {
+                name: "T".to_string(),
+            }),
+        },
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
+        "unreachable",
+        TType::Function {
+            parameters: vec![TType::None],
+            return_type: Box::new(TType::Generic {
+                name: "T".to_string(),
+            }),
+        },
+        None,
+        SymbolKind::GenericFunction,
+    );
+    env.insert_symbol(
         "exit",
         TType::Function {
             parameters: vec![TType::None],

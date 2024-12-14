@@ -26,8 +26,7 @@ fn extends orError(self: ?$A, msg: String) -> $A {
     }
     println(msg)
     exit()
-    // unreachable
-    pass
+    return unreachable() @[T: $A]
 }
 
 fn extends orDefault(self: ?$A, default: $A) -> $A {

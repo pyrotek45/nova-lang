@@ -371,6 +371,7 @@ dependencies = [
  "lexer",
  "native",
  "novacore",
+ "nu-ansi-term",
  "optimizer",
  "parser",
  "rand",
