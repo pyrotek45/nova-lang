@@ -3372,49 +3372,6 @@ impl Parser {
         }))
     }
 
-    fn unwrap(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("unwrap"))?;
-        let (identifier, pos) = self.get_identifier()?;
-        // test if option type
-        self.environment.push_block();
-        if let Some(id_type) = self.environment.get_type(&identifier) {
-            if let TType::Option { inner } = id_type.clone() {
-                self.environment.insert_symbol(
-                    &identifier,
-                    *inner.clone(),
-                    Some(pos),
-                    SymbolKind::Variable,
-                );
-                let body = self.block()?;
-                let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
-                    self.consume_identifier(Some("else"))?;
-                    Some(self.block()?)
-                } else {
-                    None
-                };
-                self.environment.pop_block();
-                return Ok(Some(common::nodes::Statement::Unwrap {
-                    ttype: id_type,
-                    identifier,
-                    body,
-                    alternative,
-                }));
-            } else {
-                return Err(self.generate_error_with_pos(
-                    format!("unwrap expects an option type"),
-                    format!("got {}", id_type.to_string()),
-                    pos,
-                ));
-            }
-        } else {
-            return Err(self.generate_error_with_pos(
-                format!("unknown identifier"),
-                format!("got {}", identifier),
-                pos,
-            ));
-        }
-    }
-
     fn match_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("match"))?;
         let expr = self.expr()?;
