@@ -350,7 +350,9 @@ impl Vm {
                     if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
-                        let result = v1 + v2;
+                        let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
+                            msg: "Integer overflow".to_string(),
+                        })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
                         return Err(NovaError::Runtime {
@@ -366,7 +368,9 @@ impl Vm {
                     if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
-                        let result = v2 - v1;
+                        let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
+                            msg: "Integer overflow".to_string(),
+                        })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
                         return Err(NovaError::Runtime {
@@ -382,7 +386,11 @@ impl Vm {
                     if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
-                        let result = v1 * v2;
+                        // safely multi
+
+                        let result = v1.checked_mul(v2).ok_or_else(|| NovaError::Runtime {
+                            msg: "Integer overflow".to_string(),
+                        })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
                         return Err(NovaError::Runtime {
@@ -398,7 +406,9 @@ impl Vm {
                     if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
-                        let result = v2 / v1;
+                        let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
+                            msg: "Integer division by zero".to_string(),
+                        })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
                         return Err(NovaError::Runtime {
