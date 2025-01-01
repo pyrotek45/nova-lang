@@ -97,11 +97,11 @@ impl Environment {
     }
 
     pub fn get_type(&mut self, symbol: &str) -> Option<TType> {
-        if let Some(s) = self.values.last().unwrap().get(symbol) {
-            Some(s.ttype.clone())
-        } else {
-            None
-        }
+        self.values
+            .last()
+            .unwrap()
+            .get(symbol)
+            .map(|s| s.ttype.clone())
     }
 
     pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, String, SymbolKind)> {

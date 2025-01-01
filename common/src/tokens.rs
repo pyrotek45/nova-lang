@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::fileposition::FilePosition;
 use crate::ttype::TType;
 pub type TokenList = Vec<Token>;
@@ -283,20 +285,22 @@ impl Token {
             None
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Type { ttype, .. } => format!("Type({:?})", ttype),
-            Token::Identifier { name, .. } => format!("Identifier(\"{}\")", name),
-            Token::Integer { value, .. } => format!("Integer({})", value),
-            Token::Float { value, .. } => format!("Float({})", value),
-            Token::String { value, .. } => format!("String(\"{}\")", value),
-            Token::Char { value, .. } => format!("Char('{}')", value),
-            Token::Symbol { symbol, .. } => format!("Symbol('{}')", symbol),
-            Token::Bool { value, .. } => format!("Bool({})", value),
-            Token::Operator { operator, .. } => format!("Operator({:?})", operator),
-            Token::EOF { .. } => "EOF".to_string(),
-            Token::Keyword { keyword, .. } => format!("Keyword({:?})", keyword),
+            Token::Type { ttype, .. } => write!(f, "Type({:?})", ttype),
+            Token::Identifier { name, .. } => write!(f, "Identifier(\"{}\")", name),
+            Token::Integer { value, .. } => write!(f, "Integer({})", value),
+            Token::Float { value, .. } => write!(f, "Float({})", value),
+            Token::String { value, .. } => write!(f, "String(\"{}\")", value),
+            Token::Char { value, .. } => write!(f, "Char('{}')", value),
+            Token::Symbol { symbol, .. } => write!(f, "Symbol('{}')", symbol),
+            Token::Bool { value, .. } => write!(f, "Bool({})", value),
+            Token::Operator { operator, .. } => write!(f, "Operator({:?})", operator),
+            Token::EOF { .. } => write!(f, "EOF"),
+            Token::Keyword { keyword, .. } => write!(f, "Keyword({:?})", keyword),
         }
     }
 }

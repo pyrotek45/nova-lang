@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TType {
     None,
@@ -50,53 +52,55 @@ impl TType {
             _ => None,
         }
     }
+}
 
-    // Adjusted `to_string` to handle the new field names
-    pub fn to_string(&self) -> String {
-        match self {
-            TType::Any => "Any".to_string(),
-            TType::Int => "Int".to_string(),
-            TType::Float => "Float".to_string(),
-            TType::Bool => "Bool".to_string(),
-            TType::String => "String".to_string(),
-            TType::Void => "Void".to_string(),
-            TType::Auto => "Auto".to_string(),
-            TType::Char => "Char".to_string(),
-            TType::None => "None".to_string(),
+struct TypeList<'s>(&'s [TType]);
+
+impl Display for TypeList<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut args = self.0.iter();
+        if let Some(first) = args.next() {
+            write!(f, "{first}")?
+        }
+        for arg in args {
+            write!(f, ",{arg}")?
+        }
+        Ok(())
+    }
+}
+
+impl Display for TType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let literal = match self {
+            TType::Any => "Any",
+            TType::Int => "Int",
+            TType::Float => "Float",
+            TType::Bool => "Bool",
+            TType::String => "String",
+            TType::Void => "Void",
+            TType::Auto => "Auto",
+            TType::Char => "Char",
+            TType::None => "None",
             TType::Custom {
                 name, type_params, ..
             } => {
-                let type_strings: Vec<String> = type_params.iter().map(TType::to_string).collect();
-                let types_concatenated = type_strings.join(",");
-                if types_concatenated.is_empty() {
-                    name.to_string()
-                } else {
-                    format!("{}({})", name, types_concatenated)
+                if !type_params.is_empty() {
+                    return write!(f, "{name}({})", TypeList(type_params));
                 }
+                name
             }
-            TType::Generic { name } => format!("${}", name),
-            TType::List { inner } => format!("[{}]", inner.to_string()),
-            TType::Option { inner } => format!("?{}", inner.to_string()),
+            TType::Generic { name } => return write!(f, "${name}"),
+            TType::List { inner } => return write!(f, "[{inner}]"),
+            TType::Option { inner } => return write!(f, "?{inner}"),
             TType::Tuple { elements } => {
-                let types = elements
-                    .iter()
-                    .map(TType::to_string)
-                    .collect::<Vec<String>>()
-                    .join(",");
-                format!("#({})", types)
+                return write!(f, "#({})", TypeList(elements));
             }
             TType::Function {
                 parameters: args,
                 return_type,
-            } => {
-                let args_str = args
-                    .iter()
-                    .map(TType::to_string)
-                    .collect::<Vec<String>>()
-                    .join(",");
-                format!("({}) -> {}", args_str, return_type.to_string())
-            }
-        }
+            } => return write!(f, "({params}) -> {return_type}", params = TypeList(args)),
+        };
+        f.write_str(literal)
     }
 }
 

@@ -24,7 +24,8 @@ pub struct NovaCore {
 
 impl NovaCore {
     pub fn repl() -> NovaCore {
-        let nova = NovaCore {
+        
+        NovaCore {
             filepath: "repl".to_string(),
             lexer: Lexer::default(),
             parser: parser::default(),
@@ -33,8 +34,7 @@ impl NovaCore {
             assembler: assembler::new_empty(),
             vm: vm::new(),
             current_repl: "".to_string(),
-        };
-        nova
+        }
     }
 
     pub fn new(filepath: &str) -> Result<NovaCore, NovaError> {
@@ -435,10 +435,8 @@ impl NovaCore {
         self.vm.state.program = self.assembler.output.clone();
 
         self.vm.run()?;
-        if !store {
-            if line.contains("println") || line.contains("print") {
-                self.current_repl = oldrepl;
-            }
+        if !store && (line.contains("println") || line.contains("print")) {
+            self.current_repl = oldrepl;
         }
 
         Ok(())

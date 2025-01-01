@@ -63,7 +63,7 @@ fn entry_command() -> Option<()> {
 fn repl_session() -> ! {
     let mut novarepl = NovaCore::repl();
     // print pretty welcome message in ascii art
-    let banners = vec![
+    let banners = [
         r#"
      _______   ____________   _________   
      \      \  \_____  \   \ /   /  _  \  
@@ -178,243 +178,233 @@ fn repl_session() -> ! {
     println!("Welcome to Nova 0.1.0: Made with Love <3 : Pyrotek45 ");
     println!("Type 'help' for a list of commands");
     // Assuming NovaRepl is defined elsewhere
+    use reedline::{DefaultPrompt, Reedline, Signal};
+
+    let validator = Box::new(DefaultValidator);
+    let history = Box::new(
+        FileBackedHistory::with_file(100, "history.txt".into())
+            .expect("Error configuring history with file"),
+    );
+
+    let commands = vec![
+        "exit".into(),
+        "show".into(),
+        "clear".into(),
+        "new".into(),
+        "help".into(),
+        "session".into(),
+        "save".into(),
+        "keep".into(),
+        "banner".into(),
+        "back".into(),
+        "ast".into(),
+        // common functions
+        "println".into(),
+    ];
+    let completer = Box::new(DefaultCompleter::new_with_wordlen(commands.clone(), 2));
+    // Use the interactive menu to select options from the completer
+    let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
+    // Set up the required keybindings
+    let mut keybindings = default_emacs_keybindings();
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Tab,
+        ReedlineEvent::UntilFound(vec![
+            ReedlineEvent::Menu("completion_menu".to_string()),
+            ReedlineEvent::MenuNext,
+        ]),
+    );
+
+    let edit_mode = Box::new(Emacs::new(keybindings));
+    let mut line_editor = Reedline::create()
+        .with_validator(validator)
+        .with_history(history)
+        .with_completer(completer)
+        .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
+        .with_edit_mode(edit_mode);
+
+    let mut prompt = DefaultPrompt::default();
+    let mut states = vec![novarepl.clone()];
+    prompt.left_prompt = DefaultPromptSegment::Basic(format!("Session: {}  $", states.len()));
+    prompt.right_prompt = DefaultPromptSegment::WorkingDirectory;
     loop {
-        use reedline::{DefaultPrompt, Reedline, Signal};
-
-        let validator = Box::new(DefaultValidator);
-        let history = Box::new(
-            FileBackedHistory::with_file(100, "history.txt".into())
-                .expect("Error configuring history with file"),
-        );
-
-        let commands = vec![
-            "exit".into(),
-            "show".into(),
-            "clear".into(),
-            "new".into(),
-            "help".into(),
-            "session".into(),
-            "save".into(),
-            "keep".into(),
-            "banner".into(),
-            "back".into(),
-            "ast".into(),
-            // common functions
-            "println".into(),
-        ];
-        let completer = Box::new(DefaultCompleter::new_with_wordlen(commands.clone(), 2));
-        // Use the interactive menu to select options from the completer
-        let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
-        // Set up the required keybindings
-        let mut keybindings = default_emacs_keybindings();
-        keybindings.add_binding(
-            KeyModifiers::NONE,
-            KeyCode::Tab,
-            ReedlineEvent::UntilFound(vec![
-                ReedlineEvent::Menu("completion_menu".to_string()),
-                ReedlineEvent::MenuNext,
-            ]),
-        );
-
-        let edit_mode = Box::new(Emacs::new(keybindings));
-        let mut line_editor = Reedline::create()
-            .with_validator(validator)
-            .with_history(history)
-            .with_completer(completer)
-            .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
-            .with_edit_mode(edit_mode);
-
-        let mut prompt = DefaultPrompt::default();
-        let mut states = vec![novarepl.clone()];
-        prompt.left_prompt =
-            DefaultPromptSegment::Basic(format!("Session: {}  $", states.len().to_string()));
-        prompt.right_prompt = DefaultPromptSegment::WorkingDirectory;
-        loop {
-            let sig = line_editor.read_line(&prompt);
-            match sig {
-                Ok(Signal::Success(mut line)) => {
-                    line_editor.sync_history().unwrap();
-                    io::stdout().flush().unwrap();
-                    //dbg!(line.clone());
-                    match line.as_str() {
-                        "show" => {
-                            // print current session
-                            print!("{}", novarepl.current_repl);
-                            continue;
-                        }
-                        "exit" => {
-                            println!("Goodbye!");
-                            exit(0);
-                        }
-                        "clear" => {
-                            line_editor.clear_screen().unwrap();
-                            continue;
-                        }
-                        "new" => {
-                            states.clear();
-                            novarepl = NovaCore::repl();
-                            states.push(novarepl.clone());
-                            prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                "Session: {}  $",
-                                states.len().to_string()
-                            ));
-                            continue;
-                        }
-                        "help" => {
-                            print_help();
-                            continue;
-                        }
-                        "banner" => {
-                            println!(
-                                "{}",
-                                banners[rand::thread_rng().gen_range(0..banners.len())]
-                            );
-                            continue;
-                        }
-                        "back" => {
-                            if states.len() > 1 {
-                                states.pop();
-                                novarepl = states.last().unwrap().clone();
-                                prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                    "Session: {}  $",
-                                    states.len().to_string()
-                                ));
-                            } else {
-                                println!("No more sessions to go back to");
-                            }
-                            continue;
-                        }
-                        pline => {
-                            if pline.starts_with("session") {
-                                let session = pline.split_whitespace().collect::<Vec<&str>>()[1]
-                                    .parse::<usize>()
-                                    .unwrap();
-                                if session < states.len() {
-                                    novarepl = states[session].clone();
-                                    states.truncate(session + 1);
-                                    prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                        "Session: {}  $",
-                                        states.len().to_string()
-                                    ));
-                                } else {
-                                    println!("Session not found");
-                                }
-                                continue;
-                            }
-                            // save to file
-                            if pline.starts_with("save") {
-                                let file = pline.split_whitespace().collect::<Vec<&str>>()[1];
-                                // save the current session to a file
-                                // check if the file exists
-                                if std::path::Path::new(file).exists() {
-                                    println!(
-                                        "File already exists, do you want to overwrite it? (y/n)"
-                                    );
-                                    let mut response = String::new();
-                                    io::stdin().read_line(&mut response).unwrap();
-                                    if response.trim() != "y" {
-                                        continue;
-                                    }
-                                }
-                                let mut file = std::fs::File::create(file).unwrap();
-                                file.write_all(novarepl.current_repl.as_bytes()).unwrap();
-                                continue;
-                            }
-
-                            // store state even if println | print is used
-                            if pline.starts_with("keep") {
-                                // strip the store command
-                                let mut line =
-                                    pline.split_whitespace().collect::<Vec<&str>>()[1..].join(" ");
-                                // dbg!(line.clone());
-                                if line.is_empty() {
-                                    continue;
-                                }
-                                line.push('\n');
-                                // make a copy of the current repl and reload on error
-
-                                let last_save = novarepl.clone();
-                                match novarepl.run_line(&line, true) {
-                                    Ok(_) => {
-                                        states.push(novarepl.clone());
-                                        prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                            "Session: {}  $",
-                                            states.len().to_string()
-                                        ));
-                                    }
-                                    Err(e) => {
-                                        e.show_without_position();
-                                        novarepl = last_save
-                                    }
-                                }
-
-                                continue;
-                            }
-                            // store state even if println | print is used
-                            if pline.starts_with("ast") {
-                                // strip the store command
-                                let mut line =
-                                    pline.split_whitespace().collect::<Vec<&str>>()[1..].join(" ");
-
-                                // dbg!(line.clone());
-                                if line.is_empty() {
-                                    continue;
-                                }
-
-                                line.push('\n');
-                                // make a copy of the current repl and reload on error
-
-                                let last_save = novarepl.clone();
-                                match novarepl.run_line(&line, true) {
-                                    Ok(_) => {
-                                        println!("{:#?}", novarepl.parser.ast.clone());
-                                        states.push(novarepl.clone());
-                                        prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                            "Session: {}  $",
-                                            states.len().to_string()
-                                        ));
-                                    }
-                                    Err(e) => {
-                                        e.show_without_position();
-                                        novarepl = last_save
-                                    }
-                                }
-
-                                continue;
-                            }
-                        }
-                    }
-
-                    if line.is_empty() {
+        let sig = line_editor.read_line(&prompt);
+        match sig {
+            Ok(Signal::Success(mut line)) => {
+                line_editor.sync_history().unwrap();
+                io::stdout().flush().unwrap();
+                //dbg!(line.clone());
+                match line.as_str() {
+                    "show" => {
+                        // print current session
+                        print!("{}", novarepl.current_repl);
                         continue;
                     }
-                    line.push('\n');
-                    // make a copy of the current repl and reload on error
-
-                    let last_save = novarepl.clone();
-                    match novarepl.run_line(&line, false) {
-                        Ok(_) => {
-                            if !(line.contains("println") || line.contains("print")) {
-                                states.push(novarepl.clone());
-                            }
+                    "exit" => {
+                        println!("Goodbye!");
+                        exit(0);
+                    }
+                    "clear" => {
+                        line_editor.clear_screen().unwrap();
+                        continue;
+                    }
+                    "new" => {
+                        states.clear();
+                        novarepl = NovaCore::repl();
+                        states.push(novarepl.clone());
+                        prompt.left_prompt =
+                            DefaultPromptSegment::Basic(format!("Session: {}  $", states.len()));
+                        continue;
+                    }
+                    "help" => {
+                        print_help();
+                        continue;
+                    }
+                    "banner" => {
+                        println!(
+                            "{}",
+                            banners[rand::thread_rng().gen_range(0..banners.len())]
+                        );
+                        continue;
+                    }
+                    "back" => {
+                        if states.len() > 1 {
+                            states.pop();
+                            novarepl = states.last().unwrap().clone();
                             prompt.left_prompt = DefaultPromptSegment::Basic(format!(
                                 "Session: {}  $",
-                                states.len().to_string()
+                                states.len()
                             ));
+                        } else {
+                            println!("No more sessions to go back to");
                         }
-                        Err(e) => {
-                            e.show_without_position();
-                            novarepl = last_save
+                        continue;
+                    }
+                    pline => {
+                        if pline.starts_with("session") {
+                            let session = pline.split_whitespace().collect::<Vec<&str>>()[1]
+                                .parse::<usize>()
+                                .unwrap();
+                            if session < states.len() {
+                                novarepl = states[session].clone();
+                                states.truncate(session + 1);
+                                prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                    "Session: {}  $",
+                                    states.len()
+                                ));
+                            } else {
+                                println!("Session not found");
+                            }
+                            continue;
+                        }
+                        // save to file
+                        if pline.starts_with("save") {
+                            let file = pline.split_whitespace().collect::<Vec<&str>>()[1];
+                            // save the current session to a file
+                            // check if the file exists
+                            if std::path::Path::new(file).exists() {
+                                println!("File already exists, do you want to overwrite it? (y/n)");
+                                let mut response = String::new();
+                                io::stdin().read_line(&mut response).unwrap();
+                                if response.trim() != "y" {
+                                    continue;
+                                }
+                            }
+                            let mut file = std::fs::File::create(file).unwrap();
+                            file.write_all(novarepl.current_repl.as_bytes()).unwrap();
+                            continue;
+                        }
+
+                        // store state even if println | print is used
+                        if pline.starts_with("keep") {
+                            // strip the store command
+                            let mut line =
+                                pline.split_whitespace().collect::<Vec<&str>>()[1..].join(" ");
+                            // dbg!(line.clone());
+                            if line.is_empty() {
+                                continue;
+                            }
+                            line.push('\n');
+                            // make a copy of the current repl and reload on error
+
+                            let last_save = novarepl.clone();
+                            match novarepl.run_line(&line, true) {
+                                Ok(_) => {
+                                    states.push(novarepl.clone());
+                                    prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                        "Session: {}  $",
+                                        states.len()
+                                    ));
+                                }
+                                Err(e) => {
+                                    e.show_without_position();
+                                    novarepl = last_save
+                                }
+                            }
+
+                            continue;
+                        }
+                        // store state even if println | print is used
+                        if pline.starts_with("ast") {
+                            // strip the store command
+                            let mut line =
+                                pline.split_whitespace().collect::<Vec<&str>>()[1..].join(" ");
+
+                            // dbg!(line.clone());
+                            if line.is_empty() {
+                                continue;
+                            }
+
+                            line.push('\n');
+                            // make a copy of the current repl and reload on error
+
+                            let last_save = novarepl.clone();
+                            match novarepl.run_line(&line, true) {
+                                Ok(_) => {
+                                    println!("{:#?}", novarepl.parser.ast.clone());
+                                    states.push(novarepl.clone());
+                                    prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                        "Session: {}  $",
+                                        states.len()
+                                    ));
+                                }
+                                Err(e) => {
+                                    e.show_without_position();
+                                    novarepl = last_save
+                                }
+                            }
+                            continue;
                         }
                     }
                 }
-                Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
-                    println!("Goodbye!");
-                    exit(0);
+
+                if line.is_empty() {
+                    continue;
                 }
-                x => {
-                    println!("Event: {:?}", x);
+                line.push('\n');
+                // make a copy of the current repl and reload on error
+
+                let last_save = novarepl.clone();
+                match novarepl.run_line(&line, false) {
+                    Ok(_) => {
+                        if !(line.contains("println") || line.contains("print")) {
+                            states.push(novarepl.clone());
+                        }
+                        prompt.left_prompt =
+                            DefaultPromptSegment::Basic(format!("Session: {}  $", states.len()));
+                    }
+                    Err(e) => {
+                        e.show_without_position();
+                        novarepl = last_save
+                    }
                 }
+            }
+            Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
+                println!("Goodbye!");
+                exit(0);
+            }
+            x => {
+                println!("Event: {:?}", x);
             }
         }
     }

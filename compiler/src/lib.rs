@@ -58,7 +58,7 @@ impl Compiler {
         self.global.insert("print".to_string());
         let w_index = self.global.len() - 1;
         let jump = self.gen.generate();
-        self.asm.push(Asm::FUNCTION(jump as u64));
+        self.asm.push(Asm::FUNCTION(jump));
         self.asm.push(Asm::OFFSET(1, 0));
         self.asm.push(Asm::PRINT);
         self.asm.push(Asm::RET(false));
@@ -69,7 +69,7 @@ impl Compiler {
         self.global.insert("println".to_string());
         let w_index = self.global.len() - 1;
         let jump = self.gen.generate();
-        self.asm.push(Asm::FUNCTION(jump as u64));
+        self.asm.push(Asm::FUNCTION(jump));
         self.asm.push(Asm::OFFSET(1, 0));
         self.asm.push(Asm::PRINT);
         self.asm.push(Asm::STRING("\n".to_string()));
@@ -88,7 +88,7 @@ impl Compiler {
                         self.global.insert(native.to_string());
                         let w_index = self.global.len() - 1;
                         let jump = self.gen.generate();
-                        self.asm.push(Asm::FUNCTION(jump as u64));
+                        self.asm.push(Asm::FUNCTION(jump));
                         self.asm.push(Asm::OFFSET(parameters.len() as u32, 0));
                         self.asm.push(Asm::NATIVE(index as u64));
                         if **return_type != TType::Void {
@@ -240,14 +240,12 @@ impl Compiler {
                             let index = self.global.len() - 1;
                             self.asm.push(Asm::STOREGLOBAL(index as u32))
                         }
+                    } else if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        self.asm.push(Asm::STORE(index as u32))
                     } else {
-                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
-                            self.asm.push(Asm::STORE(index as u32))
-                        } else {
-                            self.variables.insert(identifier.to_string());
-                            let index = self.variables.len() - 1;
-                            self.asm.push(Asm::STORE(index as u32))
-                        }
+                        self.variables.insert(identifier.to_string());
+                        let index = self.variables.len() - 1;
+                        self.asm.push(Asm::STORE(index as u32))
                     }
                 }
                 Function {
@@ -276,7 +274,7 @@ impl Compiler {
                     }
 
                     // Compile captured variables for the closure
-                    for captured_var in captured.iter().cloned() {
+                    for captured_var in captured {
                         if let Some(index) = self.variables.get_index(captured_var.to_string()) {
                             // Get the local variable if it exists in the current scope
                             self.asm.push(Asm::GET(index as u32));
@@ -286,7 +284,7 @@ impl Compiler {
                             self.asm.push(Asm::GETGLOBAL(index as u32));
                         } else {
                             // Debug output for missing variable
-                            dbg!(&captured_var);
+                            dbg!(captured_var);
                             panic!("Captured variable not found in local or global scope.");
                         }
                     }
@@ -344,7 +342,7 @@ impl Compiler {
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
                     self.asm
-                        .push(Asm::OFFSET((fields.len() - 1) as u32, 0 as u32));
+                        .push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
                     self.asm.push(Asm::STRING(identifier.clone()));
                     self.asm.push(Asm::LIST(fields.len() as u64));
                     self.asm.push(Asm::RET(true));
@@ -576,16 +574,16 @@ impl Compiler {
                         // offset is what it will accept
                         // enum is stored as a tuple [value,tag,type]
                         if field.ttype != TType::None {
-                            self.asm.push(Asm::OFFSET((1) as u32, 0 as u32));
+                            self.asm.push(Asm::OFFSET(1_u32, 0_u32));
                         } else {
-                            self.asm.push(Asm::OFFSET((0) as u32, 0 as u32));
+                            self.asm.push(Asm::OFFSET(0_u32, 0_u32));
                             self.asm.push(Asm::NONE);
                         }
 
                         self.asm.push(Asm::INTEGER(tag as i64));
                         self.asm.push(Asm::STRING(identifier.clone()));
 
-                        self.asm.push(Asm::LIST(3 as u64));
+                        self.asm.push(Asm::LIST(3_u64));
                         self.asm.push(Asm::RET(true));
 
                         self.asm.push(Asm::LABEL(structjump));
@@ -606,7 +604,7 @@ impl Compiler {
                     let end = self.gen.generate();
                     self.compile_expr(expr.clone())?;
                     // will test the expression
-                    self.asm.push(Asm::INTEGER(1 as i64));
+                    self.asm.push(Asm::INTEGER(1_i64));
                     self.compile_expr(expr.clone())?;
                     self.asm.push(Asm::LIN);
                     // store in temp variable
@@ -624,7 +622,7 @@ impl Compiler {
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::JUMPIFFALSE(next));
                         if let Some(vid) = &arm.1 {
-                            self.asm.push(Asm::INTEGER(0 as i64));
+                            self.asm.push(Asm::INTEGER(0_i64));
                             self.compile_expr(expr.clone())?;
                             self.asm.push(Asm::LIN);
                             // store the vid in the variable
@@ -934,7 +932,8 @@ impl Compiler {
                 }
                 common::tokens::Unary::Not => {
                     self.compile_expr(*expr)?;
-                    Ok(self.asm.push(Asm::NOT))
+                    self.asm.push(Asm::NOT);
+                    Ok(())
                 }
             },
             Expr::Binop {
@@ -1209,7 +1208,7 @@ impl Compiler {
                 }
 
                 // Compile captured variables for the closure
-                for captured_var in captured.iter().cloned() {
+                for captured_var in captured.iter() {
                     //dbg!(&captured);
                     if let Some(index) = self.variables.get_index(captured_var.to_string()) {
                         // Get the local variable if it exists in the current scope
@@ -1614,12 +1613,9 @@ impl Compiler {
                 arguments: list,
                 position,
             } => {
-                match caller.as_str() {
-                    "typeof" => {
-                        self.asm.push(Asm::STRING(list[0].get_type().to_string()));
-                        return Ok(());
-                    }
-                    _ => {}
+                if caller.as_str() == "typeof" {
+                    self.asm.push(Asm::STRING(list[0].get_type().to_string()));
+                    return Ok(());
                 }
                 for expr in list.iter() {
                     self.compile_expr(expr.clone())?;

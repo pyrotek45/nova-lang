@@ -200,7 +200,7 @@ impl State {
     }
 
     #[inline(always)]
-    pub fn next(&mut self) -> u8 {
+    pub fn next_instruction(&mut self) -> u8 {
         let result = &self.program[self.current_instruction];
         self.current_instruction += 1;
         *result
@@ -290,92 +290,92 @@ impl State {
             VmData::Function(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::Function(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::Function(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::Int(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::Int(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::Int(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::Float(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::Float(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::Float(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::Bool(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::Bool(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::Bool(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::List(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::ListAddress(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::ListAddress(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::None => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::None;
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::None);
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::String(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::StringAddress(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::StringAddress(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::Closure(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::ClosureAddress(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::ClosureAddress(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::StackAddress(_) => todo!(),
             VmData::Struct(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::StructAddress(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::StructAddress(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
             VmData::Char(v) => {
                 if let Some(space) = self.free_space.pop() {
                     self.heap[space] = Heap::Char(v);
-                    return space;
+                    space
                 } else {
                     self.heap.push(Heap::Char(v));
-                    return self.heap.len() - 1;
+                    self.heap.len() - 1
                 }
             }
         }
@@ -466,7 +466,7 @@ impl State {
 
     #[inline(always)]
     pub fn deallocate_registers_with_return(&mut self) {
-        let returnvalue = self.stack.last().unwrap().clone();
+        let returnvalue = *self.stack.last().unwrap();
         if let Some(window) = self.window.pop() {
             let remove = self.stack.len() - window;
             for _ in 0..remove {

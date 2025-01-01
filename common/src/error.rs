@@ -19,7 +19,7 @@ pub fn print_line(position: &FilePosition, msg: &str) {
             if current_line == position.line {
                 if let Ok(line) = line_content {
                     // Print line number and line content with padding
-                    print!("{:<width$} |\n", "", width = line_number_width);
+                    println!("{:<width$} |", "", width = line_number_width);
                     println!(
                         "{:width$} | {}",
                         current_line,
@@ -123,11 +123,7 @@ impl NovaError {
                 ..
             } => {
                 println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
-                println!(
-                    "Expected type: {}\nFound type: {}",
-                    expected.to_string(),
-                    found.to_string()
-                );
+                println!("Expected type: {expected}\nFound type: {found}",);
             }
             NovaError::TypeMismatch {
                 expected, found, ..
@@ -137,11 +133,7 @@ impl NovaError {
                     "Type Mismatch".bright_red(),
                     "Type Mismatch".bright_red()
                 );
-                println!(
-                    "Expected type: {}\nFound type: {}",
-                    expected.to_string(),
-                    found.to_string()
-                );
+                println!("Expected type: {expected}\nFound type: {found}",);
             }
             NovaError::SimpleTypeError { msg, .. } => {
                 println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
@@ -166,7 +158,7 @@ impl NovaError {
                     position.line,
                     position.row
                 );
-                print_line(position, &msg);
+                print_line(position, msg);
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
             }
             NovaError::Parsing {
@@ -182,10 +174,10 @@ impl NovaError {
                     position.line,
                     position.row
                 );
-                print_line(position, &msg);
+                print_line(position, msg);
                 if let Some(extra_notes) = extra {
                     for (extra_msg, extra_position) in extra_notes {
-                        print_line(&extra_position, &extra_msg);
+                        print_line(extra_position, extra_msg);
                     }
                 }
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
@@ -205,7 +197,7 @@ impl NovaError {
                     position.line,
                     position.row
                 );
-                print_line(position, &msg);
+                print_line(position, msg);
             }
             NovaError::TypeError {
                 msg,
@@ -224,8 +216,8 @@ impl NovaError {
                     position,
                     &format!(
                         "Expected type: {}\nFound type: {}",
-                        expected.to_string(),
-                        found.to_string()
+                        expected,
+                        found
                     ),
                 );
                 println!("{}: {}", "Note".bright_yellow(), msg.bright_yellow());
@@ -246,8 +238,8 @@ impl NovaError {
                     position,
                     &format!(
                         "Expected type: {}\nFound type: {}",
-                        expected.to_string(),
-                        found.to_string()
+                        expected,
+                        found
                     ),
                 );
             }
@@ -259,7 +251,7 @@ impl NovaError {
                     position.line,
                     position.row
                 );
-                print_line(position, &msg);
+                print_line(position, msg);
             }
         }
     }

@@ -356,13 +356,13 @@ impl Parser {
                 } else {
                     // return type error novaerror::typeError
                     if self.environment.live_generics.last().unwrap().has(&name) {
-                        return Ok(TType::Generic { name });
+                        Ok(TType::Generic { name })
                     } else {
                         //dbg!(self.environment.live_generics.last().unwrap());
-                        return Err(NovaError::SimpleTypeError {
+                        Err(NovaError::SimpleTypeError {
                             msg: format!("Generic type {} could not be inferred", name),
                             position: pos,
-                        });
+                        })
                     }
                 }
             }
@@ -464,10 +464,7 @@ impl Parser {
             }
         }
         Err(self.generate_error(
-            format!(
-                "unexpected operator, got {}",
-                self.current_token().to_string()
-            ),
+            format!("unexpected operator, got {}", self.current_token()),
             format!("expecting {:?}", op),
         ))
     }
@@ -480,10 +477,7 @@ impl Parser {
             }
         }
         Err(self.generate_error(
-            format!(
-                "unexpected symbol, got {}",
-                self.current_token().to_string()
-            ),
+            format!("unexpected symbol, got {}", self.current_token()),
             format!("expecting {}", sym),
         ))
     }
@@ -497,10 +491,7 @@ impl Parser {
             }
         }
         Err(self.generate_error(
-            format!(
-                "unexpected keyword, got {}",
-                self.current_token().to_string()
-            ),
+            format!("unexpected keyword, got {}", self.current_token()),
             format!("expecting {:?}", kind),
         ))
     }
@@ -513,13 +504,13 @@ impl Parser {
             }
             _ => {
                 let current_token = self.current_token();
-                return Err(self.generate_error(
-                    format!("unexpected identifier, got {}", current_token.to_string()),
+                Err(self.generate_error(
+                    format!("unexpected identifier, got {current_token}"),
                     match symbol {
-                        Some(s) => format!("expecting {}", s),
+                        Some(s) => format!("expecting {s}"),
                         None => "expecting an identifier".to_string(),
                     },
-                ));
+                ))
             }
         }
     }
@@ -547,15 +538,10 @@ impl Parser {
                 Operator::Addition => Ok(Some(Unary::Positive)),
                 Operator::Subtraction => Ok(Some(Unary::Negitive)),
                 Operator::Not => Ok(Some(Unary::Not)),
-                _ => {
-                    return Err(self.generate_error(
-                        format!(
-                            "unexpected operation, got {}",
-                            self.current_token().to_string()
-                        ),
-                        format!("expected unary sign ( + | - )"),
-                    ));
-                }
+                _ => Err(self.generate_error(
+                    format!("unexpected operation, got {}", self.current_token()),
+                    "expected unary sign ( + | - )".to_string(),
+                )),
             },
             _ => Ok(None),
         }
@@ -604,16 +590,15 @@ impl Parser {
     fn process_expression(&mut self, exprs: &mut Vec<Expr>) -> Result<(), NovaError> {
         let pos = self.get_current_token_position();
         let e = self.expr()?;
-        if e.get_type() != TType::Void {
-            exprs.push(e);
-            Ok(())
-        } else {
-            Err(self.generate_error_with_pos(
-                format!("cannot insert a void expression"),
-                format!("expressions must not be void"),
+        if e.get_type() == TType::Void {
+            return Err(self.generate_error_with_pos(
+                "cannot insert a void expression".to_string(),
+                "expressions must not be void".to_string(),
                 pos,
-            ))
+            ));
         }
+        exprs.push(e);
+        Ok(())
     }
 
     fn argument_list(&mut self) -> Result<Vec<Expr>, NovaError> {
@@ -674,8 +659,8 @@ impl Parser {
             }
             if let Some(expr) = field_exprs.get(field_name) {
                 self.check_and_map_types(
-                    &vec![field_type.clone()],
-                    &vec![expr.get_type()],
+                    &[field_type.clone()],
+                    &[expr.get_type()],
                     &mut HashMap::default(),
                     conpos.clone(),
                 )?;
@@ -727,28 +712,26 @@ impl Parser {
         arguments.extend(self.argument_list()?);
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
-        match self.current_token() {
-            Token::Operator {
-                operator: Operator::Colon,
-                ..
-            } => {
-                self.advance();
-                // call get closure
-                let (typeinput, input, output, statement, captured) = self.bar_closure()?;
-                //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
-                let last_closure = Expr::Closure {
-                    ttype: TType::Function {
-                        parameters: typeinput,
-                        return_type: Box::new(output),
-                    },
-                    args: input,
-                    body: statement,
-                    captures: captured,
-                };
-                argument_types.push(last_closure.get_type());
-                arguments.push(last_closure);
-            }
-            _ => {}
+        if let Token::Operator {
+            operator: Operator::Colon,
+            ..
+        } = self.current_token()
+        {
+            self.advance();
+            // call get closure
+            let (typeinput, input, output, statement, captured) = self.bar_closure()?;
+            //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
+            let last_closure = Expr::Closure {
+                ttype: TType::Function {
+                    parameters: typeinput,
+                    return_type: Box::new(output),
+                },
+                args: input,
+                body: statement,
+                captures: captured,
+            };
+            argument_types.push(last_closure.get_type());
+            arguments.push(last_closure);
         }
 
         if argument_types.is_empty() {
@@ -756,12 +739,11 @@ impl Parser {
         }
         let old_identifier = identifier.clone();
         if self.environment.custom_types.contains_key(&identifier) {
-        } else if let Some(TType::Custom { name, .. }) = argument_types.get(0) {
+        } else if let Some(TType::Custom { name, .. }) = argument_types.first() {
             if self.environment.custom_types.contains_key(name) {
-                //dbg!(&name);
                 identifier = format!("{}::{}", name, identifier);
             }
-        } else if let Some(ttype) = argument_types.get(0) {
+        } else if let Some(ttype) = argument_types.first() {
             match ttype {
                 TType::List { .. } => {
                     identifier = format!("List::{}", identifier);
@@ -803,7 +785,7 @@ impl Parser {
                                 .map(|t| t.to_string())
                                 .collect::<Vec<String>>()
                                 .join(", "),
-                            ttype.to_string()
+                            ttype,
                         ),
                         pos,
                     ))
@@ -848,56 +830,54 @@ impl Parser {
                 argument_types,
                 pos,
             )
+        } else if let Some((function_type, function_id, function_kind)) = self
+            .environment
+            .get_function_type(&old_identifier, &argument_types)
+        {
+            self.handle_function_call(
+                function_type,
+                function_id,
+                function_kind,
+                arguments,
+                argument_types,
+                pos,
+            )
+        } else if let Some((function_type, function_id, function_kind)) =
+            self.environment.get_type_capture(&old_identifier)
+        {
+            //println!("captured id {}", identifier);
+            let pos = self.get_current_token_position();
+            self.environment.captured.last_mut().unwrap().insert(
+                identifier.clone(),
+                Symbol {
+                    id: old_identifier.clone(),
+                    ttype: function_type.clone(),
+                    pos: Some(pos.clone()),
+                    kind: SymbolKind::Captured,
+                },
+            );
+            self.handle_function_call(
+                function_type,
+                function_id,
+                function_kind,
+                arguments,
+                argument_types,
+                pos,
+            )
         } else {
-            if let Some((function_type, function_id, function_kind)) = self
-                .environment
-                .get_function_type(&old_identifier, &argument_types)
-            {
-                self.handle_function_call(
-                    function_type,
-                    function_id,
-                    function_kind,
-                    arguments,
-                    argument_types,
-                    pos,
-                )
-            } else if let Some((function_type, function_id, function_kind)) =
-                self.environment.get_type_capture(&old_identifier)
-            {
-                //println!("captured id {}", identifier);
-                let pos = self.get_current_token_position();
-                self.environment.captured.last_mut().unwrap().insert(
-                    identifier.clone(),
-                    Symbol {
-                        id: old_identifier.clone(),
-                        ttype: function_type.clone(),
-                        pos: Some(pos.clone()),
-                        kind: SymbolKind::Captured,
-                    },
-                );
-                self.handle_function_call(
-                    function_type,
-                    function_id,
-                    function_kind,
-                    arguments,
-                    argument_types,
-                    pos,
-                )
-            } else {
-                Err(self.generate_error_with_pos(
-                    format!("E1 Not a valid call: {}", identifier),
-                    format!(
-                        "No function signature '{}' with {} as arguments",
-                        identifier,
-                        argument_types
-                            .iter()
-                            .map(|t| t.to_string())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    ),
-                    pos,
-                ))
-            }
+            Err(self.generate_error_with_pos(
+                format!("E1 Not a valid call: {}", identifier),
+                format!(
+                    "No function signature '{}' with {} as arguments",
+                    identifier,
+                    argument_types
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ),
+                pos,
+            ))
         }
     }
 
@@ -917,10 +897,7 @@ impl Parser {
             } => (parameters, return_type),
             _ => {
                 return Err(self.generate_error_with_pos(
-                    format!(
-                        "E2 Not a valid function type: {}",
-                        function_type.to_string()
-                    ),
+                    format!("E2 Not a valid function type: {}", function_type),
                     String::new(),
                     pos,
                 ))
@@ -949,14 +926,14 @@ impl Parser {
             function_id = subtype.clone();
         }
 
-        return Ok(Expr::Literal {
+        Ok(Expr::Literal {
             ttype: *return_type.clone(),
             value: Atom::Call {
                 name: function_id,
                 arguments,
                 position: pos.clone(),
             },
-        });
+        })
     }
 
     fn modify_type_map(
@@ -966,9 +943,45 @@ impl Parser {
         generics_list: table::Table<String>,
     ) -> Result<(), NovaError> {
         //dbg!(type_map.clone());
-        Ok(if self.current_token().is_symbol('@') {
+        if !self.current_token().is_symbol('@') {
+            return Ok(());
+        }
+        self.advance();
+        self.consume_symbol('[')?;
+        let (generic_type, _) = self.get_identifier()?;
+        if !generics_list.has(&generic_type) {
+            return Err(NovaError::SimpleTypeError {
+                msg: format!("E2 Type '{}' is not a generic type", generic_type),
+                position: pos,
+            });
+        }
+        self.consume_operator(Operator::Colon)?;
+        let ttype = self.ttype()?;
+        // check to see if type is generic and then checkt to see if it is live and if it is not live, throw an error
+        let generic_list = self.collect_generics(&[ttype.clone()]);
+        for generic in generic_list.items {
+            if !self.environment.live_generics.last().unwrap().has(&generic) {
+                //dbg!(self.environment.live_generics.last().unwrap());
+                return Err(NovaError::SimpleTypeError {
+                    msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
+                    position: pos,
+                });
+            }
+        }
+        if let Some(t) = type_map.get(&generic_type) {
+            if t != &ttype {
+                return Err(NovaError::TypeError {
+                    msg: format!("E1 Type '{generic_type}' is already inferred as {t}"),
+                    expected: ttype.to_string(),
+                    found: generic_type.clone(),
+                    position: pos,
+                });
+            }
+        }
+        type_map.insert(generic_type.clone(), ttype.clone());
+
+        while self.current_token().is_symbol(',') {
             self.advance();
-            self.consume_symbol('[')?;
             let (generic_type, _) = self.get_identifier()?;
             if !generics_list.has(&generic_type) {
                 return Err(NovaError::SimpleTypeError {
@@ -978,11 +991,9 @@ impl Parser {
             }
             self.consume_operator(Operator::Colon)?;
             let ttype = self.ttype()?;
-            // check to see if type is generic and then checkt to see if it is live and if it is not live, throw an error
             let generic_list = self.collect_generics(&[ttype.clone()]);
             for generic in generic_list.items {
                 if !self.environment.live_generics.last().unwrap().has(&generic) {
-                    //dbg!(self.environment.live_generics.last().unwrap());
                     return Err(NovaError::SimpleTypeError {
                         msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
                         position: pos,
@@ -992,58 +1003,18 @@ impl Parser {
             if let Some(t) = type_map.get(&generic_type) {
                 if t != &ttype {
                     return Err(NovaError::TypeError {
-                        msg: format!(
-                            "E1 Type '{}' is already inferred as {}",
-                            generic_type,
-                            t.to_string()
-                        ),
+                        msg: format!("E2 Type '{generic_type}' is already inferred as {t}"),
                         expected: ttype.to_string(),
-                        found: generic_type.clone(),
+                        found: generic_type,
                         position: pos,
                     });
                 }
             }
-            type_map.insert(generic_type.clone(), ttype.clone());
-
-            while self.current_token().is_symbol(',') {
-                self.advance();
-                let (generic_type, _) = self.get_identifier()?;
-                if !generics_list.has(&generic_type) {
-                    return Err(NovaError::SimpleTypeError {
-                        msg: format!("E2 Type '{}' is not a generic type", generic_type),
-                        position: pos,
-                    });
-                }
-                self.consume_operator(Operator::Colon)?;
-                let ttype = self.ttype()?;
-                let generic_list = self.collect_generics(&[ttype.clone()]);
-                for generic in generic_list.items {
-                    if !self.environment.live_generics.last().unwrap().has(&generic) {
-                        return Err(NovaError::SimpleTypeError {
-                            msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
-                            position: pos,
-                        });
-                    }
-                }
-                if let Some(t) = type_map.get(&generic_type) {
-                    if t != &ttype {
-                        return Err(NovaError::TypeError {
-                            msg: format!(
-                                "E2 Type '{}' is already inferred as {}",
-                                generic_type,
-                                t.to_string()
-                            ),
-                            expected: ttype.to_string(),
-                            found: generic_type.clone(),
-                            position: pos,
-                        });
-                    }
-                }
-                type_map.insert(generic_type.clone(), ttype.clone());
-            }
-            self.consume_symbol(']')?;
-            //dbg!(type_map.clone());
-        })
+            type_map.insert(generic_type, ttype.clone());
+        }
+        self.consume_symbol(']')?;
+        //dbg!(type_map.clone());
+        Ok(())
     }
 
     fn map_generic_types(
@@ -1083,7 +1054,7 @@ impl Parser {
 
     fn varargs(
         &mut self,
-        identifier: &String,
+        identifier: &str,
         argument_types: &mut Vec<TType>,
         arguments: &mut Vec<Expr>,
     ) {
@@ -1091,16 +1062,16 @@ impl Parser {
         let mut has_varargs = false;
         let mut element = 0;
 
-        if let Some(_) = self
+        if self
             .environment
             .get_function_type(identifier, &*argument_types)
+            .is_none()
         {
-        } else {
             for i in 0..=argument_types.len() {
                 // Split the list at the current index from the end
                 let (left, right) = argument_types.split_at(argument_types.len() - i);
                 // Check if all elements in 'right' are the same
-                if let Some(first) = right.get(0) {
+                if let Some(first) = right.first() {
                     type_flag = first.clone();
                     let mut check = true;
                     for ttype in right.iter() {
@@ -1115,9 +1086,10 @@ impl Parser {
                         new_right.push(TType::List {
                             inner: Box::new(first.clone()),
                         });
-                        if let Some(_) = self
+                        if self
                             .environment
                             .get(&generate_unique_string(identifier, &new_right))
+                            .is_some()
                         {
                             *argument_types = new_right;
                             element = i;
@@ -1149,28 +1121,26 @@ impl Parser {
         let mut arguments = self.get_field_arguments(&identifier, pos.clone())?;
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
-        match self.current_token() {
-            Token::Operator {
-                operator: Operator::Colon,
-                ..
-            } => {
-                self.advance();
-                // call get closure
-                let (typeinput, input, output, statement, captured) = self.bar_closure()?;
-                //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
-                let last_closure = Expr::Closure {
-                    ttype: TType::Function {
-                        parameters: typeinput,
-                        return_type: Box::new(output),
-                    },
-                    args: input,
-                    body: statement,
-                    captures: captured,
-                };
-                argument_types.push(last_closure.get_type());
-                arguments.push(last_closure);
-            }
-            _ => {}
+        if let Token::Operator {
+            operator: Operator::Colon,
+            ..
+        } = self.current_token()
+        {
+            self.advance();
+            // call get closure
+            let (typeinput, input, output, statement, captured) = self.bar_closure()?;
+            //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
+            let last_closure = Expr::Closure {
+                ttype: TType::Function {
+                    parameters: typeinput,
+                    return_type: Box::new(output),
+                },
+                args: input,
+                body: statement,
+                captures: captured,
+            };
+            argument_types.push(last_closure.get_type());
+            arguments.push(last_closure);
         }
 
         if argument_types.is_empty() {
@@ -1246,6 +1216,7 @@ impl Parser {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn replace_generic_types(&self, ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
         match ttype {
             TType::Generic { name: n } => {
@@ -1356,7 +1327,7 @@ impl Parser {
         } else {
             return Err(self.generate_error_with_pos(
                 format!("E1 Not a valid field access: {}", identifier),
-                format!("{} is not a custom type", lhs.get_type().to_string()),
+                format!("{} is not a custom type", lhs.get_type()),
                 pos,
             ));
         }
@@ -1438,7 +1409,7 @@ impl Parser {
                 {
                     if arguments.len() != parameters.len() {
                         return Err(self.generate_error_with_pos(
-                            format!("Incorrect number of arguments"),
+                            "Incorrect number of arguments".to_string(),
                             format!("Got {}, expected {}", arguments.len(), parameters.len()),
                             pos,
                         ));
@@ -1461,8 +1432,8 @@ impl Parser {
                     };
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot call {}", lhs.get_type().to_string()),
-                        format!("Not a function"),
+                        format!("Cannot call {}", lhs.get_type()),
+                        "Not a function".to_string(),
                         pos,
                     ));
                 }
@@ -1554,11 +1525,11 @@ impl Parser {
                     if let Some(start_expr) = &start_expr {
                         if start_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                format!("Must index List with an int"),
+                                "Must index List with an int".to_string(),
                                 format!(
                                     "Cannot index into {} with {}",
-                                    lhs.get_type().to_string(),
-                                    start_expr.get_type().to_string()
+                                    lhs.get_type(),
+                                    start_expr.get_type()
                                 ),
                                 position,
                             ));
@@ -1568,11 +1539,11 @@ impl Parser {
                     if let Some(step_expr) = &step {
                         if step_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                format!("Must index List with an int"),
+                                "Must index List with an int".to_string(),
                                 format!(
                                     "Cannot index into {} with {}",
-                                    lhs.get_type().to_string(),
-                                    step_expr.get_type().to_string()
+                                    lhs.get_type(),
+                                    step_expr.get_type()
                                 ),
                                 position,
                             ));
@@ -1582,11 +1553,11 @@ impl Parser {
                     if let Some(end_expr) = &end_expr {
                         if end_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                format!("Must index List with an int"),
+                                "Must index List with an int".to_string(),
                                 format!(
                                     "Cannot index into {} with {}",
-                                    lhs.get_type().to_string(),
-                                    end_expr.get_type().to_string()
+                                    lhs.get_type(),
+                                    end_expr.get_type()
                                 ),
                                 position,
                             ));
@@ -1606,32 +1577,30 @@ impl Parser {
                         name: identifier.clone(),
                         start: start_expr,
                         end: end_expr,
-                        step: step,
+                        step,
                         container: Box::new(lhs),
                         position,
                     };
-                } else {
-                    if let Some(start_expr) = start_expr {
-                        // typecheck
-                        if start_expr.get_type() != TType::Int {
-                            return Err(self.generate_error_with_pos(
-                                format!("Must index List with an int"),
-                                format!(
-                                    "Cannot index into {} with {}",
-                                    lhs.get_type().to_string(),
-                                    start_expr.get_type().to_string()
-                                ),
-                                position,
-                            ));
-                        }
-                        lhs = Expr::Indexed {
-                            ttype: *element_type.clone(),
-                            name: identifier.clone(),
-                            index: start_expr,
-                            container: Box::new(lhs),
+                } else if let Some(start_expr) = start_expr {
+                    // typecheck
+                    if start_expr.get_type() != TType::Int {
+                        return Err(self.generate_error_with_pos(
+                            "Must index List with an int".to_string(),
+                            format!(
+                                "Cannot index into {} with {}",
+                                lhs.get_type(),
+                                start_expr.get_type()
+                            ),
                             position,
-                        };
+                        ));
                     }
+                    lhs = Expr::Indexed {
+                        ttype: *element_type.clone(),
+                        name: identifier.clone(),
+                        index: start_expr,
+                        container: Box::new(lhs),
+                        position,
+                    };
                 }
                 if self.current_token().is_symbol('[') {
                     lhs = self.index(identifier.clone(), lhs, *element_type)?;
@@ -1668,11 +1637,11 @@ impl Parser {
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Must index Tuple with an int"),
+                        "Must index Tuple with an int".to_string(),
                         format!(
                             "Cannot index into {} with {}",
-                            lhs.get_type().to_string(),
-                            self.current_token().to_string()
+                            lhs.get_type(),
+                            self.current_token()
                         ),
                         position,
                     ));
@@ -1680,8 +1649,8 @@ impl Parser {
             }
             _ => {
                 return Err(self.generate_error(
-                    format!("Cannot index into non-list or non-tuple"),
-                    format!("Must be of type list or tuple"),
+                    "Cannot index into non-list or non-tuple".to_string(),
+                    "Must be of type list or tuple".to_string(),
                 ));
             }
         }
@@ -1726,8 +1695,9 @@ impl Parser {
                     } = left_expr.get_type()
                     {
                         if arguments.len() != parameters.len() {
+                            let msg = "E3 Incorrect number of arguments".to_string();
                             return Err(self.generate_error_with_pos(
-                                format!("E3 Incorrect number of arguments"),
+                                msg,
                                 format!("Got {}, expected {}", arguments.len(), parameters.len()),
                                 field_position,
                             ));
@@ -1752,8 +1722,8 @@ impl Parser {
                         }
                     } else {
                         return Err(self.generate_error_with_pos(
-                            format!("Cannot call {}", left_expr.get_type().to_string()),
-                            format!("Not a function"),
+                            format!("Cannot call {}", left_expr.get_type()),
+                            "Not a function".to_string(),
                             field_position,
                         ));
                     }
@@ -1982,7 +1952,7 @@ impl Parser {
                     typeinput.push(TType::None)
                 }
                 let mut generic_list = self.collect_generics(&typeinput);
-                generic_list.extend(self.collect_generics(&vec![output.clone()]));
+                generic_list.extend(self.collect_generics(&[output.clone()]));
                 if let Some(livemap) = self.environment.live_generics.last_mut() {
                     for generic in generic_list.items.iter() {
                         // add generics to live map
@@ -2001,7 +1971,7 @@ impl Parser {
                             return_type: output,
                         } => {
                             self.environment.insert_symbol(
-                                &id,
+                                id,
                                 TType::Function {
                                     parameters: paraminput.clone(),
                                     return_type: Box::new(*output.clone()),
@@ -2011,7 +1981,7 @@ impl Parser {
                             );
                         }
                         _ => self.environment.insert_symbol(
-                            &id,
+                            id,
                             ttype.clone(),
                             Some(pos.clone()),
                             SymbolKind::Parameter,
@@ -2062,11 +2032,7 @@ impl Parser {
                     let name = arg.1.clone();
                     // check if name is in captured
                     if captured.contains(&name) {
-                        captured = captured
-                            .iter()
-                            .filter(|&x| x != &name)
-                            .map(|x| x.clone())
-                            .collect();
+                        captured.retain(|x| x != &name);
                     }
                 }
 
@@ -2159,8 +2125,8 @@ impl Parser {
                             );
                         } else {
                             return Err(self.generate_error_with_pos(
-                                format!("List comprehension must be a list"),
-                                format!("{} is not a list", listexpr.get_type().to_string()),
+                                "List comprehension must be a list".to_string(),
+                                format!("{} is not a list", listexpr.get_type()),
                                 pos,
                             ));
                         }
@@ -2182,8 +2148,8 @@ impl Parser {
                                 );
                             } else {
                                 return Err(self.generate_error_with_pos(
-                                    format!("List comprehension must be a list"),
-                                    format!("{} is not a list", listexpr.get_type().to_string()),
+                                    "List comprehension must be a list".to_string(),
+                                    format!("{} is not a list", listexpr.get_type()),
                                     pos,
                                 ));
                             }
@@ -2201,8 +2167,8 @@ impl Parser {
                         // typecheck taht outexpr is not void
                         if outexpr.last().unwrap().get_type() == TType::Void {
                             return Err(self.generate_error_with_pos(
-                                format!("List comprehension must return a value"),
-                                format!("Return expression is Void"),
+                                "List comprehension must return a value".to_string(),
+                                "Return expression is Void".to_string(),
                                 pos,
                             ));
                         }
@@ -2219,8 +2185,8 @@ impl Parser {
                         for guard in guards.iter() {
                             if guard.get_type() != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    format!("Guard must be a boolean"),
-                                    format!("{} is not a boolean", guard.get_type().to_string()),
+                                    "Guard must be a boolean".to_string(),
+                                    format!("{} is not a boolean", guard.get_type()),
                                     pos,
                                 ));
                             }
@@ -2228,11 +2194,9 @@ impl Parser {
                         self.environment.pop_block();
                         self.consume_symbol(']')?;
                         // remove ident from scope
-                        for (ident, _) in loops.iter().cloned() {
+                        for (ident, _) in loops.iter() {
                             if let Some(v) = self.environment.values.last_mut() {
-                                if let Some(_) = v.get(&ident) {
-                                    v.remove(&ident);
-                                }
+                                _ = v.remove(ident);
                             }
                         }
                         left = Expr::ListCompConstructor {
@@ -2253,7 +2217,7 @@ impl Parser {
                         for elem in expr_list.clone() {
                             if elem.get_type() != ttype {
                                 return Err(NovaError::TypeError {
-                                    msg: format!("List must contain same type"),
+                                    msg: "List must contain same type".to_string(),
                                     expected: ttype.to_string(),
                                     found: elem.get_type().to_string(),
                                     position: pos,
@@ -2261,25 +2225,21 @@ impl Parser {
                             }
                         }
 
-                        match self.current_token() {
-                            Token::Operator {
-                                operator: Operator::Colon,
-                                ..
-                            } => {
-                                self.consume_operator(Operator::Colon)?;
-                                ttype = self.ttype()?;
-                                if !expr_list.is_empty() {
-                                    if ttype != expr_list[0].get_type() {
-                                        return Err(NovaError::TypeError {
-                                            msg: format!("List must contain same type"),
-                                            expected: ttype.to_string(),
-                                            found: expr_list[0].get_type().to_string(),
-                                            position: pos,
-                                        });
-                                    }
-                                }
+                        if let Token::Operator {
+                            operator: Operator::Colon,
+                            ..
+                        } = self.current_token()
+                        {
+                            self.consume_operator(Operator::Colon)?;
+                            ttype = self.ttype()?;
+                            if !expr_list.is_empty() && ttype != expr_list[0].get_type() {
+                                return Err(NovaError::TypeError {
+                                    msg: "List must contain same type".to_string(),
+                                    expected: ttype.to_string(),
+                                    found: expr_list[0].get_type().to_string(),
+                                    position: pos,
+                                });
                             }
-                            _ => {}
                         }
 
                         let generic_list = self.collect_generics(&[ttype.clone()]);
@@ -2294,8 +2254,8 @@ impl Parser {
                         }
                         if ttype == TType::None {
                             return Err(self.generate_error_with_pos(
-                                format!("List must have a type"),
-                                format!("use `[]: type` to annotate an empty list"),
+                                "List must have a type".to_string(),
+                                "use `[]: type` to annotate an empty list".to_string(),
                                 pos,
                             ));
                         }
@@ -2314,13 +2274,11 @@ impl Parser {
                 self.consume_symbol(')')?;
                 left = expr;
                 if let Some(sign) = sign {
-                    if Unary::Not == sign {
-                        if left.get_type() != TType::Bool {
-                            return Err(self.generate_error(
-                                "cannot apply (Not) operation to a non bool".to_string(),
-                                "Make sure expression returns a bool type".to_string(),
-                            ));
-                        }
+                    if Unary::Not == sign && left.get_type() != TType::Bool {
+                        return Err(self.generate_error(
+                            "cannot apply (Not) operation to a non bool".to_string(),
+                            "Make sure expression returns a bool type".to_string(),
+                        ));
                     }
                     left = Expr::Unary {
                         ttype: left.clone().get_type(),
@@ -2335,17 +2293,23 @@ impl Parser {
                     Token::Operator {
                         operator: Operator::DoubleColon,
                         ..
-                    } => {
-                        if self.environment.custom_types.contains_key(&identifier) {
-                            self.advance();
-                            let (name, _) = self.get_identifier()?;
-                            identifier = format!("{}::{}", identifier, name);
-                        } else if self.modules.has(&identifier) {
-                            self.advance();
-                            let (name, _) = self.get_identifier()?;
-                            identifier = format!("{}::{}", identifier, name);
-                        }
+                    } if self.environment.custom_types.contains_key(&identifier) => {
+                        self.advance();
+                        let (name, _) = self.get_identifier()?;
+                        identifier = format!("{}::{}", identifier, name);
                     }
+                    Token::Operator {
+                        operator: Operator::DoubleColon,
+                        ..
+                    } if self.modules.has(&identifier) => {
+                        self.advance();
+                        let (name, _) = self.get_identifier()?;
+                        identifier = format!("{}::{}", identifier, name);
+                    }
+                    Token::Operator {
+                        operator: Operator::DoubleColon,
+                        ..
+                    } => {}
                     Token::Symbol { symbol: '@', .. } => {
                         self.consume_symbol('@')?;
                         self.consume_symbol('(')?;
@@ -2408,13 +2372,11 @@ impl Parser {
                 let leftt = self.anchor(identifier, pos)?;
                 left = leftt;
                 if let Some(sign) = sign {
-                    if Unary::Not == sign {
-                        if left.get_type() != TType::Bool {
-                            return Err(self.generate_error(
-                                "cannot apply not operation to a non bool".to_string(),
-                                "Make sure expression returns a bool type".to_string(),
-                            ));
-                        }
+                    if Unary::Not == sign && left.get_type() != TType::Bool {
+                        return Err(self.generate_error(
+                            "cannot apply not operation to a non bool".to_string(),
+                            "Make sure expression returns a bool type".to_string(),
+                        ));
                     }
                     left = Expr::Unary {
                         ttype: left.clone().get_type(),
@@ -2430,13 +2392,11 @@ impl Parser {
                     value: Atom::Integer { value: v },
                 };
                 if let Some(sign) = sign {
-                    if Unary::Not == sign {
-                        if left.get_type() != TType::Bool {
-                            return Err(self.generate_error(
-                                "cannot apply (Not) operation to a non bool".to_string(),
-                                "Make sure expression returns a bool type".to_string(),
-                            ));
-                        }
+                    if Unary::Not == sign && left.get_type() != TType::Bool {
+                        return Err(self.generate_error(
+                            "cannot apply (Not) operation to a non bool".to_string(),
+                            "Make sure expression returns a bool type".to_string(),
+                        ));
                     }
                     left = Expr::Unary {
                         ttype: left.clone().get_type(),
@@ -2452,13 +2412,11 @@ impl Parser {
                     value: Atom::Float { value: v },
                 };
                 if let Some(sign) = sign {
-                    if Unary::Not == sign {
-                        if left.get_type() != TType::Bool {
-                            return Err(self.generate_error(
-                                "cannot apply (Not) operation to a non bool".to_string(),
-                                "Make sure expression returns a bool type".to_string(),
-                            ));
-                        }
+                    if Unary::Not == sign && left.get_type() != TType::Bool {
+                        return Err(self.generate_error(
+                            "cannot apply (Not) operation to a non bool".to_string(),
+                            "Make sure expression returns a bool type".to_string(),
+                        ));
                     }
                     left = Expr::Unary {
                         ttype: left.clone().get_type(),
@@ -2483,8 +2441,10 @@ impl Parser {
                 };
             }
             Token::EOF { .. } => {
-                return Err(self
-                    .generate_error(format!("End of file error"), format!("expected expression")));
+                return Err(self.generate_error(
+                    "End of file error".to_string(),
+                    "expected expression".to_string(),
+                ));
             }
             _ => left = Expr::None,
         }
@@ -2523,6 +2483,7 @@ impl Parser {
         Ok(left)
     }
 
+    #[allow(clippy::type_complexity)]
     fn bar_closure(
         &mut self,
     ) -> Result<(Vec<TType>, Vec<Arg>, TType, Vec<Statement>, Vec<String>), NovaError> {
@@ -2586,7 +2547,7 @@ impl Parser {
                     return_type: output,
                 } => {
                     self.environment.insert_symbol(
-                        &id,
+                        id,
                         TType::Function {
                             parameters: paraminput.clone(),
                             return_type: Box::new(*output.clone()),
@@ -2596,7 +2557,7 @@ impl Parser {
                     );
                 }
                 _ => self.environment.insert_symbol(
-                    &id,
+                    id,
                     ttype.clone(),
                     Some(pos.clone()),
                     SymbolKind::Parameter,
@@ -2661,11 +2622,7 @@ impl Parser {
             if captured.contains(&name) {
                 // remove from captured
                 // remove from captured variable
-                captured = captured
-                    .iter()
-                    .filter(|&x| x != &name)
-                    .map(|x| x.clone())
-                    .collect();
+                captured.retain(|x| x != &name);
             }
         }
         for dc in captured.iter() {
@@ -2725,7 +2682,7 @@ impl Parser {
         {
             if arguments.len() != parameters.len() {
                 return Err(self.generate_error_with_pos(
-                    format!("Incorrect number of arguments"),
+                    "Incorrect number of arguments".to_string(),
                     format!("Got {}, expected {}", arguments.len(), parameters.len()),
                     pos.clone(),
                 ));
@@ -2746,8 +2703,8 @@ impl Parser {
             })
         } else {
             Err(self.generate_error_with_pos(
-                format!("Cannot call {}", function_expr.get_type().to_string()),
-                format!("Not a function"),
+                format!("Cannot call {}", function_expr.get_type()),
+                "Not a function".to_string(),
                 pos.clone(),
             ))
         }
@@ -2814,8 +2771,8 @@ impl Parser {
                     Expr::Literal { value: v, .. } => match v {
                         Atom::Id { .. } => {
                             self.check_and_map_types(
-                                &vec![left_expr.get_type()],
-                                &vec![right_expr.get_type()],
+                                &[left_expr.get_type()],
+                                &[right_expr.get_type()],
                                 &mut HashMap::default(),
                                 current_pos.clone(),
                             )?;
@@ -2824,8 +2781,8 @@ impl Parser {
                             return Err(self.generate_error_with_pos(
                                 format!(
                                     "cannot assign {} to {}",
-                                    right_expr.get_type().to_string(),
-                                    left_expr.get_type().to_string()
+                                    right_expr.get_type(),
+                                    left_expr.get_type()
                                 ),
                                 "Cannot assign a value to a literal value".to_string(),
                                 current_pos.clone(),
@@ -2833,12 +2790,12 @@ impl Parser {
                         }
                     },
                     _ => {
-                        if &right_expr.get_type() != &left_expr.get_type() {
+                        if right_expr.get_type() != left_expr.get_type() {
                             return Err(self.generate_error_with_pos(
                                 format!(
                                     "cannot assign {} to {}",
-                                    right_expr.get_type().to_string(),
-                                    left_expr.get_type().to_string()
+                                    right_expr.get_type(),
+                                    left_expr.get_type()
                                 ),
                                 "Cannot assign a value to a literal value".to_string(),
                                 current_pos.clone(),
@@ -2855,74 +2812,72 @@ impl Parser {
             }
         }
 
-        match self.current_token() {
-            Token::Operator {
-                operator: Operator::RightTilde,
-                ..
-            } => {
-                //dbg!("right tilde");
-                //dbg!(left_expr.clone());
-                // the syntax is expr ~> id { statements }
-                self.consume_operator(Operator::RightTilde)?;
-                let (identifier, pos) = self.get_identifier()?;
+        if let Token::Operator {
+            operator: Operator::RightTilde,
+            ..
+        } = self.current_token()
+        {
+            //dbg!("right tilde");
+            //dbg!(left_expr.clone());
+            // the syntax is expr ~> id { statements }
+            self.consume_operator(Operator::RightTilde)?;
+            let (identifier, pos) = self.get_identifier()?;
 
-                // if current token is { else its expr,
-                match self.current_token() {
-                    Token::Symbol { symbol: '{', .. } => {
-                        // cant assing a void
-                        if left_expr.get_type() == TType::Void {
-                            return Err(self.generate_error_with_pos(
-                                format!("Variable '{}' cannot be assinged to void", identifier),
-                                "Make sure the expression returns a value".to_string(),
-                                pos.clone(),
-                            ));
-                        }
-
-                        if self.environment.has(&identifier) {
-                            return Err(self.generate_error_with_pos(
-                                format!("Variable '{}' has already been created", identifier),
-                                "".to_string(),
-                                pos.clone(),
-                            ));
-                        } else {
-                            self.environment.push_block();
-                            self.environment.insert_symbol(
-                                &identifier,
-                                left_expr.get_type(),
-                                Some(pos.clone()),
-                                SymbolKind::Variable,
-                            );
-                            let expr_block = self.block_expr_inline()?;
-                            self.environment.pop_block();
-
-                            if let Some(Statement::Expression { ttype, .. }) = expr_block.last() {
-                                left_expr = Expr::StoreExpr {
-                                    ttype: ttype.clone(),
-                                    name: identifier.clone(),
-                                    expr: Box::new(left_expr),
-                                    body: expr_block,
-                                };
-                            } else {
-                                left_expr = Expr::StoreExpr {
-                                    ttype: TType::Void,
-                                    name: identifier.clone(),
-                                    expr: Box::new(left_expr),
-                                    body: expr_block,
-                                };
-                            }
-                        }
-                    }
-                    _ => {
-                        // return error
+            // if current token is { else its expr,
+            match self.current_token() {
+                Token::Symbol { symbol: '{', .. } => {
+                    // cant assing a void
+                    if left_expr.get_type() == TType::Void {
                         return Err(self.generate_error_with_pos(
-                            format!("Expected block after `~>`"),
-                            "Make sure to use a block after `~>`".to_string(),
+                            format!("Variable '{}' cannot be assinged to void", identifier),
+                            "Make sure the expression returns a value".to_string(),
                             pos.clone(),
                         ));
                     }
+
+                    if self.environment.has(&identifier) {
+                        return Err(self.generate_error_with_pos(
+                            format!("Variable '{}' has already been created", identifier),
+                            "".to_string(),
+                            pos.clone(),
+                        ));
+                    } else {
+                        self.environment.push_block();
+                        self.environment.insert_symbol(
+                            &identifier,
+                            left_expr.get_type(),
+                            Some(pos.clone()),
+                            SymbolKind::Variable,
+                        );
+                        let expr_block = self.block_expr_inline()?;
+                        self.environment.pop_block();
+
+                        if let Some(Statement::Expression { ttype, .. }) = expr_block.last() {
+                            left_expr = Expr::StoreExpr {
+                                ttype: ttype.clone(),
+                                name: identifier.clone(),
+                                expr: Box::new(left_expr),
+                                body: expr_block,
+                            };
+                        } else {
+                            left_expr = Expr::StoreExpr {
+                                ttype: TType::Void,
+                                name: identifier.clone(),
+                                expr: Box::new(left_expr),
+                                body: expr_block,
+                            };
+                        }
+                    }
+                }
+                _ => {
+                    // return error
+                    return Err(self.generate_error_with_pos(
+                        "Expected block after `~>`".to_string(),
+                        "Make sure to use a block after `~>`".to_string(),
+                        pos.clone(),
+                    ));
                 }
             }
-            _ => {}
         }
         Ok(left_expr)
     }
@@ -2940,11 +2895,7 @@ impl Parser {
                         {
                             return Err(self.generate_error_with_pos(
                                 "Logical operation expects bool".to_string(),
-                                format!(
-                                    "got {} {}",
-                                    left_expr.get_type().to_string(),
-                                    right_expr.get_type().to_string()
-                                ),
+                                format!("got {} {}", left_expr.get_type(), right_expr.get_type(),),
                                 current_pos.clone(),
                             ));
                         }
@@ -2963,8 +2914,8 @@ impl Parser {
                                     "Comparison operation expects int or float".to_string(),
                                     format!(
                                         "expected {} , but found {}",
-                                        left_expr.get_type().to_string(),
-                                        right_expr.get_type().to_string()
+                                        left_expr.get_type(),
+                                        right_expr.get_type(),
                                     ),
                                     current_pos.clone(),
                                 ));
@@ -3062,8 +3013,8 @@ impl Parser {
             msg: format!(
                 "Type error, cannot apply operation {:?} to {} and {}",
                 operation,
-                right_expr.get_type().to_string(),
-                left_expr.get_type().to_string()
+                right_expr.get_type(),
+                left_expr.get_type(),
             ),
         }
     }
@@ -3127,7 +3078,7 @@ impl Parser {
                 if let TType::Option { .. } = ttype {
                     return Err(self.generate_error(
                         "Cannot have option directly inside an option".to_string(),
-                        format!("Type Error: Try removing the extra `?`"),
+                        "Type Error: Try removing the extra `?`".to_string(),
                     ));
                 }
                 Ok(TType::Option {
@@ -3151,7 +3102,7 @@ impl Parser {
             }
             Token::Identifier { .. } => {
                 let (identifier, pos) = self.get_identifier()?;
-                if let Some(_) = self.environment.custom_types.get(&identifier) {
+                if self.environment.custom_types.contains_key(&identifier) {
                     let mut type_annotation = vec![];
                     if let Token::Symbol { symbol: '(', .. } = self.current_token() {
                         self.consume_symbol('(')?;
@@ -3167,10 +3118,10 @@ impl Parser {
                     }
                     if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier)
                     {
-                        if generic_len.len() != type_annotation.iter().count() {
+                        if generic_len.len() != type_annotation.len() {
                             return Err(self.generate_error_with_pos(
                                 format!("Expected {} type parameters", generic_len.len()),
-                                format!("Got {} type parameters", type_annotation.iter().count()),
+                                format!("Got {} type parameters", type_annotation.len()),
                                 pos,
                             ));
                         }
@@ -3181,23 +3132,20 @@ impl Parser {
                         type_params: type_annotation,
                     })
                 } else {
-                    if let Some(alias) = self.environment.type_alias.get(&identifier) {
-                        return Ok(alias.clone());
-                    } else {
+                    let Some(alias) = self.environment.type_alias.get(&identifier) else {
                         return Err(self.generate_error_with_pos(
                             "Unknown type".to_string(),
                             format!("Unknown type '{identifier}' "),
                             pos,
                         ));
-                    }
+                    };
+                    Ok(alias.clone())
                 }
             }
-            _ => {
-                return Err(self.generate_error(
-                    "Expected type annotation".to_string(),
-                    format!("Unknown type value {}", self.current_token().to_string()),
-                ));
-            }
+            _ => Err(self.generate_error(
+                "Expected type annotation".to_string(),
+                format!("Unknown type value {}", self.current_token()),
+            )),
         }
     }
 
@@ -3207,10 +3155,7 @@ impl Parser {
             None => {
                 return Err(self.generate_error(
                     "Expected identifier".to_string(),
-                    format!(
-                        "Cannot assign a value to {}",
-                        self.current_token().to_string()
-                    ),
+                    format!("Cannot assign a value to {}", self.current_token(),),
                 ));
             }
         };
@@ -3234,8 +3179,8 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    format!("parameter identifier already defined"),
-                    format!("try using another name"),
+                    "parameter identifier already defined".to_string(),
+                    "try using another name".to_string(),
                     pos,
                 ));
             }
@@ -3261,8 +3206,8 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    format!("parameter identifier already defined"),
-                    format!("try using another name"),
+                    "parameter identifier already defined".to_string(),
+                    "try using another name".to_string(),
                     pos,
                 ));
             }
@@ -3294,8 +3239,8 @@ impl Parser {
         let pos = self.get_current_token_position();
         if test.get_type() != TType::Bool {
             return Err(self.generate_error_with_pos(
-                format!("If statement expression must return a bool"),
-                format!("got {}", test.get_type().to_string()),
+                "If statement expression must return a bool".to_string(),
+                format!("got {}", test.get_type()),
                 pos,
             ));
         }
@@ -3336,7 +3281,7 @@ impl Parser {
                 self.advance();
                 while self.current_token().is_symbol('.') {
                     self.advance();
-                    import_filepath.push_str("/");
+                    import_filepath.push('/');
                     let (identifier, _) = self.get_identifier()?;
                     if identifier == "super" {
                         import_filepath.push_str("..");
@@ -3376,11 +3321,11 @@ impl Parser {
         self.consume_identifier(Some("match"))?;
         let expr = self.expr()?;
 
-        if let Some(_) = expr.get_type().custom_to_string() {
+        if expr.get_type().custom_to_string().is_some() {
         } else {
             return Err(self.generate_error_with_pos(
-                format!("Match statement expects an enum type"),
-                format!("got {}", expr.get_type().to_string()),
+                "Match statement expects an enum type".to_string(),
+                format!("got {}", expr.get_type()),
                 self.get_current_token_position(),
             ));
         }
@@ -3395,8 +3340,8 @@ impl Parser {
                 // check to see if default branch is already defined
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
-                        format!("default branch already defined"),
-                        format!("make sure only one default branch is defined"),
+                        "default branch already defined".to_string(),
+                        "make sure only one default branch is defined".to_string(),
                         pos,
                     ));
                 }
@@ -3453,20 +3398,18 @@ impl Parser {
                     }
                 }
 
-                if vtype != TType::None {
-                    if enum_id.is_empty() {
-                        return Err(self.generate_error_with_pos(
-                            format!("variant '{}' is missing Identifier", variant),
-                            format!("Variant(id), id is missing"),
-                            pos,
-                        ));
-                    }
+                if vtype != TType::None && enum_id.is_empty() {
+                    return Err(self.generate_error_with_pos(
+                        format!("variant '{}' is missing Identifier", variant),
+                        "Variant(id), id is missing".to_string(),
+                        pos,
+                    ));
                 }
 
                 if !found {
                     return Err(self.generate_error_with_pos(
                         format!("variant '{}' not found in type", variant),
-                        format!("make sure the variant is in the type"),
+                        "make sure the variant is in the type".to_string(),
                         pos,
                     ));
                 }
@@ -3506,8 +3449,7 @@ impl Parser {
         }
         self.consume_symbol('}')?;
 
-        if let Some(_) = default_branch.clone() {
-        } else {
+        if default_branch.is_none() {
             // check to see if all variants are covered
             let mut covered = vec![];
             for (tag, _, _) in branches.clone() {
@@ -3541,7 +3483,7 @@ impl Parser {
                     if field.0 != "type" && !covered.contains(&i) {
                         return Err(self.generate_error_with_pos(
                             format!("variant '{}' is not covered", field.0),
-                            format!("make sure all variants are covered"),
+                            "make sure all variants are covered".to_string(),
                             pos,
                         ));
                     }
@@ -3562,10 +3504,10 @@ impl Parser {
     fn type_alias(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("alias"))?;
         let (alias, _) = self.get_identifier()?;
-        if let Some(_) = self.environment.custom_types.get(&alias) {
+        if self.environment.custom_types.contains_key(&alias) {
             return Err(self.generate_error_with_pos(
                 format!("type '{}' already defined", alias),
-                format!("try using another name"),
+                "try using another name".to_string(),
                 self.get_current_token_position(),
             ));
         }
@@ -3627,6 +3569,7 @@ impl Parser {
         Ok(idlist)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn collect_generics(&self, input: &[TType]) -> Table<String> {
         let mut contracts = table::new();
         for t in input {
@@ -3896,7 +3839,7 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if self.environment.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    format!("identifier already used"),
+                    "identifier already used".to_string(),
                     format!("identifier '{identifier}' is already used within this scope"),
                     pos.clone(),
                 ));
@@ -3969,8 +3912,8 @@ impl Parser {
                         )
                     } else {
                         return Err(self.generate_error_with_pos(
-                            format!("foreach can only iterate over arrays"),
-                            format!("got {}", array.get_type().to_string()),
+                            "foreach can only iterate over arrays".to_string(),
+                            format!("got {}", array.get_type()),
                             arraypos.clone(),
                         ));
                     }
@@ -3994,8 +3937,8 @@ impl Parser {
             let inc = self.expr()?;
             if test.get_type() != TType::Bool && test.get_type() != TType::Void {
                 return Err(self.generate_error_with_pos(
-                    format!("test expression must return a bool"),
-                    format!("got {}", test.get_type().to_string()),
+                    "test expression must return a bool".to_string(),
+                    format!("got {}", test.get_type()),
                     testpos,
                 ));
             }
@@ -4017,8 +3960,8 @@ impl Parser {
         let test = self.top_expr()?;
         if test.get_type() != TType::Bool && test.get_type() != TType::Void {
             return Err(self.generate_error_with_pos(
-                format!("test expression must return a bool"),
-                format!("got {}", test.get_type().to_string()),
+                "test expression must return a bool".to_string(),
+                format!("got {}", test.get_type()),
                 testpos,
             ));
         }
@@ -4050,19 +3993,19 @@ impl Parser {
                 inner
             } else {
                 return Err(self.generate_error_with_pos(
-                    format!("unwrap expects an option type"),
-                    format!("got {}", expr.get_type().to_string()),
+                    "unwrap expects an option type".to_string(),
+                    format!("got {}", expr.get_type()),
                     pos.clone(),
                 ));
             };
 
             // make sure symbol doesn't already exist
             if self.environment.has(&identifier) {
-                return Err(self.generate_error_with_pos(
+                Err(self.generate_error_with_pos(
                     format!("Symbol '{}' is already instantiated", identifier),
                     "Cannot reinstantiate the same symbol in the same scope".to_string(),
                     pos.clone(),
-                ));
+                ))
             } else {
                 self.environment.push_block();
                 self.environment.insert_symbol(
@@ -4094,8 +4037,8 @@ impl Parser {
             let test = self.top_expr()?;
             if test.get_type() != TType::Bool {
                 return Err(self.generate_error_with_pos(
-                    format!("If statement's expression must return a bool"),
-                    format!("got {}", test.get_type().to_string()),
+                    "If statement's expression must return a bool".to_string(),
+                    format!("got {}", test.get_type()),
                     testpos.clone(),
                 ));
             }
@@ -4125,7 +4068,7 @@ impl Parser {
         if self.modules.has(&identifier) {
             // throw error
             return Err(self.generate_error_with_pos(
-                format!("Cannot use module as identifier"),
+                "Cannot use module as identifier".to_string(),
                 format!("got {}", identifier),
                 pos.clone(),
             ));
@@ -4145,14 +4088,14 @@ impl Parser {
             expr = self.expr()?;
             match (
                 self.check_and_map_types(
-                    &vec![ttype.clone()],
-                    &vec![expr.get_type()],
+                    &[ttype.clone()],
+                    &[expr.get_type()],
                     &mut HashMap::default(),
                     pos.clone(),
                 ),
                 self.check_and_map_types(
-                    &vec![expr.get_type()],
-                    &vec![ttype.clone()],
+                    &[expr.get_type()],
+                    &[ttype.clone()],
                     &mut HashMap::default(),
                     pos.clone(),
                 ),
@@ -4160,11 +4103,7 @@ impl Parser {
                 (Ok(_), Ok(_)) => {}
                 _ => {
                     return Err(self.generate_error_with_pos(
-                        format!(
-                            "Cannot assign {} to {}",
-                            expr.get_type().to_string(),
-                            ttype.to_string()
-                        ),
+                        format!("Cannot assign {} to {}", expr.get_type(), ttype),
                         "Make sure the expression returns the givin type".to_string(),
                         pos.clone(),
                     ));
@@ -4187,11 +4126,11 @@ impl Parser {
         // make sure symbol doesnt already exist
         if self.environment.has(&identifier) {
             //dbg!(&self.environment);
-            return Err(self.generate_error_with_pos(
+            Err(self.generate_error_with_pos(
                 format!("Symbol '{}' is already instantiated", identifier),
                 "Cannot reinstantiate the same symbol in the same scope".to_string(),
                 pos.clone(),
-            ));
+            ))
         } else {
             self.environment.insert_symbol(
                 &identifier,
@@ -4217,6 +4156,7 @@ impl Parser {
         }))
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn is_generic(&self, params: &[TType]) -> bool {
         for param in params {
             match param {
@@ -4351,7 +4291,7 @@ impl Parser {
                     _ => {
                         // error
                         return Err(self.generate_error_with_pos(
-                            format!("Cannot extend from type"),
+                            "Cannot extend from type".to_string(),
                             "Cannot extend from this type".to_string(),
                             pos.clone(),
                         ));
@@ -4476,7 +4416,7 @@ impl Parser {
         //dbg!(self.environment.values.clone());
         self.environment.no_override.insert(identifier.clone());
         let mut generic_list = self.collect_generics(&typeinput);
-        generic_list.extend(self.collect_generics(&vec![output.clone()]));
+        generic_list.extend(self.collect_generics(&[output.clone()]));
         self.environment.live_generics.push(generic_list.clone());
         //dbg!(generic_list);
         // parse body with scope
@@ -4489,7 +4429,7 @@ impl Parser {
                     return_type,
                 } => {
                     self.environment.insert_symbol(
-                        &id,
+                        id,
                         TType::Function {
                             parameters: parameters.clone(),
                             return_type: return_type.clone(),
@@ -4499,7 +4439,7 @@ impl Parser {
                     );
                 }
                 _ => self.environment.insert_symbol(
-                    &id,
+                    id,
                     ttype.clone(),
                     Some(pos.clone()),
                     SymbolKind::Parameter,
@@ -4551,11 +4491,7 @@ impl Parser {
             if captured.contains(&name) {
                 // remove from captured
                 // remove from captured variable
-                captured = captured
-                    .iter()
-                    .filter(|&x| x != &name)
-                    .map(|x| x.clone())
-                    .collect();
+                captured.retain(|x| x != &name);
             }
         }
 
@@ -4585,14 +4521,12 @@ impl Parser {
         if !has_return && output != TType::Void {
             if let Some(Statement::Pass) = statements.last() {
                 // do nothing
-            } else {
-                if !has_return {
-                    return Err(self.generate_error_with_pos(
-                        "Function is missing a return statement in a branch".to_string(),
-                        "Function missing return".to_string(),
-                        pos.clone(),
-                    ));
-                }
+            } else if !has_return {
+                return Err(self.generate_error_with_pos(
+                    "Function is missing a return statement in a branch".to_string(),
+                    "Function missing return".to_string(),
+                    pos.clone(),
+                ));
             }
         }
         //dbg!(&captured);
@@ -4619,11 +4553,7 @@ impl Parser {
                     if ttype != &return_type {
                         Err(self.generate_error_with_pos(
                             "Return type does not match function return type".to_string(),
-                            format!(
-                                "Expected {} got {}",
-                                return_type.to_string(),
-                                ttype.to_string()
-                            ),
+                            format!("Expected {} got {}", return_type, ttype),
                             pos.clone(),
                         ))
                     } else {
@@ -4780,7 +4710,7 @@ impl Parser {
         // if repl mode no need to parse module
         if self.repl {
             self.ast.program = self.compound_statement()?;
-            return self.eof();
+            self.eof()
         } else {
             if self.current_token().is_id("module") {
                 self.consume_identifier(Some("module"))?;
@@ -4796,7 +4726,7 @@ impl Parser {
                 ));
             }
             self.ast.program = self.compound_statement()?;
-            return self.eof();
+            self.eof()
         }
     }
 }
