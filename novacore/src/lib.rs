@@ -98,7 +98,7 @@ impl NovaCore {
                     .insert(function_id.to_string());
                 self.compiler
                     .native_functions_types
-                    .insert(function_id.to_string(), function_type.clone());
+                    .insert(function_id.to_string(), function_type);
                 self.vm
                     .native_functions
                     .insert(self.vm.native_functions.len(), function_pointer);
@@ -390,7 +390,7 @@ impl NovaCore {
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast.clone(), filepath, true, true, false)?;
+            .compile_program(ast, filepath, true, true, false)?;
         self.assembler.input = asm;
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
@@ -405,7 +405,7 @@ impl NovaCore {
         self.initnova();
 
         self.lexer = Lexer::default();
-        self.lexer.source = self.current_repl.clone();
+        self.lexer.source = self.current_repl.as_str().into();
 
         self.parser = parser::default();
         self.parser.repl = true;

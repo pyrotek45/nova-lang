@@ -63,9 +63,9 @@ impl Environment {
                 if let TType::Function {
                     parameters: input_types,
                     ..
-                } = ttype.clone()
+                } = &ttype
                 {
-                    let unique_id = generate_unique_string(id, &input_types);
+                    let unique_id = generate_unique_string(id, input_types);
                     self.values.last_mut().unwrap().insert(
                         unique_id.clone(),
                         Symbol {

@@ -217,20 +217,20 @@ impl State {
     }
 
     #[inline(always)]
-    pub fn check_useage(&mut self, index: usize) {
+    pub fn check_usage(&mut self, index: usize) {
         if !self.used_data.has(&index) {
             self.used_data.insert(index);
-            let href = self.heap[index].clone();
+            let href = &self.heap[index];
             match href {
                 Heap::List(list) => {
-                    for i in list.iter() {
-                        self.check_useage(*i)
+                    for i in list.clone() {
+                        self.check_usage(i)
                     }
                 }
-                Heap::ListAddress(index) => self.check_useage(index),
-                Heap::StringAddress(index) => self.check_useage(index),
-                Heap::ClosureAddress(index) => self.check_useage(index),
-                Heap::Closure(_, indextwo) => self.check_useage(indextwo),
+                Heap::ListAddress(index) => self.check_usage(*index),
+                Heap::StringAddress(index) => self.check_usage(*index),
+                Heap::ClosureAddress(index) => self.check_usage(*index),
+                Heap::Closure(_, indextwo) => self.check_usage(*indextwo),
                 _ => {}
             }
         }
@@ -255,13 +255,13 @@ impl State {
         for item in self.stack.clone().iter() {
             match item {
                 VmData::List(index) => {
-                    self.check_useage(*index);
+                    self.check_usage(*index);
                 }
                 VmData::String(index) => {
-                    self.check_useage(*index);
+                    self.check_usage(*index);
                 }
                 VmData::Closure(index) => {
-                    self.check_useage(*index);
+                    self.check_usage(*index);
                 }
                 _ => {}
             }

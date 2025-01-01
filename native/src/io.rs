@@ -67,7 +67,7 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
                 for arg in args.iter() {
                     if let Heap::StringAddress(string) = state.deref(*arg) {
                         if let Heap::String(string) = state.deref(string) {
-                            strings.push(string.clone());
+                            strings.push(string);
                         } else {
                             return Err(NovaError::Runtime {
                                 msg: "Invalid arguments for printf".into(),

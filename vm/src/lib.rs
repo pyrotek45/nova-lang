@@ -416,8 +416,8 @@ impl Vm {
                         }
                         VmData::Closure(target) => {
                             if let Heap::Closure(target, captured) = self.state.heap[target] {
-                                if let Heap::List(list) = self.state.heap[captured].clone() {
-                                    for i in list {
+                                if let Heap::List(list) = &self.state.heap[captured] {
+                                    for &i in list {
                                         self.state.stack.push(self.state.to_vmdata(i))
                                     }
                                     self.state.goto(target);

@@ -37,9 +37,7 @@ impl<T: Eq + Clone> Table<T> {
         self.items.clear()
     }
     pub fn extend(&mut self, othertable: Table<T>) {
-        for items in othertable.items.iter() {
-            self.insert(items.clone())
-        }
+        self.items.extend(othertable.items);
     }
     pub fn remove(&mut self, item: T) {
         self.items.remove(self.get_index(item).unwrap());
