@@ -107,10 +107,10 @@ impl Disassembler {
             print!("{} : ", self.ip);
             match code {
                 Code::NONE => {
-                    self.out(&format!("None"));
+                    self.out("None");
                 }
-                Code::LINDEX => self.out(&format!("LINDEX")),
-                Code::PINDEX => self.out(&format!("PINDEX")),
+                Code::LINDEX => self.out("LINDEX"),
+                Code::PINDEX => self.out("PINDEX"),
                 Code::JMP => {
                     let int = u32::from_le_bytes([
                         self.next(&mut input).unwrap(),
@@ -341,7 +341,7 @@ impl Disassembler {
                     ]);
                     self.out(&format!("Closure ID {}", index))
                 }
-                Code::PRINT => self.out(&format!("Print")),
+                Code::PRINT => self.out("Print"),
 
                 Code::STRING => {
                     let mut string = vec![];

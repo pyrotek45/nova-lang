@@ -70,19 +70,19 @@ impl Lexer {
     }
 
     fn current_position(&self) -> FilePosition {
-        return FilePosition {
+        FilePosition {
             line: self.line,
             row: self.row,
             filepath: self.filepath.to_string(),
-        };
+        }
     }
 
     fn current_position_buffer_row(&self, row: usize) -> FilePosition {
-        return FilePosition {
+        FilePosition {
             line: self.line,
-            row: row,
+            row,
             filepath: self.filepath.clone(),
-        };
+        }
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
@@ -112,7 +112,7 @@ impl Lexer {
                     if let Ok(v) = id.parse::<i64>() {
                         self.state = LexerState::Token;
                         self.token_list.push(Token::Integer {
-                            value: v as i64,
+                            value: v,
                             position: self
                                 .current_position_buffer_row(self.row - id.chars().count()),
                         });
@@ -226,15 +226,13 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self) -> Result<TokenList, NovaError> {
-        if !self.repl {
-            if self.filepath.is_empty() {
-                // Consider making the error take a Position struct
-                return Err(NovaError::Lexing {
-                    msg: String::from("File is missing"),
-                    note: String::from("Check the files location was typed correctly"),
-                    position: self.current_position(),
-                });
-            }
+        if !self.repl && self.filepath.is_empty() {
+            // Consider making the error take a Position struct
+            return Err(NovaError::Lexing {
+                msg: String::from("File is missing"),
+                note: String::from("Check the files location was typed correctly"),
+                position: self.current_position(),
+            });
         }
 
         let tempstr = self.source_file.clone();
@@ -287,12 +285,11 @@ impl Lexer {
                 if c != '\n' {
                     self.row += 1;
                     continue;
-                } else {
-                    self.state = LexerState::Token;
-                    self.line += 1;
-                    self.row = 1;
-                    continue;
                 }
+                self.state = LexerState::Token;
+                self.line += 1;
+                self.row = 1;
+                continue;
             }
             if self.state == LexerState::String {
                 if c == '\\' {
@@ -429,7 +426,7 @@ impl Lexer {
                     if self.buffer.is_empty() || self.buffer.chars().count() > 1 {
                         return Err(NovaError::Lexing {
                             msg: String::from("Expecting valid char"),
-                            note: String::from(format!("? {}", self.buffer)),
+                            note: format!("? {}", self.buffer),
                             position: self.current_position(),
                         });
                     }
@@ -749,7 +746,7 @@ impl Lexer {
             LexerState::String => {
                 return Err(NovaError::Lexing {
                     msg: String::from("Expecting valid string"),
-                    note: String::from(format!("? {}", self.buffer)),
+                    note: format!("? {}", self.buffer),
                     position: self.current_position(),
                 });
             }
@@ -773,7 +770,7 @@ impl Lexer {
 
     pub fn check(&self) {
         for token in self.token_list.iter() {
-            common::error::print_line(&token.position(), &format!("{}", token.to_string()));
+            common::error::print_line(&token.position(), &token.to_string());
         }
     }
 }

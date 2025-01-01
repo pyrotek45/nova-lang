@@ -114,13 +114,10 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
 
     state.gclock = true;
     let mut myarray = vec![];
-    let captures = match re
+    let captures: Vec<String> = re
         .find_iter(&text)
         .map(|m| m.as_str().to_string())
-        .collect::<Vec<String>>()
-    {
-        captures => captures,
-    };
+        .collect();
     //dbg!(&text, &pattern, &captures);
     for i in 0..captures.len() {
         let capture = match captures.get(i) {

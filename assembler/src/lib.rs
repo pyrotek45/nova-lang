@@ -349,7 +349,7 @@ impl Assembler {
                 }
                 Asm::INTEGER(int) => {
                     self.output.push(Code::INTEGER);
-                    let int = (int as i64).to_le_bytes();
+                    let int = int.to_le_bytes();
                     self.output.extend_from_slice(&int);
                 }
 
@@ -386,7 +386,7 @@ impl Assembler {
                     } else {
                         self.output.push(Code::JUMPIFFALSE);
                         self.forwardjumps.push((target, self.output.len() as u64));
-                        let t = (0 as u32).to_le_bytes();
+                        let t = 0u32.to_le_bytes();
                         self.output.extend_from_slice(&t);
                     }
                 }
@@ -398,7 +398,7 @@ impl Assembler {
                     } else {
                         self.output.push(Code::JMP);
                         self.forwardjumps.push((target, self.output.len() as u64));
-                        let t = (0 as u32).to_le_bytes();
+                        let t = 0u32.to_le_bytes();
                         self.output.extend_from_slice(&t);
                     }
                 }
@@ -410,7 +410,7 @@ impl Assembler {
                     } else {
                         self.output.push(Code::JMP);
                         self.forwardjumps.push((target, self.output.len() as u64));
-                        let t = (0 as u32).to_le_bytes();
+                        let t = 0u32.to_le_bytes();
                         self.output.extend_from_slice(&t);
                     }
                 }
@@ -430,33 +430,33 @@ impl Assembler {
                     } else {
                         self.output.push(Code::FUNCTION);
                         self.forwardjumps.push((target, self.output.len() as u64));
-                        let t = (0 as u32).to_le_bytes();
+                        let t = 0u32.to_le_bytes();
                         self.output.extend_from_slice(&t);
                     }
                 }
                 Asm::ASSIGN => self.output.push(Code::ASSIGN),
                 Asm::STORE(index) => {
                     self.output.push(Code::STORE);
-                    let bytes = (index as u32).to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::STOREGLOBAL(index) => {
                     self.output.push(Code::STOREGLOBAL);
-                    self.output.extend_from_slice(&(index as u32).to_le_bytes());
+                    self.output.extend_from_slice(&index.to_le_bytes());
                 }
                 Asm::GET(index) => {
                     self.output.push(Code::GET);
-                    let bytes = (index as u32).to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::GETGLOBAL(index) => {
                     self.output.push(Code::GETGLOBAL);
-                    let bytes = (index as u32).to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::DCALL(index) => {
                     self.output.push(Code::DIRECTCALL);
-                    let bytes = (index as u32).to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::CALL => {
@@ -511,7 +511,7 @@ impl Assembler {
                     } else {
                         self.output.push(Code::CLOSURE);
                         self.forwardjumps.push((target, self.output.len() as u64));
-                        let t = (0 as u32).to_le_bytes();
+                        let t = 0_u32.to_le_bytes();
                         self.output.extend_from_slice(&t);
                     }
                 }
@@ -522,7 +522,7 @@ impl Assembler {
                 Asm::LIN => self.output.push(Code::LINDEX),
                 Asm::TCALL(index) => {
                     self.output.push(Code::TAILCALL);
-                    let bytes = (index as u32).to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::AND => self.output.push(Code::AND),
@@ -552,10 +552,10 @@ impl Assembler {
         }
 
         for (target, replace) in self.forwardjumps.iter() {
-            if let Some(destination) = self.labels.get(&target) {
+            if let Some(destination) = self.labels.get(target) {
                 // need to offset - 4 for the jump location
                 let t = ((destination - replace - 4) as u32).to_le_bytes();
-                self.output[(*replace as usize) + 0] = t[0];
+                self.output[*replace as usize] = t[0];
                 self.output[(*replace as usize) + 1] = t[1];
                 self.output[(*replace as usize) + 2] = t[2];
                 self.output[(*replace as usize) + 3] = t[3];

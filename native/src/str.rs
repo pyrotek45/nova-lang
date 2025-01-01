@@ -135,13 +135,12 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
         }
         VmData::Struct(v) => format!("Struct pointer: {v}"),
         VmData::String(v) => {
-            if let Heap::String(str) = state.deref(v) {
-                format!("{str}")
-            } else {
+            let Heap::String(s) = state.deref(v) else {
                 return Err(NovaError::Runtime {
                     msg: "Expected a string in the heap".to_string(),
                 });
-            }
+            };
+            s
         }
         VmData::None => "None".to_string(),
     };
