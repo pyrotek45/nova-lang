@@ -32,7 +32,7 @@ impl NovaCore {
             parser: parser::default(),
             compiler: compiler::new(),
             _optimizer: optimizer::new(),
-            assembler: assembler::new_empty(),
+            assembler: Assembler::empty(),
             vm: vm::new(),
             current_repl: "".to_string(),
         }
@@ -45,7 +45,7 @@ impl NovaCore {
             parser: parser::new(filepath),
             compiler: compiler::new(),
             _optimizer: optimizer::new(),
-            assembler: assembler::new_empty(),
+            assembler: Assembler::empty(),
             vm: vm::new(),
             current_repl: String::new(),
         })
@@ -424,7 +424,7 @@ impl NovaCore {
             .compiler
             .compile_program(ast, filepath, true, true, false)?;
 
-        self.assembler = assembler::new_empty();
+        self.assembler = Assembler::empty();
         self.assembler.input = asm;
         self.assembler.assemble();
 

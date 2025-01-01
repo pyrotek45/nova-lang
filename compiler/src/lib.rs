@@ -7,6 +7,7 @@ use common::error::NovaError;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
+use common::table::Table;
 use common::ttype::TType;
 
 #[derive(Debug, Clone)]
@@ -28,14 +29,14 @@ pub struct Compiler {
 
 pub fn new() -> Compiler {
     Compiler {
-        native_functions: common::table::new(),
-        variables: common::table::new(),
+        native_functions: Table::new(),
+        variables: Table::new(),
         output: Vec::new(),
         filepath: None,
-        upvalues: common::table::new(),
-        global: common::table::new(),
+        upvalues: Table::new(),
+        global: Table::new(),
         entry: 0,
-        bindings: common::table::new(),
+        bindings: Table::new(),
         asm: vec![],
         gen: common::gen::new(),
         breaks: vec![],

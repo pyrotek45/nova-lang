@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     fileposition::FilePosition,
     nodes::{Symbol, SymbolKind},
-    table,
+    table::{self, Table},
     ttype::{generate_unique_string, TType},
 };
 
@@ -20,21 +20,26 @@ pub struct Environment {
     pub live_generics: Vec<table::Table<String>>,
 }
 
-pub fn new_environment() -> Environment {
-    Environment {
-        custom_types: HashMap::default(),
-        no_override: table::new(),
-        captured: vec![HashMap::default()],
-        values: vec![HashMap::default()],
-        type_alias: HashMap::default(),
-        generic_type_struct: HashMap::default(),
-        generic_type_map: HashMap::default(),
-        live_generics: vec![table::new()],
-        enums: table::new(),
+impl Default for Environment {
+    fn default() -> Self {
+        Environment {
+            custom_types: HashMap::default(),
+            no_override: Table::new(),
+            captured: vec![HashMap::default()],
+            values: vec![HashMap::default()],
+            type_alias: HashMap::default(),
+            generic_type_struct: HashMap::default(),
+            generic_type_map: HashMap::default(),
+            live_generics: vec![Table::new()],
+            enums: Table::new(),
+        }
     }
 }
 
 impl Environment {
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn insert_symbol(
         &mut self,
         id: &str,
