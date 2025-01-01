@@ -1,3 +1,5 @@
+use std::{path::Path, rc::Rc};
+
 use crate::{
     fileposition::FilePosition,
     tokens::{Operator, Unary},
@@ -127,7 +129,7 @@ pub enum Statement {
     },
     Block {
         body: Vec<Statement>,
-        filepath: String,
+        filepath: Option<Rc<Path>>,
     },
     Match {
         ttype: TType,

@@ -46,9 +46,9 @@ impl TType {
         matches!(self, TType::Function { .. })
     }
 
-    pub fn custom_to_string(&self) -> Option<String> {
+    pub fn custom_to_string(&self) -> Option<&str> {
         match self {
-            TType::Custom { name, .. } => Some(name.to_string()),
+            TType::Custom { name, .. } => Some(name),
             _ => None,
         }
     }

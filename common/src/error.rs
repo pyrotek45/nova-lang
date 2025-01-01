@@ -1,6 +1,10 @@
 use crate::{fileposition::FilePosition, ttype::TType};
 use colored::Colorize;
-use std::io::{self, BufRead};
+use std::{
+    borrow::Cow,
+    io::{self, BufRead},
+    path::Path,
+};
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<std::fs::File>>>
 where
@@ -11,7 +15,7 @@ where
 }
 
 pub fn print_line(position: &FilePosition, msg: &str) {
-    if let Ok(lines) = read_lines(&position.filepath) {
+    if let Ok(lines) = read_lines(position.filepath.as_deref().unwrap_or(Path::new(""))) {
         let line_number_width = position.line.to_string().chars().count();
 
         for (linenumber, line_content) in lines.enumerate() {
@@ -52,26 +56,26 @@ pub enum NovaError {
         position: FilePosition,
     },
     Parsing {
-        msg: String,
-        note: String,
+        msg: Cow<'static, str>,
+        note: Cow<'static, str>,
         position: FilePosition,
         extra: Option<Vec<(String, FilePosition)>>,
     },
     Compiler {
-        msg: String,
-        note: String,
+        msg: Cow<'static, str>,
+        note: Cow<'static, str>,
     },
     Runtime {
-        msg: String,
+        msg: Cow<'static, str>,
     },
     RuntimeWithPos {
-        msg: String,
+        msg: Cow<'static, str>,
         position: FilePosition,
     },
     TypeError {
-        msg: String,
-        expected: String,
-        found: String,
+        msg: Cow<'static, str>,
+        expected: Cow<'static, str>,
+        found: Cow<'static, str>,
         position: FilePosition,
     },
     TypeMismatch {
@@ -80,7 +84,7 @@ pub enum NovaError {
         position: FilePosition,
     },
     SimpleTypeError {
-        msg: String,
+        msg: Cow<'static, str>,
         position: FilePosition,
     },
 }
@@ -154,7 +158,11 @@ impl NovaError {
                 println!(
                     "{} in {}:{}:{}",
                     "Lexing Error".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );
@@ -170,7 +178,11 @@ impl NovaError {
                 println!(
                     "{} in {}:{}:{}",
                     "Parsing Error".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );
@@ -193,7 +205,11 @@ impl NovaError {
                 println!(
                     "{} in {}:{}:{}",
                     "Runtime Error".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );
@@ -208,17 +224,17 @@ impl NovaError {
                 println!(
                     "{} in {}:{}:{}",
                     "Type Error".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );
                 print_line(
                     position,
-                    &format!(
-                        "Expected type: {}\nFound type: {}",
-                        expected,
-                        found
-                    ),
+                    &format!("Expected type: {}\nFound type: {}", expected, found),
                 );
                 println!("{}: {}", "Note".bright_yellow(), msg.bright_yellow());
             }
@@ -230,24 +246,28 @@ impl NovaError {
                 println!(
                     "{} in {}:{}:{}",
                     "Type Mismatch".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );
                 print_line(
                     position,
-                    &format!(
-                        "Expected type: {}\nFound type: {}",
-                        expected,
-                        found
-                    ),
+                    &format!("Expected type: {}\nFound type: {}", expected, found),
                 );
             }
             NovaError::SimpleTypeError { msg, position } => {
                 println!(
                     "{} in {}:{}:{}",
                     "Type Error".bright_red(),
-                    position.filepath,
+                    position
+                        .filepath
+                        .as_deref()
+                        .unwrap_or(Path::new("repl"))
+                        .display(),
                     position.line,
                     position.row
                 );

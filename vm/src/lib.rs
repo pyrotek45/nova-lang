@@ -41,7 +41,7 @@ impl Vm {
             match self.state.next_instruction() {
                 Code::ERROR => {
                     return Err(NovaError::RuntimeWithPos {
-                        msg: "Error".to_string(),
+                        msg: "Error".into(),
                         position: self.runtime_errors_table[&self.state.current_instruction]
                             .clone(),
                     });
@@ -287,7 +287,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -303,7 +304,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -319,7 +321,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -335,7 +338,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -345,7 +349,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".to_string(),
+                            msg: "Integer overflow".into(),
                         })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
@@ -353,7 +357,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -363,7 +368,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".to_string(),
+                            msg: "Integer overflow".into(),
                         })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
@@ -371,7 +376,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -383,7 +389,7 @@ impl Vm {
                         // safely multi
 
                         let result = v1.checked_mul(v2).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".to_string(),
+                            msg: "Integer overflow".into(),
                         })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
@@ -391,7 +397,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -401,7 +408,7 @@ impl Vm {
                         (self.state.stack.pop(), self.state.stack.pop())
                     {
                         let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer division by zero".to_string(),
+                            msg: "Integer division by zero".into(),
                         })?;
                         self.state.stack.push(VmData::Int(result))
                     } else {
@@ -409,7 +416,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -524,7 +532,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -540,7 +549,8 @@ impl Vm {
                             msg: format!(
                                 "IGTR Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 },
@@ -556,7 +566,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -572,7 +583,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -636,7 +648,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -656,7 +669,8 @@ impl Vm {
                                     msg: format!(
                                         "Error on Opcode : {}",
                                         self.state.program[self.state.current_instruction]
-                                    ),
+                                    )
+                                    .into(),
                                 });
                             }
                         }
@@ -689,7 +703,8 @@ impl Vm {
                                     msg: format!(
                                         "Error on Opcode : {}",
                                         self.state.program[self.state.current_instruction]
-                                    ),
+                                    )
+                                    .into(),
                                 });
                             }
                         }
@@ -707,7 +722,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -766,7 +782,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }
@@ -811,9 +828,9 @@ impl Vm {
                                                 .runtime_errors_table
                                                 .get(&self.state.current_instruction)
                                             {
-                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), position: pos.clone() });
+                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
                                             } else {
-                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get) });
+                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
                                             }
                                         }
                                         self.state
@@ -830,9 +847,9 @@ impl Vm {
                                                 .runtime_errors_table
                                                 .get(&self.state.current_instruction)
                                             {
-                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get), position: pos.clone() });
+                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
                                             } else {
-                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get) });
+                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
                                             }
                                         }
                                         self.state
@@ -853,7 +870,8 @@ impl Vm {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
                                 self.state.program[self.state.current_instruction]
-                            ),
+                            )
+                            .into(),
                         });
                     }
                 }

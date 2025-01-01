@@ -9,14 +9,14 @@ pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
                 Ok(())
             }
             _ => Err(NovaError::Runtime {
-                msg: "Expected a string in the heap".to_string(),
+                msg: "Expected a string in the heap".into(),
             }),
         },
         Some(_) => Err(NovaError::Runtime {
-            msg: "Expected a string on the stack".to_string(),
+            msg: "Expected a string on the stack".into(),
         }),
         None => Err(NovaError::Runtime {
-            msg: "Stack is empty".to_string(),
+            msg: "Stack is empty".into(),
         }),
     }
 }
@@ -36,14 +36,14 @@ pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
                 Ok(())
             }
             _ => Err(NovaError::Runtime {
-                msg: "Expected a string in the heap".to_string(),
+                msg: "Expected a string in the heap".into(),
             }),
         },
         Some(_) => Err(NovaError::Runtime {
-            msg: "Expected a string on the stack".to_string(),
+            msg: "Expected a string on the stack".into(),
         }),
         None => Err(NovaError::Runtime {
-            msg: "Stack is empty".to_string(),
+            msg: "Stack is empty".into(),
         }),
     }
 }
@@ -53,7 +53,7 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -62,7 +62,7 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
         VmData::List(index) => index,
         _ => {
             return Err(NovaError::Runtime {
-                msg: "Expected a list on the stack".to_string(),
+                msg: "Expected a list on the stack".into(),
             })
         }
     };
@@ -71,7 +71,7 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
         Heap::List(array) => array,
         _ => {
             return Err(NovaError::Runtime {
-                msg: "Expected a list in the heap".to_string(),
+                msg: "Expected a list in the heap".into(),
             })
         }
     };
@@ -85,7 +85,7 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
             _ => {
                 state.gclock = false;
                 return Err(NovaError::Runtime {
-                    msg: "Expected a char in the list".to_string(),
+                    msg: "Expected a char in the list".into(),
                 });
             }
         }
@@ -102,7 +102,7 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -128,7 +128,7 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
                 sbuild += "]";
             } else {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a list in the heap".to_string(),
+                    msg: "Expected a list in the heap".into(),
                 });
             }
             sbuild
@@ -137,7 +137,7 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
         VmData::String(v) => {
             let Heap::String(s) = state.deref(v) else {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string(),
+                    msg: "Expected a string in the heap".into(),
                 });
             };
             s
@@ -155,7 +155,7 @@ pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };

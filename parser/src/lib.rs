@@ -1,4 +1,9 @@
-use std::collections::HashMap;
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use common::{
     environment::{new_environment, Environment},
@@ -12,16 +17,9 @@ use common::{
 use dym::Lexicon;
 use lexer::Lexer;
 
-fn extract_current_directory(path: &str) -> Option<String> {
-    if let Some(last_slash_index) = path.rfind('/') {
-        return Some(path[..last_slash_index + 1].to_string());
-    }
-    None
-}
-
 #[derive(Debug, Clone)]
 pub struct Parser {
-    filepath: String,
+    filepath: Option<Rc<Path>>,
     pub input: TokenList,
     index: usize,
     pub ast: Ast,
@@ -33,7 +31,7 @@ pub struct Parser {
 pub fn default() -> Parser {
     let env = create_environment();
     Parser {
-        filepath: String::new(),
+        filepath: None,
         ast: Ast { program: vec![] },
         input: vec![],
         index: 0,
@@ -43,10 +41,10 @@ pub fn default() -> Parser {
     }
 }
 
-pub fn new(filepath: &str) -> Parser {
+pub fn new(filepath: impl AsRef<Path>) -> Parser {
     let env = create_environment();
     Parser {
-        filepath: filepath.to_string(),
+        filepath: Some(filepath.as_ref().into()),
         ast: Ast { program: vec![] },
         input: vec![],
         index: 0,
@@ -360,7 +358,7 @@ impl Parser {
                     } else {
                         //dbg!(self.environment.live_generics.last().unwrap());
                         Err(NovaError::SimpleTypeError {
-                            msg: format!("Generic type {} could not be inferred", name),
+                            msg: format!("Generic type {} could not be inferred", name).into(),
                             position: pos,
                         })
                     }
@@ -416,8 +414,8 @@ impl Parser {
             Ok(())
         } else {
             Err(NovaError::Parsing {
-                msg: "Parsing not completed, left over tokens unparsed".to_string(),
-                note: "Make sure your statement ends with ';'.".to_string(),
+                msg: "Parsing not completed, left over tokens unparsed".into(),
+                note: "Make sure your statement ends with ';'.".into(),
                 position: self.get_current_token_position(),
                 extra: None,
             })
@@ -428,19 +426,28 @@ impl Parser {
         matches!(self.current_token(), Token::EOF { .. })
     }
 
-    fn generate_error(&self, msg: String, note: String) -> NovaError {
+    fn generate_error(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        note: impl Into<Cow<'static, str>>,
+    ) -> NovaError {
         NovaError::Parsing {
-            msg,
-            note,
+            msg: msg.into(),
+            note: note.into(),
             position: self.get_current_token_position(),
             extra: None,
         }
     }
 
-    fn generate_error_with_pos(&self, msg: String, note: String, pos: FilePosition) -> NovaError {
+    fn generate_error_with_pos(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        note: impl Into<Cow<'static, str>>,
+        pos: FilePosition,
+    ) -> NovaError {
         NovaError::Parsing {
-            msg,
-            note,
+            msg: msg.into(),
+            note: note.into(),
             position: pos,
             extra: None,
         }
@@ -667,9 +674,9 @@ impl Parser {
                 validated_exprs.push(expr.clone());
             } else {
                 return Err(NovaError::Parsing {
-                    msg: format!("{} is missing field {}", constructor, field_name),
-                    note: String::new(),
-                    position: conpos.clone(),
+                    msg: format!("{} is missing field {}", constructor, field_name).into(),
+                    note: "".into(),
+                    position: conpos,
                     extra: None,
                 });
             }
@@ -681,8 +688,9 @@ impl Parser {
                     constructor,
                     fields.len() - 1,
                     field_exprs.len()
-                ),
-                note: String::new(),
+                )
+                .into(),
+                note: "".into(),
                 position: conpos.clone(),
                 extra: None,
             });
@@ -693,8 +701,9 @@ impl Parser {
                     "{} has {} fields, not all of them are covered",
                     constructor,
                     fields.len() - 1
-                ),
-                note: String::new(),
+                )
+                .into(),
+                note: "".into(),
                 position: conpos,
                 extra: None,
             });
@@ -951,7 +960,7 @@ impl Parser {
         let (generic_type, _) = self.get_identifier()?;
         if !generics_list.has(&generic_type) {
             return Err(NovaError::SimpleTypeError {
-                msg: format!("E2 Type '{}' is not a generic type", generic_type),
+                msg: format!("E2 Type '{}' is not a generic type", generic_type).into(),
                 position: pos,
             });
         }
@@ -963,7 +972,7 @@ impl Parser {
             if !self.environment.live_generics.last().unwrap().has(&generic) {
                 //dbg!(self.environment.live_generics.last().unwrap());
                 return Err(NovaError::SimpleTypeError {
-                    msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
+                    msg: format!("E1 Generic Type '{generic}' is not live").into(),
                     position: pos,
                 });
             }
@@ -971,9 +980,9 @@ impl Parser {
         if let Some(t) = type_map.get(&generic_type) {
             if t != &ttype {
                 return Err(NovaError::TypeError {
-                    msg: format!("E1 Type '{generic_type}' is already inferred as {t}"),
-                    expected: ttype.to_string(),
-                    found: generic_type.clone(),
+                    msg: format!("E1 Type '{generic_type}' is already inferred as {t}").into(),
+                    expected: ttype.to_string().into(),
+                    found: generic_type.into(),
                     position: pos,
                 });
             }
@@ -985,7 +994,7 @@ impl Parser {
             let (generic_type, _) = self.get_identifier()?;
             if !generics_list.has(&generic_type) {
                 return Err(NovaError::SimpleTypeError {
-                    msg: format!("E2 Type '{}' is not a generic type", generic_type),
+                    msg: format!("E2 Type '{generic_type}' is not a generic type").into(),
                     position: pos,
                 });
             }
@@ -995,7 +1004,7 @@ impl Parser {
             for generic in generic_list.items {
                 if !self.environment.live_generics.last().unwrap().has(&generic) {
                     return Err(NovaError::SimpleTypeError {
-                        msg: format!("E1 Generic Type '{}' is not live", generic.clone()),
+                        msg: format!("E1 Generic Type '{}' is not live", generic).into(),
                         position: pos,
                     });
                 }
@@ -1003,9 +1012,9 @@ impl Parser {
             if let Some(t) = type_map.get(&generic_type) {
                 if t != &ttype {
                     return Err(NovaError::TypeError {
-                        msg: format!("E2 Type '{generic_type}' is already inferred as {t}"),
-                        expected: ttype.to_string(),
-                        found: generic_type,
+                        msg: format!("E2 Type '{generic_type}' is already inferred as {t}").into(),
+                        expected: ttype.to_string().into(),
+                        found: generic_type.into(),
                         position: pos,
                     });
                 }
@@ -1286,10 +1295,10 @@ impl Parser {
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
-            if let Some(fields) = self.environment.custom_types.get(&type_name) {
+            if let Some(fields) = self.environment.custom_types.get(type_name) {
                 //dbg!(&identifier, lhs.get_type().custom_to_string(), fields);
                 let new_fields =
-                    if let Some(x) = self.environment.generic_type_struct.get(&type_name) {
+                    if let Some(x) = self.environment.generic_type_struct.get(type_name) {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
                             panic!("not a custom type")
                         };
@@ -1308,7 +1317,7 @@ impl Parser {
                 if let Some((index, field_type)) = self.find_field(&identifier, &new_fields) {
                     lhs = Expr::Field {
                         ttype: field_type.clone(),
-                        name: type_name.clone(),
+                        name: type_name.into(),
                         index,
                         expr: Box::new(lhs),
                         position: pos.clone(),
@@ -1316,13 +1325,13 @@ impl Parser {
                 } else {
                     return self.generate_field_not_found_error(
                         &identifier,
-                        &type_name,
+                        type_name,
                         fields,
                         pos,
                     );
                 }
             } else {
-                return self.generate_field_not_found_error(&identifier, &type_name, &[], pos);
+                return self.generate_field_not_found_error(&identifier, type_name, &[], pos);
             }
         } else {
             return Err(self.generate_error_with_pos(
@@ -2217,9 +2226,9 @@ impl Parser {
                         for elem in expr_list.clone() {
                             if elem.get_type() != ttype {
                                 return Err(NovaError::TypeError {
-                                    msg: "List must contain same type".to_string(),
-                                    expected: ttype.to_string(),
-                                    found: elem.get_type().to_string(),
+                                    msg: "List must contain same type".into(),
+                                    expected: ttype.to_string().into(),
+                                    found: elem.get_type().to_string().into(),
                                     position: pos,
                                 });
                             }
@@ -2234,9 +2243,9 @@ impl Parser {
                             ttype = self.ttype()?;
                             if !expr_list.is_empty() && ttype != expr_list[0].get_type() {
                                 return Err(NovaError::TypeError {
-                                    msg: "List must contain same type".to_string(),
-                                    expected: ttype.to_string(),
-                                    found: expr_list[0].get_type().to_string(),
+                                    msg: "List must contain same type".into(),
+                                    expected: ttype.to_string().into(),
+                                    found: expr_list[0].get_type().to_string().into(),
                                     position: pos,
                                 });
                             }
@@ -2247,7 +2256,7 @@ impl Parser {
                             if !self.environment.live_generics.last().unwrap().has(&generic) {
                                 //dbg!(self.environment.live_generics.last().unwrap().clone());
                                 return Err(NovaError::SimpleTypeError {
-                                    msg: format!("Generic Type '{}' is not live", generic.clone()),
+                                    msg: format!("Generic Type '{}' is not live", generic).into(),
                                     position: pos,
                                 });
                             }
@@ -3007,15 +3016,15 @@ impl Parser {
         pos: FilePosition,
     ) -> NovaError {
         NovaError::TypeError {
-            expected: left_expr.get_type().to_string(),
-            found: right_expr.get_type().to_string(),
+            expected: left_expr.get_type().to_string().into(),
+            found: right_expr.get_type().to_string().into(),
             position: pos,
             msg: format!(
-                "Type error, cannot apply operation {:?} to {} and {}",
-                operation,
+                "Type error, cannot apply operation {operation:?} to {} and {}",
                 right_expr.get_type(),
                 left_expr.get_type(),
-            ),
+            )
+            .into(),
         }
     }
 
@@ -3263,12 +3272,12 @@ impl Parser {
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("import"))?;
-        let import_filepath = match self.current_token() {
+        let import_filepath: PathBuf = match self.current_token() {
             Token::String {
                 value: filepath, ..
             } => {
                 self.advance();
-                filepath.clone()
+                filepath.into()
             }
             Token::Identifier { name, .. } => {
                 let mut import_filepath = {
@@ -3291,29 +3300,35 @@ impl Parser {
                 }
                 //dbg!(self.current_token());
                 import_filepath.push_str(".nv");
-                import_filepath
+                import_filepath.into()
             }
             _ => panic!(),
         };
-        let resolved_filepath: String = match extract_current_directory(&self.filepath) {
+        let resolved_filepath = match self
+            .filepath
+            .as_ref()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+        {
             Some(mut current_dir) => {
-                current_dir.push_str(&import_filepath);
+                current_dir.push(import_filepath);
                 current_dir
             }
-            None => import_filepath.clone(),
+            None => import_filepath,
         };
+        let resolved_filepath: Rc<Path> = resolved_filepath.into();
         let tokens = Lexer::new(&resolved_filepath)?.tokenize()?;
         let mut parser = self.clone();
         parser.repl = false;
         parser.index = 0;
-        parser.filepath = resolved_filepath.clone();
+        parser.filepath = Some(resolved_filepath.clone());
         parser.input = tokens;
         parser.parse()?;
         self.environment = parser.environment.clone();
         self.modules = parser.modules.clone();
         Ok(Some(Statement::Block {
             body: parser.ast.program.clone(),
-            filepath: resolved_filepath,
+            filepath: Some(resolved_filepath),
         }))
     }
 
@@ -3363,12 +3378,12 @@ impl Parser {
             if let Some(fields) = self
                 .environment
                 .custom_types
-                .get(&expr.get_type().custom_to_string().unwrap())
+                .get(expr.get_type().custom_to_string().unwrap())
             {
                 let new_fields = if let Some(x) = self
                     .environment
                     .generic_type_struct
-                    .get(&expr.get_type().custom_to_string().unwrap())
+                    .get(expr.get_type().custom_to_string().unwrap())
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         panic!("not a custom type")
@@ -3458,12 +3473,12 @@ impl Parser {
             if let Some(fields) = self
                 .environment
                 .custom_types
-                .get(&expr.get_type().custom_to_string().unwrap())
+                .get(expr.get_type().custom_to_string().unwrap())
             {
                 let new_fields = if let Some(x) = self
                     .environment
                     .generic_type_struct
-                    .get(&expr.get_type().custom_to_string().unwrap())
+                    .get(expr.get_type().custom_to_string().unwrap())
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         panic!("not a custom type")

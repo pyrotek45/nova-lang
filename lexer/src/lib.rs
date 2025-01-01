@@ -1,3 +1,5 @@
+use std::{path::Path, rc::Rc};
+
 use common::{
     error::NovaError,
     fileposition::{load_file_content, FilePosition},
@@ -19,15 +21,14 @@ enum LexerState {
 pub struct Lexer {
     line: usize,
     row: usize,
-    filepath: String,
-    pub source_file: String,
+    filepath: Option<Rc<Path>>,
+    pub source: String,
     token_list: TokenList,
     buffer: String,
     state: LexerState,
     string_start_position: Vec<usize>,
     char_start_position: Vec<usize>,
     literal_pound_count: Vec<usize>,
-    pub repl: bool,
 }
 
 impl Default for Lexer {
@@ -36,36 +37,34 @@ impl Default for Lexer {
             line: 1,
             row: 1,
             filepath: Default::default(),
-            source_file: Default::default(),
+            source: Default::default(),
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
             string_start_position: vec![],
             char_start_position: vec![],
             literal_pound_count: vec![],
-            repl: false,
         }
     }
 }
 
 impl Lexer {
-    pub fn new(filepath: &str) -> Result<Lexer, NovaError> {
-        let source = match load_file_content(filepath) {
+    pub fn new(path: &Path) -> Result<Lexer, NovaError> {
+        let source = match load_file_content(path) {
             Ok(value) => value,
             Err(value) => return Err(value),
         };
         Ok(Lexer {
             line: 1,
             row: 1,
-            filepath: filepath.to_string(),
-            source_file: source,
+            filepath: Some(path.into()),
+            source,
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,
             string_start_position: vec![],
             char_start_position: vec![],
             literal_pound_count: vec![],
-            repl: false,
         })
     }
 
@@ -73,7 +72,7 @@ impl Lexer {
         FilePosition {
             line: self.line,
             row: self.row,
-            filepath: self.filepath.to_string(),
+            filepath: self.filepath.clone(),
         }
     }
 
@@ -226,16 +225,7 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self) -> Result<TokenList, NovaError> {
-        if !self.repl && self.filepath.is_empty() {
-            // Consider making the error take a Position struct
-            return Err(NovaError::Lexing {
-                msg: String::from("File is missing"),
-                note: String::from("Check the files location was typed correctly"),
-                position: self.current_position(),
-            });
-        }
-
-        let tempstr = self.source_file.clone();
+        let tempstr = self.source.clone();
         let mut chars = tempstr.chars().peekable();
 
         while let Some(c) = chars.next() {
