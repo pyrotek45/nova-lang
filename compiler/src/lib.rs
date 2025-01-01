@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::path::Path;
+use std::rc::Rc;
 
 use common::code::Asm;
 use common::error::NovaError;
@@ -16,7 +18,7 @@ pub struct Compiler {
     pub native_functions: common::table::Table<String>,
     pub native_functions_types: HashMap<String, TType>,
     pub output: Vec<u8>,
-    pub filepath: String,
+    pub filepath: Option<Rc<Path>>,
     pub entry: usize,
     pub asm: Vec<Asm>,
     pub gen: Gen,
@@ -29,7 +31,7 @@ pub fn new() -> Compiler {
         native_functions: common::table::new(),
         variables: common::table::new(),
         output: Vec::new(),
-        filepath: String::new(),
+        filepath: None,
         upvalues: common::table::new(),
         global: common::table::new(),
         entry: 0,
@@ -114,12 +116,12 @@ impl Compiler {
     pub fn compile_program(
         &mut self,
         input: Ast,
-        filepath: String,
+        filepath: impl Into<Option<Rc<Path>>>,
         alloc: bool,
         global: bool,
         function: bool,
     ) -> Result<Vec<Asm>, NovaError> {
-        self.filepath = filepath;
+        self.filepath = filepath.into();
         // create wrapper functions for builtin functions
         //dbg!(&self.native_functions);
 
@@ -341,8 +343,7 @@ impl Compiler {
                     self.global.insert(identifier.to_string());
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
-                    self.asm
-                        .push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
+                    self.asm.push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
                     self.asm.push(Asm::STRING(identifier.clone()));
                     self.asm.push(Asm::LIST(fields.len() as u64));
                     self.asm.push(Asm::RET(true));
@@ -1594,8 +1595,8 @@ impl Compiler {
                     self.asm.push(Asm::GETGLOBAL(index as u32));
                 } else {
                     return Err(NovaError::Compiler {
-                        msg: format!("Identifier \"{}\" not found", identifier),
-                        note: "Identifier could not be loaded".to_string(),
+                        msg: format!("Identifier \"{}\" not found", identifier).into(),
+                        note: "Identifier could not be loaded".into(),
                     });
                 }
             }
@@ -1658,8 +1659,8 @@ impl Compiler {
                             self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             return Err(NovaError::Compiler {
-                                msg: format!("Function \"{}\" not found", identifier),
-                                note: "Function could not be loaded".to_string(),
+                                msg: format!("Function \"{}\" not found", identifier).into(),
+                                note: "Function could not be loaded".into(),
                             });
                         }
                     }

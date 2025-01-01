@@ -8,6 +8,7 @@ use reedline::{
 };
 use std::{
     io::{self, Write},
+    path::{Path, PathBuf},
     process::exit,
 };
 fn main() {
@@ -29,17 +30,17 @@ fn entry_command() -> Option<()> {
         }
     };
 
-    let execute_command = |filepath: String, action: fn(NovaCore) -> Result<(), NovaError>| {
-        let novacore = compile_file_or_exit(&filepath);
+    let execute_command = |filepath: &Path, action: fn(NovaCore) -> Result<(), NovaError>| {
+        let novacore = compile_file_or_exit(filepath);
         handle_error(action(novacore));
     };
 
     match command.as_str() {
-        "run" => execute_command(args.next()?, NovaCore::run),
-        "dbg" => execute_command(args.next()?, NovaCore::run_debug),
-        "dis" => execute_command(args.next()?, NovaCore::dis_file),
+        "run" => execute_command(args.next().as_ref().map(Path::new)?, NovaCore::run),
+        "dbg" => execute_command(args.next().as_ref().map(Path::new)?, NovaCore::run_debug),
+        "dis" => execute_command(args.next().as_ref().map(Path::new)?, NovaCore::dis_file),
         "time" => {
-            let filepath = args.next()?;
+            let filepath: PathBuf = args.next()?.into();
             let novacore = compile_file_or_exit(&filepath);
             let start_time = std::time::Instant::now();
             let execution_result = novacore.run();
@@ -47,7 +48,7 @@ fn entry_command() -> Option<()> {
             handle_error(execution_result);
         }
         "check" => {
-            let filepath = args.next()?;
+            let filepath: PathBuf = args.next()?.into();
             let start_time = std::time::Instant::now();
             let novacore = compile_file_or_exit(&filepath);
             handle_error(novacore.check());
@@ -435,7 +436,7 @@ fn print_help() {
     println!("\tback           // go back to the previous session");
 }
 
-fn compile_file_or_exit(file: &str) -> NovaCore {
+fn compile_file_or_exit(file: &Path) -> NovaCore {
     match novacore::NovaCore::new(file) {
         Ok(novacore) => novacore,
         Err(error) => {
