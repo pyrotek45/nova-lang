@@ -9,6 +9,16 @@ pub struct FilePosition {
     pub row: usize,
 }
 
+impl Default for FilePosition {
+    fn default() -> Self {
+        FilePosition {
+            line: 1,
+            row: 1,
+            filepath: Default::default(),
+        }
+    }
+}
+
 pub fn load_file_content(path: &Path) -> Result<String, NovaError> {
     let source = match std::fs::read_to_string(path) {
         Ok(content) => content,
