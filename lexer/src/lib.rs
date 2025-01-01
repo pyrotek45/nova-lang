@@ -85,136 +85,107 @@ impl Lexer {
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
-        if !self.buffer.is_empty() {
-            if let Ok(v) = self.buffer.parse() {
-                return Some(if self.buffer.contains('.') {
-                    self.state = LexerState::Token;
-                    Token::Float {
-                        value: v,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    }
-                } else {
-                    Token::Integer {
-                        value: v as i64,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    }
-                });
-            }
+        if self.buffer.is_empty() {
+            return None;
+        }
+        if let Ok(v) = self.buffer.parse() {
+            return Some(if self.buffer.contains('.') {
+                self.state = LexerState::Token;
+                Token::Float {
+                    value: v,
+                    position: self
+                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                }
+            } else {
+                Token::Integer {
+                    value: v as i64,
+                    position: self
+                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                }
+            });
+        }
 
-            // Splits buffers beginning with a number, e.g., 1.print() -> 1 . print
-            if self.buffer.contains('.') {
-                let lastchar = self.buffer.chars().last();
-                let split = self.buffer.split('.');
-                for id in split {
-                    if let Ok(v) = id.parse::<i64>() {
-                        self.state = LexerState::Token;
-                        self.token_list.push(Token::Integer {
-                            value: v,
-                            position: self
-                                .current_position_buffer_row(self.row - id.chars().count()),
-                        });
-                    } else {
-                        self.token_list.push(Token::Identifier {
-                            name: id.to_string(),
-                            position: self
-                                .current_position_buffer_row(self.row - id.chars().count()),
-                        });
-                    }
-                    self.token_list.push(Token::Symbol {
-                        symbol: '.',
+        // Splits buffers beginning with a number, e.g., 1.print() -> 1 . print
+        if self.buffer.contains('.') {
+            let lastchar = self.buffer.chars().last();
+            let split = self.buffer.split('.');
+            for id in split {
+                if let Ok(v) = id.parse::<i64>() {
+                    self.state = LexerState::Token;
+                    self.token_list.push(Token::Integer {
+                        value: v,
+                        position: self.current_position_buffer_row(self.row - id.chars().count()),
+                    });
+                } else {
+                    self.token_list.push(Token::Identifier {
+                        name: id.to_string(),
                         position: self.current_position_buffer_row(self.row - id.chars().count()),
                     });
                 }
-
-                self.token_list.pop();
-
-                if let Some('.') = lastchar {
-                    self.token_list.push(Token::Symbol {
-                        symbol: '.',
-                        position: self.current_position_buffer_row(self.row + 1),
-                    });
-                }
-                return None;
+                self.token_list.push(Token::Symbol {
+                    symbol: '.',
+                    position: self.current_position_buffer_row(self.row - id.chars().count()),
+                });
             }
 
-            // Consider adding keywords like let, if, for, type, fn
-            match self.buffer.as_str() {
-                "false" => {
-                    return Some(Token::Bool {
-                        value: false,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "true" => {
-                    return Some(Token::Bool {
-                        value: true,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Int" => {
-                    return Some(Token::Type {
-                        ttype: TType::Int,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Float" => {
-                    return Some(Token::Type {
-                        ttype: TType::Float,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Bool" => {
-                    return Some(Token::Type {
-                        ttype: TType::Bool,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "String" => {
-                    return Some(Token::Type {
-                        ttype: TType::String,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Any" => {
-                    return Some(Token::Type {
-                        ttype: TType::Any,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "Char" => {
-                    return Some(Token::Type {
-                        ttype: TType::Char,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                "in" => {
-                    return Some(Token::Keyword {
-                        keyword: KeyWord::In,
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    })
-                }
-                _ => {
-                    //dbg!(a);
-                    return Some(Token::Identifier {
-                        name: self.buffer.to_string(),
-                        position: self
-                            .current_position_buffer_row(self.row - self.buffer.chars().count()),
-                    });
-                }
+            self.token_list.pop();
+
+            if let Some('.') = lastchar {
+                self.token_list.push(Token::Symbol {
+                    symbol: '.',
+                    position: self.current_position_buffer_row(self.row + 1),
+                });
+            }
+            return None;
+        }
+
+        // Consider adding keywords like let, if, for, type, fn
+        match self.buffer.as_str() {
+            "false" => Some(Token::Bool {
+                value: false,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "true" => Some(Token::Bool {
+                value: true,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "Int" => Some(Token::Type {
+                ttype: TType::Int,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "Float" => Some(Token::Type {
+                ttype: TType::Float,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "Bool" => Some(Token::Type {
+                ttype: TType::Bool,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "String" => Some(Token::Type {
+                ttype: TType::String,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "Any" => Some(Token::Type {
+                ttype: TType::Any,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "Char" => Some(Token::Type {
+                ttype: TType::Char,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            "in" => Some(Token::Keyword {
+                keyword: KeyWord::In,
+                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+            }),
+            _ => {
+                //dbg!(a);
+                Some(Token::Identifier {
+                    name: self.buffer.to_string(),
+                    position: self
+                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                })
             }
         }
-        None
     }
 
     fn check_token(&mut self) {
@@ -240,33 +211,32 @@ impl Lexer {
                     }
                     self.buffer.push(c);
                     continue;
-                } else {
-                    // need to be able to recover if the string literal is not closed with the same number of pound signs
-                    let mut current_iter = chars.clone();
-                    if let Some(pound_count) = self.literal_pound_count.last().cloned() {
-                        let mut pound_count2 = 0;
-                        while let Some('#') = current_iter.peek() {
-                            current_iter.next();
-                            pound_count2 += 1;
-                        }
-                        if pound_count == pound_count2 {
-                            self.state = LexerState::Token;
-                            //dbg!("String Literal End");
-                            let string_start = self.string_start_position.pop().unwrap();
-                            self.token_list.push(Token::String {
-                                value: self.buffer.clone(),
-                                position: self.current_position_buffer_row(string_start),
-                            });
-                            self.literal_pound_count.pop();
-                            self.row += 1;
-                            self.buffer.clear();
-                            chars = current_iter;
-                            continue;
-                        } else {
-                            self.row += 1;
-                            self.buffer.push(c);
-                            continue;
-                        }
+                }
+                // need to be able to recover if the string literal is not closed with the same number of pound signs
+                let mut current_iter = chars.clone();
+                if let Some(pound_count) = self.literal_pound_count.last().cloned() {
+                    let mut pound_count2 = 0;
+                    while let Some('#') = current_iter.peek() {
+                        current_iter.next();
+                        pound_count2 += 1;
+                    }
+                    if pound_count == pound_count2 {
+                        self.state = LexerState::Token;
+                        //dbg!("String Literal End");
+                        let string_start = self.string_start_position.pop().unwrap();
+                        self.token_list.push(Token::String {
+                            value: self.buffer.clone(),
+                            position: self.current_position_buffer_row(string_start),
+                        });
+                        self.literal_pound_count.pop();
+                        self.row += 1;
+                        self.buffer.clear();
+                        chars = current_iter;
+                        continue;
+                    } else {
+                        self.row += 1;
+                        self.buffer.push(c);
+                        continue;
                     }
                 }
             }

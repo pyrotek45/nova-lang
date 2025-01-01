@@ -27,18 +27,17 @@ pub fn new(input: Vec<Asm>) -> Assembler {
     }
 }
 
-pub fn new_empty() -> Assembler {
-    Assembler {
-        input: vec![],
-        output: vec![],
-        labels: HashMap::default(),
-        forwardjumps: vec![],
-        nva: vec![],
-        runtime_error_table: HashMap::default(),
-    }
-}
-
 impl Assembler {
+    pub fn empty() -> Self {
+        Assembler {
+            input: vec![],
+            output: vec![],
+            labels: HashMap::default(),
+            forwardjumps: vec![],
+            nva: vec![],
+            runtime_error_table: HashMap::default(),
+        }
+    }
     // pub fn assemble_from_nva(&mut self, fileinput: TokenList) {
     //     let asmfile = fileinput.clone();
     //     let mut ci = 0;

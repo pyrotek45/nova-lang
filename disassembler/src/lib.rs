@@ -1,16 +1,19 @@
-use common::code::{Asm, Code};
+use common::{
+    code::{Asm, Code},
+    table::Table,
+};
 
 pub fn new() -> Disassembler {
     Disassembler {
         depth: vec![],
-        native_functions: common::table::new(),
+        native_functions: Table::new(),
         ip: 0,
     }
 }
 
 pub struct Disassembler {
     depth: Vec<usize>,
-    pub native_functions: common::table::Table<String>,
+    pub native_functions: Table<String>,
     ip: usize,
 }
 

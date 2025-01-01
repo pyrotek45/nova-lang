@@ -6,7 +6,7 @@ use std::{
 };
 
 use common::{
-    environment::{new_environment, Environment},
+    environment::Environment,
     error::NovaError,
     fileposition::FilePosition,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
@@ -36,7 +36,7 @@ pub fn default() -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        modules: table::new(),
+        modules: Table::new(),
         repl: false,
     }
 }
@@ -49,13 +49,13 @@ pub fn new(filepath: impl AsRef<Path>) -> Parser {
         input: vec![],
         index: 0,
         environment: env,
-        modules: table::new(),
+        modules: Table::new(),
         repl: false,
     }
 }
 
 fn create_environment() -> Environment {
-    let mut env = new_environment();
+    let mut env = Environment::new();
     env.insert_symbol(
         "error",
         TType::Function {
@@ -3181,7 +3181,7 @@ impl Parser {
     }
 
     fn parameter_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
-        let mut parameters: Table<String> = table::new();
+        let mut parameters: Table<String> = Table::new();
         let mut arguments = vec![];
 
         while self.current_token().is_identifier() {
@@ -3208,7 +3208,7 @@ impl Parser {
     }
 
     fn enum_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
-        let mut parameters: Table<String> = table::new();
+        let mut parameters = Table::new();
         let mut arguments = vec![];
 
         while self.current_token().is_identifier() {
@@ -3586,7 +3586,7 @@ impl Parser {
 
     #[allow(clippy::only_used_in_recursion)]
     fn collect_generics(&self, input: &[TType]) -> Table<String> {
-        let mut contracts = table::new();
+        let mut contracts = Table::new();
         for t in input {
             match t {
                 TType::Generic { name: generic } => contracts.insert(generic.clone()),
@@ -3640,7 +3640,7 @@ impl Parser {
         //dbg!(parameter_list.clone());
         let mut fields: Vec<(String, TType)> = vec![];
         let mut type_parameters = vec![];
-        let mut generics_table: Table<String> = table::new();
+        let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
             generics_table.extend(self.collect_generics(&[field_type.clone()]));
@@ -3756,7 +3756,7 @@ impl Parser {
 
         let mut fields: Vec<(String, TType)> = vec![];
         let mut type_parameters = vec![];
-        let mut generics_table: Table<String> = table::new();
+        let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
             generics_table.extend(self.collect_generics(&[field_type.clone()]));
