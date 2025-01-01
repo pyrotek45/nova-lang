@@ -1,4 +1,4 @@
-use std::{path::Path, rc::Rc};
+use std::path::Path;
 
 use common::{
     error::NovaError,
@@ -19,9 +19,7 @@ enum LexerState {
 
 #[derive(Debug, Clone)]
 pub struct Lexer {
-    line: usize,
-    row: usize,
-    filepath: Option<Rc<Path>>,
+    pos: FilePosition,
     pub source: String,
     token_list: TokenList,
     buffer: String,
@@ -34,9 +32,7 @@ pub struct Lexer {
 impl Default for Lexer {
     fn default() -> Self {
         Self {
-            line: 1,
-            row: 1,
-            filepath: Default::default(),
+            pos: FilePosition::default(),
             source: Default::default(),
             token_list: Default::default(),
             buffer: Default::default(),
@@ -55,9 +51,11 @@ impl Lexer {
             Err(value) => return Err(value),
         };
         Ok(Lexer {
-            line: 1,
-            row: 1,
-            filepath: Some(path.into()),
+            pos: FilePosition {
+                line: 1,
+                row: 1,
+                filepath: Some(path.into()),
+            },
             source,
             token_list: Default::default(),
             buffer: Default::default(),
@@ -69,19 +67,13 @@ impl Lexer {
     }
 
     fn current_position(&self) -> FilePosition {
-        FilePosition {
-            line: self.line,
-            row: self.row,
-            filepath: self.filepath.clone(),
-        }
+        self.pos.clone()
     }
 
     fn current_position_buffer_row(&self, row: usize) -> FilePosition {
-        FilePosition {
-            line: self.line,
-            row,
-            filepath: self.filepath.clone(),
-        }
+        let mut pos = self.pos.clone();
+        pos.row = row;
+        pos
     }
 
     fn check_token_buffer(&mut self) -> Option<Token> {
@@ -94,13 +86,13 @@ impl Lexer {
                 Token::Float {
                     value: v,
                     position: self
-                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                        .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
                 }
             } else {
                 Token::Integer {
                     value: v as i64,
                     position: self
-                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                        .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
                 }
             });
         }
@@ -114,17 +106,19 @@ impl Lexer {
                     self.state = LexerState::Token;
                     self.token_list.push(Token::Integer {
                         value: v,
-                        position: self.current_position_buffer_row(self.row - id.chars().count()),
+                        position: self
+                            .current_position_buffer_row(self.pos.row - id.chars().count()),
                     });
                 } else {
                     self.token_list.push(Token::Identifier {
                         name: id.to_string(),
-                        position: self.current_position_buffer_row(self.row - id.chars().count()),
+                        position: self
+                            .current_position_buffer_row(self.pos.row - id.chars().count()),
                     });
                 }
                 self.token_list.push(Token::Symbol {
                     symbol: '.',
-                    position: self.current_position_buffer_row(self.row - id.chars().count()),
+                    position: self.current_position_buffer_row(self.pos.row - id.chars().count()),
                 });
             }
 
@@ -133,7 +127,7 @@ impl Lexer {
             if let Some('.') = lastchar {
                 self.token_list.push(Token::Symbol {
                     symbol: '.',
-                    position: self.current_position_buffer_row(self.row + 1),
+                    position: self.current_position_buffer_row(self.pos.row + 1),
                 });
             }
             return None;
@@ -143,46 +137,55 @@ impl Lexer {
         match self.buffer.as_str() {
             "false" => Some(Token::Bool {
                 value: false,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "true" => Some(Token::Bool {
                 value: true,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "Int" => Some(Token::Type {
                 ttype: TType::Int,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "Float" => Some(Token::Type {
                 ttype: TType::Float,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "Bool" => Some(Token::Type {
                 ttype: TType::Bool,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "String" => Some(Token::Type {
                 ttype: TType::String,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "Any" => Some(Token::Type {
                 ttype: TType::Any,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "Char" => Some(Token::Type {
                 ttype: TType::Char,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             "in" => Some(Token::Keyword {
                 keyword: KeyWord::In,
-                position: self.current_position_buffer_row(self.row - self.buffer.chars().count()),
+                position: self
+                    .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
             }),
             _ => {
                 //dbg!(a);
                 Some(Token::Identifier {
                     name: self.buffer.to_string(),
                     position: self
-                        .current_position_buffer_row(self.row - self.buffer.chars().count()),
+                        .current_position_buffer_row(self.pos.row - self.buffer.chars().count()),
                 })
             }
         }
@@ -204,10 +207,10 @@ impl Lexer {
             if self.state == LexerState::StringLiteral {
                 if c != '"' {
                     if c == '\n' {
-                        self.line += 1;
-                        self.row = 1;
+                        self.pos.line += 1;
+                        self.pos.row = 1;
                     } else {
-                        self.row += 1;
+                        self.pos.row += 1;
                     }
                     self.buffer.push(c);
                     continue;
@@ -229,12 +232,12 @@ impl Lexer {
                             position: self.current_position_buffer_row(string_start),
                         });
                         self.literal_pound_count.pop();
-                        self.row += 1;
+                        self.pos.row += 1;
                         self.buffer.clear();
                         chars = current_iter;
                         continue;
                     } else {
-                        self.row += 1;
+                        self.pos.row += 1;
                         self.buffer.push(c);
                         continue;
                     }
@@ -243,12 +246,12 @@ impl Lexer {
 
             if self.state == LexerState::Comment {
                 if c != '\n' {
-                    self.row += 1;
+                    self.pos.row += 1;
                     continue;
                 }
                 self.state = LexerState::Token;
-                self.line += 1;
-                self.row = 1;
+                self.pos.line += 1;
+                self.pos.row = 1;
                 continue;
             }
             if self.state == LexerState::String {
@@ -257,47 +260,47 @@ impl Lexer {
                         Some('n') => {
                             chars.next();
                             self.buffer.push('\n');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('t') => {
                             chars.next();
                             self.buffer.push('\t');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('r') => {
                             chars.next();
                             self.buffer.push('\r');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
                             self.buffer.push('\'');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
                             self.buffer.push('\"');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('0') => {
                             chars.next();
                             self.buffer.push('\0');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
                             self.buffer.push('\\');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         _ => {
-                            println!("{}", self.line);
+                            println!("{}", self.pos.line);
                             return Err(NovaError::Lexing {
                                 msg: String::from("Expecting valid escape char"),
                                 note: String::from(""),
@@ -308,10 +311,10 @@ impl Lexer {
                 }
                 if c != '"' {
                     if c == '\n' {
-                        self.line += 1;
-                        self.row = 1;
+                        self.pos.line += 1;
+                        self.pos.row = 1;
                     } else {
-                        self.row += 1;
+                        self.pos.row += 1;
                     }
                     self.buffer.push(c);
                     continue;
@@ -322,7 +325,7 @@ impl Lexer {
                         value: self.buffer.clone(),
                         position: self.current_position_buffer_row(string_start),
                     });
-                    self.row += 1;
+                    self.pos.row += 1;
                     self.buffer.clear();
                     continue;
                 }
@@ -333,43 +336,43 @@ impl Lexer {
                         Some('n') => {
                             chars.next();
                             self.buffer.push('\n');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('t') => {
                             chars.next();
                             self.buffer.push('\t');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('r') => {
                             chars.next();
                             self.buffer.push('\r');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\'') => {
                             chars.next();
                             self.buffer.push('\'');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\"') => {
                             chars.next();
                             self.buffer.push('\"');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('0') => {
                             chars.next();
                             self.buffer.push('\0');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         Some('\\') => {
                             chars.next();
                             self.buffer.push('\\');
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                         _ => {
@@ -395,12 +398,12 @@ impl Lexer {
                         value: self.buffer.chars().next().unwrap(),
                         position: self.current_position_buffer_row(char_start),
                     });
-                    self.row += 1;
+                    self.pos.row += 1;
                     self.buffer.clear();
                     continue;
                 } else {
                     self.buffer.push(c);
-                    self.row += 1;
+                    self.pos.row += 1;
                     continue;
                 }
             }
@@ -409,17 +412,17 @@ impl Lexer {
                 '\'' => {
                     self.state = LexerState::Char;
                     self.check_token();
-                    self.char_start_position.push(self.row);
+                    self.char_start_position.push(self.pos.row);
                 }
                 '"' => {
                     self.state = LexerState::String;
                     self.check_token();
-                    self.string_start_position.push(self.row);
+                    self.string_start_position.push(self.pos.row);
                 }
                 '\n' => {
                     self.check_token();
-                    self.line += 1;
-                    self.row = 1;
+                    self.pos.line += 1;
+                    self.pos.row = 1;
                     continue;
                 }
                 '\r' => self.check_token(),
@@ -434,7 +437,7 @@ impl Lexer {
                                 operator: Operator::ExclusiveRange,
                                 position: self.current_position(),
                             });
-                            self.row += 3;
+                            self.pos.row += 3;
                             continue;
                         } else {
                             self.check_token();
@@ -442,7 +445,7 @@ impl Lexer {
                                 operator: Operator::InclusiveRange,
                                 position: self.current_position(),
                             });
-                            self.row += 2;
+                            self.pos.row += 2;
                             continue;
                         }
                     }
@@ -479,14 +482,14 @@ impl Lexer {
                             self.literal_pound_count.push(pound_count);
                             self.state = LexerState::StringLiteral;
                             self.check_token();
-                            self.string_start_position.push(self.row);
+                            self.string_start_position.push(self.pos.row);
                             continue;
                         } else {
                             // If not a raw string, push 'r' and any pound signs to the buffer
-                            self.row += 1;
+                            self.pos.row += 1;
                             self.buffer.push(c);
                             for _ in 0..pound_count {
-                                self.row += 1;
+                                self.pos.row += 1;
                                 self.buffer.push('#');
                             }
                             continue;
@@ -507,7 +510,7 @@ impl Lexer {
                                     operator: Operator::DoubleColon,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Colon,
@@ -526,7 +529,7 @@ impl Lexer {
                                     operator: Operator::GtrOrEqu,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::GreaterThan,
@@ -541,7 +544,7 @@ impl Lexer {
                                     operator: Operator::LssOrEqu,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                                 continue;
                             }
                             if let Some('-') = chars.peek() {
@@ -550,7 +553,7 @@ impl Lexer {
                                     operator: Operator::LeftArrow,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::LessThan,
@@ -565,7 +568,7 @@ impl Lexer {
                                     operator: Operator::AdditionAssignment,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Addition,
@@ -580,14 +583,14 @@ impl Lexer {
                                     operator: Operator::RightArrow,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else if let Some('=') = chars.peek() {
                                 chars.next();
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::SubtractionAssignment,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Subtraction,
@@ -602,7 +605,7 @@ impl Lexer {
                         '/' => {
                             if let Some('/') = chars.peek() {
                                 chars.next();
-                                self.row += 1;
+                                self.pos.row += 1;
                                 self.state = LexerState::Comment;
                             } else {
                                 self.token_list.push(Token::Operator {
@@ -618,7 +621,7 @@ impl Lexer {
                                     operator: Operator::Equality,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Assignment,
@@ -633,7 +636,7 @@ impl Lexer {
                                     operator: Operator::NotEqual,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Operator {
                                     operator: Operator::Not,
@@ -648,7 +651,7 @@ impl Lexer {
                                     operator: Operator::And,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Symbol {
                                     symbol: c,
@@ -663,7 +666,7 @@ impl Lexer {
                                     operator: Operator::Or,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Symbol {
                                     symbol: c,
@@ -678,7 +681,7 @@ impl Lexer {
                                     operator: Operator::RightTilde,
                                     position: self.current_position(),
                                 });
-                                self.row += 1;
+                                self.pos.row += 1;
                             } else {
                                 self.token_list.push(Token::Symbol {
                                     symbol: c,
@@ -698,7 +701,7 @@ impl Lexer {
                 }
                 _ => {}
             }
-            self.row += 1;
+            self.pos.row += 1;
         }
 
         // check state and throw error if not token
