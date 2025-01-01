@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, rc::Rc};
 
 use common::{
     error::NovaError,
@@ -20,7 +20,7 @@ enum LexerState {
 #[derive(Debug, Clone)]
 pub struct Lexer {
     pos: FilePosition,
-    pub source: String,
+    pub source: Rc<str>,
     token_list: TokenList,
     buffer: String,
     state: LexerState,
@@ -56,7 +56,7 @@ impl Lexer {
                 row: 1,
                 filepath: Some(path.into()),
             },
-            source,
+            source: source.into(),
             token_list: Default::default(),
             buffer: Default::default(),
             state: LexerState::Token,

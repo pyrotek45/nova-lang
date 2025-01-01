@@ -161,7 +161,7 @@ impl Compiler {
                         self.variables.len() - 1
                     };
 
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     self.asm.push(Asm::STORE(array_index as u32));
 
                     // storing counter and expression array
@@ -233,7 +233,7 @@ impl Compiler {
                     expr,
                     global,
                 } => {
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
 
                     if *global {
                         if let Some(index) = self.global.get_index(identifier.to_string()) {
@@ -354,7 +354,7 @@ impl Compiler {
                 }
 
                 Return { ttype, expr } => {
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     if ttype != &TType::Void {
                         self.asm.push(Asm::RET(true))
                     } else {
@@ -362,7 +362,7 @@ impl Compiler {
                     }
                 }
                 Expression { ttype, expr } => {
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     if ttype != &TType::Void {
                         self.asm.push(Asm::POP);
                     }
@@ -374,7 +374,7 @@ impl Compiler {
                     alternative,
                 } => {
                     let (bodyjump, alterjump) = (self.gen.generate(), self.gen.generate());
-                    self.compile_expr(test.clone())?;
+                    self.compile_expr(test)?;
                     self.asm.push(Asm::JUMPIFFALSE(bodyjump));
                     let body_ast = Ast {
                         program: body.clone(),
@@ -402,7 +402,7 @@ impl Compiler {
                     self.breaks.push(end);
                     self.continues.push(top);
                     self.asm.push(Asm::LABEL(top));
-                    self.compile_expr(test.clone())?;
+                    self.compile_expr(test)?;
                     self.asm.push(Asm::JUMPIFFALSE(end));
                     let whilebody = Ast {
                         program: body.clone(),
@@ -425,9 +425,9 @@ impl Compiler {
                     let next = self.gen.generate();
                     self.breaks.push(end);
                     self.continues.push(next);
-                    self.compile_expr(init.clone())?;
+                    self.compile_expr(init)?;
                     self.asm.push(Asm::LABEL(top));
-                    self.compile_expr(test.clone())?;
+                    self.compile_expr(test)?;
                     self.asm.push(Asm::JUMPIFFALSE(end));
                     let whilebody = Ast {
                         program: body.clone(),
@@ -435,7 +435,7 @@ impl Compiler {
                     self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
                     self.asm.pop();
                     self.asm.push(Asm::LABEL(next));
-                    self.compile_expr(inc.clone())?;
+                    self.compile_expr(inc)?;
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
                     self.breaks.pop();
@@ -513,7 +513,7 @@ impl Compiler {
                 } => {
                     let skip = self.gen.generate();
                     let end = self.gen.generate();
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     if let Some(index) = self
                         .native_functions
                         .get_index("Option::isSome".to_string())
@@ -604,10 +604,10 @@ impl Compiler {
                     // if there is a default it will jump to the default
                     // if there is no default it will jump to the end
                     let end = self.gen.generate();
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     // will test the expression
                     self.asm.push(Asm::INTEGER(1_i64));
-                    self.compile_expr(expr.clone())?;
+                    self.compile_expr(expr)?;
                     self.asm.push(Asm::LIN);
                     // store in temp variable
                     self.variables
@@ -625,7 +625,7 @@ impl Compiler {
                         self.asm.push(Asm::JUMPIFFALSE(next));
                         if let Some(vid) = &arm.1 {
                             self.asm.push(Asm::INTEGER(0_i64));
-                            self.compile_expr(expr.clone())?;
+                            self.compile_expr(expr)?;
                             self.asm.push(Asm::LIN);
                             // store the vid in the variable
                             if let Some(index) = self.variables.get_index(vid.to_string()) {
@@ -669,7 +669,7 @@ impl Compiler {
                     self.continues.push(next);
 
                     // start of range
-                    self.compile_expr(start_expr.clone())?;
+                    self.compile_expr(start_expr)?;
                     if let Some(index) = self.variables.get_index(identifier.to_string()) {
                         self.asm.push(Asm::STORE(index as u32))
                     } else {
@@ -681,7 +681,7 @@ impl Compiler {
                     // top of loop
                     self.asm.push(Asm::LABEL(top));
                     // test if we are at the end
-                    self.compile_expr(end_expr.clone())?;
+                    self.compile_expr(end_expr)?;
                     if let Some(index) = self.variables.get_index(identifier.to_string()) {
                         self.asm.push(Asm::GET(index as u32))
                     }
@@ -695,7 +695,7 @@ impl Compiler {
                         self.asm.push(Asm::NOT);
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
-                        self.compile_expr(end_expr.clone())?;
+                        self.compile_expr(end_expr)?;
                         if let Some(index) = self.variables.get_index(identifier.to_string()) {
                             self.asm.push(Asm::GET(index as u32))
                         }
@@ -716,7 +716,7 @@ impl Compiler {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     if let Some(step) = step {
-                        self.compile_expr(step.clone())?;
+                        self.compile_expr(step)?;
                         self.asm.push(Asm::IADD);
                     } else {
                         self.asm.push(Asm::INTEGER(1));
@@ -752,7 +752,7 @@ impl Compiler {
         Ok(self.asm.to_owned())
     }
 
-    pub fn getref_expr(&mut self, expr: Expr) -> Result<(), NovaError> {
+    pub fn getref_expr(&mut self, expr: &Expr) -> Result<(), NovaError> {
         match expr {
             Expr::None => {
                 // self.output.push(Code::NONE)
@@ -765,9 +765,9 @@ impl Compiler {
                 ..
             } => {
                 // dbg!(id, t);
-                self.asm.push(Asm::INTEGER(index as i64));
-                self.getref_expr(*expr)?;
-                self.asm.push(Asm::PIN(position));
+                self.asm.push(Asm::INTEGER(*index as i64));
+                self.getref_expr(expr)?;
+                self.asm.push(Asm::PIN(position.clone()));
             }
             Expr::Indexed {
                 container,
@@ -775,10 +775,10 @@ impl Compiler {
                 position,
                 ..
             } => {
-                self.compile_expr(*index)?;
+                self.compile_expr(index)?;
 
                 let negitive_step = self.gen.generate();
-                self.compile_expr(*container.clone())?;
+                self.compile_expr(container)?;
                 self.variables
                     .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
                 let array_index = self.variables.len() - 1;
@@ -797,8 +797,8 @@ impl Compiler {
                 self.asm.push(Asm::IADD);
                 self.asm.push(Asm::LABEL(negitive_step));
 
-                self.getref_expr(*container)?;
-                self.asm.push(Asm::PIN(position));
+                self.getref_expr(container)?;
+                self.asm.push(Asm::PIN(position.clone()));
             }
             Expr::Call { .. } => todo!(),
             Expr::Unary { .. } => todo!(),
@@ -814,10 +814,10 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn getref_atom(&mut self, atom: Atom) -> Result<(), NovaError> {
+    pub fn getref_atom(&mut self, atom: &Atom) -> Result<(), NovaError> {
         match atom {
             Atom::Bool { value } => {
-                self.asm.push(Asm::BOOL(value));
+                self.asm.push(Asm::BOOL(*value));
             }
             Atom::Id { name } => {
                 if let Some(index) = self.variables.get_index(name.to_string()) {
@@ -829,19 +829,19 @@ impl Compiler {
                 }
             }
             Atom::Float { value: float } => {
-                self.asm.push(Asm::FLOAT(float));
+                self.asm.push(Asm::FLOAT(*float));
             }
             Atom::String { value: str } => {
                 self.asm.push(Asm::STRING(str.clone()));
             }
             Atom::Integer { value: int } => {
-                self.asm.push(Asm::INTEGER(int));
+                self.asm.push(Asm::INTEGER(*int));
             }
             Atom::Call {
                 name, arguments, ..
             } => {
-                for expr in arguments.iter() {
-                    self.compile_expr(expr.clone())?;
+                for expr in arguments {
+                    self.compile_expr(expr)?;
                 }
                 match name.as_str() {
                     "print" => self.asm.push(Asm::PRINT),
@@ -866,32 +866,32 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile_expr(&mut self, expr: Expr) -> Result<(), NovaError> {
+    pub fn compile_expr(&mut self, expr: &Expr) -> Result<(), NovaError> {
         match expr {
             Expr::None => {
                 //    Ok(self.output.push(Code::NONE))
                 Ok(())
             }
             Expr::ListConstructor { elements, .. } => {
-                for x in elements.iter().cloned() {
+                for x in elements {
                     self.compile_expr(x)?;
                 }
                 self.asm.push(Asm::LIST(elements.len() as u64));
                 Ok(())
             }
             Expr::Field { index, expr, .. } => {
-                self.asm.push(Asm::INTEGER(index as i64));
-                self.compile_expr(*expr)?;
+                self.asm.push(Asm::INTEGER(*index as i64));
+                self.compile_expr(expr)?;
                 self.asm.push(Asm::LIN);
                 Ok(())
             }
             Expr::Indexed {
                 container, index, ..
             } => {
-                self.compile_expr(*index)?;
+                self.compile_expr(index)?;
                 let negitive_step = self.gen.generate();
 
-                self.compile_expr(*container)?;
+                self.compile_expr(container)?;
                 self.variables
                     .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
                 let array_index = self.variables.len() - 1;
@@ -915,25 +915,25 @@ impl Compiler {
                 Ok(())
             }
             Expr::Call { function, args, .. } => {
-                for e in args.iter().cloned() {
+                for e in args.iter() {
                     self.compile_expr(e)?;
                 }
-                self.compile_expr(*function)?;
+                self.compile_expr(function)?;
                 self.asm.push(Asm::CALL);
                 Ok(())
             }
             Expr::Unary { op, expr, .. } => match op {
                 common::tokens::Unary::Positive => {
-                    self.compile_expr(*expr)?;
+                    self.compile_expr(expr)?;
                     Ok(())
                 }
                 common::tokens::Unary::Negitive => {
-                    self.compile_expr(*expr)?;
+                    self.compile_expr(expr)?;
                     self.asm.push(Asm::NEG);
                     Ok(())
                 }
                 common::tokens::Unary::Not => {
-                    self.compile_expr(*expr)?;
+                    self.compile_expr(expr)?;
                     self.asm.push(Asm::NOT);
                     Ok(())
                 }
@@ -947,8 +947,8 @@ impl Compiler {
                 match op {
                     common::tokens::Operator::RightArrow => todo!(),
                     common::tokens::Operator::GreaterThan => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::IGTR);
                         } else if lhs.get_type() == TType::Float {
@@ -958,8 +958,8 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::LessThan => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::ILSS);
                         } else if lhs.get_type() == TType::Float {
@@ -969,14 +969,14 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::Assignment => {
-                        self.compile_expr(*rhs.clone())?;
-                        self.getref_expr(*lhs.clone())?;
+                        self.compile_expr(rhs)?;
+                        self.getref_expr(lhs)?;
 
                         self.asm.push(Asm::ASSIGN)
                     }
                     common::tokens::Operator::Addition => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         match lhs.get_type() {
                             TType::Int => self.asm.push(Asm::IADD),
                             TType::Float => self.asm.push(Asm::FADD),
@@ -988,8 +988,8 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::Subtraction => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::ISUB);
                         } else if lhs.get_type() == TType::Float {
@@ -999,8 +999,8 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::Division => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::IDIV);
                         } else if lhs.get_type() == TType::Float {
@@ -1010,8 +1010,8 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::Multiplication => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::IMUL);
                         } else if lhs.get_type() == TType::Float {
@@ -1021,27 +1021,27 @@ impl Compiler {
                         }
                     }
                     common::tokens::Operator::Equality => {
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::EQUALS);
                     }
                     common::tokens::Operator::Access => todo!(),
                     common::tokens::Operator::ListAccess => todo!(),
                     common::tokens::Operator::Call => todo!(),
                     common::tokens::Operator::Modulo => {
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::IMODULO);
                     }
                     common::tokens::Operator::NotEqual => {
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::NOT);
                     }
                     common::tokens::Operator::Not => {
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::NOT);
                     }
                     common::tokens::Operator::DoubleColon => todo!(),
@@ -1051,8 +1051,8 @@ impl Compiler {
 
                         // if lhs is true, return its value
                         // else return the other value
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs.clone())?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::IGTR);
                         } else if lhs.get_type() == TType::Float {
@@ -1064,8 +1064,8 @@ impl Compiler {
                         self.asm.push(Asm::NOT);
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::LABEL(sc))
                     }
@@ -1074,8 +1074,8 @@ impl Compiler {
 
                         // if lhs is true, return its value
                         // else return the other value
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs.clone())?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::ILSS);
                         } else if lhs.get_type() == TType::Float {
@@ -1087,8 +1087,8 @@ impl Compiler {
                         self.asm.push(Asm::NOT);
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
-                        self.compile_expr(*lhs)?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::LABEL(sc))
                     }
@@ -1097,57 +1097,57 @@ impl Compiler {
 
                         // if lhs is false, return its value
                         // else return other value
-                        self.compile_expr(*lhs)?;
+                        self.compile_expr(lhs)?;
                         self.asm.push(Asm::DUP);
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::Or => {
                         let sc = self.gen.generate();
                         // if lhs is true, return its value
                         // else return the other value
-                        self.compile_expr(*lhs)?;
+                        self.compile_expr(lhs)?;
                         self.asm.push(Asm::DUP);
                         self.asm.push(Asm::NOT);
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(rhs)?;
                         self.asm.push(Asm::LABEL(sc))
                     }
                     common::tokens::Operator::AdditionAssignment => {
                         match lhs.get_type() {
                             TType::Int => {
-                                self.compile_expr(*rhs.clone())?;
-                                self.compile_expr(*lhs.clone())?;
+                                self.compile_expr(rhs)?;
+                                self.compile_expr(lhs)?;
                                 self.asm.push(Asm::IADD);
                             }
                             TType::Float => {
-                                self.compile_expr(*rhs.clone())?;
-                                self.compile_expr(*lhs.clone())?;
+                                self.compile_expr(rhs)?;
+                                self.compile_expr(lhs)?;
                                 self.asm.push(Asm::FADD);
                             }
                             TType::String => {
-                                self.compile_expr(*lhs.clone())?;
-                                self.compile_expr(*rhs.clone())?;
+                                self.compile_expr(lhs)?;
+                                self.compile_expr(rhs)?;
                                 self.asm.push(Asm::CONCAT);
                             }
                             TType::List { .. } => {
-                                self.compile_expr(*lhs.clone())?;
-                                self.compile_expr(*rhs.clone())?;
+                                self.compile_expr(lhs)?;
+                                self.compile_expr(rhs)?;
                                 self.asm.push(Asm::CONCAT);
                             }
                             _ => {
                                 dbg!(&lhs.get_type());
                             }
                         }
-                        self.getref_expr(*lhs.clone())?;
+                        self.getref_expr(lhs)?;
                         self.asm.push(Asm::ASSIGN)
                     }
                     common::tokens::Operator::SubtractionAssignment => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs.clone())?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
                             self.asm.push(Asm::ISUB);
                         } else if lhs.get_type() == TType::Float {
@@ -1155,13 +1155,13 @@ impl Compiler {
                         } else {
                             dbg!(&ttype);
                         }
-                        self.getref_expr(*lhs.clone())?;
+                        self.getref_expr(lhs)?;
 
                         self.asm.push(Asm::ASSIGN)
                     }
                     common::tokens::Operator::Concat => {
-                        self.compile_expr(*lhs.clone())?;
-                        self.compile_expr(*rhs)?;
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::String {
                             self.asm.push(Asm::CONCAT);
                         } else {
@@ -1268,9 +1268,10 @@ impl Compiler {
             Expr::ListCompConstructor {
                 expr,
                 guards,
-                mut loops,
+                loops,
                 ..
             } => {
+                let mut loops = loops.clone();
                 loops.reverse();
                 let (identifier, list) = loops.pop().unwrap();
                 // create temp list to hold new values
@@ -1281,7 +1282,14 @@ impl Compiler {
                 self.asm.push(Asm::LIST(0));
                 self.asm.push(Asm::STORE(list_index as u32));
 
-                self.for_in_loop(identifier, list, expr, guards, list_index, loops)?;
+                self.for_in_loop(
+                    identifier,
+                    list,
+                    expr.clone(),
+                    guards.clone(),
+                    list_index,
+                    loops,
+                )?;
 
                 // return the list
                 self.asm.push(Asm::GET(list_index as u32));
@@ -1330,12 +1338,12 @@ impl Compiler {
                 let id_index = self.variables.len() - 1;
 
                 // compile list expr
-                self.compile_expr(*container.clone())?;
+                self.compile_expr(container)?;
                 self.asm.push(Asm::STORE(array_index as u32));
 
                 // compiling start as integer
-                if let Some(startstep) = startstep.clone() {
-                    self.compile_expr(*startstep.clone())?;
+                if let Some(startstep) = startstep {
+                    self.compile_expr(startstep)?;
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::INTEGER(0));
                     self.asm.push(Asm::ILSS);
@@ -1386,7 +1394,7 @@ impl Compiler {
 
                 // compile upper bound check
                 if let Some(endstep) = endstep {
-                    self.compile_expr(*endstep.clone())?;
+                    self.compile_expr(endstep)?;
 
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::INTEGER(0));
@@ -1425,7 +1433,7 @@ impl Compiler {
                 self.asm.push(Asm::LABEL(next));
                 // increment counter
                 if let Some(stepstep) = stepstep {
-                    self.compile_expr(*stepstep.clone())?;
+                    self.compile_expr(stepstep)?;
                 } else {
                     self.asm.push(Asm::INTEGER(1));
                 }
@@ -1449,7 +1457,7 @@ impl Compiler {
                 expr,
                 body,
             } => {
-                self.compile_expr(*expr)?;
+                self.compile_expr(expr)?;
                 if let Some(index) = self.variables.get_index(name.to_string()) {
                     self.asm.push(Asm::STORE(index as u32))
                 } else {
@@ -1465,7 +1473,7 @@ impl Compiler {
                 self.asm.pop();
                 // total hack, happens when last statement gets autopopped when compiling a statement expr
                 // so we need to pop it again
-                if TType::Void != ttype {
+                if TType::Void != *ttype {
                     self.asm.pop();
                 }
                 //self.asm.pop();
@@ -1506,7 +1514,7 @@ impl Compiler {
         self.continues.push(next);
 
         // compile list expr
-        self.compile_expr(list)?;
+        self.compile_expr(&list)?;
         self.asm.push(Asm::STORE(array_index as u32));
         self.asm.push(Asm::INTEGER(0));
         self.asm.push(Asm::STORE(tempcounter_index as u32));
@@ -1547,13 +1555,13 @@ impl Compiler {
             let skipcurrent = self.gen.generate();
             // check guards
             for guard in guards.iter() {
-                self.compile_expr(guard.clone())?;
+                self.compile_expr(guard)?;
                 self.asm.push(Asm::JUMPIFFALSE(skipcurrent));
             }
 
             // -- expr and then push to temp array
             for expr in expr.iter() {
-                self.compile_expr(expr.clone())?;
+                self.compile_expr(expr)?;
             }
             self.asm.push(Asm::STORE(id_index as u32));
 
@@ -1584,10 +1592,10 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile_atom(&mut self, atom: Atom) -> Result<(), NovaError> {
+    pub fn compile_atom(&mut self, atom: &Atom) -> Result<(), NovaError> {
         match atom {
             Atom::Bool { value: bool } => {
-                self.asm.push(Asm::BOOL(bool));
+                self.asm.push(Asm::BOOL(*bool));
             }
             Atom::Id { name: identifier } => {
                 if let Some(index) = self.variables.get_index(identifier.to_string()) {
@@ -1602,13 +1610,13 @@ impl Compiler {
                 }
             }
             Atom::Float { value: float } => {
-                self.asm.push(Asm::FLOAT(float));
+                self.asm.push(Asm::FLOAT(*float));
             }
             Atom::String { value: str } => {
                 self.asm.push(Asm::STRING(str.clone()));
             }
             Atom::Integer { value: int } => {
-                self.asm.push(Asm::INTEGER(int));
+                self.asm.push(Asm::INTEGER(*int));
             }
             Atom::Call {
                 name: caller,
@@ -1619,8 +1627,8 @@ impl Compiler {
                     self.asm.push(Asm::STRING(list[0].get_type().to_string()));
                     return Ok(());
                 }
-                for expr in list.iter() {
-                    self.compile_expr(expr.clone())?;
+                for expr in list {
+                    self.compile_expr(expr)?;
                 }
                 match caller.as_str() {
                     // "println" => {
@@ -1631,13 +1639,13 @@ impl Compiler {
                     // "print" => {
                     //     self.asm.push(Asm::PRINT);
                     // }
-                    "unreachable" => self.asm.push(Asm::ERROR(position)),
+                    "unreachable" => self.asm.push(Asm::ERROR(position.clone())),
                     "todo" => {
                         // show a panic message before exiting
                         self.asm
                             .push(Asm::STRING("Not yet implemented\n".to_string()));
                         self.asm.push(Asm::PRINT);
-                        self.asm.push(Asm::ERROR(position));
+                        self.asm.push(Asm::ERROR(position.clone()));
                     }
                     "None" => self.asm.push(Asm::NONE),
                     "Option::unwrap" => self.asm.push(Asm::UNWRAP),
@@ -1646,7 +1654,7 @@ impl Compiler {
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
-                    "error" => self.asm.push(Asm::ERROR(position)),
+                    "error" => self.asm.push(Asm::ERROR(position.clone())),
                     identifier => {
                         //dbg!(identifier);
                         if let Some(index) = self.native_functions.get_index(identifier.to_string())
@@ -1667,7 +1675,7 @@ impl Compiler {
                     }
                 }
             }
-            Atom::Char { value: c } => self.asm.push(Asm::Char(c)),
+            Atom::Char { value: c } => self.asm.push(Asm::Char(*c)),
             Atom::None => self.asm.push(Asm::NONE),
         }
         Ok(())
