@@ -7,18 +7,18 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string(),
+                    msg: "Expected a string in the heap".into(),
                 })
             }
         },
         Some(_) => {
             return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string(),
+                msg: "Expected a string on the stack".into(),
             })
         }
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -28,18 +28,18 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string(),
+                    msg: "Expected a string in the heap".into(),
                 })
             }
         },
         Some(_) => {
             return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string(),
+                msg: "Expected a string on the stack".into(),
             })
         }
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -48,7 +48,7 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
-                msg: format!("Invalid regex pattern: {}", e),
+                msg: format!("Invalid regex pattern: {e}").into(),
             })
         }
     };
@@ -65,18 +65,18 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string(),
+                    msg: "Expected a string in the heap".into(),
                 })
             }
         },
         Some(_) => {
             return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string(),
+                msg: "Expected a string on the stack".into(),
             })
         }
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -86,18 +86,18 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string(),
+                    msg: "Expected a string in the heap".into(),
                 })
             }
         },
         Some(_) => {
             return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string(),
+                msg: "Expected a string on the stack".into(),
             })
         }
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
@@ -107,7 +107,7 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
-                msg: format!("Invalid regex pattern: {}", e),
+                msg: format!("Invalid regex pattern: {e}").into(),
             })
         }
     };

@@ -1,3 +1,5 @@
+use std::{path::Path, rc::Rc};
+
 use assembler::Assembler;
 use common::{
     error::NovaError,
@@ -13,7 +15,7 @@ use vm::{state::State, Vm};
 #[derive(Debug, Clone)]
 pub struct NovaCore {
     pub current_repl: String,
-    filepath: String,
+    filepath: Option<Rc<Path>>,
     lexer: Lexer,
     pub parser: Parser,
     compiler: Compiler,
@@ -24,9 +26,8 @@ pub struct NovaCore {
 
 impl NovaCore {
     pub fn repl() -> NovaCore {
-        
         NovaCore {
-            filepath: "repl".to_string(),
+            filepath: None,
             lexer: Lexer::default(),
             parser: parser::default(),
             compiler: compiler::new(),
@@ -37,9 +38,9 @@ impl NovaCore {
         }
     }
 
-    pub fn new(filepath: &str) -> Result<NovaCore, NovaError> {
+    pub fn new(filepath: &Path) -> Result<NovaCore, NovaError> {
         Ok(NovaCore {
-            filepath: filepath.to_string(),
+            filepath: Some(filepath.into()),
             lexer: Lexer::new(filepath)?,
             parser: parser::new(filepath),
             compiler: compiler::new(),
@@ -404,8 +405,7 @@ impl NovaCore {
         self.initnova();
 
         self.lexer = Lexer::default();
-        self.lexer.source_file = self.current_repl.clone();
-        self.lexer.repl = true;
+        self.lexer.source = self.current_repl.clone();
 
         self.parser = parser::default();
         self.parser.repl = true;

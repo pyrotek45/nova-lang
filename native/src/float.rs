@@ -7,7 +7,7 @@ pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string(),
+                msg: "Stack is empty".into(),
             })
         }
     };
