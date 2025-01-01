@@ -4661,13 +4661,15 @@ impl Parser {
         self.consume_symbol('{')?;
         let statements = self.compound_statement()?;
         self.consume_symbol('}')?;
-        let error = self.generate_error_with_pos(
-            "Block must have expression as last value".to_string(),
-            "".to_string(),
-            pos.clone(),
-        );
+        let error = || {
+            self.generate_error_with_pos(
+                "Block must have expression as last value",
+                "",
+                pos.clone(),
+            )
+        };
         statements.split_last().map_or_else(
-            || Err(error.clone()),
+            || Err(error()),
             |(last, initial_statements)| {
                 if let Statement::Expression { ttype, expr, .. } = last {
                     let mut final_statements = initial_statements.to_vec();
@@ -4677,7 +4679,7 @@ impl Parser {
                     });
                     Ok(final_statements)
                 } else {
-                    Err(error.clone())
+                    Err(error())
                 }
             },
         )

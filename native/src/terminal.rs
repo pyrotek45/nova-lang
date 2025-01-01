@@ -72,14 +72,15 @@ pub fn show_cursor(_state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaError> {
-    let args: Vec<String> = std::env::args().skip(3).collect();
+    let args = std::env::args().skip(3);
     let mut myarray = vec![];
     state.gclock = true;
-    for arg in args.iter() {
-        let string_pos = state.allocate_string(arg.clone());
+    let len = args.len();
+    for arg in args {
+        let string_pos = state.allocate_string(arg);
         myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
     }
-    if args.is_empty() {
+    if len == 0 {
         state.stack.push(VmData::None);
     } else {
         let index = state.allocate_array(myarray);
