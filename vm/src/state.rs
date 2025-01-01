@@ -105,9 +105,9 @@ impl State {
     // recursiely print out data for the Heap type, and ouly print out the value
 
     pub fn print_heap(&self, index: usize) {
+        let mut out = io::stdout().lock();
         // check if the index is out of bounds
         if index >= self.heap.len() {
-            io::stdout().flush().expect("");
             return;
         }
         match &self.heap[index] {
@@ -115,20 +115,16 @@ impl State {
                 self.print_heap(*v);
             }
             Heap::Function(v) => {
-                print!("Function Pointer ({})", v);
-                io::stdout().flush().expect("");
+                write!(out, "Function Pointer ({v})").unwrap();
             }
             Heap::Int(v) => {
-                print!("{}", v);
-                io::stdout().flush().expect("");
+                write!(out, "{v}").unwrap();
             }
             Heap::Float(v) => {
-                print!("{}", v);
-                io::stdout().flush().expect("");
+                write!(out, "{v}").unwrap();
             }
             Heap::Bool(v) => {
-                print!("{}", v);
-                io::stdout().flush().expect("");
+                write!(out, "{v}").unwrap();
             }
             Heap::ListAddress(v) => {
                 self.print_heap(*v);
@@ -137,8 +133,7 @@ impl State {
                 self.print_heap(*v);
             }
             Heap::None => {
-                print!("None");
-                io::stdout().flush().expect("");
+                write!(out, "None").unwrap();
             }
             Heap::Closure(function_poiner, capture_index) => {
                 print!("Closure (");
@@ -149,18 +144,18 @@ impl State {
                 print!(")");
             }
             Heap::List(v) => {
-                print!("[");
-                for (i, item) in v.iter().enumerate() {
-                    self.print_heap(*item);
-                    if i < v.len() - 1 {
-                        print!(",");
-                    }
+                write!(out, "[").unwrap();
+                if let Some(&first) = v.first() {
+                    self.print_heap(first);
                 }
-                print!("]");
+                for item in v.iter().skip(1) {
+                    self.print_heap(*item);
+                    write!(out, ",").unwrap();
+                }
+                write!(out, "]").unwrap();
             }
             Heap::String(v) => {
-                print!("{}", v);
-                io::stdout().flush().expect("");
+                write!(out, "{v}").unwrap();
             }
             Heap::Struct(_, _) => {
                 todo!()
@@ -169,10 +164,10 @@ impl State {
                 self.print_heap(*v);
             }
             Heap::Char(v) => {
-                print!("{}", v);
-                io::stdout().flush().expect("");
+                write!(out, "{}", v).unwrap();
             }
         }
+        out.flush().unwrap();
     }
 
     #[inline(always)]
@@ -208,7 +203,11 @@ impl State {
     }
     #[inline(always)]
     pub fn next_arr<const LEN: usize>(&mut self) -> [u8; LEN] {
-        std::array::from_fn(|_| self.next_instruction())
+        let arr = self.program[self.current_instruction..][..LEN]
+            .try_into()
+            .unwrap();
+        self.current_instruction += LEN;
+        arr
     }
 
     #[inline(always)]
@@ -285,8 +284,13 @@ impl State {
     }
 
     #[inline(always)]
+    pub fn get_ref(&self, index: usize) -> &Heap {
+        &self.heap[index]
+    }
+
+    #[inline(always)]
     pub fn deref(&self, index: usize) -> Heap {
-        self.heap[index].clone()
+        self.get_ref(index).clone()
     }
 
     #[inline(always)]

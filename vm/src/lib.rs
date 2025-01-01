@@ -61,16 +61,10 @@ impl Vm {
                     }
                     (Some(VmData::List(l1)), Some(VmData::List(l2))) => {
                         // make new list from both after getting lists from heap
-                        match (self.state.deref(l1), self.state.deref(l2)) {
+                        match (self.state.get_ref(l1), self.state.get_ref(l2)) {
                             (Heap::List(list1), Heap::List(list2)) => {
-                                let mut newlist = vec![];
+                                let newlist = list2.iter().chain(list1).copied().collect();
                                 self.state.gclock = true;
-                                for i in list2.iter() {
-                                    newlist.push(*i);
-                                }
-                                for i in list1.iter() {
-                                    newlist.push(*i);
-                                }
                                 let index = self.state.allocate_array(newlist);
                                 self.state.gclock = false;
                                 self.state.stack.push(VmData::List(index));
@@ -80,21 +74,16 @@ impl Vm {
                     }
                     _ => panic!(),
                 },
-                Code::ISSOME => {
-                    if let Some(value) = self.state.stack.pop() {
-                        match value {
-                            VmData::None => self.state.stack.push(VmData::Bool(false)),
-                            _ => self.state.stack.push(VmData::Bool(true)),
-                        }
-                    }
-                }
+                Code::ISSOME => match self.state.stack.pop() {
+                    Some(VmData::None) => self.state.stack.push(VmData::Bool(false)),
+                    None => (),
+                    _ => self.state.stack.push(VmData::Bool(true)),
+                },
                 Code::UNWRAP => {
-                    if let Some(value) = self.state.stack.last() {
-                        if value == &VmData::None {
-                            println!("ERROR: Tried to unwrap a none value");
-                            println!("ERROR: exiting program");
-                            std::process::exit(1)
-                        }
+                    if let Some(VmData::None) = self.state.stack.last() {
+                        println!("ERROR: Tried to unwrap a none value");
+                        println!("ERROR: exiting program");
+                        std::process::exit(1)
                     }
                 }
                 Code::DUP => self.state.stack.push(*self.state.stack.last().unwrap()),
@@ -176,26 +165,22 @@ impl Vm {
                 // i think you can figure this one out
                 Code::PRINT => {
                     fn print_item(state: &mut State, item: VmData) {
+                        let mut out = io::stdout().lock();
                         match item {
                             VmData::Function(v) => {
-                                print!("Function Pointer ({})", v);
-                                io::stdout().flush().expect("");
+                                write!(out, "Function Pointer ({})", v).unwrap();
                             }
                             VmData::Int(v) => {
-                                print!("{}", v);
-                                io::stdout().flush().expect("");
+                                write!(out, "{}", v).unwrap();
                             }
                             VmData::Float(v) => {
-                                print!("{}", v);
-                                io::stdout().flush().expect("");
+                                write!(out, "{}", v).unwrap();
                             }
                             VmData::Bool(v) => {
-                                print!("{}", v);
-                                io::stdout().flush().expect("");
+                                write!(out, "{}", v).unwrap();
                             }
                             VmData::None => {
-                                print!("None");
-                                io::stdout().flush().expect("");
+                                write!(out, "None").unwrap();
                             }
                             VmData::List(index) => {
                                 state.print_heap(index);
@@ -213,10 +198,10 @@ impl Vm {
                                 state.print_heap(v);
                             }
                             VmData::Char(char) => {
-                                print!("{}", char);
-                                io::stdout().flush().expect("");
+                                write!(out, "{}", char).unwrap();
                             }
                         }
+                        out.flush().unwrap();
                     }
 
                     let item = self.state.stack.pop().unwrap();
@@ -224,12 +209,9 @@ impl Vm {
                 }
 
                 Code::FADD => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v1 + v2;
-                        self.state.stack.push(VmData::Float(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -237,16 +219,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v1 + v2;
+                    self.state.stack.push(VmData::Float(result))
                 }
 
                 Code::FSUB => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2 - v1;
-                        self.state.stack.push(VmData::Float(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -254,16 +235,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2 - v1;
+                    self.state.stack.push(VmData::Float(result))
                 }
 
                 Code::FMUL => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v1 * v2;
-                        self.state.stack.push(VmData::Float(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -271,16 +251,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v1 * v2;
+                    self.state.stack.push(VmData::Float(result))
                 }
 
                 Code::FDIV => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2 / v1;
-                        self.state.stack.push(VmData::Float(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -288,18 +267,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2 / v1;
+                    self.state.stack.push(VmData::Float(result))
                 }
 
                 Code::IADD => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".into(),
-                        })?;
-                        self.state.stack.push(VmData::Int(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -307,18 +283,17 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
+                        msg: "Integer overflow".into(),
+                    })?;
+                    self.state.stack.push(VmData::Int(result))
                 }
 
                 Code::ISUB => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".into(),
-                        })?;
-                        self.state.stack.push(VmData::Int(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -326,20 +301,17 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
+                        msg: "Integer overflow".into(),
+                    })?;
+                    self.state.stack.push(VmData::Int(result))
                 }
 
                 Code::IMUL => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        // safely multi
-
-                        let result = v1.checked_mul(v2).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer overflow".into(),
-                        })?;
-                        self.state.stack.push(VmData::Int(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -347,18 +319,19 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    // safely multi
+
+                    let result = v1.checked_mul(v2).ok_or_else(|| NovaError::Runtime {
+                        msg: "Integer overflow".into(),
+                    })?;
+                    self.state.stack.push(VmData::Int(result))
                 }
 
                 Code::IDIV => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
-                            msg: "Integer division by zero".into(),
-                        })?;
-                        self.state.stack.push(VmData::Int(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -366,7 +339,11 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
+                        msg: "Integer division by zero".into(),
+                    })?;
+                    self.state.stack.push(VmData::Int(result))
                 }
 
                 Code::STOREGLOBAL => {
@@ -386,20 +363,19 @@ impl Vm {
                 }
 
                 Code::CLOSURE => {
-                    if let Some(VmData::List(list)) = self.state.stack.pop() {
-                        self.state.gclock = true;
-                        let closure = self.state.allocate_new_heap();
-                        self.state.heap[closure] =
-                            Heap::Closure(self.state.current_instruction + 4, list);
-
-                        self.state.stack.push(VmData::Closure(closure));
-                        self.state.gclock = false;
-                        self.state.collect_garbage();
-                        let jump = u32::from_le_bytes(self.state.next_arr());
-                        self.state.current_instruction += jump as usize;
-                    } else {
+                    let Some(VmData::List(list)) = self.state.stack.pop() else {
                         todo!()
-                    }
+                    };
+                    self.state.gclock = true;
+                    let closure = self.state.allocate_new_heap();
+                    self.state.heap[closure] =
+                        Heap::Closure(self.state.current_instruction + 4, list);
+
+                    self.state.stack.push(VmData::Closure(closure));
+                    self.state.gclock = false;
+                    self.state.collect_garbage();
+                    let jump = u32::from_le_bytes(self.state.next_arr());
+                    self.state.current_instruction += jump as usize;
                 }
 
                 Code::DIRECTCALL => {
@@ -444,12 +420,9 @@ impl Vm {
                 }
 
                 Code::ILSS => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2 < v1;
-                        self.state.stack.push(VmData::Bool(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -457,7 +430,9 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2 < v1;
+                    self.state.stack.push(VmData::Bool(result))
                 }
 
                 Code::IGTR => match (self.state.stack.pop(), self.state.stack.pop()) {
@@ -478,12 +453,9 @@ impl Vm {
                 },
 
                 Code::FLSS => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2 < v1;
-                        self.state.stack.push(VmData::Bool(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -491,16 +463,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2 < v1;
+                    self.state.stack.push(VmData::Bool(result))
                 }
 
                 Code::FGTR => {
-                    if let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
+                    let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2 > v1;
-                        self.state.stack.push(VmData::Bool(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -508,7 +479,9 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2 > v1;
+                    self.state.stack.push(VmData::Bool(result))
                 }
 
                 Code::JMP => {
@@ -537,20 +510,8 @@ impl Vm {
                 }
 
                 Code::EQUALS => {
-                    if let (Some(v1), Some(v2)) = (self.state.stack.pop(), self.state.stack.pop()) {
-                        match (v1, v2) {
-                            (VmData::String(i1), VmData::String(i2)) => {
-                                let s1 = self.state.heap[i1].get_string();
-                                let s2 = self.state.heap[i2].get_string();
-                                let result = s1 == s2;
-                                self.state.stack.push(VmData::Bool(result))
-                            }
-                            _ => {
-                                let result = v2 == v1;
-                                self.state.stack.push(VmData::Bool(result))
-                            }
-                        }
-                    } else {
+                    let (Some(v1), Some(v2)) = (self.state.stack.pop(), self.state.stack.pop())
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -558,31 +519,35 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
-                }
-
-                Code::NOT => {
-                    if let Some(bool) = self.state.stack.pop() {
-                        match bool {
-                            VmData::Bool(b) => {
-                                if b {
-                                    self.state.stack.push(VmData::Bool(false))
-                                } else {
-                                    self.state.stack.push(VmData::Bool(true))
-                                }
-                            }
-                            _ => {
-                                return Err(NovaError::Runtime {
-                                    msg: format!(
-                                        "Error on Opcode : {}",
-                                        self.state.program[self.state.current_instruction]
-                                    )
-                                    .into(),
-                                });
-                            }
+                    };
+                    match (v1, v2) {
+                        (VmData::String(i1), VmData::String(i2)) => {
+                            let s1 = self.state.heap[i1].get_string();
+                            let s2 = self.state.heap[i2].get_string();
+                            let result = s1 == s2;
+                            self.state.stack.push(VmData::Bool(result))
+                        }
+                        _ => {
+                            let result = v2 == v1;
+                            self.state.stack.push(VmData::Bool(result))
                         }
                     }
                 }
+
+                Code::NOT => match self.state.stack.pop() {
+                    Some(VmData::Bool(b)) => {
+                        self.state.stack.push(VmData::Bool(!b));
+                    }
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: format!(
+                                "Error on Opcode : {}",
+                                self.state.program[self.state.current_instruction]
+                            )
+                            .into(),
+                        });
+                    }
+                },
 
                 Code::AND => {
                     if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
@@ -619,12 +584,9 @@ impl Vm {
                 }
 
                 Code::IMODULO => {
-                    if let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
+                    let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        let result = v2.modulo(v1);
-                        self.state.stack.push(VmData::Int(result))
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -632,59 +594,15 @@ impl Vm {
                             )
                             .into(),
                         });
-                    }
+                    };
+                    let result = v2.modulo(v1);
+                    self.state.stack.push(VmData::Int(result))
                 }
 
                 Code::ASSIGN => {
-                    if let (Some(destination), Some(value)) =
+                    let (Some(destination), Some(value)) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        match (value, destination) {
-                            (item, VmData::StackAddress(index)) => {
-                                match (self.state.stack[self.state.offset + index], value) {
-                                    (VmData::List(d), VmData::Closure(v)) => {
-                                        self.state.heap[d] = self.state.heap[v].clone()
-                                    }
-                                    (VmData::List(d), VmData::List(v)) => {
-                                        self.state.heap[d] = self.state.heap[v].clone();
-                                    }
-                                    (VmData::List(_), VmData::Struct(_)) => todo!(),
-                                    (VmData::List(_), VmData::String(_)) => todo!(),
-                                    (VmData::String(d), VmData::String(v)) => {
-                                        self.state.heap[d] = self.state.heap[v].clone()
-                                    }
-                                    _ => self.state.stack[self.state.offset + index] = item,
-                                }
-                            }
-                            (item, VmData::List(index)) => {
-                                //dbg!(&item, &index);
-                                match item {
-                                    VmData::Function(v) => {
-                                        self.state.heap[index] = Heap::Function(v)
-                                    }
-                                    VmData::Int(v) => self.state.heap[index] = Heap::Int(v),
-                                    VmData::Float(_) => todo!(),
-                                    VmData::Bool(_) => todo!(),
-                                    VmData::List(v) => {
-                                        //dbg!(&self.state.heap[v]);
-                                        self.state.heap[index] = Heap::ListAddress(v)
-                                    }
-                                    VmData::None => todo!(),
-                                    VmData::String(v) => {
-                                        self.state.heap[index] = Heap::StringAddress(v)
-                                    }
-                                    VmData::Closure(_) => todo!(),
-                                    VmData::StackAddress(_) => todo!(),
-                                    VmData::Struct(_) => todo!(),
-                                    VmData::Char(v) => self.state.heap[index] = Heap::Char(v),
-                                };
-                            }
-                            (a, b) => {
-                                dbg!(a, b, self.state.program[self.state.current_instruction]);
-                                todo!()
-                            }
-                        }
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -692,6 +610,49 @@ impl Vm {
                             )
                             .into(),
                         });
+                    };
+                    match (value, destination) {
+                        (item, VmData::StackAddress(index)) => {
+                            match (self.state.stack[self.state.offset + index], value) {
+                                (VmData::List(d), VmData::Closure(v)) => {
+                                    self.state.heap[d] = self.state.heap[v].clone()
+                                }
+                                (VmData::List(d), VmData::List(v)) => {
+                                    self.state.heap[d] = self.state.heap[v].clone();
+                                }
+                                (VmData::List(_), VmData::Struct(_)) => todo!(),
+                                (VmData::List(_), VmData::String(_)) => todo!(),
+                                (VmData::String(d), VmData::String(v)) => {
+                                    self.state.heap[d] = self.state.heap[v].clone()
+                                }
+                                _ => self.state.stack[self.state.offset + index] = item,
+                            }
+                        }
+                        (item, VmData::List(index)) => {
+                            //dbg!(&item, &index);
+                            match item {
+                                VmData::Function(v) => self.state.heap[index] = Heap::Function(v),
+                                VmData::Int(v) => self.state.heap[index] = Heap::Int(v),
+                                VmData::Float(_) => todo!(),
+                                VmData::Bool(_) => todo!(),
+                                VmData::List(v) => {
+                                    //dbg!(&self.state.heap[v]);
+                                    self.state.heap[index] = Heap::ListAddress(v)
+                                }
+                                VmData::None => todo!(),
+                                VmData::String(v) => {
+                                    self.state.heap[index] = Heap::StringAddress(v)
+                                }
+                                VmData::Closure(_) => todo!(),
+                                VmData::StackAddress(_) => todo!(),
+                                VmData::Struct(_) => todo!(),
+                                VmData::Char(v) => self.state.heap[index] = Heap::Char(v),
+                            };
+                        }
+                        (a, b) => {
+                            dbg!(a, b, self.state.program[self.state.current_instruction]);
+                            todo!()
+                        }
                     }
                 }
 
@@ -712,58 +673,9 @@ impl Vm {
                 }
 
                 Code::PINDEX => {
-                    if let (Some(array), Some(index)) =
+                    let (Some(array), Some(index)) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        match (array, index) {
-                            (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
-                                if let VmData::List(newindex) =
-                                    &self.state.stack[self.state.offset + array_index]
-                                {
-                                    if let Heap::List(array) = self.state.deref(*newindex) {
-                                        if array.len() <= index_to_get as usize {
-                                            if let Some(pos) = self
-                                                .runtime_errors_table
-                                                .get(&self.state.current_instruction)
-                                            {
-                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
-                                            } else {
-                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
-                                            }
-                                        }
-                                        self.state
-                                            .stack
-                                            .push(VmData::List(array[index_to_get as usize]))
-                                    }
-                                }
-                            }
-                            (VmData::List(array_index), VmData::Int(index_to_get)) => {
-                                if let Heap::ListAddress(newindex) = self.state.deref(array_index) {
-                                    if let Heap::List(array) = self.state.deref(newindex) {
-                                        if array.len() <= index_to_get as usize {
-                                            if let Some(pos) = self
-                                                .runtime_errors_table
-                                                .get(&self.state.current_instruction)
-                                            {
-                                                return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
-                                            } else {
-                                                return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
-                                            }
-                                        }
-                                        self.state
-                                            .stack
-                                            .push(VmData::List(array[index_to_get as usize]))
-                                    }
-                                } else {
-                                    todo!()
-                                }
-                            }
-                            (a, b) => {
-                                dbg!(a, b);
-                                todo!()
-                            }
-                        }
-                    } else {
+                    else {
                         return Err(NovaError::Runtime {
                             msg: format!(
                                 "Error Not enough arguments Opcode : {}",
@@ -771,57 +683,101 @@ impl Vm {
                             )
                             .into(),
                         });
+                    };
+                    match (array, index) {
+                        (VmData::StackAddress(array_index), VmData::Int(index_to_get)) => {
+                            if let VmData::List(newindex) =
+                                &self.state.stack[self.state.offset + array_index]
+                            {
+                                if let Heap::List(array) = self.state.deref(*newindex) {
+                                    if array.len() <= index_to_get as usize {
+                                        if let Some(pos) = self
+                                            .runtime_errors_table
+                                            .get(&self.state.current_instruction)
+                                        {
+                                            return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
+                                        } else {
+                                            return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
+                                        }
+                                    }
+                                    self.state
+                                        .stack
+                                        .push(VmData::List(array[index_to_get as usize]))
+                                }
+                            }
+                        }
+                        (VmData::List(array_index), VmData::Int(index_to_get)) => {
+                            let Heap::ListAddress(newindex) = self.state.deref(array_index) else {
+                                todo!()
+                            };
+                            if let Heap::List(array) = self.state.deref(newindex) {
+                                if array.len() <= index_to_get as usize {
+                                    if let Some(pos) = self
+                                        .runtime_errors_table
+                                        .get(&self.state.current_instruction)
+                                    {
+                                        return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into(), position: pos.clone() });
+                                    } else {
+                                        return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to_get).into() });
+                                    }
+                                }
+                                self.state
+                                    .stack
+                                    .push(VmData::List(array[index_to_get as usize]))
+                            }
+                        }
+                        (a, b) => {
+                            dbg!(a, b);
+                            todo!()
+                        }
                     }
                 }
 
                 Code::LINDEX => {
-                    if let (Some(array), Some(index)) =
+                    let (Some(array), Some(index)) =
                         (self.state.stack.pop(), self.state.stack.pop())
-                    {
-                        match (array, index) {
-                            (VmData::List(array), VmData::Int(index_to)) => {
-                                match self.state.deref(array) {
-                                    Heap::List(array) => {
-                                        let item = self.state.deref(array[index_to as usize]);
-                                        match item {
-                                            Heap::Function(v) => {
-                                                self.state.stack.push(VmData::Function(v))
-                                            }
-                                            Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
-                                            Heap::Float(v) => {
-                                                self.state.stack.push(VmData::Float(v))
-                                            }
-                                            Heap::Bool(v) => self.state.stack.push(VmData::Bool(v)),
-                                            Heap::ListAddress(v) => {
-                                                self.state.stack.push(VmData::List(v))
-                                            }
-                                            Heap::List(_) => panic!(),
-                                            Heap::String(_) => panic!(),
-                                            Heap::None => self.state.stack.push(VmData::None),
-                                            Heap::StringAddress(v) => {
-                                                self.state.stack.push(VmData::String(v))
-                                            }
-                                            Heap::Closure(_, _) => todo!(),
-                                            Heap::ClosureAddress(v) => {
-                                                self.state.stack.push(VmData::Closure(v))
-                                            }
-                                            Heap::Struct(_, _) => todo!(),
-                                            Heap::StructAddress(_) => todo!(),
-                                            Heap::Char(v) => self.state.stack.push(VmData::Char(v)),
+                    else {
+                        todo!()
+                    };
+                    match (array, index) {
+                        (VmData::List(array), VmData::Int(index_to)) => {
+                            match self.state.deref(array) {
+                                Heap::List(array) => {
+                                    let item = self.state.deref(array[index_to as usize]);
+                                    match item {
+                                        Heap::Function(v) => {
+                                            self.state.stack.push(VmData::Function(v))
                                         }
-                                    }
-                                    _ => {
-                                        todo!()
+                                        Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
+                                        Heap::Float(v) => self.state.stack.push(VmData::Float(v)),
+                                        Heap::Bool(v) => self.state.stack.push(VmData::Bool(v)),
+                                        Heap::ListAddress(v) => {
+                                            self.state.stack.push(VmData::List(v))
+                                        }
+                                        Heap::List(_) => panic!(),
+                                        Heap::String(_) => panic!(),
+                                        Heap::None => self.state.stack.push(VmData::None),
+                                        Heap::StringAddress(v) => {
+                                            self.state.stack.push(VmData::String(v))
+                                        }
+                                        Heap::Closure(_, _) => todo!(),
+                                        Heap::ClosureAddress(v) => {
+                                            self.state.stack.push(VmData::Closure(v))
+                                        }
+                                        Heap::Struct(_, _) => todo!(),
+                                        Heap::StructAddress(_) => todo!(),
+                                        Heap::Char(v) => self.state.stack.push(VmData::Char(v)),
                                     }
                                 }
-                            }
-                            (a, b) => {
-                                dbg!(a, b);
-                                todo!()
+                                _ => {
+                                    todo!()
+                                }
                             }
                         }
-                    } else {
-                        todo!()
+                        (a, b) => {
+                            dbg!(a, b);
+                            todo!()
+                        }
                     }
                 }
 
@@ -836,38 +792,37 @@ impl Vm {
                 }
 
                 Code::CALL => {
-                    if let Some(callee) = self.state.stack.pop() {
-                        match callee {
-                            VmData::Closure(index) => {
-                                if let Some(Heap::Closure(target, captured)) =
-                                    self.state.heap.get(index)
-                                {
-                                    //dbg!(&self.state.heap[*captured]);
-                                    if let Heap::List(list) = &self.state.heap[*captured] {
-                                        for i in list {
-                                            self.state.stack.push(self.state.to_vmdata(*i))
-                                        }
-                                        self.state.callstack.push(self.state.current_instruction);
-                                        self.state.goto(*target);
-                                    } else {
-                                        dbg!(target, callee, captured);
-                                        todo!()
+                    let Some(callee) = self.state.stack.pop() else {
+                        todo!()
+                    };
+                    match callee {
+                        VmData::Closure(index) => {
+                            if let Some(Heap::Closure(target, captured)) =
+                                self.state.heap.get(index)
+                            {
+                                //dbg!(&self.state.heap[*captured]);
+                                if let Heap::List(list) = &self.state.heap[*captured] {
+                                    for i in list {
+                                        self.state.stack.push(self.state.to_vmdata(*i))
                                     }
+                                    self.state.callstack.push(self.state.current_instruction);
+                                    self.state.goto(*target);
                                 } else {
+                                    dbg!(target, callee, captured);
                                     todo!()
                                 }
-                            }
-                            VmData::Function(target) => {
-                                self.state.callstack.push(self.state.current_instruction);
-                                self.state.goto(target);
-                            }
-                            a => {
-                                dbg!(a);
+                            } else {
                                 todo!()
                             }
                         }
-                    } else {
-                        todo!()
+                        VmData::Function(target) => {
+                            self.state.callstack.push(self.state.current_instruction);
+                            self.state.goto(target);
+                        }
+                        a => {
+                            dbg!(a);
+                            todo!()
+                        }
                     }
                 }
 
