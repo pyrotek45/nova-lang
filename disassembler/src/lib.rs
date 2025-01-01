@@ -12,9 +12,9 @@ pub fn new() -> Disassembler {
 }
 
 pub struct Disassembler {
-    depth: Vec<usize>,
+    depth: Vec<u64>,
     pub native_functions: Table<String>,
-    ip: usize,
+    ip: u64,
 }
 
 impl Disassembler {
@@ -91,7 +91,7 @@ impl Disassembler {
         println!("{}", output)
     }
 
-    fn next(&mut self, input: &mut std::vec::IntoIter<u8>) -> Option<u8> {
+    fn next(&mut self, mut input: impl Iterator<Item = u8>) -> Option<u8> {
         if let Some(index) = self.depth.last() {
             if self.ip == *index {
                 self.depth.pop();
@@ -100,6 +100,17 @@ impl Disassembler {
         //println!("ip: {}", self.ip);
         self.ip += 1;
         input.next()
+    }
+
+    fn next_arr<const LEN: usize>(
+        &mut self,
+        mut input: impl Iterator<Item = u8>,
+    ) -> Option<[u8; LEN]> {
+        let mut out = [0; LEN];
+        for slot in &mut out {
+            *slot = self.next(&mut input)?;
+        }
+        Some(out)
     }
 
     pub fn dis(
@@ -115,21 +126,11 @@ impl Disassembler {
                 Code::LINDEX => self.out("LINDEX"),
                 Code::PINDEX => self.out("PINDEX"),
                 Code::JMP => {
-                    let int = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let int = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("JMP {}", int))
                 }
                 Code::BJMP => {
-                    let int = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let int = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("BJMP {}", int))
                 }
                 Code::RET => {
@@ -137,29 +138,11 @@ impl Disassembler {
                     self.out(&format!("Return with {}", wr));
                 }
                 Code::INTEGER => {
-                    let int = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let int = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Push I{}", int))
                 }
                 Code::STACKREF => {
-                    let int = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let int = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Stack ref {}", int))
                 }
                 Code::BYTE => {
@@ -167,16 +150,7 @@ impl Disassembler {
                     self.out(&format!("Push I{}", int))
                 }
                 Code::FLOAT => {
-                    let fl = f64::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let fl = f64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Push Float {}", fl))
                 }
                 Code::IADD => self.out("iAdd"),
@@ -188,119 +162,52 @@ impl Disassembler {
                 Code::FMUL => self.out("fMul"),
                 Code::FDIV => self.out("fDiv"),
                 Code::STORE => {
-                    let index = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Store ID {}", index))
                 }
                 Code::GET => {
-                    let index = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("ID {}", index))
                 }
                 Code::ASSIGN => self.out("Assign"),
                 Code::ALLOCLOCALS => {
-                    let allocations = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let allocations = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Register allocation {}", allocations))
                 }
                 Code::OFFSET => {
-                    let allocations = i32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
-                    let locals = i32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let allocations = i32::from_le_bytes(self.next_arr(&mut input).unwrap());
+                    let locals = i32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Offset {}, locals {}", allocations, locals))
                 }
                 Code::BLOCK => {
-                    let jump = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.depth.push(self.ip + jump);
                     self.out("Block:")
                 }
                 Code::CALL => self.out("Call"),
                 Code::DIRECTCALL => {
-                    let target = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let target = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Direct call {}", target))
                 }
                 Code::NEWLIST => {
-                    let size = u64::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Create list: size of {}", size))
                 }
                 Code::TRUE => self.out("Push True"),
                 Code::FALSE => self.out("Push False"),
                 Code::STOREFAST => {
-                    let index = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("StoreFast ID {}", index))
                 }
                 Code::FUNCTION => {
-                    let jump = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.depth.push(self.ip + jump);
                     self.out("Function:")
                 }
                 Code::IGTR => self.out("Greater than"),
                 Code::ILSS => self.out("Less than"),
                 Code::JUMPIFFALSE => {
-                    let jump = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Jump if false: {}", jump))
                 }
                 Code::REC => self.out("Recursive call"),
@@ -309,55 +216,25 @@ impl Disassembler {
                 Code::EQUALS => self.out("Equals"),
                 Code::IMODULO => self.out("Modulo"),
                 Code::REFID => {
-                    let index = u16::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u16::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Referance ID {}", index))
                 }
 
                 Code::CLOSURE => {
-                    let jump = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.depth.push(self.ip + jump);
                     self.out("Closure:")
                 }
 
                 Code::CID => {
-                    let index = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Closure ID {}", index))
                 }
                 Code::PRINT => self.out("Print"),
 
                 Code::STRING => {
                     let mut string = vec![];
-                    let size = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
                     for _ in 0..size {
                         string.push(self.next(&mut input).unwrap());
                     }
@@ -372,49 +249,25 @@ impl Disassembler {
 
                 Code::RANGE => self.out("Range"),
                 Code::NATIVE => {
-                    let index = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
 
-                    if let Some(function) = self.native_functions.retreive(index) {
+                    if let Some(function) = self.native_functions.retreive(index as usize) {
                         self.out(&format!("Function: {}", function))
                     }
                 }
                 Code::ALLOCATEGLOBAL => {
-                    let size = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let size = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
                     self.out(&format!("Global allocation {}", size))
                 }
 
                 Code::GETGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
 
                     self.out(&format!("Global ID {}", index))
                 }
 
                 Code::STOREGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
 
                     self.out(&format!("Store Global ID {}", index))
                 }
@@ -431,16 +284,7 @@ impl Disassembler {
                 Code::NEWBINDING => self.out("Create Bindings"),
                 Code::POPBINDING => self.out("Remove Bindings"),
                 Code::GETBIND => {
-                    let index = usize::from_le_bytes([
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                        self.next(&mut input).unwrap(),
-                    ]);
+                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
 
                     self.out(&format!("Get Binding {}", index))
                 }
