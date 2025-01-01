@@ -8,7 +8,7 @@ pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
     io::stdin()
         .read_line(&mut input)
         .map_err(|e| NovaError::Runtime {
-            msg: format!("Error reading line: {}", e),
+            msg: format!("Error reading line: {e}").into(),
         })?;
     // removing newline token
     input.pop();
@@ -27,7 +27,7 @@ pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
                 }
                 Err(e) => {
                     return Err(NovaError::Runtime {
-                        msg: format!("Error reading file: {}", e),
+                        msg: format!("Error reading file: {e}").into(),
                     })
                 }
             }
@@ -70,29 +70,29 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
                             strings.push(string.clone());
                         } else {
                             return Err(NovaError::Runtime {
-                                msg: "Invalid arguments for printf".to_string(),
+                                msg: "Invalid arguments for printf".into(),
                             });
                         }
                     } else {
                         return Err(NovaError::Runtime {
-                            msg: "Invalid arguments for printf".to_string(),
+                            msg: "Invalid arguments for printf".into(),
                         });
                     }
                 }
             } else {
                 return Err(NovaError::Runtime {
-                    msg: "Invalid arguments for printf".to_string(),
+                    msg: "Invalid arguments for printf".into(),
                 });
             }
             printf_with_array(&format_string, strings);
         } else {
             return Err(NovaError::Runtime {
-                msg: "Invalid arguments for printf".to_string(),
+                msg: "Invalid arguments for printf".into(),
             });
         }
     } else {
         return Err(NovaError::Runtime {
-            msg: "Invalid arguments for printf".to_string(),
+            msg: "Invalid arguments for printf".into(),
         });
     }
     Ok(())
