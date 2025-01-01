@@ -206,6 +206,10 @@ impl State {
         self.current_instruction += 1;
         *result
     }
+    #[inline(always)]
+    pub fn next_arr<const LEN: usize>(&mut self) -> [u8; LEN] {
+        std::array::from_fn(|_| self.next_instruction())
+    }
 
     #[inline(always)]
     pub fn goto(&mut self, addr: usize) {

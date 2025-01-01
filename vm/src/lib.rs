@@ -103,16 +103,7 @@ impl Vm {
                     self.state.stack.pop();
                 }
                 Code::NATIVE => {
-                    let index = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u64::from_le_bytes(self.state.next_arr());
 
                     match self.native_functions[index as usize](&mut self.state) {
                         Ok(_) => {}
@@ -122,74 +113,35 @@ impl Vm {
 
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCATEGLOBAL => {
-                    let allocations = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let allocations = u32::from_le_bytes(self.state.next_arr());
                     self.state.alloc_locals(allocations as usize);
                 }
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCLOCALS => {
-                    let allocations = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let allocations = u32::from_le_bytes(self.state.next_arr());
                     self.state.alloc_locals(allocations as usize);
                 }
                 // sets up the stack with empty values for use later with local variables
                 Code::OFFSET => {
-                    let offset = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
-                    let locals = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let offset = u32::from_le_bytes(self.state.next_arr());
+                    let locals = u32::from_le_bytes(self.state.next_arr());
                     self.state.offset_locals(offset as usize, locals as usize);
                 }
                 // pushes a constant integer to the stack
                 Code::INTEGER => {
-                    let int = i64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let int = i64::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::Int(int));
                 }
 
                 Code::STACKREF => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::StackAddress(index as usize));
                 }
 
                 // takes item and stores it into stack at location
                 // with offset
                 Code::STORE => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
 
                     let data = self.state.stack.pop().unwrap();
                     //dbg!(&data,index);
@@ -199,12 +151,7 @@ impl Vm {
                 // gets the data from a local index in the stack
                 // from offset
                 Code::GET => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     let item = &self.state.stack[self.state.offset + index as usize];
                     //dbg!(&item);
                     self.state.stack.push(*item);
@@ -423,12 +370,7 @@ impl Vm {
                 }
 
                 Code::STOREGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     let item = self.state.stack.pop().unwrap();
                     self.state.stack[index as usize] = item;
                 }
@@ -438,12 +380,7 @@ impl Vm {
                         .stack
                         .push(VmData::Function(self.state.current_instruction + 4));
 
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
 
                     self.state.current_instruction += jump as usize;
                 }
@@ -458,12 +395,7 @@ impl Vm {
                         self.state.stack.push(VmData::Closure(closure));
                         self.state.gclock = false;
                         self.state.collect_garbage();
-                        let jump = u32::from_le_bytes([
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                        ]);
+                        let jump = u32::from_le_bytes(self.state.next_arr());
                         self.state.current_instruction += jump as usize;
                     } else {
                         todo!()
@@ -474,12 +406,7 @@ impl Vm {
                     self.state
                         .callstack
                         .push(self.state.current_instruction + 4);
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
 
                     let callee = self.state.stack[index as usize];
 
@@ -509,12 +436,7 @@ impl Vm {
                 }
 
                 Code::TAILCALL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     if let VmData::Function(target) = self.state.stack[index as usize] {
                         self.state.goto(target);
                     }
@@ -590,30 +512,15 @@ impl Vm {
                 }
 
                 Code::JMP => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     self.state.current_instruction += jump as usize;
                 }
                 Code::BJMP => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     self.state.current_instruction -= jump as usize;
                 }
                 Code::JUMPIFFALSE => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     if let VmData::Bool(test) = self.state.stack.pop().unwrap() {
                         if !test {
                             self.state.current_instruction += jump as usize;
@@ -789,16 +696,7 @@ impl Vm {
                 }
 
                 Code::NEWLIST => {
-                    let size = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let size = u64::from_le_bytes(self.state.next_arr());
 
                     let mut myarray = vec![];
                     for _ in 0..size {
@@ -928,26 +826,12 @@ impl Vm {
                 }
 
                 Code::FLOAT => {
-                    let fl = f64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let fl = f64::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::Float(fl));
                 }
 
                 Code::GETGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(self.state.stack[index as usize]);
                 }
 
@@ -989,16 +873,7 @@ impl Vm {
 
                 Code::STRING => {
                     let mut string = vec![];
-                    let size = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let size = u64::from_le_bytes(self.state.next_arr());
 
                     for _ in 0..size {
                         string.push(self.state.next_instruction());
@@ -1127,74 +1002,35 @@ impl Vm {
                 }
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCATEGLOBAL => {
-                    let allocations = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let allocations = u32::from_le_bytes(self.state.next_arr());
                     self.state.alloc_locals(allocations as usize);
                 }
                 // sets up the stack with empty values for use later with local variables
                 Code::ALLOCLOCALS => {
-                    let allocations = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let allocations = u32::from_le_bytes(self.state.next_arr());
                     self.state.alloc_locals(allocations as usize);
                 }
                 // sets up the stack with empty values for use later with local variables
                 Code::OFFSET => {
-                    let offset = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
-                    let locals = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let offset = u32::from_le_bytes(self.state.next_arr());
+                    let locals = u32::from_le_bytes(self.state.next_arr());
                     self.state.offset_locals(offset as usize, locals as usize);
                 }
                 // pushes a constant integer to the stack
                 Code::INTEGER => {
-                    let int = i64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let int = i64::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::Int(int));
                 }
 
                 Code::STACKREF => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::StackAddress(index as usize));
                 }
 
                 // takes item and stores it into stack at location
                 // with offset
                 Code::STORE => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
 
                     let data = self.state.stack.pop().unwrap();
                     //dbg!(&data,index);
@@ -1204,12 +1040,7 @@ impl Vm {
                 // gets the data from a local index in the stack
                 // from offset
                 Code::GET => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     let item = &self.state.stack[self.state.offset + index as usize];
                     //dbg!(&item);
                     self.state.stack.push(*item);
@@ -1348,12 +1179,7 @@ impl Vm {
                 }
 
                 Code::STOREGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     let item = self.state.stack.pop().unwrap();
                     self.state.stack[index as usize] = item;
                 }
@@ -1363,12 +1189,7 @@ impl Vm {
                         .stack
                         .push(VmData::Function(self.state.current_instruction + 4));
 
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
 
                     self.state.current_instruction += jump as usize;
                 }
@@ -1382,12 +1203,7 @@ impl Vm {
                         self.state.stack.push(VmData::Closure(closure));
                         self.state.gclock = false;
                         self.state.collect_garbage();
-                        let jump = u32::from_le_bytes([
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                            self.state.next_instruction(),
-                        ]);
+                        let jump = u32::from_le_bytes(self.state.next_arr());
                         self.state.current_instruction += jump as usize;
                     } else {
                         todo!()
@@ -1398,24 +1214,14 @@ impl Vm {
                     self.state
                         .callstack
                         .push(self.state.current_instruction + 4);
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     if let VmData::Function(target) = self.state.stack[index as usize] {
                         self.state.goto(target);
                     }
                 }
 
                 Code::TAILCALL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     if let VmData::Function(target) = self.state.stack[index as usize] {
                         self.state.goto(target);
                     }
@@ -1458,30 +1264,15 @@ impl Vm {
                 }
 
                 Code::JMP => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     self.state.current_instruction += jump as usize;
                 }
                 Code::BJMP => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     self.state.current_instruction -= jump as usize;
                 }
                 Code::JUMPIFFALSE => {
-                    let jump = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let jump = u32::from_le_bytes(self.state.next_arr());
                     if let VmData::Bool(test) = self.state.stack.pop().unwrap() {
                         if !test {
                             self.state.current_instruction += jump as usize;
@@ -1602,16 +1393,7 @@ impl Vm {
                 }
 
                 Code::NEWLIST => {
-                    let size = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let size = u64::from_le_bytes(self.state.next_arr());
                     let mut myarray = vec![];
                     self.state.gclock = true;
                     for _ in 0..size {
@@ -1744,26 +1526,12 @@ impl Vm {
                 }
 
                 Code::FLOAT => {
-                    let fl = f64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let fl = f64::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(VmData::Float(fl));
                 }
 
                 Code::GETGLOBAL => {
-                    let index = u32::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u32::from_le_bytes(self.state.next_arr());
                     self.state.stack.push(self.state.stack[index as usize]);
                 }
 
@@ -1805,16 +1573,7 @@ impl Vm {
 
                 Code::STRING => {
                     let mut string = vec![];
-                    let size = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let size = u64::from_le_bytes(self.state.next_arr());
                     for _ in 0..size {
                         string.push(self.state.next_instruction());
                     }
@@ -1866,16 +1625,7 @@ impl Vm {
                     self.state.stack.push(VmData::None);
                 }
                 Code::NATIVE => {
-                    let index = u64::from_le_bytes([
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                        self.state.next_instruction(),
-                    ]);
+                    let index = u64::from_le_bytes(self.state.next_arr());
 
                     match self.native_functions[index as usize](&mut self.state) {
                         Ok(_) => {}
