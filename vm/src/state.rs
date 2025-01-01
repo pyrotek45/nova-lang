@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 
+use common::table::Table;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,7 +76,7 @@ pub struct State {
     pub current_instruction: usize,
     pub offset: usize,
     pub window: Vec<usize>,
-    pub used_data: common::table::Table<usize>,
+    pub used_data: Table<usize>,
     pub threshold: usize,
     pub gc_count: usize,
     pub garbage_collected: usize,
@@ -92,7 +93,7 @@ pub fn new() -> State {
         window: vec![],
         heap: vec![],
         free_space: vec![],
-        used_data: common::table::new(),
+        used_data: Table::new(),
         threshold: 999999999,
         gc_count: 0,
         garbage_collected: 0,
