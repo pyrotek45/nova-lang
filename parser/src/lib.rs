@@ -910,8 +910,8 @@ impl Parser {
             }
         };
 
-        let mut generic_list = self.collect_generics(&[*return_type.clone()]);
-        generic_list.extend(self.collect_generics(&parameters));
+        let mut generic_list = Self::collect_generics(&[*return_type.clone()]);
+        generic_list.extend(Self::collect_generics(&parameters));
         //dbg!(generic_list.clone());
         let mut type_map = self.check_and_map_types(
             &parameters,
@@ -964,7 +964,7 @@ impl Parser {
         self.consume_operator(Operator::Colon)?;
         let ttype = self.ttype()?;
         // check to see if type is generic and then checkt to see if it is live and if it is not live, throw an error
-        let generic_list = self.collect_generics(&[ttype.clone()]);
+        let generic_list = Self::collect_generics(&[ttype.clone()]);
         for generic in generic_list.items {
             if !self.environment.live_generics.last().unwrap().has(&generic) {
                 //dbg!(self.environment.live_generics.last().unwrap());
@@ -997,7 +997,7 @@ impl Parser {
             }
             self.consume_operator(Operator::Colon)?;
             let ttype = self.ttype()?;
-            let generic_list = self.collect_generics(&[ttype.clone()]);
+            let generic_list = Self::collect_generics(&[ttype.clone()]);
             for generic in generic_list.items {
                 if !self.environment.live_generics.last().unwrap().has(&generic) {
                     return Err(NovaError::SimpleTypeError {
@@ -1222,8 +1222,7 @@ impl Parser {
         }
     }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn replace_generic_types(&self, ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
+    fn replace_generic_types(ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
         match ttype {
             TType::Generic { name: n } => {
                 if let Some(index) = x.iter().position(|x| x == n) {
@@ -1247,7 +1246,7 @@ impl Parser {
             } => {
                 let new_params = inner_params
                     .iter()
-                    .map(|param| self.replace_generic_types(param, x, type_params))
+                    .map(|param| Self::replace_generic_types(param, x, type_params))
                     .collect();
                 TType::Custom {
                     name: name.clone(),
@@ -1255,7 +1254,7 @@ impl Parser {
                 }
             }
             TType::List { inner } => TType::List {
-                inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+                inner: Box::new(Self::replace_generic_types(inner, x, type_params)),
             },
             TType::Function {
                 parameters,
@@ -1263,20 +1262,20 @@ impl Parser {
             } => {
                 let new_params = parameters
                     .iter()
-                    .map(|param| self.replace_generic_types(param, x, type_params))
+                    .map(|param| Self::replace_generic_types(param, x, type_params))
                     .collect();
                 TType::Function {
                     parameters: new_params,
-                    return_type: Box::new(self.replace_generic_types(return_type, x, type_params)),
+                    return_type: Box::new(Self::replace_generic_types(return_type, x, type_params)),
                 }
             }
             TType::Option { inner } => TType::Option {
-                inner: Box::new(self.replace_generic_types(inner, x, type_params)),
+                inner: Box::new(Self::replace_generic_types(inner, x, type_params)),
             },
             TType::Tuple { elements } => {
                 let new_elements = elements
                     .iter()
-                    .map(|element| self.replace_generic_types(element, x, type_params))
+                    .map(|element| Self::replace_generic_types(element, x, type_params))
                     .collect();
                 TType::Tuple {
                     elements: new_elements,
@@ -1303,7 +1302,7 @@ impl Parser {
                         fields
                             .iter()
                             .map(|(name, ttype)| {
-                                let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                                let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                                 (name.clone(), new_ttype)
                             })
                             .collect::<Vec<(String, TType)>>()
@@ -1957,8 +1956,8 @@ impl Parser {
                 if typeinput.is_empty() {
                     typeinput.push(TType::None)
                 }
-                let mut generic_list = self.collect_generics(&typeinput);
-                generic_list.extend(self.collect_generics(&[output.clone()]));
+                let mut generic_list = Self::collect_generics(&typeinput);
+                generic_list.extend(Self::collect_generics(&[output.clone()]));
                 if let Some(livemap) = self.environment.live_generics.last_mut() {
                     for generic in generic_list.items.iter() {
                         // add generics to live map
@@ -2248,7 +2247,7 @@ impl Parser {
                             }
                         }
 
-                        let generic_list = self.collect_generics(&[ttype.clone()]);
+                        let generic_list = Self::collect_generics(&[ttype.clone()]);
                         for generic in generic_list.items {
                             if !self.environment.live_generics.last().unwrap().has(&generic) {
                                 //dbg!(self.environment.live_generics.last().unwrap().clone());
@@ -2543,7 +2542,7 @@ impl Parser {
         if typeinput.is_empty() {
             typeinput.push(TType::None)
         }
-        let generic_list = self.collect_generics(&typeinput);
+        let generic_list = Self::collect_generics(&typeinput);
         self.environment.live_generics.push(generic_list.clone());
         self.environment.push_scope();
         for (ttype, id) in parameters.iter() {
@@ -3388,7 +3387,7 @@ impl Parser {
                     fields
                         .iter()
                         .map(|(name, ttype)| {
-                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                            let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
                         .collect::<Vec<(String, TType)>>()
@@ -3483,7 +3482,7 @@ impl Parser {
                     fields
                         .iter()
                         .map(|(name, ttype)| {
-                            let new_ttype = self.replace_generic_types(ttype, x, &type_params);
+                            let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
                         .collect::<Vec<(String, TType)>>()
@@ -3580,8 +3579,7 @@ impl Parser {
         Ok(idlist)
     }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn collect_generics(&self, input: &[TType]) -> Table<String> {
+    fn collect_generics(input: &[TType]) -> Table<String> {
         let mut contracts = Table::new();
         for t in input {
             match t {
@@ -3590,20 +3588,20 @@ impl Parser {
                     parameters: input,
                     return_type: output,
                 } => {
-                    contracts.extend(self.collect_generics(input));
-                    contracts.extend(self.collect_generics(&[*output.clone()]))
+                    contracts.extend(Self::collect_generics(input));
+                    contracts.extend(Self::collect_generics(&[*output.clone()]))
                 }
                 TType::List { inner: list } => {
-                    contracts.extend(self.collect_generics(&[*list.clone()]))
+                    contracts.extend(Self::collect_generics(&[*list.clone()]))
                 }
                 TType::Option { inner: option } => {
-                    contracts.extend(self.collect_generics(&[*option.clone()]))
+                    contracts.extend(Self::collect_generics(&[*option.clone()]))
                 }
                 TType::Custom { type_params, .. } => {
-                    contracts.extend(self.collect_generics(&type_params.clone()))
+                    contracts.extend(Self::collect_generics(&type_params.clone()))
                 }
                 TType::Tuple { elements } => {
-                    contracts.extend(self.collect_generics(&elements.clone()))
+                    contracts.extend(Self::collect_generics(&elements.clone()))
                 }
                 _ => {}
             }
@@ -3639,7 +3637,7 @@ impl Parser {
         let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
-            generics_table.extend(self.collect_generics(&[field_type.clone()]));
+            generics_table.extend(Self::collect_generics(&[field_type.clone()]));
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
@@ -3755,7 +3753,7 @@ impl Parser {
         let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
-            generics_table.extend(self.collect_generics(&[field_type.clone()]));
+            generics_table.extend(Self::collect_generics(&[field_type.clone()]));
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
@@ -4088,10 +4086,8 @@ impl Parser {
             (identifier, pos) = self.get_identifier()?;
             global = true
         }
-        #[allow(unused_assignments)]
-        let mut ttype = TType::None;
-        #[allow(unused_assignments)]
-        let mut expr = Expr::None;
+        let ttype;
+        let expr;
         if self.current_token().is_op(Operator::Colon) {
             self.consume_operator(Operator::Colon)?;
             ttype = self.ttype()?;
@@ -4167,8 +4163,7 @@ impl Parser {
         }))
     }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn is_generic(&self, params: &[TType]) -> bool {
+    fn is_generic(params: &[TType]) -> bool {
         for param in params {
             match param {
                 TType::Generic { .. } => return true,
@@ -4177,27 +4172,27 @@ impl Parser {
                     return_type,
                 } => {
                     // dbg!(parameters.clone(), return_type.clone());
-                    if self.is_generic(parameters) || self.is_generic(&[*return_type.clone()]) {
+                    if Self::is_generic(parameters) || Self::is_generic(&[*return_type.clone()]) {
                         return true;
                     }
                 }
                 TType::List { inner } => {
-                    if self.is_generic(&[*inner.clone()]) {
+                    if Self::is_generic(&[*inner.clone()]) {
                         return true;
                     }
                 }
                 TType::Option { inner } => {
-                    if self.is_generic(&[*inner.clone()]) {
+                    if Self::is_generic(&[*inner.clone()]) {
                         return true;
                     }
                 }
                 TType::Custom { type_params, .. } => {
-                    if self.is_generic(type_params) {
+                    if Self::is_generic(type_params) {
                         return true;
                     }
                 }
                 TType::Tuple { elements } => {
-                    if self.is_generic(elements) {
+                    if Self::is_generic(elements) {
                         return true;
                     }
                 }
@@ -4332,7 +4327,7 @@ impl Parser {
         }
         // is function using generics?
         //dbg!(generate_unique_string(&identifier, &typeinput));
-        let generic = self.is_generic(&typeinput);
+        let generic = Self::is_generic(&typeinput);
         // build helper vecs
         let mut input = vec![];
         for (ttype, identifier) in parameters.clone() {
@@ -4426,8 +4421,8 @@ impl Parser {
 
         //dbg!(self.environment.values.clone());
         self.environment.no_override.insert(identifier.clone());
-        let mut generic_list = self.collect_generics(&typeinput);
-        generic_list.extend(self.collect_generics(&[output.clone()]));
+        let mut generic_list = Self::collect_generics(&typeinput);
+        generic_list.extend(Self::collect_generics(&[output.clone()]));
         self.environment.live_generics.push(generic_list.clone());
         //dbg!(generic_list);
         // parse body with scope
