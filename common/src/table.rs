@@ -14,12 +14,13 @@ impl<T> Table<T> {
 }
 impl<T: Eq + Clone> Table<T> {
     pub fn insert(&mut self, item: T) {
-        if !self.items.contains(&item) {
-            self.items.push(item)
+        if self.has(&item) {
+            return;
         }
+        self.items.push(item)
     }
     pub fn get_index(&self, item: T) -> Option<usize> {
-        self.items.iter().enumerate().position(|x| x.1 == &item)
+        self.items.iter().position(|x| x == &item)
     }
     pub fn has(&self, item: &T) -> bool {
         self.items.contains(item)
