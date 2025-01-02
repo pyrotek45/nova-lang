@@ -25,7 +25,6 @@ pub struct Parser {
     pub ast: Ast,
     pub environment: Environment,
     pub modules: table::Table<String>,
-    pub repl: bool,
 }
 
 pub fn default() -> Parser {
@@ -37,7 +36,6 @@ pub fn default() -> Parser {
         index: 0,
         environment: env,
         modules: Table::new(),
-        repl: false,
     }
 }
 
@@ -50,7 +48,6 @@ pub fn new(filepath: impl AsRef<Path>) -> Parser {
         index: 0,
         environment: env,
         modules: Table::new(),
-        repl: false,
     }
 }
 
@@ -3319,7 +3316,6 @@ impl Parser {
         let resolved_filepath: Rc<Path> = resolved_filepath.into();
         let tokens = Lexer::new(&resolved_filepath)?.tokenize()?;
         let mut parser = self.clone();
-        parser.repl = false;
         parser.index = 0;
         parser.filepath = Some(resolved_filepath.clone());
         parser.input = tokens;
@@ -4725,25 +4721,24 @@ impl Parser {
 
     pub fn parse(&mut self) -> Result<(), NovaError> {
         // if repl mode no need to parse module
-        if self.repl {
+        if self.filepath.is_none() {
             self.ast.program = self.compound_statement()?;
-            self.eof()
-        } else {
-            if self.current_token().is_id("module") {
-                self.consume_identifier(Some("module"))?;
-                let (module_name, _) = self.get_identifier()?;
-                if self.modules.has(&module_name) {
-                    return Ok(());
-                }
-                self.modules.insert(module_name);
-            } else {
-                return Err(self.generate_error(
-                    "Expected module declaration".to_string(),
-                    "Module declaration must be the first statement".to_string(),
-                ));
-            }
-            self.ast.program = self.compound_statement()?;
-            self.eof()
+            return self.eof();
         }
+        if self.current_token().is_id("module") {
+            self.consume_identifier(Some("module"))?;
+            let (module_name, _) = self.get_identifier()?;
+            if self.modules.has(&module_name) {
+                return Ok(());
+            }
+            self.modules.insert(module_name);
+        } else {
+            return Err(self.generate_error(
+                "Expected module declaration".to_string(),
+                "Module declaration must be the first statement".to_string(),
+            ));
+        }
+        self.ast.program = self.compound_statement()?;
+        self.eof()
     }
 }
