@@ -209,10 +209,10 @@ impl Parser {
         }
         for (t1, t2) in type_list1.iter().zip(type_list2.iter()) {
             match (t1, t2) {
-                (TType::Any, _) => {
+                (TType::Any, b) if b != &TType::None => {
                     continue;
                 }
-                (_, TType::Any) => {
+                (a, TType::Any) if a != &TType::None => {
                     continue;
                 }
                 (
