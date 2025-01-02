@@ -300,10 +300,9 @@ impl Lexer {
                             continue;
                         }
                         _ => {
-                            println!("{}", self.pos.line);
                             return Err(NovaError::Lexing {
-                                msg: String::from("Expecting valid escape char"),
-                                note: String::from(""),
+                                msg: "Expecting valid escape char".into(),
+                                note: "".into(),
                                 position: self.current_position(),
                             });
                         }
@@ -377,8 +376,8 @@ impl Lexer {
                         }
                         _ => {
                             return Err(NovaError::Lexing {
-                                msg: String::from("Expecting valid escape char"),
-                                note: String::from(""),
+                                msg: "Expecting valid escape char".into(),
+                                note: "".into(),
                                 position: self.current_position(),
                             })
                         }
@@ -388,8 +387,8 @@ impl Lexer {
                     // should throw error, cant have ''
                     if self.buffer.is_empty() || self.buffer.chars().count() > 1 {
                         return Err(NovaError::Lexing {
-                            msg: String::from("Expecting valid char"),
-                            note: format!("? {}", self.buffer),
+                            msg: "Expecting valid char".into(),
+                            note: format!("? {}", self.buffer).into(),
                             position: self.current_position(),
                         });
                     }
@@ -708,15 +707,15 @@ impl Lexer {
         match self.state {
             LexerState::String => {
                 return Err(NovaError::Lexing {
-                    msg: String::from("Expecting valid string"),
-                    note: format!("? {}", self.buffer),
+                    msg: "Expecting valid string".into(),
+                    note: format!("? {}", self.buffer).into(),
                     position: self.current_position(),
                 });
             }
             LexerState::StringLiteral => {
                 return Err(NovaError::Lexing {
-                    msg: String::from("Expecting valid string literal"),
-                    note: String::from(""),
+                    msg: "Expecting valid string literal".into(),
+                    note: "".into(),
                     position: self.current_position(),
                 });
             }
