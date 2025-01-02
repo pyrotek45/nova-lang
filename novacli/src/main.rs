@@ -312,6 +312,7 @@ fn repl_session() -> ! {
                                 }
                             }
                             let mut file = std::fs::File::create(file).unwrap();
+                            file.write_all(b"module repl\n\n").unwrap();
                             file.write_all(novarepl.current_repl.as_bytes()).unwrap();
                             continue;
                         }
