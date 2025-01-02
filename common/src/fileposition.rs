@@ -24,7 +24,7 @@ pub fn load_file_content(path: &Path) -> Result<String, NovaError> {
         Ok(content) => content,
         Err(_) => {
             return Err(NovaError::File {
-                msg: format!(" '{}' is not a valid filepath", path.display()),
+                msg: format!(" '{}' is not a valid filepath", path.display()).into(),
             })
         }
     };

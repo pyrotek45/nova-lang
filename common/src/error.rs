@@ -48,11 +48,11 @@ pub fn print_line(position: &FilePosition, msg: &str) {
 #[derive(Debug, Clone)]
 pub enum NovaError {
     File {
-        msg: String,
+        msg: Cow<'static, str>,
     },
     Lexing {
-        msg: String,
-        note: String,
+        msg: Cow<'static, str>,
+        note: Cow<'static, str>,
         position: FilePosition,
     },
     Parsing {
