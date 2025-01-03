@@ -44,7 +44,7 @@ fn extends sqrt(self: Float) -> Float {
 }
 
 fn extends sqrt(self: Int) -> Float {
-    return Cast::float().unwrap().sqrt()
+    return Cast::float(self).unwrap().sqrt()
 }
 
 // limit a value between a minimum and a maximum value
