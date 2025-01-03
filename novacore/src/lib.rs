@@ -107,6 +107,7 @@ impl NovaCore {
     }
 
     fn initnova(&mut self) {
+        self.parser.modules.clear();
         self.parser.modules.insert("terminal".to_string());
         self.parser.modules.insert("Cast".to_string());
         self.parser.modules.insert("Regex".to_string());
@@ -414,25 +415,25 @@ impl NovaCore {
         let oldrepl = self.current_repl.clone();
 
         self.current_repl.push_str(line);
-        self.initnova();
 
         self.lexer = Lexer::new(self.current_repl.as_str(), None);
-
         self.initnova();
-        self.parser.input = self.lexer.tokenize()?;
-        self.parser.parse()?;
 
+        self.parser = parser::default();
+        self.parser.input = self.lexer.tokenize()?;
+
+        self.parser.parse()?;
         let ast = self.parser.ast.clone();
-        let filepath = self.filepath.clone();
 
         self.compiler = compiler::new();
         self.initnova();
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, filepath, true, true, false)?;
+            .compile_program(ast, None, true, true, false)?;
 
         self.assembler = Assembler::empty();
+        self.initnova();
         self.assembler.input = asm;
         self.assembler.assemble();
 
