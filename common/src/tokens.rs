@@ -175,7 +175,7 @@ impl Token {
     }
 
     pub fn is_identifier(&self) -> bool {
-        matches!(self.value, TokenValue::StringLiteral(_))
+        matches!(self.value, TokenValue::Identifier(_))
     }
 
     pub fn is_id(&self, ident: &str) -> bool {

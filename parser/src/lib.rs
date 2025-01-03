@@ -359,7 +359,6 @@ impl Parser {
                     if self.environment.live_generics.last().unwrap().has(&name) {
                         Ok(TType::Generic { name })
                     } else {
-                        //dbg!(self.environment.live_generics.last().unwrap());
                         Err(NovaError::SimpleTypeError {
                             msg: format!("Generic type {} could not be inferred", name).into(),
                             position: pos,
@@ -754,7 +753,6 @@ impl Parser {
             self.advance();
             // call get closure
             let (typeinput, input, output, statement, captured) = self.bar_closure()?;
-            //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
             let last_closure = Expr::Closure {
                 ttype: TType::Function {
                     parameters: typeinput,
@@ -826,7 +824,6 @@ impl Parser {
                 }
             }
         }
-        //dbg!(identifier.clone(), argument_types.clone());
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
 
@@ -940,7 +937,6 @@ impl Parser {
 
         let mut generic_list = Self::collect_generics(&[*return_type.clone()]);
         generic_list.extend(Self::collect_generics(&parameters));
-        //dbg!(generic_list.clone());
         let mut type_map = self.check_and_map_types(
             &parameters,
             &argument_types,
@@ -951,7 +947,6 @@ impl Parser {
         if let SymbolKind::GenericFunction | SymbolKind::Constructor = function_kind {
             self.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
         }
-        //dbg!(self.current_token());
         // if current token is @ then parse [T: Type] and replace the generic type and inset that into the type_map
         self.modify_type_map(&mut type_map, pos.clone(), generic_list)?;
         return_type = Box::new(self.get_output(*return_type, &mut type_map, pos.clone())?);
@@ -976,7 +971,6 @@ impl Parser {
         pos: FilePosition,
         generics_list: table::Table<String>,
     ) -> Result<(), NovaError> {
-        //dbg!(type_map.clone());
         if !self.current_token().is_some_and(|t| t.is_symbol(At)) {
             return Ok(());
         }
@@ -995,7 +989,6 @@ impl Parser {
         let generic_list = Self::collect_generics(&[ttype.clone()]);
         for generic in generic_list.items {
             if !self.environment.live_generics.last().unwrap().has(&generic) {
-                //dbg!(self.environment.live_generics.last().unwrap());
                 return Err(NovaError::SimpleTypeError {
                     msg: format!("E1 Generic Type '{generic}' is not live").into(),
                     position: pos,
@@ -1047,7 +1040,6 @@ impl Parser {
             type_map.insert(generic_type, ttype.clone());
         }
         self.consume_symbol(RightSquareBracket)?;
-        //dbg!(type_map.clone());
         Ok(())
     }
 
@@ -1162,7 +1154,6 @@ impl Parser {
             self.advance();
             // call get closure
             let (typeinput, input, output, statement, captured) = self.bar_closure()?;
-            //dbg!(typeinput.clone(), input.clone(), output.clone(), statement.clone());
             let last_closure = Expr::Closure {
                 ttype: TType::Function {
                     parameters: typeinput,
@@ -1319,13 +1310,11 @@ impl Parser {
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
             if let Some(fields) = self.environment.custom_types.get(type_name) {
-                //dbg!(&identifier, lhs.get_type().custom_to_string(), fields);
                 let new_fields =
                     if let Some(x) = self.environment.generic_type_struct.get(type_name) {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
                             panic!("not a custom type")
                         };
-                        //dbg!(&fields);
                         fields
                             .iter()
                             .map(|(name, ttype)| {
@@ -1336,7 +1325,6 @@ impl Parser {
                     } else {
                         fields.clone()
                     };
-                //dbg!(&new_fields);
                 if let Some((index, field_type)) = self.find_field(&identifier, &new_fields) {
                     lhs = Expr::Field {
                         ttype: field_type.clone(),
@@ -1539,7 +1527,6 @@ impl Parser {
                     start_expr = Some(Box::new(self.expr()?));
                 }
                 // do list slice if next token is a colon
-                // dbg!(self.current_token());
                 if self
                     .current_token()
                     .is_some_and(|t| t.is_op(Operator::Colon))
@@ -1738,7 +1725,6 @@ impl Parser {
                         field_position.clone(),
                     )?;
                     arguments.extend(self.argument_list()?);
-                    //dbg!(arguments.clone());
                     if let TType::Function {
                         parameters,
                         mut return_type,
@@ -1754,7 +1740,6 @@ impl Parser {
                         }
                         let input_types: Vec<TType> =
                             arguments.iter().map(|arg| arg.get_type()).collect();
-                        //dbg!(input_types.clone());
                         let mut type_map: HashMap<String, TType> = HashMap::default();
                         type_map = self.check_and_map_types(
                             &parameters,
@@ -2039,7 +2024,6 @@ impl Parser {
                     };
                 }
 
-                //dbg!(self.environment.live_generics.last().unwrap().clone());
                 let mut statements = self.block()?;
 
                 let mut captured: Vec<String> = self
@@ -2056,7 +2040,6 @@ impl Parser {
                 for c in captured.iter() {
                     if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_current_token_position();
-                        //dbg!(c);
                         self.environment.captured.last_mut().unwrap().insert(
                             c.clone(),
                             Symbol {
@@ -2121,7 +2104,6 @@ impl Parser {
                         }
                     }
                 }
-                //dbg!(&captured);
                 left = Expr::Closure {
                     ttype: TType::Function {
                         parameters: typeinput,
@@ -2287,7 +2269,6 @@ impl Parser {
                         let generic_list = Self::collect_generics(&[ttype.clone()]);
                         for generic in generic_list.items {
                             if !self.environment.live_generics.last().unwrap().has(&generic) {
-                                //dbg!(self.environment.live_generics.last().unwrap().clone());
                                 return Err(NovaError::SimpleTypeError {
                                     msg: format!("Generic Type '{}' is not live", generic).into(),
                                     position: pos,
@@ -2598,7 +2579,6 @@ impl Parser {
             //println!("its an expression");
             let expression = self.expr()?;
             output = expression.clone().get_type();
-            //dbg!(&typeinput, output.clone());
             let statement = vec![Statement::Return {
                 ttype: expression.get_type(),
                 expr: expression.clone(),
@@ -2663,13 +2643,11 @@ impl Parser {
         let mut arguments = vec![left.clone()];
         let function_expr = self.field(target_field.clone(), left.clone(), pos.clone())?;
         arguments.extend(self.argument_list()?);
-        //dbg!(arguments.clone());
         self.create_call_expression(function_expr, target_field, arguments, pos)
     }
 
     fn handle_field_access(&mut self, left: Expr) -> Result<Expr, NovaError> {
         let (field, pos) = self.get_identifier()?;
-        //dbg!(&field);
         self.field(field.clone(), left, pos)
     }
 
@@ -2835,8 +2813,6 @@ impl Parser {
         }
 
         if let Some(Operator(Operator::RightTilde)) = self.current_token_value() {
-            //dbg!("right tilde");
-            //dbg!(left_expr.clone());
             // the syntax is expr ~> id { statements }
             self.consume_operator(Operator::RightTilde)?;
             let (identifier, pos) = self.get_identifier()?;
@@ -3128,7 +3104,21 @@ impl Parser {
             }
             Some(Identifier(_)) => {
                 let (identifier, pos) = self.get_identifier()?;
-                if self.environment.custom_types.contains_key(&identifier) {
+
+                let builtin = 'builtin: {
+                    Some(match identifier.as_str() {
+                        "Int" => TType::Int,
+                        "Float" => TType::Float,
+                        "Bool" => TType::Bool,
+                        "String" => TType::String,
+                        "Any" => TType::Any,
+                        "Char" => TType::Char,
+                        _ => break 'builtin None,
+                    })
+                };
+                if let Some(builtin) = builtin {
+                    Ok(builtin)
+                } else if self.environment.custom_types.contains_key(&identifier) {
                     let mut type_annotation = vec![];
                     if let Some(StructuralSymbol(LeftParen)) = self.current_token_value() {
                         self.consume_symbol(LeftParen)?;
@@ -3311,8 +3301,7 @@ impl Parser {
                         import_filepath.push(&identifier);
                     }
                 }
-                //dbg!(self.current_token());
-                import_filepath.set_extension(".nv");
+                import_filepath.set_extension("nv");
                 import_filepath
             }
             _ => panic!(),
@@ -3407,7 +3396,6 @@ impl Parser {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         panic!("not a custom type")
                     };
-                    //dbg!(&fields);
                     fields
                         .iter()
                         .map(|(name, ttype)| {
@@ -3424,7 +3412,6 @@ impl Parser {
                 let mut vtype = TType::None;
 
                 for (i, field) in new_fields.iter().enumerate() {
-                    //dbg!(field);
                     if variant == field.0 {
                         tag = i;
                         vtype = field.1.clone();
@@ -3502,7 +3489,6 @@ impl Parser {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         panic!("not a custom type")
                     };
-                    //dbg!(&fields);
                     fields
                         .iter()
                         .map(|(name, ttype)| {
@@ -3661,7 +3647,6 @@ impl Parser {
         self.consume_symbol(LeftBrace)?;
         let parameter_list = self.enum_list()?;
         self.consume_symbol(RightBrace)?;
-        //dbg!(parameter_list.clone());
         let mut fields: Vec<(String, TType)> = vec![];
         let mut type_parameters = vec![];
         let mut generics_table = Table::new();
@@ -3695,10 +3680,7 @@ impl Parser {
         }
 
         for variants in field_definitions.clone() {
-            //dbg!(variants.clone());
-
             if generics_table.is_empty() {
-                //dbg!(enum_name.clone());
                 self.environment.insert_symbol(
                     &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
                     TType::Function {
@@ -3712,7 +3694,6 @@ impl Parser {
                     SymbolKind::Constructor,
                 );
             } else {
-                //dbg!(enum_name.clone());
                 let genericmap = generic_field_names
                     .iter()
                     .map(|x| TType::Generic { name: x.clone() })
@@ -3882,7 +3863,6 @@ impl Parser {
             self.consume_keyword(KeyWord::In)?;
             let arraypos = self.get_current_token_position();
             let array = self.expr()?;
-            //dbg!(self.current_token());
             // check for inclusiverange operator
             match self.current_token_value() {
                 Some(Operator(Operator::ExclusiveRange)) => {
@@ -4156,7 +4136,6 @@ impl Parser {
         }
         // make sure symbol doesnt already exist
         if self.environment.has(&identifier) {
-            //dbg!(&self.environment);
             Err(self.generate_error_with_pos(
                 format!("Symbol '{}' is already instantiated", identifier),
                 "Cannot reinstantiate the same symbol in the same scope",
@@ -4195,7 +4174,6 @@ impl Parser {
                     parameters,
                     return_type,
                 } => {
-                    // dbg!(parameters.clone(), return_type.clone());
                     if Self::is_generic(parameters) || Self::is_generic(&[*return_type.clone()]) {
                         return true;
                     }
@@ -4278,7 +4256,6 @@ impl Parser {
         // get parameters
         self.consume_symbol(LeftParen)?;
         let parameters = self.parameter_list()?;
-        //dbg!(&parameters);
         self.consume_symbol(RightParen)?;
         // get output type
 
@@ -4350,7 +4327,6 @@ impl Parser {
             typeinput.push(arg.0.clone())
         }
         // is function using generics?
-        //dbg!(generate_unique_string(&identifier, &typeinput));
         let generic = Self::is_generic(&typeinput);
         // build helper vecs
         let mut input = vec![];
@@ -4419,7 +4395,6 @@ impl Parser {
                 SymbolKind::Function,
             );
             identifier = generate_unique_string(&identifier, &typeinput);
-            //dbg!(&identifier, self.is_generic(&typeinput));
         } else {
             if self.environment.no_override.has(&identifier) {
                 return Err(self.generate_error_with_pos(
@@ -4442,12 +4417,10 @@ impl Parser {
             );
         }
 
-        //dbg!(self.environment.values.clone());
         self.environment.no_override.insert(identifier.clone());
         let mut generic_list = Self::collect_generics(&typeinput);
         generic_list.extend(Self::collect_generics(&[output.clone()]));
         self.environment.live_generics.push(generic_list.clone());
-        //dbg!(generic_list);
         // parse body with scope
         self.environment.push_scope();
         // insert params into scope
@@ -4558,7 +4531,6 @@ impl Parser {
                 ));
             }
         }
-        //dbg!(&captured);
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
