@@ -179,7 +179,7 @@ impl Token {
     }
 
     pub fn is_id(&self, ident: &str) -> bool {
-        matches!(&self.value, TokenValue::StringLiteral(id) if id == ident)
+        matches!(&self.value, TokenValue::Identifier(id) if id == ident)
     }
 
     pub fn line(&self) -> usize {
