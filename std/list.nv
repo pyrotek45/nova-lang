@@ -393,6 +393,16 @@ fn extends filterMap(input: [$A], f:($A) -> ?$B) -> [$B] {
     return result
 }
 
+fn extends filterEmpty(input: [[$T]]) -> [[$T]] {
+    let result = []:[$T]
+    for x in input {
+        if x.len() > 0 {
+            result.push(x)
+        }
+    }
+    return result
+}
+
 fn extends count(input: [$T], f:($T) -> Bool) -> Int {
     let result = 0
     for x in input {
@@ -617,6 +627,124 @@ fn extends join(input: [$T], delim: $T) -> [$T] {
             result.push(delim)
         }
     }
+    return result
+}
+
+fn extends anyIn(input: [$T], values: [[$T]]) -> Bool {
+    for x in values {
+        if input.equals(x) {
+            return true
+        }
+    }
+    return false
+}
+
+// matrix 
+
+fn extends allRotations(matrix: [[$T]], x_index: Int, y_index: Int, length: Int) -> [[$T]] {
+    let result = []: [$T]
+    let section = []: $T
+    for i in 0..length {
+        if x_index + i >= matrix[0].len() {
+            break
+        }
+        section.push(matrix[y_index][x_index + i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if y_index + i >= matrix.len() {
+            break
+        }
+        section.push(matrix[y_index + i][x_index])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if x_index - i < 0 {
+            break
+        }
+        section.push(matrix[y_index][x_index - i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if y_index - i < 0 {
+            break
+        }
+        section.push(matrix[y_index - i][x_index])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index - i < 0) || (x_index + i >= matrix[0].len()) {
+            break
+        }
+        section.push(matrix[y_index - i][x_index + i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index + i >= matrix.len()) || (x_index + i >= matrix[0].len() ){
+            break
+        }
+        section.push(matrix[y_index + i][x_index + i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index + i >= matrix.len()) || (x_index - i < 0) {
+            break
+        }
+        section.push(matrix[y_index + i][x_index - i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index - i < 0) || (x_index - i < 0) {
+            break
+        }
+        section.push(matrix[y_index - i][x_index - i])
+    }
+    result.push(clone(section))
+    return result
+}
+
+// diagonal stencil, from middle out 
+fn extends diagonalStencil(matrix: [[$T]], x_index: Int, y_index: Int, length: Int) -> [[$T]] {
+    let result = []: [$T]
+    let section = []: $T
+    for i in 0..length {
+        if (y_index - i < 0) || (x_index + i >= matrix[0].len()) {
+            break
+        }
+        section.push(matrix[y_index - i][x_index + i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index + i >= matrix.len()) || (x_index + i >= matrix[0].len()) {
+            break
+        }
+        section.push(matrix[y_index + i][x_index + i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index + i >= matrix.len()) || (x_index - i < 0) {
+            break
+        }
+        section.push(matrix[y_index + i][x_index - i])
+    }
+    result.push(clone(section))
+    section = []: $T
+    for i in 0..length {
+        if (y_index - i < 0) || (x_index - i < 0) {
+            break
+        }
+        section.push(matrix[y_index - i][x_index - i])
+    }
+    result.push(clone(section))
     return result
 }
 

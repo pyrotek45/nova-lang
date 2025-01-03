@@ -104,13 +104,12 @@ impl NovaCore {
                     .insert(self.vm.native_functions.len(), function_pointer);
             }
         };
-
-        self.parser.modules.insert("terminal".to_string());
-        self.parser.modules.insert("Cast".to_string());
-        self.parser.modules.insert("Regex".to_string());
     }
 
     fn initnova(&mut self) {
+        self.parser.modules.insert("terminal".to_string());
+        self.parser.modules.insert("Cast".to_string());
+        self.parser.modules.insert("Regex".to_string());
         // add regex captures function, takes two strings and returns a list of strings
         self.add_function(
             "Regex::captures",
@@ -132,6 +131,19 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::regex::regex_match,
+        );
+        self.add_function(
+            "Regex::first",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::String],
+                    }),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::regex::regex_first,
         );
         // add printf function
         self.add_function(
