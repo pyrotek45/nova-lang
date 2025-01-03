@@ -4717,6 +4717,7 @@ impl Parser {
             self.ast.program = self.compound_statement()?;
             return self.eof();
         }
+
         if self.current_token().is_some_and(|t| t.is_id("module")) {
             self.consume_identifier(Some("module"))?;
             let (module_name, _) = self.get_identifier()?;
@@ -4730,6 +4731,7 @@ impl Parser {
                 "Module declaration must be the first statement",
             ));
         }
+
         self.ast.program = self.compound_statement()?;
         self.eof()
     }
