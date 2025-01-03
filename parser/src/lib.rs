@@ -452,7 +452,7 @@ impl Parser {
 
     fn get_line_and_row(&self) -> (usize, usize) {
         let line = self.current_token().line();
-        let row = self.current_token().row();
+        let row = self.current_token().col();
         (line, row)
     }
 
@@ -2907,10 +2907,10 @@ impl Parser {
                         left_expr =
                             self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
-                    Operator::GreaterThan
-                    | Operator::GtrOrEqu
-                    | Operator::LssOrEqu
-                    | Operator::LessThan => {
+                    Operator::Greater
+                    | Operator::GreaterOrEqual
+                    | Operator::LessOrEqual
+                    | Operator::Less => {
                         match (left_expr.get_type(), right_expr.get_type()) {
                             (TType::Int, TType::Int) => {}
                             (TType::Float, TType::Float) => {}
@@ -3155,7 +3155,7 @@ impl Parser {
     }
 
     fn get_identifier(&mut self) -> Result<(String, FilePosition), NovaError> {
-        let identifier = match self.current_token().expect_id() {
+        let identifier = match self.current_token().into_ident() {
             Some(id) => id,
             None => {
                 return Err(self.generate_error(
@@ -3170,7 +3170,7 @@ impl Parser {
             identifier,
             FilePosition {
                 line,
-                row,
+                col: row,
                 filepath: self.filepath.clone(),
             },
         ))
@@ -3860,11 +3860,11 @@ impl Parser {
             // check for inclusiverange operator
             match self.current_token() {
                 Token::Operator {
-                    operator: Operator::InclusiveRange,
+                    operator: Operator::ExclusiveRange,
                     ..
                 } => {
                     let start_range = array;
-                    self.consume_operator(Operator::InclusiveRange)?;
+                    self.consume_operator(Operator::ExclusiveRange)?;
                     let end_range = self.expr()?;
                     self.environment.push_block();
                     self.environment.insert_symbol(
@@ -3885,11 +3885,11 @@ impl Parser {
                     }))
                 }
                 Token::Operator {
-                    operator: Operator::ExclusiveRange,
+                    operator: Operator::InclusiveRange,
                     ..
                 } => {
                     let start_range = array;
-                    self.consume_operator(Operator::ExclusiveRange)?;
+                    self.consume_operator(Operator::InclusiveRange)?;
                     let end_range = self.expr()?;
                     self.environment.push_block();
                     self.environment.insert_symbol(
