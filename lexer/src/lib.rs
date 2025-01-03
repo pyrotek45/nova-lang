@@ -21,21 +21,30 @@ use common::{
     tokens::{Operator, StructuralSymbol, Token, TokenValue},
 };
 
-pub struct Scanner {
+#[derive(Debug, Clone, Default)]
+pub struct Lexer {
     pos: FilePosition,
     pub source: Rc<str>,
     remaining: Range<usize>,
 }
 
-impl Scanner {
-    pub fn new(source: impl Into<Rc<str>>, path: impl Into<Option<Rc<Path>>>) -> Self {
+impl Lexer {
+    pub fn read_file(path: impl AsRef<Path>) -> Result<Self, NovaError> {
+        match std::fs::read_to_string(path.as_ref()) {
+            Ok(source) => Ok(Self::new(source, Some(path.as_ref()))),
+            Err(_) => Err(NovaError::File {
+                msg: format!(" '{}' is not a valid filepath", path.as_ref().display()).into(),
+            }),
+        }
+    }
+    pub fn new(source: impl Into<Rc<str>>, path: Option<&Path>) -> Self {
         let source = source.into();
         let remaining = 0..source.len();
-        Scanner {
+        Lexer {
             source,
             remaining,
             pos: FilePosition {
-                filepath: path.into(),
+                filepath: path.map(|p| p.into()),
                 line: 1,
                 col: 1,
             },
@@ -110,6 +119,9 @@ impl Scanner {
             _ => return None,
         })
     }
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, NovaError> {
+        self.collect()
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Span {
@@ -117,7 +129,7 @@ pub struct Span {
     start: usize,
 }
 
-impl Iterator for Scanner {
+impl Iterator for Lexer {
     type Item = Result<Token, NovaError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -130,11 +142,11 @@ impl Iterator for Scanner {
             out += text;
             out
         }
-        fn capture_int_digits(scanner: &mut Scanner) {
+        fn capture_int_digits(scanner: &mut Lexer) {
             while scanner.consume_if(|c| matches!(c, '0'..='9' | 'a'..='f' )) {}
         }
         fn try_parse_int(
-            scanner: &Scanner,
+            scanner: &Lexer,
             body: &str,
             radix: u32,
             kind: &str,
@@ -179,7 +191,7 @@ impl Iterator for Scanner {
                     continue;
                 }
                 '\'' => {
-                    let unterminated_err = |s: &Scanner| {
+                    let unterminated_err = |s: &Lexer| {
                         Some(Err(NovaError::Lexing {
                             msg: "Unterminated char literal".into(),
                             note: "".into(),

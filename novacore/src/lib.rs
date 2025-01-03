@@ -38,11 +38,11 @@ impl NovaCore {
         }
     }
 
-    pub fn new(filepath: &Path) -> Result<NovaCore, NovaError> {
+    pub fn new(path: &Path) -> Result<NovaCore, NovaError> {
         Ok(NovaCore {
-            filepath: Some(filepath.into()),
-            lexer: Lexer::new(filepath)?,
-            parser: parser::new(filepath),
+            filepath: Some(path.into()),
+            lexer: Lexer::read_file(path)?,
+            parser: parser::new(path),
             compiler: compiler::new(),
             _optimizer: optimizer::new(),
             assembler: Assembler::empty(),
@@ -416,10 +416,7 @@ impl NovaCore {
         self.current_repl.push_str(line);
         self.initnova();
 
-        self.lexer = Lexer::default();
-        self.lexer.source = self.current_repl.as_str().into();
-
-        self.parser = parser::default();
+        self.lexer = Lexer::new(self.current_repl.as_str(), None);
 
         self.initnova();
         self.parser.input = self.lexer.tokenize()?;
@@ -465,7 +462,6 @@ impl NovaCore {
         println!("OK | Initialize time: {}ms", start.elapsed().as_millis());
 
         let tokenlist = self.lexer.tokenize()?;
-        self.lexer.check();
         println!("OK | Lexing time: {}ms", start.elapsed().as_millis());
 
         self.parser.input = tokenlist;

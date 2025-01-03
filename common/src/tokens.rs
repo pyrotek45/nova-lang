@@ -6,7 +6,7 @@ pub type TokenList = Vec<Token>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Unary {
     Positive,
-    Negitive,
+    Negative,
     Not,
 }
 
@@ -74,7 +74,7 @@ pub enum Operator {
     /// ..
     ExclusiveRange,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyWord {
     In,
 }
@@ -189,8 +189,12 @@ impl Token {
         self.position.col
     }
 
-    pub fn is_symbol(&self, s: impl AsRef<StructuralSymbol>) -> bool {
-        matches!(&self.value, TokenValue::StructuralSymbol(symbol) if symbol == s.as_ref())
+    pub fn is_symbol(&self, s: StructuralSymbol) -> bool {
+        matches!(&self.value, &TokenValue::StructuralSymbol(symbol) if symbol == s)
+    }
+
+    pub fn is_keyword(&self, keyword: KeyWord) -> bool {
+        matches!(&self.value, TokenValue::Keyword(kw) if kw == &keyword)
     }
 
     pub fn is_relop(&self) -> bool {
@@ -213,21 +217,21 @@ impl Token {
         matches!(&self.value, TokenValue::Operator(operator) if *operator == op)
     }
 
-    pub fn is_adding_op(&self) -> bool {
+    pub const fn is_adding_op(&self) -> bool {
         matches!(
             self.value,
             TokenValue::Operator(Operator::Addition | Operator::Subtraction | Operator::Concat)
         )
     }
 
-    pub fn is_multi_op(&self) -> bool {
+    pub const fn is_multi_op(&self) -> bool {
         matches!(
             self.value,
             TokenValue::Operator(Operator::Multiplication | Operator::Division | Operator::Modulo)
         )
     }
 
-    pub fn is_assign(&self) -> bool {
+    pub const fn is_assign(&self) -> bool {
         matches!(
             self.value,
             TokenValue::Operator(Operator::Assignment | Operator::AddAssign | Operator::SubAssign)
@@ -256,5 +260,11 @@ impl Display for TokenValue {
             StructuralSymbol(sym) => write!(f, "StructuralSymbol({sym:?})"),
             Keyword(keyword) => write!(f, "Keyword({keyword:?})"),
         }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
     }
 }

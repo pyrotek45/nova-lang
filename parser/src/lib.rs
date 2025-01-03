@@ -11,7 +11,13 @@ use common::{
     fileposition::FilePosition,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
     table::{self, Table},
-    tokens::{KeyWord, Operator, Token, TokenList, Unary},
+    tokens::{
+        KeyWord, Operator,
+        StructuralSymbol::{self, *},
+        Token, TokenList,
+        TokenValue::{self, *},
+        Unary,
+    },
     ttype::{generate_unique_string, TType},
 };
 use dym::Lexicon;
@@ -407,12 +413,12 @@ impl Parser {
     }
 
     fn eof(&mut self) -> Result<(), NovaError> {
-        if matches!(self.current_token(), Token::EOF { .. }) {
+        if self.current_token().is_none() {
             Ok(())
         } else {
             Err(NovaError::Parsing {
                 msg: "Parsing not completed, left over tokens unparsed".into(),
-                note: "Make sure your statement ends with ';'.".into(),
+                note: "Make sure your statement ends with Semicolon.".into(),
                 position: self.get_current_token_position(),
                 extra: None,
             })
@@ -420,7 +426,7 @@ impl Parser {
     }
 
     fn is_current_eof(&mut self) -> bool {
-        matches!(self.current_token(), Token::EOF { .. })
+        self.current_token().is_none()
     }
 
     fn generate_error(
@@ -451,71 +457,71 @@ impl Parser {
     }
 
     fn get_line_and_row(&self) -> (usize, usize) {
-        let line = self.current_token().line();
-        let row = self.current_token().col();
-        (line, row)
+        let Some(t) = self.current_token() else {
+            return (0, 0);
+        };
+        (t.line(), t.col())
     }
 
     fn get_current_token_position(&self) -> FilePosition {
-        self.current_token().position()
+        self.current_token()
+            .map(|t| t.position())
+            .unwrap_or_default()
     }
 
     fn consume_operator(&mut self, op: Operator) -> Result<(), NovaError> {
-        if let Token::Operator { operator, .. } = self.current_token() {
-            if op == operator {
+        match self.current_token() {
+            Some(t) if t.is_op(op) => {
                 self.advance();
-                return Ok(());
+                Ok(())
             }
+            unexpected => Err(self.generate_error(
+                format!("unexpected operator, got {unexpected:?}"),
+                format!("expected {op:?}"),
+            )),
         }
-        Err(self.generate_error(
-            format!("unexpected operator, got {}", self.current_token()),
-            format!("expecting {:?}", op),
-        ))
     }
 
-    fn consume_symbol(&mut self, sym: char) -> Result<(), NovaError> {
-        if let Token::Symbol { symbol, .. } = self.current_token() {
-            if sym == symbol {
+    fn consume_symbol(&mut self, sym: StructuralSymbol) -> Result<(), NovaError> {
+        match self.current_token() {
+            Some(t) if t.is_symbol(sym) => {
                 self.advance();
-                return Ok(());
+                Ok(())
             }
+            unexpected => Err(self.generate_error(
+                format!("unexpected symbol, got {unexpected:?}"),
+                format!("expected {:?}", sym),
+            )),
         }
-        Err(self.generate_error(
-            format!("unexpected symbol, got {}", self.current_token()),
-            format!("expecting {}", sym),
-        ))
     }
 
     // consume a keyword
-    fn consume_keyword(&mut self, kind: KeyWord) -> Result<(), NovaError> {
-        if let Token::Keyword { keyword, .. } = self.current_token() {
-            if kind == keyword {
+    fn consume_keyword(&mut self, kw: KeyWord) -> Result<(), NovaError> {
+        match self.current_token() {
+            Some(t) if t.is_keyword(kw) => {
                 self.advance();
-                return Ok(());
+                Ok(())
             }
+            unexpected => Err(self.generate_error(
+                format!("unexpected keyword, got {unexpected:?}"),
+                format!("expected {kw:?}"),
+            )),
         }
-        Err(self.generate_error(
-            format!("unexpected keyword, got {}", self.current_token()),
-            format!("expecting {:?}", kind),
-        ))
     }
 
     fn consume_identifier(&mut self, symbol: Option<&str>) -> Result<(), NovaError> {
         match self.current_token() {
-            Token::Identifier { name: sym, .. } if symbol.map_or(true, |s| sym == s) => {
+            Some(t) if symbol.map_or_else(|| t.is_identifier(), |s| t.is_id(s)) => {
                 self.advance();
                 Ok(())
             }
-            _ => {
-                let current_token = self.current_token();
-                Err(self.generate_error(
-                    format!("unexpected identifier, got {current_token}"),
-                    match symbol {
-                        Some(s) => format!("expecting {s}"),
-                        None => "expecting an identifier".to_string(),
-                    },
-                ))
-            }
+            unexpected => Err(self.generate_error(
+                format!("unexpected identifier, got {unexpected:?}"),
+                match symbol {
+                    Some(s) => format!("expecting {s}"),
+                    None => "expecting an identifier".to_string(),
+                },
+            )),
         }
     }
 
@@ -523,71 +529,85 @@ impl Parser {
         self.index += 1;
     }
 
-    fn current_token(&self) -> Token {
-        self.input[self.index].clone()
+    fn current_token(&self) -> Option<&Token> {
+        self.input.get(self.index)
+    }
+
+    fn current_token_value(&self) -> Option<&TokenValue> {
+        self.input.get(self.index).map(|t| &t.value)
     }
 
     // peek with offset
-    fn peek_offset(&self, offset: usize) -> Option<Token> {
-        if self.index + offset < self.input.len() {
-            Some(self.input[self.index + offset].clone())
-        } else {
-            None
-        }
+    fn peek_offset(&self, offset: usize) -> Option<&Token> {
+        self.input.get(self.index + offset)
+    }
+
+    fn peek_offset_value(&self, offset: usize) -> Option<&TokenValue> {
+        self.peek_offset(offset).map(|t| &t.value)
     }
 
     fn sign(&mut self) -> Result<Option<Unary>, NovaError> {
-        match self.current_token() {
-            Token::Operator { operator, .. } => match operator {
-                Operator::Addition => Ok(Some(Unary::Positive)),
-                Operator::Subtraction => Ok(Some(Unary::Negitive)),
-                Operator::Not => Ok(Some(Unary::Not)),
-                _ => Err(self.generate_error(
-                    format!("unexpected operation, got {}", self.current_token()),
-                    "expected unary sign ( + | - )".to_string(),
-                )),
-            },
+        match self.current_token_value() {
+            Some(Operator(Operator::Addition)) => Ok(Some(Unary::Positive)),
+            Some(Operator(Operator::Subtraction)) => Ok(Some(Unary::Negative)),
+            Some(Operator(Operator::Not)) => Ok(Some(Unary::Not)),
+            Some(Operator(_)) => Err(self.generate_error(
+                format!("unexpected operation, got {:?}", self.current_token_value()),
+                "expected unary sign ( + | - )",
+            )),
             _ => Ok(None),
         }
     }
 
     fn tuple_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
-        self.consume_symbol('(')?;
+        self.consume_symbol(LeftParen)?;
 
-        if !self.current_token().is_symbol(')') {
+        if !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightParen))
+        {
             self.process_expression(&mut exprs)?;
         }
 
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
-            if self.current_token().is_symbol(')') {
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_symbol(RightParen))
+            {
                 break;
             }
             self.process_expression(&mut exprs)?;
         }
 
-        self.consume_symbol(')')?;
+        self.consume_symbol(RightParen)?;
         Ok(exprs)
     }
 
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
-        self.consume_symbol('[')?;
+        self.consume_symbol(LeftSquareBracket)?;
 
-        if !self.current_token().is_symbol(']') {
+        if !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightSquareBracket))
+        {
             self.process_expression(&mut exprs)?;
         }
 
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
-            if self.current_token().is_symbol(']') {
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_symbol(RightSquareBracket))
+            {
                 break;
             }
             self.process_expression(&mut exprs)?;
         }
 
-        self.consume_symbol(']')?;
+        self.consume_symbol(RightSquareBracket)?;
         Ok(exprs)
     }
 
@@ -596,8 +616,8 @@ impl Parser {
         let e = self.expr()?;
         if e.get_type() == TType::Void {
             return Err(self.generate_error_with_pos(
-                "cannot insert a void expression".to_string(),
-                "expressions must not be void".to_string(),
+                "cannot insert a void expression",
+                "expressions must not be void",
                 pos,
             ));
         }
@@ -607,18 +627,24 @@ impl Parser {
 
     fn argument_list(&mut self) -> Result<Vec<Expr>, NovaError> {
         let mut exprs = vec![];
-        self.consume_symbol('(')?;
-        if !self.current_token().is_symbol(')') {
+        self.consume_symbol(LeftParen)?;
+        if !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightParen))
+        {
             exprs.push(self.expr()?);
         }
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
-            if self.current_token().is_symbol(')') {
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_symbol(RightParen))
+            {
                 break;
             }
             exprs.push(self.expr()?);
         }
-        self.consume_symbol(')')?;
+        self.consume_symbol(RightParen)?;
         Ok(exprs)
     }
 
@@ -629,16 +655,19 @@ impl Parser {
         conpos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
         let mut field_exprs: HashMap<String, Expr> = HashMap::default();
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         self.parse_field(&mut field_exprs)?;
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
-            if self.current_token().is_symbol('}') {
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_symbol(RightBrace))
+            {
                 break;
             }
             self.parse_field(&mut field_exprs)?;
         }
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
         self.validate_fields(constructor, &fields, conpos, &field_exprs)
     }
 
@@ -718,10 +747,9 @@ impl Parser {
         arguments.extend(self.argument_list()?);
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
-        if let Token::Operator {
-            operator: Operator::Colon,
-            ..
-        } = self.current_token()
+        if self
+            .current_token()
+            .is_some_and(|t| t.is_op(Operator::Colon))
         {
             self.advance();
             // call get closure
@@ -949,11 +977,11 @@ impl Parser {
         generics_list: table::Table<String>,
     ) -> Result<(), NovaError> {
         //dbg!(type_map.clone());
-        if !self.current_token().is_symbol('@') {
+        if !self.current_token().is_some_and(|t| t.is_symbol(At)) {
             return Ok(());
         }
         self.advance();
-        self.consume_symbol('[')?;
+        self.consume_symbol(LeftSquareBracket)?;
         let (generic_type, _) = self.get_identifier()?;
         if !generics_list.has(&generic_type) {
             return Err(NovaError::SimpleTypeError {
@@ -986,7 +1014,7 @@ impl Parser {
         }
         type_map.insert(generic_type.clone(), ttype.clone());
 
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
             let (generic_type, _) = self.get_identifier()?;
             if !generics_list.has(&generic_type) {
@@ -1018,7 +1046,7 @@ impl Parser {
             }
             type_map.insert(generic_type, ttype.clone());
         }
-        self.consume_symbol(']')?;
+        self.consume_symbol(RightSquareBracket)?;
         //dbg!(type_map.clone());
         Ok(())
     }
@@ -1127,10 +1155,9 @@ impl Parser {
         let mut arguments = self.get_field_arguments(&identifier, pos.clone())?;
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
-        if let Token::Operator {
-            operator: Operator::Colon,
-            ..
-        } = self.current_token()
+        if self
+            .current_token()
+            .is_some_and(|t| t.is_op(Operator::Colon))
         {
             self.advance();
             // call get closure
@@ -1212,7 +1239,7 @@ impl Parser {
         pos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
         if let Some(fields) = self.environment.custom_types.get(identifier) {
-            if self.current_token().is_symbol('{') {
+            if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                 self.field_list(identifier, fields.to_vec(), pos)
             } else {
                 self.argument_list()
@@ -1380,13 +1407,13 @@ impl Parser {
 
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
         let (identifier, pos) = self.get_identifier()?;
-        match self.current_token() {
-            Token::Operator {
-                operator: Operator::DoubleColon,
-                ..
-            } => {
+        match self.current_token_value() {
+            Some(Operator(Operator::DoubleColon)) => {
                 let mut rhs = lhs.clone();
-                while self.current_token().is_op(Operator::DoubleColon) {
+                while self
+                    .current_token()
+                    .is_some_and(|t| t.is_op(Operator::DoubleColon))
+                {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.get_identifier()?;
                     if let Some(custom_type) = self.environment.get_type(&identifier) {
@@ -1414,7 +1441,7 @@ impl Parser {
                 {
                     if arguments.len() != parameters.len() {
                         return Err(self.generate_error_with_pos(
-                            "Incorrect number of arguments".to_string(),
+                            "Incorrect number of arguments",
                             format!("Got {}, expected {}", arguments.len(), parameters.len()),
                             pos,
                         ));
@@ -1438,15 +1465,15 @@ impl Parser {
                 } else {
                     return Err(self.generate_error_with_pos(
                         format!("Cannot call {}", lhs.get_type()),
-                        "Not a function".to_string(),
+                        "Not a function",
                         pos,
                     ));
                 }
             }
-            Token::Symbol { symbol: '(', .. } => {
+            Some(StructuralSymbol(LeftParen)) => {
                 lhs = self.method(identifier.clone(), lhs, pos)?;
             }
-            Token::Symbol { symbol: '[', .. } => {
+            Some(StructuralSymbol(LeftSquareBracket)) => {
                 lhs = self.field(identifier.clone(), lhs, pos)?;
                 lhs = self.index(identifier.clone(), lhs.clone(), lhs.get_type())?;
             }
@@ -1497,7 +1524,7 @@ impl Parser {
             TType::List {
                 inner: element_type,
             } => {
-                self.consume_symbol('[')?;
+                self.consume_symbol(LeftSquareBracket)?;
 
                 let mut is_slice = false;
                 let mut end_expr = None;
@@ -1505,32 +1532,47 @@ impl Parser {
 
                 let position = self.get_current_token_position();
                 let mut start_expr: Option<Box<Expr>> = None;
-                if !self.current_token().is_op(Operator::Colon) {
+                if !self
+                    .current_token()
+                    .is_some_and(|t| t.is_op(Operator::Colon))
+                {
                     start_expr = Some(Box::new(self.expr()?));
                 }
                 // do list slice if next token is a colon
                 // dbg!(self.current_token());
-                if self.current_token().is_op(Operator::Colon) {
+                if self
+                    .current_token()
+                    .is_some_and(|t| t.is_op(Operator::Colon))
+                {
                     self.advance();
-                    if !self.current_token().is_symbol(']') {
-                        if self.current_token().is_symbol('$') {
+                    if !self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(RightSquareBracket))
+                    {
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_symbol(DollarSign))
+                        {
                             self.advance();
 
                             step = Some(Box::new(self.expr()?));
                         } else {
                             end_expr = Some(Box::new(self.expr()?));
-                            if self.current_token().is_symbol('$') {
+                            if self
+                                .current_token()
+                                .is_some_and(|t| t.is_symbol(DollarSign))
+                            {
                                 self.advance();
                                 step = Some(Box::new(self.expr()?));
                             }
                         }
                     }
-                    self.consume_symbol(']')?;
+                    self.consume_symbol(RightSquareBracket)?;
 
                     if let Some(start_expr) = &start_expr {
                         if start_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int".to_string(),
+                                "Must index List with an int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1544,7 +1586,7 @@ impl Parser {
                     if let Some(step_expr) = &step {
                         if step_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int".to_string(),
+                                "Must index List with an int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1558,7 +1600,7 @@ impl Parser {
                     if let Some(end_expr) = &end_expr {
                         if end_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int".to_string(),
+                                "Must index List with an int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1571,7 +1613,7 @@ impl Parser {
 
                     is_slice = true;
                 } else {
-                    self.consume_symbol(']')?;
+                    self.consume_symbol(RightSquareBracket)?;
                 }
 
                 if is_slice {
@@ -1590,7 +1632,7 @@ impl Parser {
                     // typecheck
                     if start_expr.get_type() != TType::Int {
                         return Err(self.generate_error_with_pos(
-                            "Must index List with an int".to_string(),
+                            "Must index List with an int",
                             format!(
                                 "Cannot index into {} with {}",
                                 lhs.get_type(),
@@ -1607,18 +1649,21 @@ impl Parser {
                         position,
                     };
                 }
-                if self.current_token().is_symbol('[') {
+                if self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(LeftSquareBracket))
+                {
                     lhs = self.index(identifier.clone(), lhs, *element_type)?;
                 }
             }
             TType::Tuple {
                 elements: tuple_elements,
             } => {
-                self.consume_symbol('[')?;
+                self.consume_symbol(LeftSquareBracket)?;
                 let position = self.get_current_token_position();
-                if let Token::Integer { value: index, .. } = self.current_token() {
+                if let Some(&Integer(index)) = self.current_token_value() {
                     self.advance();
-                    self.consume_symbol(']')?;
+                    self.consume_symbol(RightSquareBracket)?;
                     if index as usize >= tuple_elements.len() {
                         return self.generate_tuple_index_error(
                             index,
@@ -1637,14 +1682,17 @@ impl Parser {
                         container: Box::new(lhs),
                         position,
                     };
-                    if self.current_token().is_symbol('[') {
+                    if self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(LeftSquareBracket))
+                    {
                         lhs = self.index(identifier.clone(), lhs, element_type.clone())?;
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        "Must index Tuple with an int".to_string(),
+                        "Must index Tuple with an int",
                         format!(
-                            "Cannot index into {} with {}",
+                            "Cannot index into {} with {:?}",
                             lhs.get_type(),
                             self.current_token()
                         ),
@@ -1654,8 +1702,8 @@ impl Parser {
             }
             _ => {
                 return Err(self.generate_error(
-                    "Cannot index into non-list or non-tuple".to_string(),
-                    "Must be of type list or tuple".to_string(),
+                    "Cannot index into non-list or non-tuple",
+                    "Must be of type list or tuple",
                 ));
             }
         }
@@ -1677,11 +1725,8 @@ impl Parser {
     }
 
     fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
-        let anchor = match self.current_token() {
-            Token::Operator {
-                operator: Operator::RightArrow,
-                ..
-            } => {
+        let anchor = match self.current_token_value() {
+            Some(Operator(Operator::RightArrow)) => {
                 self.consume_operator(Operator::RightArrow)?;
                 let (field, field_position) = self.get_identifier()?;
                 if let Some(identifier_type) = self.environment.get_type(&identifier) {
@@ -1700,7 +1745,7 @@ impl Parser {
                     } = left_expr.get_type()
                     {
                         if arguments.len() != parameters.len() {
-                            let msg = "E3 Incorrect number of arguments".to_string();
+                            let msg = "E3 Incorrect number of arguments";
                             return Err(self.generate_error_with_pos(
                                 msg,
                                 format!("Got {}, expected {}", arguments.len(), parameters.len()),
@@ -1721,14 +1766,14 @@ impl Parser {
                             Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
                         Expr::Call {
                             ttype: *return_type,
-                            name: field.to_string(),
+                            name: field,
                             function: Box::new(left_expr),
                             args: arguments,
                         }
                     } else {
                         return Err(self.generate_error_with_pos(
                             format!("Cannot call {}", left_expr.get_type()),
-                            "Not a function".to_string(),
+                            "Not a function",
                             field_position,
                         ));
                     }
@@ -1740,12 +1785,12 @@ impl Parser {
                     ));
                 }
             }
-            Token::Symbol { symbol: '[', .. } => {
+            Some(StructuralSymbol(LeftSquareBracket)) => {
                 self.handle_indexing(identifier.clone(), pos.clone())?
             }
-            Token::Symbol { symbol: '(', .. } => self.call(identifier.clone(), pos)?,
+            Some(StructuralSymbol(LeftParen)) => self.call(identifier.clone(), pos)?,
             _ => {
-                if self.current_token().is_symbol('{')
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace))
                     && self.environment.custom_types.contains_key(&identifier)
                 {
                     self.call(identifier.clone(), pos.clone())?
@@ -1869,9 +1914,9 @@ impl Parser {
             None
         };
         let mut left: Expr;
-        match self.current_token() {
-            Token::Symbol { symbol: '#', .. } => {
-                self.consume_symbol('#')?;
+        match self.current_token_value() {
+            Some(StructuralSymbol(Pound)) => {
+                self.consume_symbol(Pound)?;
                 let mut typelist = vec![];
 
                 let expressions = self.tuple_list()?;
@@ -1883,8 +1928,8 @@ impl Parser {
                     elements: expressions,
                 };
             }
-            Token::Symbol { symbol: '?', .. } => {
-                self.consume_symbol('?')?;
+            Some(StructuralSymbol(QuestionMark)) => {
+                self.consume_symbol(QuestionMark)?;
                 let option_type = self.ttype()?;
                 left = Expr::Literal {
                     ttype: TType::Option {
@@ -1893,23 +1938,23 @@ impl Parser {
                     value: Atom::None,
                 };
             }
-            Token::Char { value: char, .. } => {
+            Some(&Char(value)) => {
                 self.advance();
                 left = Expr::Literal {
                     ttype: TType::Char,
-                    value: Atom::Char { value: char },
+                    value: Atom::Char { value },
                 }
             }
-            Token::Identifier { name: id, .. } if id.as_str() == "fn" => {
+            Some(Identifier(id)) if id.as_str() == "fn" => {
                 let pos = self.get_current_token_position();
                 self.advance();
                 // get parameters
-                self.consume_symbol('(')?;
+                self.consume_symbol(LeftParen)?;
                 let parameters = self.parameter_list()?;
-                self.consume_symbol(')')?;
+                self.consume_symbol(RightParen)?;
                 // get output type
                 let mut output = TType::Void;
-                if self.current_token().is_symbol('{') {
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                 } else {
                     self.consume_operator(Operator::RightArrow)?;
                     output = self.ttype()?;
@@ -1928,7 +1973,7 @@ impl Parser {
                         if self.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
                                 format!("Generic Function {} already defined", &identifier),
-                                "Cannot redefine a generic function".to_string(),
+                                "Cannot redefine a generic function",
                                 pos.clone(),
                             ));
                         }
@@ -1936,7 +1981,7 @@ impl Parser {
                         if self.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
                                 format!("Function {} already defined", &identifier,),
-                                "Cannot redefine a generic function".to_string(),
+                                "Cannot redefine a generic function",
                                 pos.clone(),
                             ));
                         }
@@ -2059,8 +2104,8 @@ impl Parser {
                         // do nothing
                     } else {
                         return Err(self.generate_error(
-                            "Function is missing a return statement in a branch".to_string(),
-                            "Function missing return".to_string(),
+                            "Function is missing a return statement in a branch",
+                            "Function missing return",
                         ));
                     }
                 }
@@ -2087,11 +2132,7 @@ impl Parser {
                     captures: captured,
                 };
             }
-            Token::Symbol { symbol: '|', .. }
-            | Token::Operator {
-                operator: Operator::Or,
-                ..
-            } => {
+            Some(StructuralSymbol(Pipe) | Operator(Operator::Or)) => {
                 let (typeinput, input, output, statement, captured) = self.bar_closure()?;
 
                 left = Expr::Closure {
@@ -2104,18 +2145,15 @@ impl Parser {
                     captures: captured,
                 };
             }
-            Token::Symbol { symbol: '[', .. } => {
+            Some(StructuralSymbol(LeftSquareBracket)) => {
                 let pos = self.get_current_token_position();
 
                 // add list comprehension using the for keyword
                 // if symbol is colon operator then it is a list comprehension
-                match self.peek_offset(2) {
-                    Some(Token::Keyword {
-                        keyword: KeyWord::In,
-                        ..
-                    }) => {
+                match self.peek_offset_value(2) {
+                    Some(Keyword(KeyWord::In)) => {
                         let mut loops = vec![];
-                        self.consume_symbol('[')?;
+                        self.consume_symbol(LeftSquareBracket)?;
                         // first get ident, then in keyword, then expr, and then any guards
                         let (ident, mut pos) = self.get_identifier()?;
                         self.consume_keyword(KeyWord::In)?;
@@ -2130,7 +2168,7 @@ impl Parser {
                             );
                         } else {
                             return Err(self.generate_error_with_pos(
-                                "List comprehension must be a list".to_string(),
+                                "List comprehension must be a list",
                                 format!("{} is not a list", listexpr.get_type()),
                                 pos,
                             ));
@@ -2138,8 +2176,8 @@ impl Parser {
 
                         loops.push((ident.clone(), listexpr.clone()));
                         // while comma is present, get ident, in keyword, expr
-                        while self.current_token().is_symbol(',') {
-                            self.consume_symbol(',')?;
+                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                            self.consume_symbol(Comma)?;
                             let (ident, _) = self.get_identifier()?;
                             self.consume_keyword(KeyWord::In)?;
                             let listexpr = self.expr()?;
@@ -2153,36 +2191,36 @@ impl Parser {
                                 );
                             } else {
                                 return Err(self.generate_error_with_pos(
-                                    "List comprehension must be a list".to_string(),
+                                    "List comprehension must be a list",
                                     format!("{} is not a list", listexpr.get_type()),
                                     pos,
                                 ));
                             }
                             loops.push((ident.clone(), listexpr.clone()));
                         }
-                        self.consume_symbol('|')?;
+                        self.consume_symbol(Pipe)?;
 
                         self.environment.push_block();
                         let mut outexpr = vec![self.expr()?];
                         // continue parsing expr if there is a comma after the outexpr
-                        if self.current_token().is_symbol(',') {
+                        if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                             self.advance();
                             outexpr.push(self.expr()?);
                         }
                         // typecheck taht outexpr is not void
                         if outexpr.last().unwrap().get_type() == TType::Void {
                             return Err(self.generate_error_with_pos(
-                                "List comprehension must return a value".to_string(),
-                                "Return expression is Void".to_string(),
+                                "List comprehension must return a value",
+                                "Return expression is Void",
                                 pos,
                             ));
                         }
 
                         let mut guards = vec![];
                         // now grab list of guards seprerated by bar
-                        while self.current_token().is_symbol('|') {
+                        while self.current_token().is_some_and(|t| t.is_symbol(Pipe)) {
                             pos = self.get_current_token_position();
-                            self.consume_symbol('|')?;
+                            self.consume_symbol(Pipe)?;
                             guards.push(self.expr()?);
                         }
 
@@ -2190,14 +2228,14 @@ impl Parser {
                         for guard in guards.iter() {
                             if guard.get_type() != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    "Guard must be a boolean".to_string(),
+                                    "Guard must be a boolean",
                                     format!("{} is not a boolean", guard.get_type()),
                                     pos,
                                 ));
                             }
                         }
                         self.environment.pop_block();
-                        self.consume_symbol(']')?;
+                        self.consume_symbol(RightSquareBracket)?;
                         // remove ident from scope
                         for (ident, _) in loops.iter() {
                             if let Some(v) = self.environment.values.last_mut() {
@@ -2230,10 +2268,9 @@ impl Parser {
                             }
                         }
 
-                        if let Token::Operator {
-                            operator: Operator::Colon,
-                            ..
-                        } = self.current_token()
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_op(Operator::Colon))
                         {
                             self.consume_operator(Operator::Colon)?;
                             ttype = self.ttype()?;
@@ -2259,8 +2296,8 @@ impl Parser {
                         }
                         if ttype == TType::None {
                             return Err(self.generate_error_with_pos(
-                                "List must have a type".to_string(),
-                                "use `[]: type` to annotate an empty list".to_string(),
+                                "List must have a type",
+                                "use `[]: type` to annotate an empty list",
                                 pos,
                             ));
                         }
@@ -2273,16 +2310,16 @@ impl Parser {
                     }
                 }
             }
-            Token::Symbol { symbol: '(', .. } => {
-                self.consume_symbol('(')?;
+            Some(StructuralSymbol(LeftParen)) => {
+                self.consume_symbol(LeftParen)?;
                 let expr = self.expr()?;
-                self.consume_symbol(')')?;
+                self.consume_symbol(RightParen)?;
                 left = expr;
                 if let Some(sign) = sign {
                     if Unary::Not == sign && left.get_type() != TType::Bool {
                         return Err(self.generate_error(
-                            "cannot apply (Not) operation to a non bool".to_string(),
-                            "Make sure expression returns a bool type".to_string(),
+                            "cannot apply (Not) operation to a non bool",
+                            "Make sure expression returns a bool type",
                         ));
                     }
                     left = Expr::Unary {
@@ -2292,47 +2329,37 @@ impl Parser {
                     };
                 }
             }
-            Token::Identifier { .. } => {
+            Some(Identifier(_)) => {
                 let (mut identifier, pos) = self.get_identifier()?;
-                match self.current_token() {
-                    Token::Operator {
-                        operator: Operator::DoubleColon,
-                        ..
-                    } if self.environment.custom_types.contains_key(&identifier) => {
+                match self.current_token_value() {
+                    Some(Operator(Operator::DoubleColon))
+                        if self.environment.custom_types.contains_key(&identifier) =>
+                    {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
                         identifier = format!("{}::{}", identifier, name);
                     }
-                    Token::Operator {
-                        operator: Operator::DoubleColon,
-                        ..
-                    } if self.modules.has(&identifier) => {
+                    Some(Operator(Operator::DoubleColon)) if self.modules.has(&identifier) => {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
                         identifier = format!("{}::{}", identifier, name);
                     }
-                    Token::Operator {
-                        operator: Operator::DoubleColon,
-                        ..
-                    } => {}
-                    Token::Symbol { symbol: '@', .. } => {
-                        self.consume_symbol('@')?;
-                        self.consume_symbol('(')?;
+                    Some(Operator(Operator::DoubleColon)) => {}
+                    Some(StructuralSymbol(At)) => {
+                        self.consume_symbol(At)?;
+                        self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
                         let ta = self.ttype()?;
                         type_annotation.push(ta);
-                        while self.current_token().is_symbol(',') {
+                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                             self.advance();
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
                         }
-                        self.consume_symbol(')')?;
+                        self.consume_symbol(RightParen)?;
                         identifier = generate_unique_string(&identifier, &type_annotation);
                     }
-                    Token::Operator {
-                        operator: Operator::LeftArrow,
-                        ..
-                    } => {
+                    Some(Operator(Operator::LeftArrow)) => {
                         self.consume_operator(Operator::LeftArrow)?;
                         let expr = self.expr()?;
 
@@ -2340,7 +2367,7 @@ impl Parser {
                         if expr.get_type() == TType::Void {
                             return Err(self.generate_error_with_pos(
                                 format!("Variable '{}' cannot be assinged to void", identifier),
-                                "Make sure the expression returns a value".to_string(),
+                                "Make sure the expression returns a value",
                                 pos.clone(),
                             ));
                         }
@@ -2348,7 +2375,7 @@ impl Parser {
                         if self.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
                                 format!("Variable '{}' has already been created", identifier),
-                                "".to_string(),
+                                "",
                                 pos.clone(),
                             ));
                         } else {
@@ -2379,8 +2406,8 @@ impl Parser {
                 if let Some(sign) = sign {
                     if Unary::Not == sign && left.get_type() != TType::Bool {
                         return Err(self.generate_error(
-                            "cannot apply not operation to a non bool".to_string(),
-                            "Make sure expression returns a bool type".to_string(),
+                            "cannot apply not operation to a non bool",
+                            "Make sure expression returns a bool type",
                         ));
                     }
                     left = Expr::Unary {
@@ -2390,17 +2417,17 @@ impl Parser {
                     };
                 }
             }
-            Token::Integer { value: v, .. } => {
+            Some(&Integer(value)) => {
                 self.advance();
                 left = Expr::Literal {
                     ttype: TType::Int,
-                    value: Atom::Integer { value: v },
+                    value: Atom::Integer { value },
                 };
                 if let Some(sign) = sign {
                     if Unary::Not == sign && left.get_type() != TType::Bool {
                         return Err(self.generate_error(
-                            "cannot apply (Not) operation to a non bool".to_string(),
-                            "Make sure expression returns a bool type".to_string(),
+                            "cannot apply (Not) operation to a non bool",
+                            "Make sure expression returns a bool type",
                         ));
                     }
                     left = Expr::Unary {
@@ -2410,17 +2437,17 @@ impl Parser {
                     };
                 }
             }
-            Token::Float { value: v, .. } => {
+            Some(&Float(value)) => {
                 self.advance();
                 left = Expr::Literal {
                     ttype: TType::Float,
-                    value: Atom::Float { value: v },
+                    value: Atom::Float { value },
                 };
                 if let Some(sign) = sign {
                     if Unary::Not == sign && left.get_type() != TType::Bool {
                         return Err(self.generate_error(
-                            "cannot apply (Not) operation to a non bool".to_string(),
-                            "Make sure expression returns a bool type".to_string(),
+                            "cannot apply (Not) operation to a non bool",
+                            "Make sure expression returns a bool type",
                         ));
                     }
                     left = Expr::Unary {
@@ -2430,53 +2457,43 @@ impl Parser {
                     };
                 }
             }
-            Token::String { value: v, .. } => {
-                self.advance();
+            Some(StringLiteral(s)) => {
                 left = Expr::Literal {
                     ttype: TType::String,
-                    value: Atom::String { value: v },
+                    value: Atom::String { value: s.clone() },
                 };
+                self.advance();
             }
-
-            Token::Bool { value: v, .. } => {
+            Some(&Bool(b)) => {
                 self.advance();
                 left = Expr::Literal {
                     ttype: TType::Bool,
-                    value: Atom::Bool { value: v },
+                    value: Atom::Bool { value: b },
                 };
             }
-            Token::EOF { .. } => {
-                return Err(self.generate_error(
-                    "End of file error".to_string(),
-                    "expected expression".to_string(),
-                ));
+            None => {
+                return Err(self.generate_error("End of file error", "expected expression"));
             }
             _ => left = Expr::None,
         }
         loop {
-            match self.current_token() {
-                Token::Operator {
-                    operator: Operator::RightArrow,
-                    ..
-                } => {
+            match self.current_token_value() {
+                Some(Operator(Operator::RightArrow)) => {
                     self.consume_operator(Operator::RightArrow)?;
                     left = self.handle_inner_function_call(left)?;
                 }
-                Token::Operator {
-                    operator: Operator::DoubleColon,
-                    ..
-                } => {
+                Some(Operator(Operator::DoubleColon)) => {
                     self.consume_operator(Operator::DoubleColon)?;
                     left = self.handle_field_access(left)?;
                 }
-                Token::Symbol { symbol: '.', .. } => {
-                    self.consume_symbol('.')?;
+                Some(StructuralSymbol(Dot)) => {
+                    self.consume_symbol(Dot)?;
                     left = self.handle_method_chain(left)?;
                 }
-                Token::Symbol { symbol: '(', .. } => {
+                Some(StructuralSymbol(LeftParen)) => {
                     left = self.handle_function_pointer_call(left)?;
                 }
-                Token::Symbol { symbol: '[', .. } => {
+                Some(StructuralSymbol(LeftSquareBracket)) => {
                     left = self.handle_chain_indexint(left)?;
                 }
                 _ => {
@@ -2493,10 +2510,10 @@ impl Parser {
         &mut self,
     ) -> Result<(Vec<TType>, Vec<Arg>, TType, Vec<Statement>, Vec<String>), NovaError> {
         let pos = self.get_current_token_position();
-        let parameters = match self.consume_symbol('|') {
+        let parameters = match self.consume_symbol(Pipe) {
             Ok(_) => {
                 let p = self.parameter_list()?;
-                self.consume_symbol('|')?;
+                self.consume_symbol(Pipe)?;
                 p
             }
             Err(_) => {
@@ -2515,7 +2532,7 @@ impl Parser {
                 if self.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Generic Function {} already defined", &identifier),
-                        "Cannot redefine a generic function".to_string(),
+                        "Cannot redefine a generic function",
                         pos.clone(),
                     ));
                 }
@@ -2523,7 +2540,7 @@ impl Parser {
                 if self.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Function {} already defined", &identifier,),
-                        "Cannot redefine a generic function".to_string(),
+                        "Cannot redefine a generic function",
                         pos.clone(),
                     ));
                 }
@@ -2570,7 +2587,7 @@ impl Parser {
             };
         }
         let mut output = TType::Void;
-        let statement = if let Token::Symbol { symbol: '{', .. } = self.current_token() {
+        let statement = if let Some(StructuralSymbol(LeftBrace)) = self.current_token_value() {
             //println!("its a block");
             let block = self.block_expr()?;
             if let Some(Statement::Return { ttype, expr: _ }) = block.last() {
@@ -2687,7 +2704,7 @@ impl Parser {
         {
             if arguments.len() != parameters.len() {
                 return Err(self.generate_error_with_pos(
-                    "Incorrect number of arguments".to_string(),
+                    "Incorrect number of arguments",
                     format!("Got {}, expected {}", arguments.len(), parameters.len()),
                     pos.clone(),
                 ));
@@ -2709,7 +2726,7 @@ impl Parser {
         } else {
             Err(self.generate_error_with_pos(
                 format!("Cannot call {}", function_expr.get_type()),
-                "Not a function".to_string(),
+                "Not a function",
                 pos.clone(),
             ))
         }
@@ -2718,8 +2735,8 @@ impl Parser {
     fn term(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.factor()?;
         let current_pos = self.get_current_token_position();
-        while self.current_token().is_multi_op() {
-            if let Some(operation) = self.current_token().get_operator() {
+        while self.current_token().is_some_and(|t| t.is_multi_op()) {
+            if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.factor()?;
                 if left_expr.clone().get_type() == right_expr.clone().get_type()
@@ -2756,8 +2773,8 @@ impl Parser {
     fn expr(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.top_expr()?;
         let current_pos = self.get_current_token_position();
-        while self.current_token().is_assign() {
-            if let Some(operation) = self.current_token().get_operator() {
+        while self.current_token().is_some_and(|t| t.is_assign()) {
+            if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.top_expr()?;
                 match left_expr.clone() {
@@ -2768,8 +2785,8 @@ impl Parser {
                     | Expr::Closure { .. }
                     | Expr::None => {
                         return Err(self.generate_error_with_pos(
-                            "Error: left hand side of `=` must be assignable".to_string(),
-                            "Cannot assign a value to a literal value".to_string(),
+                            "Error: left hand side of `=` must be assignable",
+                            "Cannot assign a value to a literal value",
                             current_pos.clone(),
                         ));
                     }
@@ -2789,7 +2806,7 @@ impl Parser {
                                     right_expr.get_type(),
                                     left_expr.get_type()
                                 ),
-                                "Cannot assign a value to a literal value".to_string(),
+                                "Cannot assign a value to a literal value",
                                 current_pos.clone(),
                             ));
                         }
@@ -2802,7 +2819,7 @@ impl Parser {
                                     right_expr.get_type(),
                                     left_expr.get_type()
                                 ),
-                                "Cannot assign a value to a literal value".to_string(),
+                                "Cannot assign a value to a literal value",
                                 current_pos.clone(),
                             ));
                         }
@@ -2817,11 +2834,7 @@ impl Parser {
             }
         }
 
-        if let Token::Operator {
-            operator: Operator::RightTilde,
-            ..
-        } = self.current_token()
-        {
+        if let Some(Operator(Operator::RightTilde)) = self.current_token_value() {
             //dbg!("right tilde");
             //dbg!(left_expr.clone());
             // the syntax is expr ~> id { statements }
@@ -2829,13 +2842,13 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
 
             // if current token is { else its expr,
-            match self.current_token() {
-                Token::Symbol { symbol: '{', .. } => {
+            match self.current_token_value() {
+                Some(StructuralSymbol(LeftBrace)) => {
                     // cant assing a void
                     if left_expr.get_type() == TType::Void {
                         return Err(self.generate_error_with_pos(
                             format!("Variable '{}' cannot be assinged to void", identifier),
-                            "Make sure the expression returns a value".to_string(),
+                            "Make sure the expression returns a value",
                             pos.clone(),
                         ));
                     }
@@ -2843,7 +2856,7 @@ impl Parser {
                     if self.environment.has(&identifier) {
                         return Err(self.generate_error_with_pos(
                             format!("Variable '{}' has already been created", identifier),
-                            "".to_string(),
+                            "",
                             pos.clone(),
                         ));
                     } else {
@@ -2877,8 +2890,8 @@ impl Parser {
                 _ => {
                     // return error
                     return Err(self.generate_error_with_pos(
-                        "Expected block after `~>`".to_string(),
-                        "Make sure to use a block after `~>`".to_string(),
+                        "Expected block after `~>`",
+                        "Make sure to use a block after `~>`",
                         pos.clone(),
                     ));
                 }
@@ -2889,8 +2902,8 @@ impl Parser {
     fn top_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.mid_expr()?;
         let current_pos = self.get_current_token_position();
-        while self.current_token().is_relop() {
-            if let Some(operation) = self.current_token().get_operator() {
+        while self.current_token().is_some_and(|t| t.is_relop()) {
+            if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.mid_expr()?;
                 match operation {
@@ -2899,7 +2912,7 @@ impl Parser {
                             || (right_expr.get_type() != TType::Bool)
                         {
                             return Err(self.generate_error_with_pos(
-                                "Logical operation expects bool".to_string(),
+                                "Logical operation expects bool",
                                 format!("got {} {}", left_expr.get_type(), right_expr.get_type(),),
                                 current_pos.clone(),
                             ));
@@ -2916,7 +2929,7 @@ impl Parser {
                             (TType::Float, TType::Float) => {}
                             _ => {
                                 return Err(self.generate_error_with_pos(
-                                    "Comparison operation expects int or float".to_string(),
+                                    "Comparison operation expects int or float",
                                     format!(
                                         "expected {} , but found {}",
                                         left_expr.get_type(),
@@ -2942,8 +2955,8 @@ impl Parser {
     fn mid_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.term()?;
         let current_pos = self.get_current_token_position();
-        while self.current_token().is_adding_op() {
-            if let Some(operation) = self.current_token().get_operator() {
+        while self.current_token().is_some_and(|t| t.is_adding_op()) {
+            if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.term()?;
 
@@ -3025,33 +3038,39 @@ impl Parser {
     }
 
     fn ttype(&mut self) -> Result<TType, NovaError> {
-        match self.current_token() {
-            Token::Symbol { symbol: '#', .. } => {
-                self.consume_symbol('#')?;
+        match self.current_token_value() {
+            Some(StructuralSymbol(Pound)) => {
+                self.consume_symbol(Pound)?;
                 let mut typelist = vec![];
-                self.consume_symbol('(')?;
+                self.consume_symbol(LeftParen)?;
                 typelist.push(self.ttype()?);
-                while self.current_token().is_symbol(',') {
-                    self.consume_symbol(',')?;
+                while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                    self.consume_symbol(Comma)?;
                     typelist.push(self.ttype()?);
                 }
-                self.consume_symbol(')')?;
+                self.consume_symbol(RightParen)?;
                 Ok(TType::Tuple { elements: typelist })
             }
-            Token::Symbol { symbol: '(', .. } => {
-                self.consume_symbol('(')?;
+            Some(StructuralSymbol(LeftParen)) => {
+                self.consume_symbol(LeftParen)?;
                 let mut input = vec![];
-                if !self.current_token().is_symbol(')') {
+                if !self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightParen))
+                {
                     let inner = self.ttype()?;
                     input.push(inner);
-                    while self.current_token().is_symbol(',') {
-                        self.consume_symbol(',')?;
+                    while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        self.consume_symbol(Comma)?;
                         let inner = self.ttype()?;
                         input.push(inner);
                     }
-                    self.consume_symbol(')')?;
+                    self.consume_symbol(RightParen)?;
                     let mut output = TType::Void;
-                    if self.current_token().is_op(Operator::RightArrow) {
+                    if self
+                        .current_token()
+                        .is_some_and(|t| t.is_op(Operator::RightArrow))
+                    {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
@@ -3060,9 +3079,12 @@ impl Parser {
                         return_type: Box::new(output),
                     })
                 } else {
-                    self.consume_symbol(')')?;
+                    self.consume_symbol(RightParen)?;
                     let mut output = TType::Void;
-                    if self.current_token().is_op(Operator::RightArrow) {
+                    if self
+                        .current_token()
+                        .is_some_and(|t| t.is_op(Operator::RightArrow))
+                    {
                         self.consume_operator(Operator::RightArrow)?;
                         output = self.ttype()?;
                     }
@@ -3072,54 +3094,53 @@ impl Parser {
                     })
                 }
             }
-            Token::Symbol { symbol: '$', .. } => {
-                self.consume_symbol('$')?;
+            Some(StructuralSymbol(DollarSign)) => {
+                self.consume_symbol(DollarSign)?;
                 let (generictype, _) = self.get_identifier()?;
                 Ok(TType::Generic { name: generictype })
             }
-            Token::Symbol { symbol: '?', .. } => {
-                self.consume_symbol('?')?;
+            Some(StructuralSymbol(QuestionMark)) => {
+                self.consume_symbol(QuestionMark)?;
                 let ttype = self.ttype()?;
                 if let TType::Option { .. } = ttype {
                     return Err(self.generate_error(
-                        "Cannot have option directly inside an option".to_string(),
-                        "Type Error: Try removing the extra `?`".to_string(),
+                        "Cannot have option directly inside an option",
+                        "Type Error: Try removing the extra `?`",
                     ));
                 }
                 Ok(TType::Option {
                     inner: Box::new(ttype),
                 })
             }
-            Token::Symbol { symbol: '[', .. } => {
-                self.consume_symbol('[')?;
+            Some(StructuralSymbol(LeftSquareBracket)) => {
+                self.consume_symbol(LeftSquareBracket)?;
                 let mut inner = TType::None;
-                if !self.current_token().is_symbol(']') {
+                if !self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightSquareBracket))
+                {
                     inner = self.ttype()?;
                 }
-                self.consume_symbol(']')?;
+                self.consume_symbol(RightSquareBracket)?;
                 Ok(TType::List {
                     inner: Box::new(inner),
                 })
             }
-            Token::Type { ttype, .. } => {
-                self.advance();
-                Ok(ttype)
-            }
-            Token::Identifier { .. } => {
+            Some(Identifier(_)) => {
                 let (identifier, pos) = self.get_identifier()?;
                 if self.environment.custom_types.contains_key(&identifier) {
                     let mut type_annotation = vec![];
-                    if let Token::Symbol { symbol: '(', .. } = self.current_token() {
-                        self.consume_symbol('(')?;
+                    if let Some(StructuralSymbol(LeftParen)) = self.current_token_value() {
+                        self.consume_symbol(LeftParen)?;
 
                         let ta = self.ttype()?;
                         type_annotation.push(ta);
-                        while self.current_token().is_symbol(',') {
+                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                             self.advance();
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
                         }
-                        self.consume_symbol(')')?;
+                        self.consume_symbol(RightParen)?;
                     }
                     if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier)
                     {
@@ -3139,7 +3160,7 @@ impl Parser {
                 } else {
                     let Some(alias) = self.environment.type_alias.get(&identifier) else {
                         return Err(self.generate_error_with_pos(
-                            "Unknown type".to_string(),
+                            "Unknown type",
                             format!("Unknown type '{identifier}' "),
                             pos,
                         ));
@@ -3148,19 +3169,19 @@ impl Parser {
                 }
             }
             _ => Err(self.generate_error(
-                "Expected type annotation".to_string(),
-                format!("Unknown type value {}", self.current_token()),
+                "Expected type annotation",
+                format!("Unknown type value {:?}", self.current_token()),
             )),
         }
     }
 
     fn get_identifier(&mut self) -> Result<(String, FilePosition), NovaError> {
-        let identifier = match self.current_token().into_ident() {
-            Some(id) => id,
-            None => {
+        let identifier = match self.current_token_value() {
+            Some(Identifier(id)) => id.clone(),
+            _ => {
                 return Err(self.generate_error(
-                    "Expected identifier".to_string(),
-                    format!("Cannot assign a value to {}", self.current_token(),),
+                    "Expected identifier",
+                    format!("Cannot assign a value to {:?}", self.current_token(),),
                 ));
             }
         };
@@ -3180,12 +3201,12 @@ impl Parser {
         let mut parameters: Table<String> = Table::new();
         let mut arguments = vec![];
 
-        while self.current_token().is_identifier() {
+        while self.current_token().is_some_and(|t| t.is_identifier()) {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "parameter identifier already defined".to_string(),
-                    "try using another name".to_string(),
+                    "parameter identifier already defined",
+                    "try using another name",
                     pos,
                 ));
             }
@@ -3194,7 +3215,7 @@ impl Parser {
             let ttype = self.ttype()?;
             arguments.push((ttype, identifier));
 
-            if !self.current_token().is_symbol(',') {
+            if !self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                 break;
             }
             self.advance();
@@ -3207,20 +3228,23 @@ impl Parser {
         let mut parameters = Table::new();
         let mut arguments = vec![];
 
-        while self.current_token().is_identifier() {
+        while self.current_token().is_some_and(|t| t.is_identifier()) {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "parameter identifier already defined".to_string(),
-                    "try using another name".to_string(),
+                    "parameter identifier already defined",
+                    "try using another name",
                     pos,
                 ));
             }
             parameters.insert(identifier.clone());
             // if no colon, then its a unit variant
-            if !self.current_token().is_op(Operator::Colon) {
+            if !self
+                .current_token()
+                .is_some_and(|t| t.is_op(Operator::Colon))
+            {
                 arguments.push((TType::None, identifier));
-                if !self.current_token().is_symbol(',') {
+                if !self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                     break;
                 }
                 self.advance();
@@ -3230,7 +3254,7 @@ impl Parser {
             let ttype = self.ttype()?;
             arguments.push((ttype, identifier));
 
-            if !self.current_token().is_symbol(',') {
+            if !self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                 break;
             }
             self.advance();
@@ -3244,17 +3268,17 @@ impl Parser {
         let pos = self.get_current_token_position();
         if test.get_type() != TType::Bool {
             return Err(self.generate_error_with_pos(
-                "If statement expression must return a bool".to_string(),
+                "If statement expression must return a bool",
                 format!("got {}", test.get_type()),
                 pos,
             ));
         }
         let statements = self.block()?;
         let mut alternative: Option<Vec<Statement>> = None;
-        if self.current_token().is_id("elif") {
+        if self.current_token().is_some_and(|t| t.is_id("elif")) {
             self.consume_identifier(Some("elif"))?;
             alternative = Some(self.alternative()?);
-        } else if self.current_token().is_id("else") {
+        } else if self.current_token().is_some_and(|t| t.is_id("else")) {
             self.consume_identifier(Some("else"))?;
             alternative = Some(self.block()?);
         }
@@ -3268,35 +3292,28 @@ impl Parser {
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("import"))?;
-        let import_filepath: PathBuf = match self.current_token() {
-            Token::String {
-                value: filepath, ..
-            } => {
+        let import_filepath: PathBuf = match self.current_token_value() {
+            Some(StringLiteral(path)) => {
+                let path = path.into();
                 self.advance();
-                filepath.into()
+                path
             }
-            Token::Identifier { name, .. } => {
-                let mut import_filepath = {
-                    if name == "super" {
-                        "..".to_string()
-                    } else {
-                        name
-                    }
-                };
+            Some(Identifier(name)) => {
+                let import_filepath = if name == "super" { ".." } else { name };
+                let mut import_filepath = PathBuf::from(import_filepath);
                 self.advance();
-                while self.current_token().is_symbol('.') {
+                while self.current_token().is_some_and(|t| t.is_symbol(Dot)) {
                     self.advance();
-                    import_filepath.push('/');
                     let (identifier, _) = self.get_identifier()?;
                     if identifier == "super" {
-                        import_filepath.push_str("..");
+                        import_filepath.push("..");
                     } else {
-                        import_filepath.push_str(&identifier);
+                        import_filepath.push(&identifier);
                     }
                 }
                 //dbg!(self.current_token());
-                import_filepath.push_str(".nv");
-                import_filepath.into()
+                import_filepath.set_extension(".nv");
+                import_filepath
             }
             _ => panic!(),
         };
@@ -3313,7 +3330,8 @@ impl Parser {
             None => import_filepath,
         };
         let resolved_filepath: Rc<Path> = resolved_filepath.into();
-        let tokens = Lexer::new(&resolved_filepath)?.tokenize()?;
+        let tokens =
+            Lexer::read_file(&resolved_filepath)?.collect::<Result<Vec<_>, NovaError>>()?;
         let mut parser = self.clone();
         parser.index = 0;
         parser.filepath = Some(resolved_filepath.clone());
@@ -3334,7 +3352,7 @@ impl Parser {
         if expr.get_type().custom_to_string().is_some() {
         } else {
             return Err(self.generate_error_with_pos(
-                "Match statement expects an enum type".to_string(),
+                "Match statement expects an enum type",
                 format!("got {}", expr.get_type()),
                 self.get_current_token_position(),
             ));
@@ -3342,16 +3360,19 @@ impl Parser {
 
         let pos = self.get_current_token_position();
         let mut branches = vec![];
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let mut default_branch = None;
-        while !self.current_token().is_symbol('}') {
+        while !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightBrace))
+        {
             let (variant, pos) = self.get_identifier()?;
             if variant == "_" {
                 // check to see if default branch is already defined
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
-                        "default branch already defined".to_string(),
-                        "make sure only one default branch is defined".to_string(),
+                        "default branch already defined",
+                        "make sure only one default branch is defined",
                         pos,
                     ));
                 }
@@ -3361,12 +3382,15 @@ impl Parser {
             }
             // collect identifiers
             let mut enum_id = String::new();
-            if self.current_token().is_symbol('(') {
-                self.consume_symbol('(')?;
-                if !self.current_token().is_symbol(')') {
+            if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                self.consume_symbol(LeftParen)?;
+                if !self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightParen))
+                {
                     enum_id = self.get_identifier()?.0;
                 }
-                self.consume_symbol(')')?;
+                self.consume_symbol(RightParen)?;
             }
             self.consume_operator(Operator::RightArrow)?;
 
@@ -3411,7 +3435,7 @@ impl Parser {
                 if vtype != TType::None && enum_id.is_empty() {
                     return Err(self.generate_error_with_pos(
                         format!("variant '{}' is missing Identifier", variant),
-                        "Variant(id), id is missing".to_string(),
+                        "Variant(id), id is missing",
                         pos,
                     ));
                 }
@@ -3419,7 +3443,7 @@ impl Parser {
                 if !found {
                     return Err(self.generate_error_with_pos(
                         format!("variant '{}' not found in type", variant),
-                        "make sure the variant is in the type".to_string(),
+                        "make sure the variant is in the type",
                         pos,
                     ));
                 }
@@ -3429,7 +3453,7 @@ impl Parser {
                     .insert_symbol(&enum_id, vtype, None, SymbolKind::Variable);
                 // get expression if no { }
 
-                let body = if self.current_token().is_symbol('{') {
+                let body = if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                     let body = self.block()?;
                     branches.push((tag, Some(enum_id.clone()), body.clone()));
                     body.clone()
@@ -3457,7 +3481,7 @@ impl Parser {
                 }
             }
         }
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
 
         if default_branch.is_none() {
             // check to see if all variants are covered
@@ -3493,7 +3517,7 @@ impl Parser {
                     if field.0 != "type" && !covered.contains(&i) {
                         return Err(self.generate_error_with_pos(
                             format!("variant '{}' is not covered", field.0),
-                            "make sure all variants are covered".to_string(),
+                            "make sure all variants are covered",
                             pos,
                         ));
                     }
@@ -3517,7 +3541,7 @@ impl Parser {
         if self.environment.custom_types.contains_key(&alias) {
             return Err(self.generate_error_with_pos(
                 format!("type '{}' already defined", alias),
-                "try using another name".to_string(),
+                "try using another name",
                 self.get_current_token_position(),
             ));
         }
@@ -3528,8 +3552,8 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
-        match self.current_token() {
-            Token::Identifier { name: id, .. } => match id.as_str() {
+        match self.current_token_value() {
+            Some(Identifier(id)) => match id.as_str() {
                 "match" => self.match_statement(),
                 "alias" => self.type_alias(),
                 "import" => self.import_file(),
@@ -3552,7 +3576,7 @@ impl Parser {
                 }
                 _ => self.expression_statement(),
             },
-            Token::EOF { .. } => Ok(None),
+            None => Ok(None),
             _ => self.expression_statement(),
         }
     }
@@ -3564,18 +3588,24 @@ impl Parser {
 
     fn get_id_list(&mut self) -> Result<Vec<String>, NovaError> {
         let mut idlist = vec![];
-        self.consume_symbol('(')?;
-        if !self.current_token().is_symbol(')') {
+        self.consume_symbol(LeftParen)?;
+        if !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightParen))
+        {
             idlist.push(self.get_identifier()?.0);
         }
-        while self.current_token().is_symbol(',') {
+        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
             self.advance();
-            if self.current_token().is_symbol(')') {
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_symbol(RightParen))
+            {
                 break;
             }
             idlist.push(self.get_identifier()?.0);
         }
-        self.consume_symbol(')')?;
+        self.consume_symbol(RightParen)?;
         Ok(idlist)
     }
 
@@ -3621,16 +3651,16 @@ impl Parser {
         self.environment.enums.insert(enum_name.clone());
 
         let mut generic_field_names = vec![];
-        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+        if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
             generic_field_names = self.get_id_list()?;
             self.environment
                 .generic_type_struct
                 .insert(enum_name.clone(), generic_field_names.clone());
         }
 
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let parameter_list = self.enum_list()?;
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
         //dbg!(parameter_list.clone());
         let mut fields: Vec<(String, TType)> = vec![];
         let mut type_parameters = vec![];
@@ -3650,7 +3680,7 @@ impl Parser {
                         "enum '{}' is missing generic type {}",
                         enum_name, generic_type
                     ),
-                    "You must include generic types in enum name(...generictypes)".to_string(),
+                    "You must include generic types in enum name(...generictypes)",
                     position.clone(),
                 ));
             }
@@ -3712,7 +3742,7 @@ impl Parser {
         } else {
             return Err(self.generate_error_with_pos(
                 format!("Enum '{}' is already instantiated", enum_name),
-                "Cannot reinstantiate the same type".to_string(),
+                "Cannot reinstantiate the same type",
                 position.clone(),
             ));
         }
@@ -3737,16 +3767,16 @@ impl Parser {
             .insert(struct_name.clone(), vec![]);
 
         let mut generic_field_names = vec![];
-        if let Token::Symbol { symbol: '(', .. } = self.current_token() {
+        if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
             generic_field_names = self.get_id_list()?;
             self.environment
                 .generic_type_struct
                 .insert(struct_name.clone(), generic_field_names.clone());
         }
 
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let parameter_list = self.parameter_list()?;
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
 
         let mut fields: Vec<(String, TType)> = vec![];
         let mut type_parameters = vec![];
@@ -3766,7 +3796,7 @@ impl Parser {
                         "Struct '{}' is missing generic type {}",
                         struct_name, generic_type
                     ),
-                    "You must include generic types in struct name(...generictypes)".to_string(),
+                    "You must include generic types in struct name(...generictypes)",
                     position.clone(),
                 ));
             }
@@ -3820,7 +3850,7 @@ impl Parser {
         } else {
             return Err(self.generate_error_with_pos(
                 format!("Struct '{}' is already instantiated", struct_name),
-                "Cannot reinstantiate the same type".to_string(),
+                "Cannot reinstantiate the same type",
                 position.clone(),
             ));
         }
@@ -3838,17 +3868,13 @@ impl Parser {
     fn for_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("for"))?;
 
-        if let Some(Token::Keyword {
-            keyword: KeyWord::In,
-            ..
-        }) = self.peek_offset(1)
-        {
+        if let Some(Keyword(KeyWord::In)) = self.peek_offset_value(1) {
             // Handle foreach statement
 
             let (identifier, pos) = self.get_identifier()?;
             if self.environment.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "identifier already used".to_string(),
+                    "identifier already used",
                     format!("identifier '{identifier}' is already used within this scope"),
                     pos.clone(),
                 ));
@@ -3858,11 +3884,8 @@ impl Parser {
             let array = self.expr()?;
             //dbg!(self.current_token());
             // check for inclusiverange operator
-            match self.current_token() {
-                Token::Operator {
-                    operator: Operator::ExclusiveRange,
-                    ..
-                } => {
+            match self.current_token_value() {
+                Some(Operator(Operator::ExclusiveRange)) => {
                     let start_range = array;
                     self.consume_operator(Operator::ExclusiveRange)?;
                     let end_range = self.expr()?;
@@ -3884,10 +3907,7 @@ impl Parser {
                         step: None,
                     }))
                 }
-                Token::Operator {
-                    operator: Operator::InclusiveRange,
-                    ..
-                } => {
+                Some(Operator(Operator::InclusiveRange)) => {
                     let start_range = array;
                     self.consume_operator(Operator::InclusiveRange)?;
                     let end_range = self.expr()?;
@@ -3921,7 +3941,7 @@ impl Parser {
                         )
                     } else {
                         return Err(self.generate_error_with_pos(
-                            "foreach can only iterate over arrays".to_string(),
+                            "foreach can only iterate over arrays",
                             format!("got {}", array.get_type()),
                             arraypos.clone(),
                         ));
@@ -3939,14 +3959,14 @@ impl Parser {
         } else {
             // Handle regular for statement
             let init = self.expr()?;
-            self.consume_symbol(';')?;
+            self.consume_symbol(Semicolon)?;
             let testpos = self.get_current_token_position();
             let test = self.expr()?;
-            self.consume_symbol(';')?;
+            self.consume_symbol(Semicolon)?;
             let inc = self.expr()?;
             if test.get_type() != TType::Bool && test.get_type() != TType::Void {
                 return Err(self.generate_error_with_pos(
-                    "test expression must return a bool".to_string(),
+                    "test expression must return a bool",
                     format!("got {}", test.get_type()),
                     testpos,
                 ));
@@ -3969,7 +3989,7 @@ impl Parser {
         let test = self.top_expr()?;
         if test.get_type() != TType::Bool && test.get_type() != TType::Void {
             return Err(self.generate_error_with_pos(
-                "test expression must return a bool".to_string(),
+                "test expression must return a bool",
                 format!("got {}", test.get_type()),
                 testpos,
             ));
@@ -3987,7 +4007,7 @@ impl Parser {
     fn if_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("if"))?;
 
-        if self.current_token().is_id("let") {
+        if self.current_token().is_some_and(|t| t.is_id("let")) {
             // Handle if let statement
             self.advance(); // consume 'let'
             let mut global = false;
@@ -4002,7 +4022,7 @@ impl Parser {
                 inner
             } else {
                 return Err(self.generate_error_with_pos(
-                    "unwrap expects an option type".to_string(),
+                    "unwrap expects an option type",
                     format!("got {}", expr.get_type()),
                     pos.clone(),
                 ));
@@ -4012,7 +4032,7 @@ impl Parser {
             if self.environment.has(&identifier) {
                 Err(self.generate_error_with_pos(
                     format!("Symbol '{}' is already instantiated", identifier),
-                    "Cannot reinstantiate the same symbol in the same scope".to_string(),
+                    "Cannot reinstantiate the same symbol in the same scope",
                     pos.clone(),
                 ))
             } else {
@@ -4024,12 +4044,13 @@ impl Parser {
                     SymbolKind::Variable,
                 );
                 let body = self.block()?;
-                let alternative: Option<Vec<Statement>> = if self.current_token().is_id("else") {
-                    self.consume_identifier(Some("else"))?;
-                    Some(self.block()?)
-                } else {
-                    None
-                };
+                let alternative: Option<Vec<Statement>> =
+                    if self.current_token().is_some_and(|t| t.is_id("else")) {
+                        self.consume_identifier(Some("else"))?;
+                        Some(self.block()?)
+                    } else {
+                        None
+                    };
                 self.environment.pop_block();
                 Ok(Some(Statement::IfLet {
                     ttype: expr.get_type(),
@@ -4046,17 +4067,17 @@ impl Parser {
             let test = self.top_expr()?;
             if test.get_type() != TType::Bool {
                 return Err(self.generate_error_with_pos(
-                    "If statement's expression must return a bool".to_string(),
+                    "If statement's expression must return a bool",
                     format!("got {}", test.get_type()),
                     testpos.clone(),
                 ));
             }
             let body = self.block()?;
             let mut alternative: Option<Vec<Statement>> = None;
-            if self.current_token().is_id("elif") {
+            if self.current_token().is_some_and(|t| t.is_id("elif")) {
                 self.advance();
                 alternative = Some(self.alternative()?);
-            } else if self.current_token().is_id("else") {
+            } else if self.current_token().is_some_and(|t| t.is_id("else")) {
                 self.advance();
                 alternative = Some(self.block()?);
             }
@@ -4077,7 +4098,7 @@ impl Parser {
         if self.modules.has(&identifier) {
             // throw error
             return Err(self.generate_error_with_pos(
-                "Cannot use module as identifier".to_string(),
+                "Cannot use module as identifier",
                 format!("got {}", identifier),
                 pos.clone(),
             ));
@@ -4088,7 +4109,10 @@ impl Parser {
         }
         let ttype;
         let expr;
-        if self.current_token().is_op(Operator::Colon) {
+        if self
+            .current_token()
+            .is_some_and(|t| t.is_op(Operator::Colon))
+        {
             self.consume_operator(Operator::Colon)?;
             ttype = self.ttype()?;
             self.consume_operator(Operator::Assignment)?;
@@ -4111,7 +4135,7 @@ impl Parser {
                 _ => {
                     return Err(self.generate_error_with_pos(
                         format!("Cannot assign {} to {}", expr.get_type(), ttype),
-                        "Make sure the expression returns the givin type".to_string(),
+                        "Make sure the expression returns the givin type",
                         pos.clone(),
                     ));
                 }
@@ -4126,7 +4150,7 @@ impl Parser {
         if expr.get_type() == TType::Void {
             return Err(self.generate_error_with_pos(
                 format!("Variable '{}' cannot be assinged to void", identifier),
-                "Make sure the expression returns a value".to_string(),
+                "Make sure the expression returns a value",
                 pos.clone(),
             ));
         }
@@ -4135,7 +4159,7 @@ impl Parser {
             //dbg!(&self.environment);
             Err(self.generate_error_with_pos(
                 format!("Symbol '{}' is already instantiated", identifier),
-                "Cannot reinstantiate the same symbol in the same scope".to_string(),
+                "Cannot reinstantiate the same symbol in the same scope",
                 pos.clone(),
             ))
         } else {
@@ -4209,39 +4233,39 @@ impl Parser {
         let mut is_mod = false;
         let mut get_first = false;
         // check to see if next is the extends keyword with a custom type name and get the custom type name
-        let mut custom_type = "".to_string();
-        if self.current_token().is_id("extends") {
+        let mut custom_type = String::new();
+        if self.current_token().is_some_and(|t| t.is_id("extends")) {
             self.advance();
             // if current token is ( then get the custom type name , otherwise extend from first argument
-            if self.current_token().is_symbol('(') {
-                self.consume_symbol('(')?;
+            if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                self.consume_symbol(LeftParen)?;
                 (custom_type, _) = self.get_identifier()?;
                 // check to see if its a valid custom type
                 if !self.environment.custom_types.contains_key(&custom_type) {
                     return Err(self.generate_error_with_pos(
                         format!("Custom type {} does not exist", custom_type),
-                        "Cannot extend a non existent custom type".to_string(),
+                        "Cannot extend a non existent custom type",
                         self.get_current_token_position(),
                     ));
                 }
-                self.consume_symbol(')')?;
+                self.consume_symbol(RightParen)?;
                 is_extended = true;
             } else {
                 get_first = true;
             }
-        } else if self.current_token().is_id("mod") {
+        } else if self.current_token().is_some_and(|t| t.is_id("mod")) {
             self.advance();
-            self.consume_symbol('(')?;
+            self.consume_symbol(LeftParen)?;
             (custom_type, _) = self.get_identifier()?;
             // check to see if its a valid custom type
             if !self.modules.has(&custom_type) {
                 return Err(self.generate_error_with_pos(
                     format!("Module {} does not exist", custom_type),
-                    "Cannot extend a non existent module".to_string(),
+                    "Cannot extend a non existent module",
                     self.get_current_token_position(),
                 ));
             }
-            self.consume_symbol(')')?;
+            self.consume_symbol(RightParen)?;
             is_mod = true;
         }
 
@@ -4252,10 +4276,10 @@ impl Parser {
         }
 
         // get parameters
-        self.consume_symbol('(')?;
+        self.consume_symbol(LeftParen)?;
         let parameters = self.parameter_list()?;
         //dbg!(&parameters);
-        self.consume_symbol(')')?;
+        self.consume_symbol(RightParen)?;
         // get output type
 
         if !is_extended && get_first {
@@ -4297,8 +4321,8 @@ impl Parser {
                     _ => {
                         // error
                         return Err(self.generate_error_with_pos(
-                            "Cannot extend from type".to_string(),
-                            "Cannot extend from this type".to_string(),
+                            "Cannot extend from type",
+                            "Cannot extend from this type",
                             pos.clone(),
                         ));
                     }
@@ -4309,13 +4333,13 @@ impl Parser {
         if self.environment.has(&identifier) {
             return Err(self.generate_error_with_pos(
                 format!("Generic Function {identifier} already defined"),
-                "Cannot overload a generic function".to_string(),
+                "Cannot overload a generic function",
                 pos.clone(),
             ));
         }
 
         let mut output = TType::Void;
-        if self.current_token().is_symbol('{') {
+        if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
         } else {
             self.consume_operator(Operator::RightArrow)?;
             output = self.ttype()?;
@@ -4336,7 +4360,7 @@ impl Parser {
                 if self.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Generic Function {} already defined", &identifier),
-                        "Cannot redefine a generic function".to_string(),
+                        "Cannot redefine a generic function",
                         pos.clone(),
                     ));
                 }
@@ -4344,7 +4368,7 @@ impl Parser {
                 if self.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Function {} already defined", &identifier,),
-                        "Cannot redefine a generic function".to_string(),
+                        "Cannot redefine a generic function",
                         pos.clone(),
                     ));
                 }
@@ -4378,7 +4402,7 @@ impl Parser {
                         .collect::<Vec<String>>()
                         .join(", ")
                 ),
-                "Cannot redefine a function with the same signature".to_string(),
+                "Cannot redefine a function with the same signature",
                 pos.clone(),
             ));
         }
@@ -4403,8 +4427,7 @@ impl Parser {
                         "Cannot create generic functon since, {} is already defined",
                         &identifier
                     ),
-                    "Cannot create generic function since this function is overload-able"
-                        .to_string(),
+                    "Cannot create generic function since this function is overload-able",
                     pos.clone(),
                 ));
             }
@@ -4529,8 +4552,8 @@ impl Parser {
                 // do nothing
             } else if !has_return {
                 return Err(self.generate_error_with_pos(
-                    "Function is missing a return statement in a branch".to_string(),
-                    "Function missing return".to_string(),
+                    "Function is missing a return statement in a branch",
+                    "Function missing return",
                     pos.clone(),
                 ));
             }
@@ -4558,7 +4581,7 @@ impl Parser {
                 Statement::Return { ttype, .. } => {
                     if ttype != &return_type {
                         Err(self.generate_error_with_pos(
-                            "Return type does not match function return type".to_string(),
+                            "Return type does not match function return type",
                             format!("Expected {} got {}", return_type, ttype),
                             pos.clone(),
                         ))
@@ -4583,8 +4606,8 @@ impl Parser {
                             Ok(body_has_return && alternative_has_return)
                         }
                         Some(_) => Err(self.generate_error(
-                            "Function is missing a return statement in a branch".to_string(),
-                            "All branches of if-else must have a return statement".to_string(),
+                            "Function is missing a return statement in a branch",
+                            "All branches of if-else must have a return statement",
                         )),
                         None => Ok(body_has_return),
                     }
@@ -4606,8 +4629,8 @@ impl Parser {
                             Ok(body_has_return && alternative_has_return)
                         }
                         Some(_) => Err(self.generate_error(
-                            "Function is missing a return statement in a branch".to_string(),
-                            "All branches of if-else must have a return statement".to_string(),
+                            "Function is missing a return statement in a branch",
+                            "All branches of if-else must have a return statement",
                         )),
                         None => Ok(body_has_return),
                     }
@@ -4641,17 +4664,17 @@ impl Parser {
     }
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let statements = self.compound_statement()?;
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
         Ok(statements)
     }
 
     fn block_expr(&mut self) -> Result<Vec<Statement>, NovaError> {
         let pos = self.get_current_token_position();
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let statements = self.compound_statement()?;
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
         let error = || {
             self.generate_error_with_pos(
                 "Block must have expression as last value",
@@ -4677,9 +4700,9 @@ impl Parser {
     }
 
     fn block_expr_inline(&mut self) -> Result<Vec<Statement>, NovaError> {
-        self.consume_symbol('{')?;
+        self.consume_symbol(LeftBrace)?;
         let statements = self.compound_statement()?;
-        self.consume_symbol('}')?;
+        self.consume_symbol(RightBrace)?;
         Ok(statements)
     }
 
@@ -4691,22 +4714,24 @@ impl Parser {
         let statements = {
             let mut statements = initial_statements;
 
-            while self.current_token().is_symbol(';') || !self.is_current_eof() {
+            while self.current_token().is_some_and(|t| t.is_symbol(Semicolon))
+                || !self.is_current_eof()
+            {
                 let index_change = self.index;
-                if self.current_token().is_symbol(';') {
+                if self.current_token().is_some_and(|t| t.is_symbol(Semicolon)) {
                     self.advance()
                 }
-                if self.current_token().is_symbol('}') {
+                if self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightBrace))
+                {
                     break;
                 }
                 if let Some(statement) = self.statement()? {
                     statements.push(statement);
                 }
                 if self.index == index_change {
-                    return Err(self.generate_error(
-                        "Expected statement".to_string(),
-                        "Expected statement".to_string(),
-                    ));
+                    return Err(self.generate_error("Expected statement", "Expected statement"));
                 }
             }
             statements
@@ -4720,7 +4745,7 @@ impl Parser {
             self.ast.program = self.compound_statement()?;
             return self.eof();
         }
-        if self.current_token().is_id("module") {
+        if self.current_token().is_some_and(|t| t.is_id("module")) {
             self.consume_identifier(Some("module"))?;
             let (module_name, _) = self.get_identifier()?;
             if self.modules.has(&module_name) {
@@ -4729,8 +4754,8 @@ impl Parser {
             self.modules.insert(module_name);
         } else {
             return Err(self.generate_error(
-                "Expected module declaration".to_string(),
-                "Module declaration must be the first statement".to_string(),
+                "Expected module declaration",
+                "Module declaration must be the first statement",
             ));
         }
         self.ast.program = self.compound_statement()?;

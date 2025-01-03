@@ -927,7 +927,7 @@ impl Compiler {
                     self.compile_expr(expr)?;
                     Ok(())
                 }
-                common::tokens::Unary::Negitive => {
+                common::tokens::Unary::Negative => {
                     self.compile_expr(expr)?;
                     self.asm.push(Asm::NEG);
                     Ok(())
