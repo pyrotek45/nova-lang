@@ -6,14 +6,14 @@ use crate::error::NovaError;
 pub struct FilePosition {
     pub filepath: Option<Rc<Path>>,
     pub line: usize,
-    pub row: usize,
+    pub col: usize,
 }
 
 impl Default for FilePosition {
     fn default() -> Self {
         FilePosition {
             line: 1,
-            row: 1,
+            col: 1,
             filepath: Default::default(),
         }
     }

@@ -33,7 +33,7 @@ pub fn print_line(position: &FilePosition, msg: &str) {
 
                     // Print marker line with padding for alignment
                     print!("{:<width$} |", "", width = line_number_width);
-                    if let Some(mut row) = position.row.checked_sub(1) {
+                    if let Some(mut row) = position.col.checked_sub(1) {
                         row += 1;
                         println!("{: <row$}{} {}", "", "^".red(), msg.bright_red(), row = row);
                     } else {
@@ -164,7 +164,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(position, msg);
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
@@ -184,7 +184,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(position, msg);
                 if let Some(extra_notes) = extra {
@@ -211,7 +211,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(position, msg);
             }
@@ -230,7 +230,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(
                     position,
@@ -252,7 +252,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(
                     position,
@@ -269,7 +269,7 @@ impl NovaError {
                         .unwrap_or(Path::new("repl"))
                         .display(),
                     position.line,
-                    position.row
+                    position.col
                 );
                 print_line(position, msg);
             }
