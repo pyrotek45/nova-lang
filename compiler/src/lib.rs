@@ -946,7 +946,7 @@ impl Compiler {
             } => {
                 match op {
                     common::tokens::Operator::RightArrow => todo!(),
-                    common::tokens::Operator::GreaterThan => {
+                    common::tokens::Operator::Greater => {
                         self.compile_expr(lhs)?;
                         self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
@@ -957,7 +957,7 @@ impl Compiler {
                             dbg!(&ttype);
                         }
                     }
-                    common::tokens::Operator::LessThan => {
+                    common::tokens::Operator::Less => {
                         self.compile_expr(lhs)?;
                         self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
@@ -1020,7 +1020,7 @@ impl Compiler {
                             dbg!(&ttype);
                         }
                     }
-                    common::tokens::Operator::Equality => {
+                    common::tokens::Operator::Equal => {
                         self.compile_expr(lhs)?;
                         self.compile_expr(rhs)?;
                         self.asm.push(Asm::EQUALS);
@@ -1046,7 +1046,7 @@ impl Compiler {
                     }
                     common::tokens::Operator::DoubleColon => todo!(),
                     common::tokens::Operator::Colon => todo!(),
-                    common::tokens::Operator::GtrOrEqu => {
+                    common::tokens::Operator::GreaterOrEqual => {
                         let sc = self.gen.generate();
 
                         // if lhs is true, return its value
@@ -1069,7 +1069,7 @@ impl Compiler {
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::LABEL(sc))
                     }
-                    common::tokens::Operator::LssOrEqu => {
+                    common::tokens::Operator::LessOrEqual => {
                         let sc = self.gen.generate();
 
                         // if lhs is true, return its value
@@ -1116,7 +1116,7 @@ impl Compiler {
                         self.compile_expr(rhs)?;
                         self.asm.push(Asm::LABEL(sc))
                     }
-                    common::tokens::Operator::AdditionAssignment => {
+                    common::tokens::Operator::AddAssign => {
                         match lhs.get_type() {
                             TType::Int => {
                                 self.compile_expr(rhs)?;
@@ -1145,7 +1145,7 @@ impl Compiler {
                         self.getref_expr(lhs)?;
                         self.asm.push(Asm::ASSIGN)
                     }
-                    common::tokens::Operator::SubtractionAssignment => {
+                    common::tokens::Operator::SubAssign => {
                         self.compile_expr(lhs)?;
                         self.compile_expr(rhs)?;
                         if lhs.get_type() == TType::Int {
@@ -1171,8 +1171,8 @@ impl Compiler {
                     common::tokens::Operator::LeftArrow => todo!(),
                     common::tokens::Operator::RightTilde => todo!(),
                     common::tokens::Operator::LeftTilde => todo!(),
-                    common::tokens::Operator::InclusiveRange => todo!(),
                     common::tokens::Operator::ExclusiveRange => todo!(),
+                    common::tokens::Operator::InclusiveRange => todo!(),
                 }
                 Ok(())
             }
