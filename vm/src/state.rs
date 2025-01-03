@@ -145,12 +145,12 @@ impl State {
             }
             Heap::List(v) => {
                 write!(out, "[").unwrap();
-                if let Some(&first) = v.first() {
-                    self.print_heap(first);
-                }
-                for item in v.iter().skip(1) {
-                    self.print_heap(*item);
-                    write!(out, ",").unwrap();
+                // print out the list with commas in between without the last comma
+                for i in 0..v.len() {
+                    self.print_heap(v[i]);
+                    if i != v.len() - 1 {
+                        write!(out, ",").unwrap();
+                    }
                 }
                 write!(out, "]").unwrap();
             }

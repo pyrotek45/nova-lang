@@ -2314,6 +2314,16 @@ impl Parser {
                 let (mut identifier, pos) = self.get_identifier()?;
                 match self.current_token_value() {
                     Some(Operator(Operator::DoubleColon))
+                        if matches!(
+                            identifier.as_str(),
+                            "Int" | "String" | "Float" | "Bool" | "List" | "Char" | "Option"
+                        ) =>
+                    {
+                        self.advance();
+                        let (name, _) = self.get_identifier()?;
+                        identifier = format!("{}::{}", identifier, name);
+                    }
+                    Some(Operator(Operator::DoubleColon))
                         if self.environment.custom_types.contains_key(&identifier) =>
                     {
                         self.advance();
