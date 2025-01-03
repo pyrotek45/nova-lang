@@ -3,7 +3,7 @@ use pretty_assertions::assert_eq;
 
 #[track_caller]
 fn assert_input_output(input: &str, output: impl IntoIterator<Item = TokenValue>) {
-    let scanner = Scanner::new(input, None);
+    let scanner = Lexer::new(input, None);
     let tokens: Result<Vec<TokenValue>, NovaError> = scanner.map(|t| t.map(|t| t.value)).collect();
     let tokens = tokens.expect("Lexing failied unexpectedly");
     assert_eq!(tokens, output.into_iter().collect::<Vec<_>>())
