@@ -240,7 +240,12 @@ impl Iterator for Scanner {
                             }));
                         };
                         if c == '"'
-                            && self.remaining().bytes().take_while(|&b| b == b'#').count()
+                            && self
+                                .remaining()
+                                .bytes()
+                                .take_while(|&b| b == b'#')
+                                .take(pound_count)
+                                .count()
                                 >= pound_count
                         {
                             let text = self.consumed_from(&body);
