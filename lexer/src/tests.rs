@@ -119,6 +119,11 @@ fn idents() {
 }
 
 #[test]
+fn ranges() {
+    assert_input_output("1..2", [Integer(1), Operator(ExclusiveRange), Integer(2)])
+}
+
+#[test]
 fn operators() {
     assert_input_output(
         "+= -= && || :: : >= <= == = -> <- > < + - / * % != ! ~> ..= ..",
