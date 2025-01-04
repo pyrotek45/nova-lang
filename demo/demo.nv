@@ -236,5 +236,5 @@ println(curriedmul(5)(5))
 // using IO struct
 import super.std.io
 
-let input = io::prompt("wow")
-println(input)
+// let input = io::prompt("wow")
+// println(input)

@@ -3,7 +3,7 @@ use vm::state::{self, Heap, VmData};
 
 pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
     let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index).clone() {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -24,7 +24,7 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index) {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -44,7 +44,7 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
 
-    let re = match regex::Regex::new(&pattern) {
+    let re = match regex::Regex::new(pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -61,7 +61,7 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
 // make a function that returns captures from a regex match as a list of strings
 pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
     let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index).clone() {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -82,7 +82,7 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index) {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -103,7 +103,7 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
     };
     // need to continue to run the regex to capture all patterns in the text
 
-    let re = match regex::Regex::new(&pattern) {
+    let re = match regex::Regex::new(pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -124,7 +124,7 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
             Some(capture) => capture.as_str(),
             None => "",
         };
-        let string_pos = state.allocate_string(capture.to_string());
+        let string_pos = state.allocate_string(capture.into());
         myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
     }
 
@@ -137,7 +137,7 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
 // make a function that returns first capture from a regex match as a string and returns both index and string
 pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
     let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index).clone() {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -158,7 +158,7 @@ pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.deref(index) {
+        Some(VmData::String(index)) => match state.get_ref(index) {
             Heap::String(str) => str,
             _ => {
                 return Err(NovaError::Runtime {
@@ -179,7 +179,7 @@ pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
     };
     // need to continue to run the regex to capture all patterns in the text
 
-    let re = match regex::Regex::new(&pattern) {
+    let re = match regex::Regex::new(pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -207,7 +207,7 @@ pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
         captures.as_str().to_string(),
     );
 
-    let string_pos = state.allocate_string(str);
+    let string_pos = state.allocate_string(str.into());
     let start_pos = state.allocate_vmdata_to_heap(VmData::Int(start as i64));
     let end_pos = state.allocate_vmdata_to_heap(VmData::Int(end as i64));
     let string_pos = state.allocate_vmdata_to_heap(VmData::String(string_pos));

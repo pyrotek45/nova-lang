@@ -77,7 +77,7 @@ pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaEr
     state.gclock = true;
     let len = args.len();
     for arg in args {
-        let string_pos = state.allocate_string(arg);
+        let string_pos = state.allocate_string(arg.into());
         myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
     }
     if len == 0 {

@@ -3,7 +3,7 @@ use vm::state::{self, Heap, VmData};
 
 pub fn len(state: &mut state::State) -> Result<(), NovaError> {
     if let Some(VmData::List(index)) = state.stack.pop() {
-        if let Heap::List(array) = state.deref(index) {
+        if let Heap::List(array) = state.get_ref(index) {
             state.stack.push(VmData::Int(array.len() as i64))
         }
     }
@@ -12,7 +12,7 @@ pub fn len(state: &mut state::State) -> Result<(), NovaError> {
 
 pub fn push(state: &mut state::State) -> Result<(), NovaError> {
     if let (Some(data), Some(VmData::List(index))) = (state.stack.pop(), state.stack.pop()) {
-        if let Heap::List(mut array) = state.deref(index) {
+        if let Heap::List(mut array) = state.get_ref(index).clone() {
             array.push(state.allocate_vmdata_to_heap(data));
             state.heap[index] = Heap::List(array);
         } else {
@@ -26,7 +26,7 @@ pub fn push(state: &mut state::State) -> Result<(), NovaError> {
 
 pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
     if let Some(VmData::List(index)) = state.stack.pop() {
-        if let Heap::List(mut array) = state.deref(index) {
+        if let Heap::List(mut array) = state.get_ref(index).clone() {
             if let Some(item) = array.pop() {
                 state.stack.push(state.to_vmdata(item));
             } else {

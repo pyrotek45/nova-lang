@@ -1,6 +1,6 @@
 //use common::error::{runtime_error, NovaError};
 use common::error::NovaError;
-use std::{fs, io};
+use std::{fs, io, rc::Rc};
 use vm::state::{self, Heap, VmData};
 
 pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
@@ -12,17 +12,17 @@ pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
         })?;
     // removing newline token
     input.pop();
-    let index = state.allocate_string(input);
+    let index = state.allocate_string(input.into());
     state.stack.push(VmData::String(index));
     Ok(())
 }
 
 pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
     if let Some(VmData::String(index)) = state.stack.pop() {
-        if let Heap::String(path) = state.deref(index) {
-            match fs::read_to_string(path) {
+        if let Heap::String(path) = state.get_ref(index) {
+            match fs::read_to_string(path.to_string()) {
                 Ok(string) => {
-                    let index = state.allocate_string(string);
+                    let index = state.allocate_string(string.into());
                     state.stack.push(VmData::String(index));
                 }
                 Err(e) => {
@@ -36,7 +36,7 @@ pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-fn printf_with_array(format_string: &str, args: Vec<String>) {
+fn printf_with_array(format_string: &str, args: Vec<Rc<str>>) {
     let mut arg_iter = args.iter();
     let mut formatted = String::new();
     let mut segments = format_string.split("{}").peekable();
@@ -61,12 +61,12 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
     if let (Some(VmData::List(args)), Some(VmData::String(str_index))) =
         (state.stack.pop(), state.stack.pop())
     {
-        if let Heap::String(format_string) = state.deref(str_index) {
-            if let Heap::List(args) = state.deref(args) {
+        if let Heap::String(format_string) = state.get_ref(str_index) {
+            if let Heap::List(args) = state.get_ref(args) {
                 // gather string arguments
                 for arg in args.iter() {
-                    if let Heap::StringAddress(string) = state.deref(*arg) {
-                        if let Heap::String(string) = state.deref(string) {
+                    if let Heap::StringAddress(string) = state.get_ref(*arg) {
+                        if let Heap::String(string) = state.get_ref(*string) {
                             strings.push(string);
                         } else {
                             return Err(NovaError::Runtime {
@@ -84,7 +84,7 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
                     msg: "Invalid arguments for printf".into(),
                 });
             }
-            printf_with_array(&format_string, strings);
+            printf_with_array(&format_string, strings.into_iter().cloned().collect());
         } else {
             return Err(NovaError::Runtime {
                 msg: "Invalid arguments for printf".into(),
