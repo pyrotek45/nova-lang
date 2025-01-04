@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::fileposition::FilePosition;
 
 pub struct Code {}
@@ -239,7 +241,7 @@ pub enum Asm {
     BJMP(u64),
 
     // large data
-    STRING(String),
+    STRING(Rc<str>),
     LIST(u64),
 
     // values

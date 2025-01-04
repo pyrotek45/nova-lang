@@ -136,11 +136,11 @@ impl Iterator for Lexer {
         use crate::Operator::*;
         use crate::StructuralSymbol::*;
         use TokenValue::*;
-        fn allocate_without_excess(text: &str) -> std::string::String {
+        fn allocate_without_excess(text: &str) -> Rc<str> {
             let mut out = std::string::String::new();
             out.reserve_exact(text.len());
             out += text;
-            out
+            out.into()
         }
         fn capture_int_digits(scanner: &mut Lexer) {
             while scanner.consume_if(|c| matches!(c, '0'..='9' | 'a'..='f' )) {}
@@ -311,7 +311,7 @@ impl Iterator for Lexer {
                     }
 
                     return Some(Ok(Token {
-                        value: TokenValue::StringLiteral(body),
+                        value: TokenValue::StringLiteral(body.into()),
                         position: span.pos,
                     }));
                 }

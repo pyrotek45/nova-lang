@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{borrow::Borrow, fmt};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,18 +12,29 @@ impl<T> Table<T> {
         Table { items: vec![] }
     }
 }
-impl<T: Eq + Clone> Table<T> {
-    pub fn insert(&mut self, item: T) {
+impl<T> Table<T> {
+    pub fn insert(&mut self, item: T)
+    where
+        T: PartialEq,
+    {
         if self.has(&item) {
             return;
         }
         self.items.push(item)
     }
-    pub fn get_index(&self, item: T) -> Option<usize> {
-        self.items.iter().position(|x| x == &item)
+    pub fn get_index<K>(&self, item: &K) -> Option<usize>
+    where
+        T: Borrow<K>,
+        K: PartialEq + ?Sized,
+    {
+        self.items.iter().position(|x| x.borrow() == item.borrow())
     }
-    pub fn has(&self, item: &T) -> bool {
-        self.items.contains(item)
+    pub fn has<K>(&self, item: &K) -> bool
+    where
+        T: Borrow<K>,
+        K: PartialEq,
+    {
+        self.items.iter().any(|x| x.borrow() == item)
     }
     pub fn retreive(&self, index: usize) -> Option<&T> {
         self.items.get(index)
@@ -40,7 +51,11 @@ impl<T: Eq + Clone> Table<T> {
     pub fn extend(&mut self, othertable: Table<T>) {
         self.items.extend(othertable.items);
     }
-    pub fn remove(&mut self, item: T) {
+    pub fn remove<K>(&mut self, item: &K)
+    where
+        T: Borrow<K>,
+        K: PartialEq,
+    {
         self.items.remove(self.get_index(item).unwrap());
     }
 }
