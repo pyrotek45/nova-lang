@@ -1,8 +1,10 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
+    str::FromStr,
 };
 
 use common::{
@@ -30,7 +32,7 @@ pub struct Parser {
     index: usize,
     pub ast: Ast,
     pub environment: Environment,
-    pub modules: table::Table<String>,
+    pub modules: table::Table<Rc<str>>,
 }
 
 pub fn default() -> Parser {
@@ -72,9 +74,7 @@ fn create_environment() -> Environment {
         "todo",
         TType::Function {
             parameters: vec![TType::None],
-            return_type: Box::new(TType::Generic {
-                name: "T".to_string(),
-            }),
+            return_type: Box::new(TType::Generic { name: "T".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -83,9 +83,7 @@ fn create_environment() -> Environment {
         "unreachable",
         TType::Function {
             parameters: vec![TType::None],
-            return_type: Box::new(TType::Generic {
-                name: "T".to_string(),
-            }),
+            return_type: Box::new(TType::Generic { name: "T".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -121,13 +119,9 @@ fn create_environment() -> Environment {
         "Option::unwrap",
         TType::Function {
             parameters: vec![TType::Option {
-                inner: Box::new(TType::Generic {
-                    name: "a".to_string(),
-                }),
+                inner: Box::new(TType::Generic { name: "a".into() }),
             }],
-            return_type: Box::new(TType::Generic {
-                name: "a".to_string(),
-            }),
+            return_type: Box::new(TType::Generic { name: "a".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -135,13 +129,9 @@ fn create_environment() -> Environment {
     env.insert_symbol(
         "Some",
         TType::Function {
-            parameters: vec![TType::Generic {
-                name: "a".to_string(),
-            }],
+            parameters: vec![TType::Generic { name: "a".into() }],
             return_type: Box::new(TType::Option {
-                inner: Box::new(TType::Generic {
-                    name: "a".to_string(),
-                }),
+                inner: Box::new(TType::Generic { name: "a".into() }),
             }),
         },
         None,
@@ -152,9 +142,7 @@ fn create_environment() -> Environment {
         TType::Function {
             parameters: vec![TType::None],
             return_type: Box::new(TType::Option {
-                inner: Box::new(TType::Generic {
-                    name: "T".to_string(),
-                }),
+                inner: Box::new(TType::Generic { name: "T".into() }),
             }),
         },
         None,
@@ -181,12 +169,8 @@ fn create_environment() -> Environment {
     env.insert_symbol(
         "clone",
         TType::Function {
-            parameters: vec![TType::Generic {
-                name: "a".to_string(),
-            }],
-            return_type: Box::new(TType::Generic {
-                name: "a".to_string(),
-            }),
+            parameters: vec![TType::Generic { name: "a".into() }],
+            return_type: Box::new(TType::Generic { name: "a".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -199,9 +183,9 @@ impl Parser {
         &self,
         type_list1: &[TType],
         type_list2: &[TType],
-        type_map: &mut HashMap<String, TType>,
+        type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
-    ) -> Result<HashMap<String, TType>, NovaError> {
+    ) -> Result<(), NovaError> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error_with_pos(
                 "E2 Incorrect amount of arguments".to_owned(),
@@ -246,7 +230,7 @@ impl Parser {
                             position: pos.clone(),
                         });
                     }
-                    if let Some(mapped_type) = type_map.clone().get(name1) {
+                    if let Some(mapped_type) = type_map.get(name1) {
                         if mapped_type != t2 {
                             return Err(NovaError::TypeMismatch {
                                 expected: mapped_type.clone(),
@@ -331,13 +315,13 @@ impl Parser {
                 }
             }
         }
-        Ok(type_map.clone())
+        Ok(())
     }
 
     pub fn get_output(
         &self,
         output: TType,
-        type_map: &mut HashMap<String, TType>,
+        type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
     ) -> Result<TType, NovaError> {
         match output.clone() {
@@ -650,10 +634,10 @@ impl Parser {
     fn field_list(
         &mut self,
         constructor: &str,
-        fields: Vec<(String, TType)>,
+        fields: Vec<(Rc<str>, TType)>,
         conpos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
-        let mut field_exprs: HashMap<String, Expr> = HashMap::default();
+        let mut field_exprs = HashMap::default();
         self.consume_symbol(LeftBrace)?;
         self.parse_field(&mut field_exprs)?;
         while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
@@ -670,26 +654,26 @@ impl Parser {
         self.validate_fields(constructor, &fields, conpos, &field_exprs)
     }
 
-    fn parse_field(&mut self, field_exprs: &mut HashMap<String, Expr>) -> Result<(), NovaError> {
+    fn parse_field(&mut self, field_exprs: &mut HashMap<Rc<str>, Expr>) -> Result<(), NovaError> {
         let (id, _) = self.get_identifier()?;
         self.consume_operator(Operator::Colon)?;
-        field_exprs.insert(id.clone(), self.expr()?);
+        field_exprs.insert(id, self.expr()?);
         Ok(())
     }
 
     fn validate_fields(
         &mut self,
         constructor: &str,
-        fields: &[(String, TType)],
+        fields: &[(impl AsRef<str>, TType)],
         conpos: FilePosition,
-        field_exprs: &HashMap<String, Expr>,
+        field_exprs: &HashMap<Rc<str>, Expr>,
     ) -> Result<Vec<Expr>, NovaError> {
         let mut validated_exprs = vec![];
         for (field_name, field_type) in fields.iter() {
-            if field_name == "type" {
+            if field_name.as_ref() == "type" {
                 continue;
             }
-            if let Some(expr) = field_exprs.get(field_name) {
+            if let Some(expr) = field_exprs.get(field_name.as_ref()) {
                 self.check_and_map_types(
                     &[field_type.clone()],
                     &[expr.get_type()],
@@ -699,7 +683,7 @@ impl Parser {
                 validated_exprs.push(expr.clone());
             } else {
                 return Err(NovaError::Parsing {
-                    msg: format!("{} is missing field {}", constructor, field_name).into(),
+                    msg: format!("{} is missing field {}", constructor, field_name.as_ref()).into(),
                     note: "".into(),
                     position: conpos,
                     extra: None,
@@ -738,7 +722,7 @@ impl Parser {
 
     fn method(
         &mut self,
-        mut identifier: String,
+        mut identifier: Rc<str>,
         first_argument: Expr,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
@@ -770,41 +754,44 @@ impl Parser {
             argument_types.push(TType::None)
         }
         let old_identifier = identifier.clone();
-        if self.environment.custom_types.contains_key(&identifier) {
+        identifier = if self.environment.custom_types.contains_key(&identifier) {
+            identifier
         } else if let Some(TType::Custom { name, .. }) = argument_types.first() {
-            if self.environment.custom_types.contains_key(name) {
-                identifier = format!("{}::{}", name, identifier);
+            if self.environment.custom_types.contains_key(name.as_ref()) {
+                format!("{}::{}", name, identifier).into()
+            } else {
+                identifier
             }
         } else if let Some(ttype) = argument_types.first() {
             match ttype {
                 TType::List { .. } => {
-                    identifier = format!("List::{}", identifier);
+                    format!("List::{}", identifier)
                 }
                 TType::Option { .. } => {
-                    identifier = format!("Option::{}", identifier);
+                     format!("Option::{}", identifier)
                 }
                 TType::Function { parameters, .. } => {
                     let repeated_elements: String = "(_)".repeat(parameters.len());
-                    identifier = format!("Function{}::{}",repeated_elements, identifier);
+                     format!("Function{}::{}",repeated_elements, identifier)
                 }
                 TType::Tuple { elements } => {
                     let repeated_elements: String = "(_)".repeat(elements.len());
-                    identifier = format!("Tuple{}::{}",repeated_elements, identifier);
+                     format!("Tuple{}::{}",repeated_elements, identifier)
                 }
                 TType::Bool => {
-                    identifier = format!("Bool::{}", identifier);
+                     format!("Bool::{}", identifier)
                 }
                 TType::Int => {
-                    identifier = format!("Int::{}", identifier);
+                     format!("Int::{}", identifier)
                 }
                 TType::Float => {
-                    identifier = format!("Float::{}", identifier);
+                     format!("Float::{}", identifier)
                 }
                 TType::Char => {
-                    identifier = format!("Char::{}", identifier);
+                     format!("Char::{}", identifier)
                 }
                 TType::String => {
-                    identifier = format!("String::{}", identifier);
+                     format!("String::{}", identifier)
                 }
                 _ => {
                     return Err(self.generate_error_with_pos(
@@ -822,8 +809,10 @@ impl Parser {
                         pos,
                     ))
                 }
-            }
-        }
+            }.into()
+        } else {
+            identifier
+        };
 
         self.varargs(&identifier, &mut argument_types, &mut arguments);
 
@@ -915,7 +904,7 @@ impl Parser {
     fn handle_function_call(
         &mut self,
         function_type: TType,
-        mut function_id: String,
+        mut function_id: Rc<str>,
         function_kind: SymbolKind,
         arguments: Vec<Expr>,
         argument_types: Vec<TType>,
@@ -937,12 +926,8 @@ impl Parser {
 
         let mut generic_list = Self::collect_generics(&[*return_type.clone()]);
         generic_list.extend(Self::collect_generics(&parameters));
-        let mut type_map = self.check_and_map_types(
-            &parameters,
-            &argument_types,
-            &mut HashMap::default(),
-            pos.clone(),
-        )?;
+        let mut type_map = HashMap::new();
+        self.check_and_map_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
 
         if let SymbolKind::GenericFunction | SymbolKind::Constructor = function_kind {
             self.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
@@ -967,9 +952,9 @@ impl Parser {
 
     fn modify_type_map(
         &mut self,
-        type_map: &mut HashMap<String, TType>,
+        type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
-        generics_list: table::Table<String>,
+        generics_list: table::Table<Rc<str>>,
     ) -> Result<(), NovaError> {
         if !self.current_token().is_some_and(|t| t.is_symbol(At)) {
             return Ok(());
@@ -1000,7 +985,7 @@ impl Parser {
                 return Err(NovaError::TypeError {
                     msg: format!("E1 Type '{generic_type}' is already inferred as {t}").into(),
                     expected: ttype.to_string().into(),
-                    found: generic_type.into(),
+                    found: generic_type.to_string().into(),
                     position: pos,
                 });
             }
@@ -1032,7 +1017,7 @@ impl Parser {
                     return Err(NovaError::TypeError {
                         msg: format!("E2 Type '{generic_type}' is already inferred as {t}").into(),
                         expected: ttype.to_string().into(),
-                        found: generic_type.into(),
+                        found: generic_type.to_string().into(),
                         position: pos,
                     });
                 }
@@ -1047,7 +1032,7 @@ impl Parser {
         &mut self,
         parameters: &[TType],
         argument_types: &[TType],
-        type_map: &mut HashMap<String, TType>,
+        type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
     ) -> Result<(), NovaError> {
         for (param_type, arg_type) in parameters.iter().zip(argument_types.iter()) {
@@ -1058,12 +1043,14 @@ impl Parser {
                 TType::Custom { name: arg_name, .. },
             ) = (param_type, arg_type)
             {
-                if let Some(internal_type) = self.environment.generic_type_map.get(arg_name) {
-                    if param_name == internal_type {
+                if let Some(internal_type) =
+                    self.environment.generic_type_map.get(arg_name.as_ref())
+                {
+                    if internal_type == param_name {
                         if let Some(param_list) = self.environment.get_type(param_name) {
                             let mut s = self.clone();
                             if let Some(arg_list) = s.environment.get_type(arg_name) {
-                                *type_map = self.check_and_map_types(
+                                self.check_and_map_types(
                                     &[param_list],
                                     &[arg_list],
                                     type_map,
@@ -1143,7 +1130,7 @@ impl Parser {
         }
     }
 
-    fn call(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
+    fn call(&mut self, identifier: Rc<str>, pos: FilePosition) -> Result<Expr, NovaError> {
         let mut arguments = self.get_field_arguments(&identifier, pos.clone())?;
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
@@ -1240,10 +1227,10 @@ impl Parser {
         }
     }
 
-    fn replace_generic_types(ttype: &TType, x: &[String], type_params: &[TType]) -> TType {
+    fn replace_generic_types(ttype: &TType, x: &[impl AsRef<str>], type_params: &[TType]) -> TType {
         match ttype {
             TType::Generic { name: n } => {
-                if let Some(index) = x.iter().position(|x| x == n) {
+                if let Some(index) = x.iter().position(|x| x.as_ref() == n.deref()) {
                     type_params[index].clone()
                 } else {
                     ttype.clone()
@@ -1304,7 +1291,7 @@ impl Parser {
 
     fn field(
         &mut self,
-        identifier: String,
+        identifier: Rc<str>,
         mut lhs: Expr,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
@@ -1321,7 +1308,7 @@ impl Parser {
                                 let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                                 (name.clone(), new_ttype)
                             })
-                            .collect::<Vec<(String, TType)>>()
+                            .collect()
                     } else {
                         fields.clone()
                     };
@@ -1342,7 +1329,12 @@ impl Parser {
                     );
                 }
             } else {
-                return self.generate_field_not_found_error(&identifier, type_name, &[], pos);
+                return self.generate_field_not_found_error(
+                    &identifier,
+                    type_name,
+                    &[] as &[(&str, _)],
+                    pos,
+                );
             }
         } else {
             return Err(self.generate_error_with_pos(
@@ -1357,13 +1349,13 @@ impl Parser {
     fn find_field<'a>(
         &self,
         identifier: &str,
-        fields: &'a [(String, TType)],
+        fields: &'a [(impl AsRef<str>, TType)],
     ) -> Option<(usize, &'a TType)> {
         fields
             .iter()
             .enumerate()
             .find_map(|(index, (field_name, field_type))| {
-                if field_name == identifier {
+                if field_name.as_ref() == identifier {
                     Some((index, field_type))
                 } else {
                     None
@@ -1375,12 +1367,12 @@ impl Parser {
         &self,
         identifier: &str,
         type_name: &str,
-        fields: &[(String, TType)],
+        fields: &[(impl AsRef<str>, TType)],
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         let mut lexicon = Lexicon::new();
         for (field_name, _) in fields.iter() {
-            lexicon.insert(field_name);
+            lexicon.insert(field_name.as_ref());
         }
         let corrections = lexicon.corrections_for(identifier);
         Err(self.generate_error_with_pos(
@@ -1435,8 +1427,8 @@ impl Parser {
                         ));
                     }
                     let input_types: Vec<_> = arguments.iter().map(|arg| arg.get_type()).collect();
-                    let mut type_map: HashMap<String, TType> = HashMap::default();
-                    type_map = self.check_and_map_types(
+                    let mut type_map = HashMap::default();
+                    self.check_and_map_types(
                         &parameters,
                         &input_types,
                         &mut type_map,
@@ -1446,7 +1438,7 @@ impl Parser {
                         Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
                     lhs = Expr::Call {
                         ttype: *return_type,
-                        name: "anon".to_string(),
+                        name: "anon".into(),
                         function: Box::new(lhs),
                         args: arguments,
                     };
@@ -1459,7 +1451,7 @@ impl Parser {
                 }
             }
             Some(StructuralSymbol(LeftParen)) => {
-                lhs = self.method(identifier.clone(), lhs, pos)?;
+                lhs = self.method(identifier, lhs, pos)?;
             }
             Some(StructuralSymbol(LeftSquareBracket)) => {
                 lhs = self.field(identifier.clone(), lhs, pos)?;
@@ -1504,7 +1496,7 @@ impl Parser {
 
     fn index(
         &mut self,
-        identifier: String,
+        identifier: Rc<str>,
         mut lhs: Expr,
         container_type: TType,
     ) -> Result<Expr, NovaError> {
@@ -1711,7 +1703,7 @@ impl Parser {
         ))
     }
 
-    fn anchor(&mut self, identifier: String, pos: FilePosition) -> Result<Expr, NovaError> {
+    fn anchor(&mut self, identifier: Rc<str>, pos: FilePosition) -> Result<Expr, NovaError> {
         let anchor = match self.current_token_value() {
             Some(Operator(Operator::RightArrow)) => {
                 self.consume_operator(Operator::RightArrow)?;
@@ -1740,8 +1732,8 @@ impl Parser {
                         }
                         let input_types: Vec<TType> =
                             arguments.iter().map(|arg| arg.get_type()).collect();
-                        let mut type_map: HashMap<String, TType> = HashMap::default();
-                        type_map = self.check_and_map_types(
+                        let mut type_map = HashMap::default();
+                        self.check_and_map_types(
                             &parameters,
                             &input_types,
                             &mut type_map,
@@ -1788,7 +1780,7 @@ impl Parser {
         Ok(anchor)
     }
 
-    fn create_literal_expr(&self, identifier: String, ttype: TType) -> Expr {
+    fn create_literal_expr(&self, identifier: Rc<str>, ttype: TType) -> Expr {
         Expr::Literal {
             ttype,
             value: Atom::Id { name: identifier },
@@ -1797,7 +1789,7 @@ impl Parser {
 
     fn handle_indexing(
         &mut self,
-        identifier: String,
+        identifier: Rc<str>,
         position: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(ttype) = self.environment.get_type(&identifier) {
@@ -1846,7 +1838,7 @@ impl Parser {
 
     fn handle_literal_or_capture(
         &mut self,
-        identifier: String,
+        identifier: Rc<str>,
         position: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(ttype) = self.environment.get_type(&identifier) {
@@ -1930,7 +1922,7 @@ impl Parser {
                     value: Atom::Char { value },
                 }
             }
-            Some(Identifier(id)) if id.as_str() == "fn" => {
+            Some(Identifier(id)) if "fn" == id.deref() => {
                 let pos = self.get_current_token_position();
                 self.advance();
                 // get parameters
@@ -1952,7 +1944,7 @@ impl Parser {
 
                 // build helper vecs
                 let mut input = vec![];
-                for (ttype, identifier) in parameters.clone() {
+                for (ttype, identifier) in parameters.iter().cloned() {
                     if let TType::Function { .. } = ttype.clone() {
                         // check if generic function exist
                         if self.environment.has(&identifier) {
@@ -2026,7 +2018,7 @@ impl Parser {
 
                 let mut statements = self.block()?;
 
-                let mut captured: Vec<String> = self
+                let mut captured: Vec<_> = self
                     .environment
                     .captured
                     .last()
@@ -2312,30 +2304,30 @@ impl Parser {
             }
             Some(Identifier(_)) => {
                 let (mut identifier, pos) = self.get_identifier()?;
-                match self.current_token_value() {
+                identifier = match self.current_token_value() {
                     Some(Operator(Operator::DoubleColon))
                         if matches!(
-                            identifier.as_str(),
+                            identifier.as_ref(),
                             "Int" | "String" | "Float" | "Bool" | "List" | "Char" | "Option"
                         ) =>
                     {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
-                        identifier = format!("{}::{}", identifier, name);
+                        format!("{}::{}", identifier, name).into()
                     }
                     Some(Operator(Operator::DoubleColon))
                         if self.environment.custom_types.contains_key(&identifier) =>
                     {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
-                        identifier = format!("{}::{}", identifier, name);
+                        format!("{}::{}", identifier, name).into()
                     }
                     Some(Operator(Operator::DoubleColon)) if self.modules.has(&identifier) => {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
-                        identifier = format!("{}::{}", identifier, name);
+                        format!("{}::{}", identifier, name).into()
                     }
-                    Some(Operator(Operator::DoubleColon)) => {}
+                    Some(Operator(Operator::DoubleColon)) => identifier,
                     Some(StructuralSymbol(At)) => {
                         self.consume_symbol(At)?;
                         self.consume_symbol(LeftParen)?;
@@ -2348,7 +2340,7 @@ impl Parser {
                             type_annotation.push(ta);
                         }
                         self.consume_symbol(RightParen)?;
-                        identifier = generate_unique_string(&identifier, &type_annotation);
+                        generate_unique_string(&identifier, &type_annotation).into()
                     }
                     Some(Operator(Operator::LeftArrow)) => {
                         self.consume_operator(Operator::LeftArrow)?;
@@ -2389,8 +2381,8 @@ impl Parser {
                             });
                         }
                     }
-                    _ => {}
-                }
+                    _ => identifier,
+                };
 
                 let leftt = self.anchor(identifier, pos)?;
                 left = leftt;
@@ -2499,7 +2491,7 @@ impl Parser {
     #[allow(clippy::type_complexity)]
     fn bar_closure(
         &mut self,
-    ) -> Result<(Vec<TType>, Vec<Arg>, TType, Vec<Statement>, Vec<String>), NovaError> {
+    ) -> Result<(Vec<TType>, Vec<Arg>, TType, Vec<Statement>, Vec<Rc<str>>), NovaError> {
         let pos = self.get_current_token_position();
         let parameters = match self.consume_symbol(Pipe) {
             Ok(_) => {
@@ -2595,7 +2587,7 @@ impl Parser {
             }];
             statement
         };
-        let mut captured: Vec<String> = self
+        let mut captured: Vec<_> = self
             .environment
             .captured
             .last()
@@ -2671,17 +2663,17 @@ impl Parser {
         if arguments.is_empty() {
             arguments.push(Expr::None)
         }
-        self.create_call_expression(left, "anon".to_string(), arguments, pos)
+        self.create_call_expression(left, "anon".into(), arguments, pos)
     }
 
     fn handle_chain_indexint(&mut self, left: Expr) -> Result<Expr, NovaError> {
-        self.index("anon".to_string(), left.clone(), left.get_type().clone())
+        self.index("anon".into(), left.clone(), left.get_type().clone())
     }
 
     fn create_call_expression(
         &mut self,
         function_expr: Expr,
-        function_name: String,
+        function_name: Rc<str>,
         arguments: Vec<Expr>,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
@@ -2701,9 +2693,8 @@ impl Parser {
             for arg in arguments.iter() {
                 input_types.push(arg.get_type())
             }
-            let mut type_map: HashMap<String, TType> = HashMap::default();
-            type_map =
-                self.check_and_map_types(&parameters, &input_types, &mut type_map, pos.clone())?;
+            let mut type_map = HashMap::new();
+            self.check_and_map_types(&parameters, &input_types, &mut type_map, pos.clone())?;
             return_type = Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
             Ok(Expr::Call {
                 ttype: *return_type,
@@ -3116,7 +3107,7 @@ impl Parser {
                 let (identifier, pos) = self.get_identifier()?;
 
                 let builtin = 'builtin: {
-                    Some(match identifier.as_str() {
+                    Some(match identifier.as_ref() {
                         "Int" => TType::Int,
                         "Float" => TType::Float,
                         "Bool" => TType::Bool,
@@ -3175,7 +3166,7 @@ impl Parser {
         }
     }
 
-    fn get_identifier(&mut self) -> Result<(String, FilePosition), NovaError> {
+    fn get_identifier(&mut self) -> Result<(Rc<str>, FilePosition), NovaError> {
         let identifier = match self.current_token_value() {
             Some(Identifier(id)) => id.clone(),
             _ => {
@@ -3197,8 +3188,8 @@ impl Parser {
         ))
     }
 
-    fn parameter_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
-        let mut parameters: Table<String> = Table::new();
+    fn parameter_list(&mut self) -> Result<Vec<(TType, Rc<str>)>, NovaError> {
+        let mut parameters: Table<Rc<str>> = Table::new();
         let mut arguments = vec![];
 
         while self.current_token().is_some_and(|t| t.is_identifier()) {
@@ -3224,7 +3215,7 @@ impl Parser {
         Ok(arguments)
     }
 
-    fn enum_list(&mut self) -> Result<Vec<(TType, String)>, NovaError> {
+    fn enum_list(&mut self) -> Result<Vec<(TType, Rc<str>)>, NovaError> {
         let mut parameters = Table::new();
         let mut arguments = vec![];
 
@@ -3294,21 +3285,21 @@ impl Parser {
         self.consume_identifier(Some("import"))?;
         let import_filepath: PathBuf = match self.current_token_value() {
             Some(StringLiteral(path)) => {
-                let path = path.into();
+                let path = PathBuf::from_str(path).unwrap();
                 self.advance();
                 path
             }
             Some(Identifier(name)) => {
-                let import_filepath = if name == "super" { ".." } else { name };
+                let import_filepath = if name.as_ref() == "super" { ".." } else { name };
                 let mut import_filepath = PathBuf::from(import_filepath);
                 self.advance();
                 while self.current_token().is_some_and(|t| t.is_symbol(Dot)) {
                     self.advance();
                     let (identifier, _) = self.get_identifier()?;
-                    if identifier == "super" {
+                    if &*identifier == "super" {
                         import_filepath.push("..");
                     } else {
-                        import_filepath.push(&identifier);
+                        import_filepath.push(&*identifier);
                     }
                 }
                 import_filepath.set_extension("nv");
@@ -3366,7 +3357,7 @@ impl Parser {
             .is_some_and(|t| t.is_symbol(RightBrace))
         {
             let (variant, pos) = self.get_identifier()?;
-            if variant == "_" {
+            if &*variant == "_" {
                 // check to see if default branch is already defined
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
@@ -3380,14 +3371,14 @@ impl Parser {
                 continue;
             }
             // collect identifiers
-            let mut enum_id = String::new();
+            let mut enum_id = None;
             if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
                 self.consume_symbol(LeftParen)?;
                 if !self
                     .current_token()
                     .is_some_and(|t| t.is_symbol(RightParen))
                 {
-                    enum_id = self.get_identifier()?.0;
+                    enum_id = Some(self.get_identifier()?.0);
                 }
                 self.consume_symbol(RightParen)?;
             }
@@ -3412,7 +3403,7 @@ impl Parser {
                             let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
-                        .collect::<Vec<(String, TType)>>()
+                        .collect()
                 } else {
                     fields.clone()
                 };
@@ -3429,7 +3420,7 @@ impl Parser {
                     }
                 }
 
-                if vtype != TType::None && enum_id.is_empty() {
+                if vtype != TType::None && enum_id.is_none() {
                     return Err(self.generate_error_with_pos(
                         format!("variant '{}' is missing Identifier", variant),
                         "Variant(id), id is missing",
@@ -3446,10 +3437,15 @@ impl Parser {
                 }
 
                 self.environment.push_block();
-                self.environment
-                    .insert_symbol(&enum_id, vtype, None, SymbolKind::Variable);
+                self.environment.insert_symbol(
+                    enum_id.as_deref().unwrap_or_default(),
+                    vtype,
+                    None,
+                    SymbolKind::Variable,
+                );
                 // get expression if no { }
 
+                let enum_id = enum_id.unwrap_or_default();
                 let body = if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                     let body = self.block()?;
                     branches.push((tag, Some(enum_id.clone()), body.clone()));
@@ -3505,12 +3501,12 @@ impl Parser {
                             let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
-                        .collect::<Vec<(String, TType)>>()
+                        .collect()
                 } else {
                     fields.clone()
                 };
                 for (i, field) in new_fields.iter().enumerate() {
-                    if field.0 != "type" && !covered.contains(&i) {
+                    if field.0.deref() != "type" && !covered.contains(&i) {
                         return Err(self.generate_error_with_pos(
                             format!("variant '{}' is not covered", field.0),
                             "make sure all variants are covered",
@@ -3549,7 +3545,7 @@ impl Parser {
 
     fn statement(&mut self) -> Result<Option<Statement>, NovaError> {
         match self.current_token_value() {
-            Some(Identifier(id)) => match id.as_str() {
+            Some(Identifier(id)) => match id.as_ref() {
                 "match" => self.match_statement(),
                 "alias" => self.type_alias(),
                 "import" => self.import_file(),
@@ -3582,7 +3578,7 @@ impl Parser {
         Ok(Some(Statement::Pass))
     }
 
-    fn get_id_list(&mut self) -> Result<Vec<String>, NovaError> {
+    fn get_id_list(&mut self) -> Result<Vec<Rc<str>>, NovaError> {
         let mut idlist = vec![];
         self.consume_symbol(LeftParen)?;
         if !self
@@ -3605,7 +3601,7 @@ impl Parser {
         Ok(idlist)
     }
 
-    fn collect_generics(input: &[TType]) -> Table<String> {
+    fn collect_generics(input: &[TType]) -> Table<Rc<str>> {
         let mut contracts = Table::new();
         for t in input {
             match t {
@@ -3657,7 +3653,7 @@ impl Parser {
         self.consume_symbol(LeftBrace)?;
         let parameter_list = self.enum_list()?;
         self.consume_symbol(RightBrace)?;
-        let mut fields: Vec<(String, TType)> = vec![];
+        let mut fields = vec![];
         let mut type_parameters = vec![];
         let mut generics_table = Table::new();
 
@@ -3666,7 +3662,7 @@ impl Parser {
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
-        fields.push(("type".to_string(), TType::String));
+        fields.push(("type".into(), TType::String));
 
         for generic_type in generics_table.items.iter() {
             if !generic_field_names.contains(generic_type) {
@@ -3729,7 +3725,7 @@ impl Parser {
             .insert(enum_name.clone(), fields);
 
         if !self.environment.has(&enum_name) {
-            self.environment.no_override.insert(enum_name.to_string());
+            self.environment.no_override.insert(enum_name.clone());
         } else {
             return Err(self.generate_error_with_pos(
                 format!("Enum '{}' is already instantiated", enum_name),
@@ -3769,7 +3765,7 @@ impl Parser {
         let parameter_list = self.parameter_list()?;
         self.consume_symbol(RightBrace)?;
 
-        let mut fields: Vec<(String, TType)> = vec![];
+        let mut fields = vec![];
         let mut type_parameters = vec![];
         let mut generics_table = Table::new();
 
@@ -3778,7 +3774,7 @@ impl Parser {
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
-        fields.push(("type".to_string(), TType::String));
+        fields.push(("type".into(), TType::String));
 
         for generic_type in generics_table.items.iter() {
             if !generic_field_names.contains(generic_type) {
@@ -3802,7 +3798,7 @@ impl Parser {
         }
 
         if !self.environment.has(&struct_name) {
-            self.environment.no_override.insert(struct_name.to_string());
+            self.environment.no_override.insert(struct_name.clone());
             if generics_table.is_empty() {
                 self.environment.insert_symbol(
                     &struct_name,
@@ -4002,7 +3998,7 @@ impl Parser {
             self.advance(); // consume 'let'
             let mut global = false;
             let (mut identifier, mut pos) = self.get_identifier()?;
-            if identifier == "global" {
+            if identifier.deref() == "global" {
                 (identifier, pos) = self.get_identifier()?;
                 global = true
             }
@@ -4093,7 +4089,7 @@ impl Parser {
                 pos.clone(),
             ));
         }
-        if identifier == "global" {
+        if identifier.deref() == "global" {
             (identifier, pos) = self.get_identifier()?;
             global = true
         }
@@ -4221,7 +4217,7 @@ impl Parser {
         let mut is_mod = false;
         let mut get_first = false;
         // check to see if next is the extends keyword with a custom type name and get the custom type name
-        let mut custom_type = String::new();
+        let mut custom_type = Rc::default();
         if self.current_token().is_some_and(|t| t.is_id("extends")) {
             self.advance();
             // if current token is ( then get the custom type name , otherwise extend from first argument
@@ -4260,7 +4256,7 @@ impl Parser {
         let (mut identifier, pos) = self.get_identifier()?;
 
         if is_extended || is_mod {
-            identifier = format!("{}::{}", custom_type, identifier);
+            identifier = format!("{}::{}", custom_type, identifier).into();
         }
 
         // get parameters
@@ -4272,38 +4268,38 @@ impl Parser {
         if !is_extended && get_first {
             //println!("{} {}", identifier, parameters.len());
             if let Some((ttype, _)) = parameters.first() {
-                match ttype {
+                identifier = match ttype {
                     TType::Custom { name, .. } => {
-                        identifier = format!("{}::{}", name, identifier);
+                        format!("{}::{}", name, identifier)
                     }
                     TType::List { .. } => {
-                        identifier = format!("List::{}", identifier);
+                        format!("List::{}", identifier)
                     }
                     TType::Option { .. } => {
-                        identifier = format!("Option::{}", identifier);
+                        format!("Option::{}", identifier)
                     }
                     TType::Function { parameters, .. } => {
                         let repeated_elements: String = "(_)".repeat(parameters.len());
-                        identifier = format!("Function{}::{}", repeated_elements, identifier);
+                        format!("Function{}::{}", repeated_elements, identifier)
                     }
                     TType::Tuple { elements } => {
                         let repeated_elements: String = "(_)".repeat(elements.len());
-                        identifier = format!("Tuple{}::{}", repeated_elements, identifier);
+                        format!("Tuple{}::{}", repeated_elements, identifier)
                     }
                     TType::Bool => {
-                        identifier = format!("Bool::{}", identifier);
+                        format!("Bool::{}", identifier)
                     }
                     TType::Int => {
-                        identifier = format!("Int::{}", identifier);
+                        format!("Int::{}", identifier)
                     }
                     TType::Float => {
-                        identifier = format!("Float::{}", identifier);
+                        format!("Float::{}", identifier)
                     }
                     TType::String => {
-                        identifier = format!("String::{}", identifier);
+                        format!("String::{}", identifier)
                     }
                     TType::Char => {
-                        identifier = format!("Char::{}", identifier);
+                        format!("Char::{}", identifier)
                     }
                     _ => {
                         // error
@@ -4314,6 +4310,7 @@ impl Parser {
                         ));
                     }
                 }
+                .into();
             }
         }
 
@@ -4404,7 +4401,7 @@ impl Parser {
                 Some(pos.clone()),
                 SymbolKind::Function,
             );
-            identifier = generate_unique_string(&identifier, &typeinput);
+            identifier = generate_unique_string(&identifier, &typeinput).into();
         } else {
             if self.environment.no_override.has(&identifier) {
                 return Err(self.generate_error_with_pos(
@@ -4462,7 +4459,7 @@ impl Parser {
         let mut statements = self.block()?;
 
         // capture variables -----------------------------------
-        let mut captured: Vec<String> = self
+        let mut captured: Vec<Rc<str>> = self
             .environment
             .captured
             .last()

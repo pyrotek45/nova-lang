@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -12,12 +13,12 @@ use common::ttype::TType;
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
-    pub bindings: common::table::Table<String>,
-    pub global: common::table::Table<String>,
-    pub variables: common::table::Table<String>,
-    pub upvalues: common::table::Table<String>,
-    pub native_functions: common::table::Table<String>,
-    pub native_functions_types: HashMap<String, TType>,
+    pub bindings: common::table::Table<Rc<str>>,
+    pub global: common::table::Table<Rc<str>>,
+    pub variables: common::table::Table<Rc<str>>,
+    pub upvalues: common::table::Table<Rc<str>>,
+    pub native_functions: common::table::Table<Rc<str>>,
+    pub native_functions_types: HashMap<Rc<str>, TType>,
     pub output: Vec<u8>,
     pub filepath: Option<Rc<Path>>,
     pub entry: usize,
@@ -58,7 +59,7 @@ impl Compiler {
         //dbg!("init");
         // compile wrapper functions into global scope
         // print function
-        self.global.insert("print".to_string());
+        self.global.insert("print".into());
         let w_index = self.global.len() - 1;
         let jump = self.gen.generate();
         self.asm.push(Asm::FUNCTION(jump));
@@ -69,13 +70,13 @@ impl Compiler {
         self.asm.push(Asm::STOREGLOBAL(w_index as u32));
 
         // println function
-        self.global.insert("println".to_string());
+        self.global.insert("println".into());
         let w_index = self.global.len() - 1;
         let jump = self.gen.generate();
         self.asm.push(Asm::FUNCTION(jump));
         self.asm.push(Asm::OFFSET(1, 0));
         self.asm.push(Asm::PRINT);
-        self.asm.push(Asm::STRING("\n".to_string()));
+        self.asm.push(Asm::STRING("\n".into()));
         self.asm.push(Asm::PRINT);
         self.asm.push(Asm::RET(false));
         self.asm.push(Asm::LABEL(jump));
@@ -88,7 +89,7 @@ impl Compiler {
                         parameters,
                         return_type,
                     } => {
-                        self.global.insert(native.to_string());
+                        self.global.insert(native.clone());
                         let w_index = self.global.len() - 1;
                         let jump = self.gen.generate();
                         self.asm.push(Asm::FUNCTION(jump));
@@ -146,18 +147,17 @@ impl Compiler {
 
                     // insert temp counter
                     self.variables
-                        .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+                        .insert(format!("__tempcounter__{}", self.gen.generate()).into());
                     let tempcounter_index = self.variables.len() - 1;
 
                     self.variables
-                        .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                        .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
                     let array_index = self.variables.len() - 1;
 
-                    let id_index = if let Some(index) = self.variables.get_index(identifier.clone())
-                    {
+                    let id_index = if let Some(index) = self.variables.get_index(identifier) {
                         index
                     } else {
-                        self.variables.insert(identifier.to_string());
+                        self.variables.insert(identifier.clone());
                         self.variables.len() - 1
                     };
 
@@ -173,7 +173,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     } else {
                         todo!()
@@ -188,7 +188,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::EQUALS);
@@ -236,17 +236,17 @@ impl Compiler {
                     self.compile_expr(expr)?;
 
                     if *global {
-                        if let Some(index) = self.global.get_index(identifier.to_string()) {
+                        if let Some(index) = self.global.get_index(identifier) {
                             self.asm.push(Asm::STOREGLOBAL(index as u32))
                         } else {
-                            self.global.insert(identifier.to_string());
+                            self.global.insert(identifier.clone());
                             let index = self.global.len() - 1;
                             self.asm.push(Asm::STOREGLOBAL(index as u32))
                         }
-                    } else if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    } else if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::STORE(index as u32))
                     } else {
-                        self.variables.insert(identifier.to_string());
+                        self.variables.insert(identifier.clone());
                         let index = self.variables.len() - 1;
                         self.asm.push(Asm::STORE(index as u32))
                     }
@@ -258,7 +258,7 @@ impl Compiler {
                     captures: captured,
                     ..
                 } => {
-                    self.global.insert(identifier.to_string());
+                    self.global.insert(identifier.clone());
                     // Clone the current state to prepare for function compilation
                     let mut function_compile = self.clone();
                     function_compile.variables.clear();
@@ -266,23 +266,20 @@ impl Compiler {
 
                     // Register parameter names in the function's local variable scope
                     for param in parameters.iter() {
-                        function_compile
-                            .variables
-                            .insert(param.identifier.to_string());
+                        function_compile.variables.insert(param.identifier.clone());
                     }
 
                     // Register captured variables in the function's local variable scope
                     for capture in captured.iter() {
-                        function_compile.variables.insert(capture.to_string());
+                        function_compile.variables.insert(capture.clone());
                     }
 
                     // Compile captured variables for the closure
                     for captured_var in captured {
-                        if let Some(index) = self.variables.get_index(captured_var.to_string()) {
+                        if let Some(index) = self.variables.get_index(captured_var) {
                             // Get the local variable if it exists in the current scope
                             self.asm.push(Asm::GET(index as u32));
-                        } else if let Some(index) = self.global.get_index(captured_var.to_string())
-                        {
+                        } else if let Some(index) = self.global.get_index(captured_var) {
                             // Otherwise, get the global variable if it exists
                             self.asm.push(Asm::GETGLOBAL(index as u32));
                         } else {
@@ -341,7 +338,7 @@ impl Compiler {
                     identifier,
                     fields,
                 } => {
-                    self.global.insert(identifier.to_string());
+                    self.global.insert(identifier.clone());
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
                     self.asm.push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
@@ -470,13 +467,10 @@ impl Compiler {
                 } => {
                     let skip = self.gen.generate();
                     let end = self.gen.generate();
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::GET(index as u32))
                     }
-                    if let Some(index) = self
-                        .native_functions
-                        .get_index("Option::isSome".to_string())
-                    {
+                    if let Some(index) = self.native_functions.get_index("Option::isSome") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::ISSOME);
@@ -514,20 +508,16 @@ impl Compiler {
                     let skip = self.gen.generate();
                     let end = self.gen.generate();
                     self.compile_expr(expr)?;
-                    if let Some(index) = self
-                        .native_functions
-                        .get_index("Option::isSome".to_string())
-                    {
+                    if let Some(index) = self.native_functions.get_index("Option::isSome") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     }
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::ISSOME);
                     self.asm.push(Asm::JUMPIFFALSE(skip));
-                    let id_index = if let Some(index) = self.variables.get_index(identifier.clone())
-                    {
+                    let id_index = if let Some(index) = self.variables.get_index(identifier) {
                         index
                     } else {
-                        self.variables.insert(identifier.to_string());
+                        self.variables.insert(identifier.clone());
                         self.variables.len() - 1
                     };
                     if *global {
@@ -562,12 +552,12 @@ impl Compiler {
                     identifier, fields, ..
                 } => {
                     for (tag, field) in fields.iter().enumerate() {
-                        if field.identifier == "type" {
+                        if field.identifier.as_ref() == "type" {
                             continue;
                         }
 
                         self.global
-                            .insert(format!("{}::{}", identifier, field.identifier).to_string());
+                            .insert(format!("{}::{}", identifier, field.identifier).into());
 
                         //dbg!(format!("{}::{}", identifier, field.identifier));
 
@@ -611,7 +601,7 @@ impl Compiler {
                     self.asm.push(Asm::LIN);
                     // store in temp variable
                     self.variables
-                        .insert(format!("__matchexpr__{}", self.gen.generate()).to_string());
+                        .insert(format!("__matchexpr__{}", self.gen.generate()).into());
                     let temp_matchexpr = self.variables.len() - 1;
                     self.asm.push(Asm::STORE(temp_matchexpr as u32));
                     for arm in arms.iter() {
@@ -628,10 +618,10 @@ impl Compiler {
                             self.compile_expr(expr)?;
                             self.asm.push(Asm::LIN);
                             // store the vid in the variable
-                            if let Some(index) = self.variables.get_index(vid.to_string()) {
+                            if let Some(index) = self.variables.get_index(vid) {
                                 self.asm.push(Asm::STORE(index as u32))
                             } else {
-                                self.variables.insert(vid.to_string());
+                                self.variables.insert(vid.clone());
                                 let index = self.variables.len() - 1;
                                 self.asm.push(Asm::STORE(index as u32))
                             }
@@ -670,10 +660,10 @@ impl Compiler {
 
                     // start of range
                     self.compile_expr(start_expr)?;
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::STORE(index as u32))
                     } else {
-                        self.variables.insert(identifier.to_string());
+                        self.variables.insert(identifier.clone());
                         let index = self.variables.len() - 1;
                         self.asm.push(Asm::STORE(index as u32))
                     }
@@ -682,7 +672,7 @@ impl Compiler {
                     self.asm.push(Asm::LABEL(top));
                     // test if we are at the end
                     self.compile_expr(end_expr)?;
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     // todo inclusive
@@ -696,7 +686,7 @@ impl Compiler {
                         self.asm.push(Asm::JUMPIFFALSE(sc));
                         self.asm.push(Asm::POP);
                         self.compile_expr(end_expr)?;
-                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        if let Some(index) = self.variables.get_index(identifier) {
                             self.asm.push(Asm::GET(index as u32))
                         }
                         self.asm.push(Asm::EQUALS);
@@ -712,7 +702,7 @@ impl Compiler {
                     self.asm.pop();
 
                     self.asm.push(Asm::LABEL(next));
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     if let Some(step) = step {
@@ -722,7 +712,7 @@ impl Compiler {
                         self.asm.push(Asm::INTEGER(1));
                         self.asm.push(Asm::IADD);
                     }
-                    if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                    if let Some(index) = self.variables.get_index(identifier) {
                         self.asm.push(Asm::STORE(index as u32))
                     }
                     self.asm.push(Asm::BJMP(top));
@@ -780,7 +770,7 @@ impl Compiler {
                 let negitive_step = self.gen.generate();
                 self.compile_expr(container)?;
                 self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
                 let array_index = self.variables.len() - 1;
                 self.asm.push(Asm::STORE(array_index as u32));
 
@@ -789,7 +779,7 @@ impl Compiler {
                 self.asm.push(Asm::ILSS);
                 self.asm.push(Asm::JUMPIFFALSE(negitive_step));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                if let Some(index) = self.native_functions.get_index("List::len") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 } else {
                     todo!()
@@ -820,10 +810,10 @@ impl Compiler {
                 self.asm.push(Asm::BOOL(*value));
             }
             Atom::Id { name } => {
-                if let Some(index) = self.variables.get_index(name.to_string()) {
+                if let Some(index) = self.variables.get_index(name) {
                     self.asm.push(Asm::STACKREF(index as u32));
                 } else {
-                    self.variables.insert(name.to_string());
+                    self.variables.insert(name.clone());
                     let index = self.variables.len() - 1;
                     self.asm.push(Asm::STACKREF(index as u32));
                 }
@@ -843,15 +833,15 @@ impl Compiler {
                 for expr in arguments {
                     self.compile_expr(expr)?;
                 }
-                match name.as_str() {
+                match name.deref() {
                     "print" => self.asm.push(Asm::PRINT),
                     "free" => self.asm.push(Asm::FREE),
                     "clone" => self.asm.push(Asm::CLONE),
                     identifier => {
-                        if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                        if let Some(index) = self.variables.get_index(identifier) {
                             self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
-                        } else if let Some(index) = self.global.get_index(identifier.to_string()) {
+                        } else if let Some(index) = self.global.get_index(identifier) {
                             self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             dbg!(identifier);
@@ -893,7 +883,7 @@ impl Compiler {
 
                 self.compile_expr(container)?;
                 self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
                 let array_index = self.variables.len() - 1;
                 self.asm.push(Asm::STORE(array_index as u32));
 
@@ -902,7 +892,7 @@ impl Compiler {
                 self.asm.push(Asm::ILSS);
                 self.asm.push(Asm::JUMPIFFALSE(negitive_step));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                if let Some(index) = self.native_functions.get_index("List::len") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 } else {
                     todo!()
@@ -1199,23 +1189,21 @@ impl Compiler {
                 //dbg!(&parameters, &captured);
                 // Register parameter names in the function's local variable scope
                 for param in parameters.iter() {
-                    function_compile
-                        .variables
-                        .insert(param.identifier.to_string());
+                    function_compile.variables.insert(param.identifier.clone());
                 }
 
                 // Register captured variables in the function's local variable scope
                 for capture in captured.iter() {
-                    function_compile.variables.insert(capture.to_string());
+                    function_compile.variables.insert(capture.clone());
                 }
 
                 // Compile captured variables for the closure
                 for captured_var in captured.iter() {
                     //dbg!(&captured);
-                    if let Some(index) = self.variables.get_index(captured_var.to_string()) {
+                    if let Some(index) = self.variables.get_index(captured_var) {
                         // Get the local variable if it exists in the current scope
                         self.asm.push(Asm::GET(index as u32));
-                    } else if let Some(index) = self.global.get_index(captured_var.to_string()) {
+                    } else if let Some(index) = self.global.get_index(captured_var) {
                         // Otherwise, get the global variable if it exists
                         self.asm.push(Asm::GETGLOBAL(index as u32));
                     } else {
@@ -1277,7 +1265,7 @@ impl Compiler {
                 // create temp list to hold new values
 
                 self.variables
-                    .insert(format!("__listexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__listexpr__{}", self.gen.generate()).into());
                 let list_index = self.variables.len() - 1;
                 self.asm.push(Asm::LIST(0));
                 self.asm.push(Asm::STORE(list_index as u32));
@@ -1319,22 +1307,22 @@ impl Compiler {
                 // create temp list to hold new values
 
                 self.variables
-                    .insert(format!("__listexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__listexpr__{}", self.gen.generate()).into());
                 let list_index = self.variables.len() - 1;
                 self.asm.push(Asm::LIST(0));
                 self.asm.push(Asm::STORE(list_index as u32));
 
                 // insert temp counter
                 self.variables
-                    .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+                    .insert(format!("__tempcounter__{}", self.gen.generate()).into());
                 let tempcounter_index = self.variables.len() - 1;
 
                 self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
                 let array_index = self.variables.len() - 1;
 
                 self.variables
-                    .insert(format!("__tempexpr__{}", self.gen.generate()).to_string());
+                    .insert(format!("__tempexpr__{}", self.gen.generate()).into());
                 let id_index = self.variables.len() - 1;
 
                 // compile list expr
@@ -1350,7 +1338,7 @@ impl Compiler {
                     self.asm.push(Asm::JUMPIFFALSE(negitive_start));
 
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     } else {
                         todo!()
@@ -1367,7 +1355,7 @@ impl Compiler {
                 self.asm.push(Asm::LABEL(top));
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                if let Some(index) = self.native_functions.get_index("List::len") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 } else {
                     todo!()
@@ -1382,7 +1370,7 @@ impl Compiler {
 
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                if let Some(index) = self.native_functions.get_index("List::len") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 }
                 self.asm.push(Asm::EQUALS);
@@ -1401,7 +1389,7 @@ impl Compiler {
                     self.asm.push(Asm::ILSS);
                     self.asm.push(Asm::JUMPIFFALSE(negitive_end));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+                    if let Some(index) = self.native_functions.get_index("List::len") {
                         self.asm.push(Asm::NATIVE(index as u64))
                     } else {
                         todo!()
@@ -1424,7 +1412,7 @@ impl Compiler {
                 self.asm.push(Asm::GET(list_index as u32));
                 self.asm.push(Asm::GET(id_index as u32));
 
-                if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
+                if let Some(index) = self.native_functions.get_index("List::push") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 } else {
                     todo!()
@@ -1458,10 +1446,10 @@ impl Compiler {
                 body,
             } => {
                 self.compile_expr(expr)?;
-                if let Some(index) = self.variables.get_index(name.to_string()) {
+                if let Some(index) = self.variables.get_index(name) {
                     self.asm.push(Asm::STORE(index as u32))
                 } else {
-                    self.variables.insert(name.to_string());
+                    self.variables.insert(name.clone());
                     let index = self.variables.len() - 1;
                     self.asm.push(Asm::STORE(index as u32))
                 }
@@ -1484,24 +1472,24 @@ impl Compiler {
 
     fn for_in_loop(
         &mut self,
-        identifier: String,
+        identifier: Rc<str>,
         list: Expr,
         expr: Vec<Expr>,
         guards: Vec<Expr>,
         list_index: usize,
-        mut loops: Vec<(String, Expr)>,
+        mut loops: Vec<(Rc<str>, Expr)>,
     ) -> Result<(), NovaError> {
         // compile list and create counter
         self.variables
-            .insert(format!("__tempcounter__{}", self.gen.generate()).to_string());
+            .insert(format!("__tempcounter__{}", self.gen.generate()).into());
         let tempcounter_index = self.variables.len() - 1;
         self.variables
-            .insert(format!("__arrayexpr__{}", self.gen.generate()).to_string());
+            .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
         let array_index = self.variables.len() - 1;
-        let id_index = if let Some(index) = self.variables.get_index(identifier.clone()) {
+        let id_index = if let Some(index) = self.variables.get_index(&*identifier) {
             index
         } else {
-            self.variables.insert(identifier.to_string());
+            self.variables.insert(identifier);
             self.variables.len() - 1
         };
         // generate labels
@@ -1521,7 +1509,7 @@ impl Compiler {
         self.asm.push(Asm::LABEL(top));
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
-        if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+        if let Some(index) = self.native_functions.get_index("List::len") {
             self.asm.push(Asm::NATIVE(index as u64))
         } else {
             todo!()
@@ -1533,7 +1521,7 @@ impl Compiler {
         self.asm.push(Asm::POP);
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
-        if let Some(index) = self.native_functions.get_index("List::len".to_string()) {
+        if let Some(index) = self.native_functions.get_index("List::len") {
             self.asm.push(Asm::NATIVE(index as u64))
         }
         self.asm.push(Asm::EQUALS);
@@ -1567,7 +1555,7 @@ impl Compiler {
 
             self.asm.push(Asm::GET(list_index as u32));
             self.asm.push(Asm::GET(id_index as u32));
-            if let Some(index) = self.native_functions.get_index("List::push".to_string()) {
+            if let Some(index) = self.native_functions.get_index("List::push") {
                 self.asm.push(Asm::NATIVE(index as u64))
             } else {
                 todo!()
@@ -1598,9 +1586,9 @@ impl Compiler {
                 self.asm.push(Asm::BOOL(*bool));
             }
             Atom::Id { name: identifier } => {
-                if let Some(index) = self.variables.get_index(identifier.to_string()) {
+                if let Some(index) = self.variables.get_index(identifier) {
                     self.asm.push(Asm::GET(index as u32));
-                } else if let Some(index) = self.global.get_index(identifier.to_string()) {
+                } else if let Some(index) = self.global.get_index(identifier) {
                     self.asm.push(Asm::GETGLOBAL(index as u32));
                 } else {
                     return Err(NovaError::Compiler {
@@ -1623,14 +1611,15 @@ impl Compiler {
                 arguments: list,
                 position,
             } => {
-                if caller.as_str() == "typeof" {
-                    self.asm.push(Asm::STRING(list[0].get_type().to_string()));
+                if caller.deref() == "typeof" {
+                    self.asm
+                        .push(Asm::STRING(list[0].get_type().to_string().into()));
                     return Ok(());
                 }
                 for expr in list {
                     self.compile_expr(expr)?;
                 }
-                match caller.as_str() {
+                match caller.deref() {
                     // "println" => {
                     //     self.asm.push(Asm::PRINT);
                     //     self.asm.push(Asm::STRING("\n".to_string()));
@@ -1642,8 +1631,7 @@ impl Compiler {
                     "unreachable" => self.asm.push(Asm::ERROR(position.clone())),
                     "todo" => {
                         // show a panic message before exiting
-                        self.asm
-                            .push(Asm::STRING("Not yet implemented\n".to_string()));
+                        self.asm.push(Asm::STRING("Not yet implemented\n".into()));
                         self.asm.push(Asm::PRINT);
                         self.asm.push(Asm::ERROR(position.clone()));
                     }
@@ -1657,14 +1645,12 @@ impl Compiler {
                     "error" => self.asm.push(Asm::ERROR(position.clone())),
                     identifier => {
                         //dbg!(identifier);
-                        if let Some(index) = self.native_functions.get_index(identifier.to_string())
-                        {
+                        if let Some(index) = self.native_functions.get_index(identifier) {
                             self.asm.push(Asm::NATIVE(index as u64));
-                        } else if let Some(index) = self.variables.get_index(identifier.to_string())
-                        {
+                        } else if let Some(index) = self.variables.get_index(identifier) {
                             self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
-                        } else if let Some(index) = self.global.get_index(identifier.to_string()) {
+                        } else if let Some(index) = self.global.get_index(identifier) {
                             self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             return Err(NovaError::Compiler {

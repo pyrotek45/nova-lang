@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     fileposition::FilePosition,
@@ -9,15 +9,15 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
-    pub captured: Vec<HashMap<String, Symbol>>,
-    pub custom_types: HashMap<String, Vec<(String, TType)>>,
-    pub enums: table::Table<String>,
-    pub no_override: table::Table<String>,
-    pub values: Vec<HashMap<String, Symbol>>,
-    pub type_alias: HashMap<String, TType>,
-    pub generic_type_struct: HashMap<String, Vec<String>>,
-    pub generic_type_map: HashMap<String, String>,
-    pub live_generics: Vec<table::Table<String>>,
+    pub captured: Vec<HashMap<Rc<str>, Symbol>>,
+    pub custom_types: HashMap<Rc<str>, Vec<(Rc<str>, TType)>>,
+    pub enums: table::Table<Rc<str>>,
+    pub no_override: table::Table<Rc<str>>,
+    pub values: Vec<HashMap<Rc<str>, Symbol>>,
+    pub type_alias: HashMap<Rc<str>, TType>,
+    pub generic_type_struct: HashMap<Rc<str>, Vec<Rc<str>>>,
+    pub generic_type_map: HashMap<Rc<str>, Rc<str>>,
+    pub live_generics: Vec<table::Table<Rc<str>>>,
 }
 
 impl Default for Environment {
@@ -49,10 +49,11 @@ impl Environment {
     ) {
         match kind {
             SymbolKind::GenericFunction => {
+                let id: Rc<str> = id.into();
                 self.values.last_mut().unwrap().insert(
-                    id.to_string(),
+                    id.clone(),
                     Symbol {
-                        id: id.to_string(),
+                        id,
                         ttype,
                         pos,
                         kind,
@@ -65,7 +66,7 @@ impl Environment {
                     ..
                 } = &ttype
                 {
-                    let unique_id = generate_unique_string(id, input_types);
+                    let unique_id: Rc<str> = generate_unique_string(id, input_types).into();
                     self.values.last_mut().unwrap().insert(
                         unique_id.clone(),
                         Symbol {
@@ -80,10 +81,11 @@ impl Environment {
                 }
             }
             _ => {
+                let id: Rc<str> = id.into();
                 self.values.last_mut().unwrap().insert(
-                    id.to_string(),
+                    id.clone(),
                     Symbol {
-                        id: id.to_string(),
+                        id,
                         ttype,
                         pos,
                         kind,
@@ -109,7 +111,7 @@ impl Environment {
             .map(|s| s.ttype.clone())
     }
 
-    pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, String, SymbolKind)> {
+    pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, Rc<str>, SymbolKind)> {
         for (i, search) in self.values.iter().rev().enumerate() {
             if let Some(s) = search.get(symbol) {
                 if i != 0 {
@@ -128,9 +130,10 @@ impl Environment {
         &mut self,
         symbol: &str,
         arguments: &[TType],
-    ) -> Option<(TType, String, SymbolKind)> {
+    ) -> Option<(TType, Rc<str>, SymbolKind)> {
         for (i, search) in self.values.iter().rev().enumerate() {
-            if let Some(s) = search.get(&generate_unique_string(symbol, arguments)) {
+            let id = generate_unique_string(symbol, arguments);
+            if let Some(s) = search.get(id.as_str()) {
                 if i != 0 {
                     self.captured
                         .last_mut()
@@ -138,11 +141,7 @@ impl Environment {
                         .insert(s.id.clone(), s.clone());
                 }
                 if let TType::Function { .. } = s.ttype {
-                    return Some((
-                        s.ttype.clone(),
-                        generate_unique_string(symbol, arguments),
-                        s.kind.clone(),
-                    ));
+                    return Some((s.ttype.clone(), s.id.clone(), s.kind.clone()));
                 }
             } else if let Some(s) = search.get(symbol) {
                 if i != 0 {
@@ -163,7 +162,7 @@ impl Environment {
         &mut self,
         symbol: &str,
         arguments: &[TType],
-    ) -> Option<(TType, String, SymbolKind)> {
+    ) -> Option<(TType, Rc<str>, SymbolKind)> {
         if let Some(s) = self.values.last().unwrap().get(symbol) {
             if let TType::Function { .. } = s.ttype {
                 Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
@@ -174,7 +173,7 @@ impl Environment {
             .values
             .last()
             .unwrap()
-            .get(&generate_unique_string(symbol, arguments))
+            .get(generate_unique_string(symbol, arguments).as_str())
         {
             if let TType::Function { .. } = s.ttype {
                 Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
@@ -187,7 +186,7 @@ impl Environment {
     }
 
     pub fn push_scope(&mut self) {
-        let mut scope: HashMap<String, Symbol> = HashMap::default();
+        let mut scope = HashMap::default();
         self.captured.push(self.captured.last().unwrap().clone());
         for (id, sym) in self.values.last().unwrap().iter() {
             match sym.kind {
