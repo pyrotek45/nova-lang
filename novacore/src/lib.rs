@@ -112,6 +112,16 @@ impl NovaCore {
         self.parser.modules.insert("Cast".to_string());
         self.parser.modules.insert("Regex".to_string());
         // add regex captures function, takes two strings and returns a list of strings
+        // add printf
+        self.add_function(
+            "printf",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::printf,
+        );
         self.add_function(
             "Regex::captures",
             TType::Function {
@@ -421,7 +431,8 @@ impl NovaCore {
 
         self.parser = parser::default();
         self.parser.input = self.lexer.tokenize()?;
-
+        self.initnova();
+        
         self.parser.parse()?;
         let ast = self.parser.ast.clone();
 
