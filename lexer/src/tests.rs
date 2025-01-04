@@ -56,6 +56,22 @@ fn float_fn_call() {
 }
 
 #[test]
+fn short_float() {
+    assert_input_output(
+        ".1 1. 2. 1.foo 1.2",
+        [
+            Float(0.1),
+            Float(1.),
+            Float(2.),
+            Integer(1),
+            StructuralSymbol(Dot),
+            Identifier("foo".to_string()),
+            Float(1.2),
+        ],
+    );
+}
+
+#[test]
 fn escaped_string() {
     assert_input_output(
         r#" "hello\nworld!\"\0\r\t" "#,

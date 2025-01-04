@@ -340,7 +340,9 @@ impl Iterator for Lexer {
                         Err(err) => return Some(Err(err)),
                     }
                 }
-                '0'..='9' => {
+                c @ ('0'..='9' | '.')
+                    if c != '.' || self.peek().is_some_and(|c| c.is_ascii_digit()) =>
+                {
                     capture_int_digits(self);
                     let int_part = self.consumed_from(&span);
 
@@ -348,10 +350,11 @@ impl Iterator for Lexer {
                         && self.remaining()[1..]
                             .chars()
                             .next()
-                            .is_some_and(|c| c.is_ascii_digit());
+                            .is_some_and(|c| !c.is_alphabetic());
+                    let float = float || c == '.';
                     if float {
                         // Capture .
-                        self.advance();
+                        self.advance_if(|c| c == '.');
                         // Capture rest of the digits
                         capture_int_digits(self);
                         let float = self.consumed_from(&span);
@@ -423,6 +426,7 @@ impl Iterator for Lexer {
                 '@' => StructuralSymbol(At),
                 '?' => StructuralSymbol(QuestionMark),
                 '#' => StructuralSymbol(Pound),
+
                 '.' => StructuralSymbol(Dot),
                 '|' => StructuralSymbol(Pipe),
                 '&' => StructuralSymbol(Ampersand),
