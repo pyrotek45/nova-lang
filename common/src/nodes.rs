@@ -8,13 +8,13 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Arg {
-    pub identifier: String,
+    pub identifier: Rc<str>,
     pub ttype: TType,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field {
-    pub identifier: String,
+    pub identifier: Rc<str>,
     pub ttype: TType,
 }
 
@@ -37,7 +37,7 @@ pub enum SymbolKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
-    pub id: String,
+    pub id: Rc<str>,
     pub ttype: TType,
     pub pos: Option<FilePosition>,
     pub kind: SymbolKind,
@@ -55,25 +55,25 @@ pub enum Statement {
     Pass,
     Let {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         expr: Expr,
         global: bool,
     },
     Function {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         parameters: Vec<Arg>,
         body: Vec<Statement>,
-        captures: Vec<String>,
+        captures: Vec<Rc<str>>,
     },
     Struct {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         fields: Vec<Field>,
     },
     Enum {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         fields: Vec<Field>,
     },
     Return {
@@ -92,13 +92,13 @@ pub enum Statement {
     },
     Unwrap {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         body: Vec<Statement>,
         alternative: Option<Vec<Statement>>,
     },
     IfLet {
         ttype: TType,
-        identifier: String,
+        identifier: Rc<str>,
         expr: Expr,
         body: Vec<Statement>,
         alternative: Option<Vec<Statement>>,
@@ -115,12 +115,12 @@ pub enum Statement {
         body: Vec<Statement>,
     },
     Foreach {
-        identifier: String,
+        identifier: Rc<str>,
         expr: Expr,
         body: Vec<Statement>,
     },
     ForRange {
-        identifier: String,
+        identifier: Rc<str>,
         start: Expr,
         end: Expr,
         inclusive: bool,
@@ -134,7 +134,7 @@ pub enum Statement {
     Match {
         ttype: TType,
         expr: Expr,
-        arms: Vec<(usize, Option<String>, Vec<Statement>)>,
+        arms: Vec<(usize, Option<Rc<str>>, Vec<Statement>)>,
         default: Option<Vec<Statement>>,
     },
 }
@@ -149,19 +149,19 @@ pub enum Atom {
         value: bool,
     },
     Id {
-        name: String,
+        name: Rc<str>,
     },
     Float {
         value: f64,
     },
     String {
-        value: String,
+        value: Rc<str>,
     },
     Integer {
         value: i64,
     },
     Call {
-        name: String,
+        name: Rc<str>,
         arguments: Vec<Expr>,
         position: FilePosition,
     },
@@ -173,7 +173,7 @@ pub enum Expr {
         ttype: TType,
         args: Vec<Arg>,
         body: Vec<Statement>,
-        captures: Vec<String>,
+        captures: Vec<Rc<str>>,
     },
     ListConstructor {
         ttype: TType,
@@ -181,27 +181,27 @@ pub enum Expr {
     },
     ListCompConstructor {
         ttype: TType,
-        loops: Vec<(String, Expr)>,
+        loops: Vec<(Rc<str>, Expr)>,
         expr: Vec<Expr>,
         guards: Vec<Expr>,
     },
     Field {
         ttype: TType,
-        name: String,
+        name: Rc<str>,
         index: usize,
         expr: Box<Expr>,
         position: FilePosition,
     },
     Indexed {
         ttype: TType,
-        name: String,
+        name: Rc<str>,
         container: Box<Expr>,
         index: Box<Expr>,
         position: FilePosition,
     },
     Sliced {
         ttype: TType,
-        name: String,
+        name: Rc<str>,
         container: Box<Expr>,
         start: Option<Box<Expr>>,
         end: Option<Box<Expr>>,
@@ -210,7 +210,7 @@ pub enum Expr {
     },
     Call {
         ttype: TType,
-        name: String,
+        name: Rc<str>,
         function: Box<Expr>,
         args: Vec<Expr>,
     },
@@ -231,7 +231,7 @@ pub enum Expr {
     },
     StoreExpr {
         ttype: TType,
-        name: String,
+        name: Rc<str>,
         expr: Box<Expr>,
         body: Vec<Statement>,
     },

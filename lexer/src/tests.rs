@@ -34,7 +34,7 @@ fn int_fn_call() {
         [
             Integer(123),
             StructuralSymbol(Dot),
-            Identifier("foo".to_string()),
+            Identifier("foo".into()),
             StructuralSymbol(LeftParen),
             StructuralSymbol(RightParen),
         ],
@@ -48,7 +48,7 @@ fn float_fn_call() {
         [
             Float(1.2),
             StructuralSymbol(Dot),
-            Identifier("foo".to_string()),
+            Identifier("foo".into()),
             StructuralSymbol(LeftParen),
             StructuralSymbol(RightParen),
         ],
@@ -65,7 +65,7 @@ fn short_float() {
             Float(2.),
             Integer(1),
             StructuralSymbol(Dot),
-            Identifier("foo".to_string()),
+            Identifier("foo".into()),
             Float(1.2),
         ],
     );
@@ -75,7 +75,7 @@ fn short_float() {
 fn escaped_string() {
     assert_input_output(
         r#" "hello\nworld!\"\0\r\t" "#,
-        [StringLiteral("hello\nworld!\"\0\r\t".to_string())],
+        [StringLiteral("hello\nworld!\"\0\r\t".into())],
     );
 }
 
@@ -83,7 +83,7 @@ fn escaped_string() {
 fn raw_string() {
     assert_input_output(
         r#####" r###"hello\nworld!\"\0\r\t"### "#####,
-        [StringLiteral(r###"hello\nworld!\"\0\r\t"###.to_string())],
+        [StringLiteral(r###"hello\nworld!\"\0\r\t"###.into())],
     );
 }
 
@@ -114,7 +114,7 @@ fn non_decimal_ints() {
 fn idents() {
     assert_input_output(
         "abc __aabb _123 ____",
-        ["abc", "__aabb", "_123", "____"].map(|i| Identifier(i.to_string())),
+        ["abc", "__aabb", "_123", "____"].map(|i| Identifier(i.into())),
     )
 }
 
