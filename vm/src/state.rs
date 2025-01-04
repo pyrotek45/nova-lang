@@ -1,9 +1,12 @@
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    rc::Rc,
+};
 
 use common::table::Table;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Heap {
     // pointer and instance
     ClosureAddress(usize),
@@ -23,7 +26,7 @@ pub enum Heap {
 
     // pointer and instance
     StringAddress(usize),
-    String(String),
+    String(Rc<str>),
 
     // pointer and instance
     StructAddress(usize),
@@ -66,7 +69,7 @@ pub enum VmData {
     None,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct State {
     pub program: Vec<u8>,
     pub heap: Vec<Heap>,
@@ -289,11 +292,6 @@ impl State {
     }
 
     #[inline(always)]
-    pub fn deref(&self, index: usize) -> Heap {
-        self.get_ref(index).clone()
-    }
-
-    #[inline(always)]
     pub fn allocate_vmdata_to_heap(&mut self, item: VmData) -> usize {
         match item {
             VmData::Function(v) => {
@@ -428,7 +426,7 @@ impl State {
     }
 
     #[inline(always)]
-    pub fn allocate_string(&mut self, str: String) -> usize {
+    pub fn allocate_string(&mut self, str: Rc<str>) -> usize {
         if let Some(space) = self.free_space.pop() {
             self.heap[space] = Heap::String(str);
             space

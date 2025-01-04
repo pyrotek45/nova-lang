@@ -49,10 +49,10 @@ impl Vm {
                 Code::EXIT => exit(0),
                 Code::CONCAT => match (self.state.stack.pop(), self.state.stack.pop()) {
                     (Some(VmData::String(s1)), Some(VmData::String(s2))) => {
-                        match (self.state.deref(s1), self.state.deref(s2)) {
-                            (Heap::String(str2), Heap::String(mut str1)) => {
-                                str1.push_str(&str2);
-                                let index = self.state.allocate_string(str1);
+                        match (self.state.get_ref(s1), self.state.get_ref(s2)) {
+                            (Heap::String(str2), Heap::String(str1)) => {
+                                let newstring = format!("{}{}", str1, str2);
+                                let index = self.state.allocate_string(newstring.into());
                                 self.state.stack.push(VmData::String(index));
                             }
 
@@ -689,7 +689,7 @@ impl Vm {
                             if let VmData::List(newindex) =
                                 &self.state.stack[self.state.offset + array_index]
                             {
-                                if let Heap::List(array) = self.state.deref(*newindex) {
+                                if let Heap::List(array) = self.state.get_ref(*newindex) {
                                     if array.len() <= index_to_get as usize {
                                         if let Some(pos) = self
                                             .runtime_errors_table
@@ -707,10 +707,11 @@ impl Vm {
                             }
                         }
                         (VmData::List(array_index), VmData::Int(index_to_get)) => {
-                            let Heap::ListAddress(newindex) = self.state.deref(array_index) else {
+                            let Heap::ListAddress(newindex) = self.state.get_ref(array_index)
+                            else {
                                 todo!()
                             };
-                            if let Heap::List(array) = self.state.deref(newindex) {
+                            if let Heap::List(array) = self.state.get_ref(*newindex) {
                                 if array.len() <= index_to_get as usize {
                                     if let Some(pos) = self
                                         .runtime_errors_table
@@ -741,9 +742,9 @@ impl Vm {
                     };
                     match (array, index) {
                         (VmData::List(array), VmData::Int(index_to)) => {
-                            match self.state.deref(array) {
+                            match self.state.get_ref(array) {
                                 Heap::List(array) => {
-                                    let item = self.state.deref(array[index_to as usize]);
+                                    let item = self.state.get_ref(array[index_to as usize]).clone();
                                     match item {
                                         Heap::Function(v) => {
                                             self.state.stack.push(VmData::Function(v))
@@ -837,7 +838,7 @@ impl Vm {
                         Ok(ok) => ok,
                         Err(_) => todo!(),
                     };
-                    let index = self.state.allocate_string(string);
+                    let index = self.state.allocate_string(string.into());
                     self.state.stack.push(VmData::String(index));
                     //self.state.collect_garbage();
                 }
@@ -873,7 +874,7 @@ impl Vm {
                             }
                             VmData::List(index) => {
                                 let mut newarray = vec![];
-                                match self.state.deref(index) {
+                                match self.state.get_ref(index).clone() {
                                     Heap::List(vec) => {
                                         for item in vec {
                                             let item_clone_index = self.state.allocate_new_heap();
@@ -1037,20 +1038,20 @@ impl Vm {
                             println!("None")
                         }
                         VmData::List(index) => {
-                            if let Heap::List(array) = self.state.deref(index) {
+                            if let Heap::List(array) = self.state.get_ref(index) {
                                 print!("[");
                                 for (index, item) in array.iter().enumerate() {
                                     if index > 0 {
                                         print!(", ");
                                     }
-                                    print!("{:?}", self.state.deref(*item));
+                                    print!("{:?}", self.state.get_ref(*item));
                                 }
                                 print!("]");
                                 io::stdout().flush().expect("");
                             }
                         }
                         VmData::String(index) => {
-                            if let Heap::String(str) = self.state.deref(index) {
+                            if let Heap::String(str) = self.state.get_ref(index) {
                                 println!("{str}")
                             }
                         }
@@ -1379,7 +1380,7 @@ impl Vm {
                                     if let VmData::List(newindex) =
                                         &self.state.stack[self.state.offset + array_index]
                                     {
-                                        if let Heap::List(array) = self.state.deref(*newindex) {
+                                        if let Heap::List(array) = self.state.get_ref(*newindex) {
                                             self.state
                                                 .stack
                                                 .push(VmData::List(array[index_to_get as usize]))
@@ -1393,7 +1394,7 @@ impl Vm {
                                 if let VmData::List(newindex) =
                                     &self.state.stack[self.state.offset + array_index]
                                 {
-                                    if let Heap::List(array) = self.state.deref(*newindex) {
+                                    if let Heap::List(array) = self.state.get_ref(*newindex) {
                                         self.state
                                             .stack
                                             .push(VmData::List(array[index_to_get as usize]))
@@ -1401,8 +1402,9 @@ impl Vm {
                                 }
                             }
                             (VmData::List(array_index), VmData::Int(index_to_get)) => {
-                                if let Heap::ListAddress(newindex) = self.state.deref(array_index) {
-                                    if let Heap::List(array) = self.state.deref(newindex) {
+                                if let Heap::ListAddress(newindex) = self.state.get_ref(array_index)
+                                {
+                                    if let Heap::List(array) = self.state.get_ref(*newindex) {
                                         self.state
                                             .stack
                                             .push(VmData::List(array[index_to_get as usize]))
@@ -1425,7 +1427,7 @@ impl Vm {
                     {
                         match (array, index) {
                             (VmData::List(array), VmData::Int(index_to)) => {
-                                match self.state.deref(array) {
+                                match self.state.get_ref(array).clone() {
                                     Heap::Function(_) => todo!(),
                                     Heap::Int(v) => self.state.stack.push(VmData::Int(v)),
                                     Heap::Float(_) => todo!(),
@@ -1433,7 +1435,8 @@ impl Vm {
                                     Heap::ListAddress(_) => todo!(),
                                     Heap::StringAddress(_) => todo!(),
                                     Heap::List(array) => {
-                                        let item = self.state.deref(array[index_to as usize]);
+                                        let item =
+                                            self.state.get_ref(array[index_to as usize]).clone();
                                         match item {
                                             Heap::Function(v) => {
                                                 self.state.stack.push(VmData::Function(v))
@@ -1536,7 +1539,7 @@ impl Vm {
                         Ok(ok) => ok,
                         Err(_) => todo!(),
                     };
-                    let index = self.state.allocate_string(string);
+                    let index = self.state.allocate_string(string.into());
                     self.state.stack.push(VmData::String(index));
                     //self.state.collect_garbage();
                 }

@@ -30,7 +30,7 @@ pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
             }
         }
         VmData::String(v) => {
-            if let Heap::String(str) = state.deref(v) {
+            if let Heap::String(str) = state.get_ref(v) {
                 if let Ok(parsed) = str.parse::<f64>() {
                     parsed
                 } else {
