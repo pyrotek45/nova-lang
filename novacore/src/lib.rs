@@ -75,12 +75,10 @@ impl NovaCore {
                     function_kind,
                 );
 
-                self.compiler
-                    .native_functions
-                    .insert(compiler_id.to_string());
+                self.compiler.native_functions.insert(compiler_id.into());
                 self.compiler
                     .native_functions_types
-                    .insert(function_id.to_string(), function_type.clone());
+                    .insert(function_id.into(), function_type.clone());
                 self.vm
                     .native_functions
                     .insert(self.vm.native_functions.len(), function_pointer);
@@ -93,12 +91,11 @@ impl NovaCore {
                     function_kind,
                 );
 
-                self.compiler
-                    .native_functions
-                    .insert(function_id.to_string());
+                let function_id: Rc<str> = function_id.into();
+                self.compiler.native_functions.insert(function_id.clone());
                 self.compiler
                     .native_functions_types
-                    .insert(function_id.to_string(), function_type);
+                    .insert(function_id, function_type);
                 self.vm
                     .native_functions
                     .insert(self.vm.native_functions.len(), function_pointer);
@@ -108,9 +105,9 @@ impl NovaCore {
 
     fn initnova(&mut self) {
         self.parser.modules.clear();
-        self.parser.modules.insert("terminal".to_string());
-        self.parser.modules.insert("Cast".to_string());
-        self.parser.modules.insert("Regex".to_string());
+        self.parser.modules.insert("terminal".into());
+        self.parser.modules.insert("Cast".into());
+        self.parser.modules.insert("Regex".into());
         // add regex captures function, takes two strings and returns a list of strings
         // add printf
         self.add_function(
@@ -205,9 +202,7 @@ impl NovaCore {
         self.add_function(
             "Cast::int",
             TType::Function {
-                parameters: vec![TType::Generic {
-                    name: "a".to_string(),
-                }],
+                parameters: vec![TType::Generic { name: "a".into() }],
                 return_type: Box::new(TType::Option {
                     inner: Box::new(TType::Int),
                 }),
@@ -218,9 +213,7 @@ impl NovaCore {
         self.add_function(
             "Cast::string",
             TType::Function {
-                parameters: vec![TType::Generic {
-                    name: "a".to_string(),
-                }],
+                parameters: vec![TType::Generic { name: "a".into() }],
                 return_type: Box::new(TType::String),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -241,9 +234,7 @@ impl NovaCore {
             "List::len",
             TType::Function {
                 parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic {
-                        name: "a".to_string(),
-                    }),
+                    inner: Box::new(TType::Generic { name: "a".into() }),
                 }],
                 return_type: Box::new(TType::Int),
             },
@@ -313,13 +304,9 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic {
-                            name: "a".to_string(),
-                        }),
+                        inner: Box::new(TType::Generic { name: "a".into() }),
                     },
-                    TType::Generic {
-                        name: "a".to_string(),
-                    },
+                    TType::Generic { name: "a".into() },
                 ],
                 return_type: Box::new(TType::Void),
             },
@@ -330,14 +317,10 @@ impl NovaCore {
             "List::pop",
             TType::Function {
                 parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic {
-                        name: "a".to_string(),
-                    }),
+                    inner: Box::new(TType::Generic { name: "a".into() }),
                 }],
                 return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Generic {
-                        name: "a".to_string(),
-                    }),
+                    inner: Box::new(TType::Generic { name: "a".into() }),
                 }),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -432,7 +415,7 @@ impl NovaCore {
         self.parser = parser::default();
         self.parser.input = self.lexer.tokenize()?;
         self.initnova();
-        
+
         self.parser.parse()?;
         let ast = self.parser.ast.clone();
 

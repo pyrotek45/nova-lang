@@ -1,4 +1,7 @@
-use std::fmt::Display;
+use std::{
+    fmt::{Display, Write},
+    rc::Rc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TType {
@@ -12,7 +15,7 @@ pub enum TType {
     Void,
     Auto,
     Custom {
-        name: String,
+        name: Rc<str>,
         type_params: Vec<TType>,
     },
     List {
@@ -23,7 +26,7 @@ pub enum TType {
         return_type: Box<TType>,
     },
     Generic {
-        name: String,
+        name: Rc<str>,
     },
     Option {
         inner: Box<TType>,
@@ -109,7 +112,11 @@ pub fn generate_unique_string(input: &str, types: &[TType]) -> String {
     if types.is_empty() {
         return input.to_owned();
     }
-    let type_strings: Vec<String> = types.iter().map(TType::to_string).collect();
-    let types_concatenated = type_strings.join("_");
-    format!("{}_{}", input, types_concatenated)
+    let mut out = format!("{input}_");
+    let mut types = types.iter();
+    if let Some(t) = types.next() {
+        write!(out, "{t}").unwrap();
+    }
+    types.for_each(|t| write!(out, "_{t}").unwrap());
+    out
 }
