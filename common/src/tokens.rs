@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref, rc::Rc};
 
 use crate::fileposition::FilePosition;
 pub type TokenList = Vec<Token>;
@@ -118,10 +118,10 @@ pub enum StructuralSymbol {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenValue {
     Keyword(KeyWord),
-    Identifier(String),
+    Identifier(Rc<str>),
     Integer(i64),
     Float(f64),
-    StringLiteral(String),
+    StringLiteral(Rc<str>),
     Char(char),
     StructuralSymbol(StructuralSymbol),
     Bool(bool),
@@ -146,7 +146,7 @@ impl Token {
         Some(b)
     }
 
-    pub fn into_str(self) -> Option<String> {
+    pub fn into_str(self) -> Option<Rc<str>> {
         let TokenValue::StringLiteral(s) = self.value else {
             return None;
         };
@@ -167,7 +167,7 @@ impl Token {
         Some(n)
     }
 
-    pub fn into_ident(self) -> Option<String> {
+    pub fn into_ident(self) -> Option<Rc<str>> {
         let TokenValue::Identifier(i) = self.value else {
             return None;
         };
@@ -179,7 +179,7 @@ impl Token {
     }
 
     pub fn is_id(&self, ident: &str) -> bool {
-        matches!(&self.value, TokenValue::Identifier(id) if id == ident)
+        matches!(&self.value, TokenValue::Identifier(id) if id.deref() == ident)
     }
 
     pub fn line(&self) -> usize {
