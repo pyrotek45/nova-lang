@@ -98,13 +98,16 @@ fn extends reduce(input: [$T], f:($A,$T,Int) -> $A, initial: $A) -> $A {
     return result
 }
 
+
 fn extends split(input: [$T], delim: $T) -> [[$T]] {
     let result = []: [$T]
     let current = []: $T
     for c in input {
         if c == delim {
-            result.push(clone(current))
-            current = []: $T
+            if current.len() > 0 {
+                result.push(clone(current))
+                current = []: $T
+            }
         } else {
             current.push(c)
         }

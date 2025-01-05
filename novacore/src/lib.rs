@@ -493,10 +493,12 @@ impl NovaCore {
         let tokenlist = self.lexer.tokenize()?;
         self.parser.input = tokenlist;
         self.parser.parse()?;
-        let ast = self.parser.ast;
+        let ast = self.parser.ast.clone();
+        let filepath = self.filepath.clone();
+        self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, self.filepath, true, true, false)?;
+            .compile_program(ast, filepath, true, true, false)?;
         let mut dis = disassembler::new();
         dis.dis_asm(asm);
         Ok(())

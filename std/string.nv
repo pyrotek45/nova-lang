@@ -1,0 +1,7 @@
+module string
+
+import list
+
+fn extends split(x: String, y: Char) -> [String] {
+    return x.chars().split(y).map(fn(x: [Char]) -> String {return x.string()})
+}
