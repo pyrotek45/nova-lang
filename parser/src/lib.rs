@@ -3264,7 +3264,9 @@ impl Parser {
                 pos,
             ));
         }
+        self.environment.push_block();
         let statements = self.block()?;
+        self.environment.pop_block();
         let mut alternative: Option<Vec<Statement>> = None;
         if self.current_token().is_some_and(|t| t.is_id("elif")) {
             self.consume_identifier(Some("elif"))?;
@@ -4030,14 +4032,18 @@ impl Parser {
                     SymbolKind::Variable,
                 );
                 let body = self.block()?;
-                let alternative: Option<Vec<Statement>> =
-                    if self.current_token().is_some_and(|t| t.is_id("else")) {
-                        self.consume_identifier(Some("else"))?;
-                        Some(self.block()?)
-                    } else {
-                        None
-                    };
                 self.environment.pop_block();
+                self.environment.push_block();
+                let mut alternative: Option<Vec<Statement>> = None;
+                if self.current_token().is_some_and(|t| t.is_id("elif")) {
+                    self.advance();
+                    alternative = Some(self.alternative()?);
+                } else if self.current_token().is_some_and(|t| t.is_id("else")) {
+                    self.advance();
+                    alternative = Some(self.block()?);
+                }
+                self.environment.pop_block();
+
                 Ok(Some(Statement::IfLet {
                     ttype: expr.get_type(),
                     identifier,
@@ -4058,7 +4064,10 @@ impl Parser {
                     testpos.clone(),
                 ));
             }
+            self.environment.push_block();
             let body = self.block()?;
+            self.environment.pop_block();
+            self.environment.push_block();
             let mut alternative: Option<Vec<Statement>> = None;
             if self.current_token().is_some_and(|t| t.is_id("elif")) {
                 self.advance();
@@ -4067,6 +4076,7 @@ impl Parser {
                 self.advance();
                 alternative = Some(self.block()?);
             }
+            self.environment.pop_block();
             Ok(Some(Statement::If {
                 ttype: TType::Void,
                 test,
