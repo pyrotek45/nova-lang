@@ -275,6 +275,7 @@ impl Compiler {
                     }
 
                     // Compile captured variables for the closure
+                    //dbg!(captured);
                     for captured_var in captured {
                         if let Some(index) = self.variables.get_index(captured_var) {
                             // Get the local variable if it exists in the current scope
