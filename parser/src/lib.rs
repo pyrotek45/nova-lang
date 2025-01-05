@@ -2061,14 +2061,14 @@ impl Parser {
                     }
                 }
 
-                for dc in captured.iter() {
-                    if let Some(v) = self.environment.values.last().unwrap().get(dc) {
-                        if let SymbolKind::Captured = v.kind {
-                        } else {
-                            self.environment.captured.last_mut().unwrap().remove(dc);
-                        }
-                    }
-                }
+                // for dc in captured.iter() {
+                //     if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                //         if let SymbolKind::Captured = v.kind {
+                //         } else {
+                //             self.environment.captured.last_mut().unwrap().remove(dc);
+                //         }
+                //     }
+                // }
 
                 // check return types
 
@@ -2595,6 +2595,7 @@ impl Parser {
             .iter()
             .map(|v| v.0.clone())
             .collect();
+
         self.environment.pop_scope();
         self.environment.live_generics.pop();
         for c in captured.iter() {
@@ -2620,6 +2621,7 @@ impl Parser {
             .iter()
             .map(|v| v.0.clone())
             .collect();
+
         for arg in parameters.iter() {
             let name = arg.1.clone();
             // check if name is in captured
@@ -2629,14 +2631,16 @@ impl Parser {
                 captured.retain(|x| x != &name);
             }
         }
-        for dc in captured.iter() {
-            if let Some(v) = self.environment.values.last().unwrap().get(dc) {
-                if let SymbolKind::Captured = v.kind {
-                } else {
-                    self.environment.captured.last_mut().unwrap().remove(dc);
-                }
-            }
-        }
+
+        // for dc in captured.iter() {
+        //     if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+        //         if let SymbolKind::Captured = v.kind {
+        //         } else {
+        //             self.environment.captured.last_mut().unwrap().remove(dc);
+        //         }
+        //     }
+        // }
+
         Ok((typeinput, input, output, statement, captured))
     }
 
@@ -3269,12 +3273,14 @@ impl Parser {
         self.environment.pop_block();
         let mut alternative: Option<Vec<Statement>> = None;
         if self.current_token().is_some_and(|t| t.is_id("elif")) {
-            self.consume_identifier(Some("elif"))?;
+            self.advance();
             alternative = Some(self.alternative()?);
         } else if self.current_token().is_some_and(|t| t.is_id("else")) {
-            self.consume_identifier(Some("else"))?;
+            self.advance();
+            self.environment.push_block();
             alternative = Some(self.block()?);
-        }
+            self.environment.pop_block();
+        };
         Ok(vec![Statement::If {
             ttype: TType::Void,
             test,
@@ -4033,16 +4039,17 @@ impl Parser {
                 );
                 let body = self.block()?;
                 self.environment.pop_block();
-                self.environment.push_block();
+
                 let mut alternative: Option<Vec<Statement>> = None;
                 if self.current_token().is_some_and(|t| t.is_id("elif")) {
                     self.advance();
                     alternative = Some(self.alternative()?);
                 } else if self.current_token().is_some_and(|t| t.is_id("else")) {
                     self.advance();
+                    self.environment.push_block();
                     alternative = Some(self.block()?);
-                }
-                self.environment.pop_block();
+                    self.environment.pop_block();
+                };
 
                 Ok(Some(Statement::IfLet {
                     ttype: expr.get_type(),
@@ -4067,16 +4074,18 @@ impl Parser {
             self.environment.push_block();
             let body = self.block()?;
             self.environment.pop_block();
-            self.environment.push_block();
             let mut alternative: Option<Vec<Statement>> = None;
+
             if self.current_token().is_some_and(|t| t.is_id("elif")) {
                 self.advance();
                 alternative = Some(self.alternative()?);
             } else if self.current_token().is_some_and(|t| t.is_id("else")) {
                 self.advance();
+                self.environment.push_block();
                 alternative = Some(self.block()?);
-            }
-            self.environment.pop_block();
+                self.environment.pop_block();
+            };
+
             Ok(Some(Statement::If {
                 ttype: TType::Void,
                 test,

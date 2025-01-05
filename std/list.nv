@@ -224,7 +224,7 @@ fn extends quicksort(array: [Int]) -> [Int] {
 }
 
 fn extends foldl(input: [$T], f: ($T,$T) -> $T) -> $T {
-    let result = input[0]
+    let result = clone(input[0])
     for i <- 1; i < input.len(); i += 1 {
         result = f(result,input[i])
     }
@@ -232,7 +232,7 @@ fn extends foldl(input: [$T], f: ($T,$T) -> $T) -> $T {
 }
 
 fn extends foldr(input: [$T], f: ($T,$T) -> $T) -> $T {
-    let result = input[input.len()-1]
+    let result = clone(input[input.len()-1])
     for i <- input.len()-2; i >= 0; i -= 1 {
         result = f(input[i],result)
     }
