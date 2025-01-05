@@ -80,7 +80,7 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
                         });
                     }
                 }
-                printf_with_array(&format_string, strings.into_iter().cloned().collect());
+                printf_with_array(format_string, strings.into_iter().cloned().collect());
             } else {
                 return Err(NovaError::Runtime {
                     msg: "Invalid arguments for printf".into(),
