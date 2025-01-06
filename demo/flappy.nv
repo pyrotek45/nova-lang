@@ -56,7 +56,7 @@ fn extends showscreen(player: Player, wall: Wall, points: Int) -> Bool {
     return true
 }
 
-let input = None() @[T: Char]
+let input = None(Char)
 let player = Player(5,5,'@')
 let wall = Wall(35,random(0,14))
 let points = 0

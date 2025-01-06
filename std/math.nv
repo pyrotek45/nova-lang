@@ -118,8 +118,8 @@ fn bin(n: Int) -> String {
     return result
 }
 
-fn divmod(n: Int, d: Int) -> #(Int, Int) {
-    return #(n / d, n % d)
+fn divmod(n: Int, d: Int) -> (Int, Int) {
+    return (n / d, n % d)
 }
 
 fn round(n: Float) -> Int {

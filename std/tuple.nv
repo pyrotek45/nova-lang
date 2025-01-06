@@ -1,5 +1,5 @@
 module tuple
 
-fn extends map(input: #([$A],[$B]), f:(#([$A],[$B])) -> $C) -> [$C] {
-    return [f(#(input[0],input[1]))]
+fn extends map(input: ([$A],[$B]), f: fn(([$A],[$B])) -> $C) -> [$C] {
+    return [f((input[0],input[1]))]
 }

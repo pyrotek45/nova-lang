@@ -1,15 +1,15 @@
 module tui
 
-struct Option(T) {
+struct Item(T) {
     name: String,
     kind: String,
-    trigger: ($T) -> String
+    trigger: fn($T) -> String
 }
 
 struct Menu(T) {
     name: String,
-    screen: ($T) -> String,
-    options: [Option($T)]
+    screen: fn($T) -> String,
+    Items: [Item($T)]
 }
 
 struct SceneManager(T) {
@@ -23,7 +23,7 @@ fn extends show(self: SceneManager($T)) {
     let index = 0
 
     let showError = fn() {
-        println("not a valid option")
+        println("not a valid Item")
         readln()
     }
 
@@ -34,15 +34,15 @@ fn extends show(self: SceneManager($T)) {
 
     while check {
         index = 0
-        let op = []: Option($T)
+        let op = []: Item($T)
         terminal::clearScreen()
 
         for scene in self.scenes {
             if self.currentScene == scene.name {
                 println(scene::screen(self.state))
-                for option in scene.options {
-                    println(Cast::string(index) + " :" + option.name)
-                    op.push(option)
+                for item in scene.Items {
+                    println(Cast::string(index) + " :" + item.name)
+                    op.push(item)
                     index += 1
                 }
                 break
@@ -58,7 +58,7 @@ fn extends show(self: SceneManager($T)) {
                 if op[u].kind == "goto" {
                     self.currentScene = op[u]::trigger(self.state)
                 } else {
-                    showErrorMsg("Error: " + op[u].kind + " is not a valid Option kind")
+                    showErrorMsg("Error: " + op[u].kind + " is not a valid Item kind")
                 }
             }
         } else {

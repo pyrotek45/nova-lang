@@ -25,7 +25,7 @@ fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     return list
 }
 
-fn extends map(list: [$A], f:($A) -> $B) -> [$B] {
+fn extends map(list: [$A], f: fn($A) -> $B) -> [$B] {
     let result = []:$B
     for x in list {
         result.push(f(x))
@@ -33,7 +33,7 @@ fn extends map(list: [$A], f:($A) -> $B) -> [$B] {
     return result
 }
 
-fn extends flatmap(list: [$T], f: ($T) -> [$U]) -> [$U] {
+fn extends flatmap(list: [$T], f: fn($T) -> [$U]) -> [$U] {
     let result = []:$U
     for x in list {
         for y in f(x) {
@@ -43,7 +43,7 @@ fn extends flatmap(list: [$T], f: ($T) -> [$U]) -> [$U] {
     return result
 }
 
-fn extends filter(list: [$A], f:($A) -> Bool) -> [$A] {
+fn extends filter(list: [$A], f: fn($A) -> Bool) -> [$A] {
     let result = []:$A
     for x in list {
         if f(x) {
@@ -63,7 +63,7 @@ fn extends remove(list: [$K], index: Int) -> [$K] {
     return result
 }
 
-fn extends foreach(list: [$A], f:($A)) {
+fn extends foreach(list: [$A], f: fn($A)) {
     for x in list {
         f(x)
     }
@@ -90,7 +90,7 @@ fn extends flatten(input: [[$T]]) -> [$T] {
     return result
 }
 
-fn extends reduce(input: [$T], f:($A,$T,Int) -> $A, initial: $A) -> $A {
+fn extends reduce(input: [$T], f: fn($A,$T,Int) -> $A, initial: $A) -> $A {
     let result = initial
     for i <- 0; i < input.len(); i += 1 {
         result = f(result,input[i],i)
@@ -116,7 +116,7 @@ fn extends split(input: [$T], delim: $T) -> [[$T]] {
     return result
 }
 
-fn extends splitWith(input: [Char], delim: Char, f:([Char]) -> ?$T) -> [$T] {
+fn extends splitWith(input: [Char], delim: Char, f: fn([Char]) -> Option($T)) -> [$T] {
     let result = []: [$T]
     let current = []: Char
     for c in input {
@@ -135,7 +135,7 @@ fn extends splitWith(input: [Char], delim: Char, f:([Char]) -> ?$T) -> [$T] {
     return result.flatten()
 }
 
-fn extends splitWhen(input: [$T], f:($T) -> Bool) -> [[$T]] {
+fn extends splitWhen(input: [$T], f: fn($T) -> Bool) -> [[$T]] {
     let result = []: [$T]
     let current = []: $T
     for c in input {
@@ -150,7 +150,7 @@ fn extends splitWhen(input: [$T], f:($T) -> Bool) -> [[$T]] {
     return result
 }
 
-fn extends sortWith(input: [$T], f:($T,$T) -> Bool) -> [$T] {
+fn extends sortWith(input: [$T], f: fn($T,$T) -> Bool) -> [$T] {
     let result = input
     for i <- 0; i < result.len(); i += 1 {
         for j <- i + 1; j < result.len(); j += 1 {
@@ -223,7 +223,7 @@ fn extends quicksort(array: [Int]) -> [Int] {
   return left.append(equal).append(right)
 }
 
-fn extends foldl(input: [$T], f: ($T,$T) -> $T) -> $T {
+fn extends foldl(input: [$T], f: fn($T,$T) -> $T) -> $T {
     let result = clone(input[0])
     for i <- 1; i < input.len(); i += 1 {
         result = f(result,input[i])
@@ -231,7 +231,7 @@ fn extends foldl(input: [$T], f: ($T,$T) -> $T) -> $T {
     return result
 }
 
-fn extends foldr(input: [$T], f: ($T,$T) -> $T) -> $T {
+fn extends foldr(input: [$T], f: fn($T,$T) -> $T) -> $T {
     let result = clone(input[input.len()-1])
     for i <- input.len()-2; i >= 0; i -= 1 {
         result = f(input[i],result)
@@ -312,22 +312,22 @@ fn extends any(input: [Bool]) -> Bool {
     return false
 }
 
-fn extends zip(input: [$A], input2: [$B]) -> [#($A,$B)] {
-    let result = []: #($A,$B)
+fn extends zip(input: [$A], input2: [$B]) -> [($A,$B)] {
+    let result = []: ($A,$B)
     for i <- 0; i < input.len(); i += 1 {
-        result.push(#(input[i],input2[i]))
+        result.push((input[i],input2[i]))
     }
     return result
 }
 
-fn extends unzip(input: [#($A,$B)]) -> #([$A],[$B]) {
+fn extends unzip(input: [($A,$B)]) -> ([$A],[$B]) {
     let result = []: $A
     let result2 = []: $B
     for i <- 0; i < input.len(); i += 1 {
         result.push(input[i][0])
         result2.push(input[i][1])
     }
-    return #(result,result2)
+    return (result,result2)
 }
 
 fn extends reverse(input: [$T]) -> [$T] {
@@ -365,7 +365,7 @@ fn extends windows(input: [$T], size: Int) -> [[$T]] {
     return result
 }
 
-fn extends mapWhile(list: [$A], f:($A) -> ?$B) -> [$B] {
+fn extends mapWhile(list: [$A], f: fn($A) -> Option($B)) -> [$B] {
     let result = []:$B
     for x in list {
         if let y = f(x) {
@@ -377,16 +377,16 @@ fn extends mapWhile(list: [$A], f:($A) -> ?$B) -> [$B] {
     return result
 }
 
-fn extends find(input: [$T], f:($T) -> Bool) -> ?$T {
+fn extends find(input: [$T], f: fn($T) -> Bool) -> Option($T) {
     for i <- 0; i < input.len(); i += 1 {
         if f(input[i]) {
             return Some(input[i])
         }
     }
-    return None() @[T: $T]
+    return None($T)
 }
 
-fn extends filterMap(input: [$A], f:($A) -> ?$B) -> [$B] {
+fn extends filterMap(input: [$A], f: fn($A) -> Option($B)) -> [$B] {
     let result = []:$B
     for x in input {
         if let y = f(x) {
@@ -406,7 +406,7 @@ fn extends filterEmpty(input: [[$T]]) -> [[$T]] {
     return result
 }
 
-fn extends count(input: [$T], f:($T) -> Bool) -> Int {
+fn extends count(input: [$T], f: fn($T) -> Bool) -> Int {
     let result = 0
     for x in input {
         if f(x) {
@@ -428,7 +428,7 @@ fn extends drop(input: [$T], n: Int) -> [$T] {
     return input.slice(n,input.len())
 }
 
-fn extends takeWhile(input: [$T], f:($T) -> Bool) -> [$T] {
+fn extends takeWhile(input: [$T], f: fn($T) -> Bool) -> [$T] {
     let result = []:$T
     for x in input {
         if f(x) {
@@ -440,7 +440,7 @@ fn extends takeWhile(input: [$T], f:($T) -> Bool) -> [$T] {
     return result
 }
 
-fn extends dropWhile(input: [$T], f:($T) -> Bool) -> [$T] {
+fn extends dropWhile(input: [$T], f: fn($T) -> Bool) -> [$T] {
     let result = []:$T
     let found = false
     for x in input {
@@ -453,7 +453,7 @@ fn extends dropWhile(input: [$T], f:($T) -> Bool) -> [$T] {
     return result
 }
 
-fn extends partition(input: [$T], f:($T) -> Bool) -> #([$T],[$T]) {
+fn extends partition(input: [$T], f: fn($T) -> Bool) -> ([$T],[$T]) {
     let left = []:$T
     let right = []:$T
     for x in input {
@@ -463,10 +463,10 @@ fn extends partition(input: [$T], f:($T) -> Bool) -> #([$T],[$T]) {
             right.push(x)
         }
     }
-    return #(left,right)
+    return (left,right)
 }
-fn extends groupBy(input: [$T], f:($T) -> $K) -> [#($K,[$T])] {
-    let result = []: #($K,[$T])
+fn extends groupBy(input: [$T], f: fn($T) -> $K) -> [($K,[$T])] {
+    let result = []: ($K,[$T])
     for x in input {
         let key = f(x)
         let found = false
@@ -478,45 +478,45 @@ fn extends groupBy(input: [$T], f:($T) -> $K) -> [#($K,[$T])] {
             }
         }
         if !found {
-            result.push(#(key,[x]))
+            result.push((key,[x]))
         }
     }
     return result
 }
 
-fn extends group(input: [$T]) -> [#($T,Int)] {
-    let result = []: #($T,Int)
+fn extends group(input: [$T]) -> [($T,Int)] {
+    let result = []: ($T,Int)
     for x in input {
         let found = false
         for i <- 0; i < result.len(); i += 1 {
             if result[i][0] == x {
-                result[i] = #(x,result[i][1]+1)
+                result[i] = (x,result[i][1]+1)
                 found = true
                 break
             }
         }
         if !found {
-            result.push(#(x,1))
+            result.push((x,1))
         }
     }
     return result
 }
 
-fn extends compare(list: [$T], list2: [$T]) -> [#($T,Int,Int)] {
+fn extends compare(list: [$T], list2: [$T]) -> [($T,Int,Int)] {
     let grouped = list.group()
     let grouped2 = list2.group()
-    let result = []: #($T,Int,Int)
+    let result = []: ($T,Int,Int)
     for x in grouped {
         for y in grouped2 {
             if x[0] == y[0] {
-                result.push(#(x[0],x[1],y[1]))
+                result.push((x[0],x[1],y[1]))
             }
         }
     }
     return result
 }
 
-fn extends zipWith(input: [$A], input2: [$B], f:($A,$B) -> $C) -> [$C] {
+fn extends zipWith(input: [$A], input2: [$B], f: fn($A,$B) -> $C) -> [$C] {
     let result = []:$C
     for i <- 0; i < input.len(); i += 1 {
         result.push(f(input[i],input2[i]))
@@ -524,7 +524,7 @@ fn extends zipWith(input: [$A], input2: [$B], f:($A,$B) -> $C) -> [$C] {
     return result
 }
 
-fn extends unzipWith(input: [$A], f:($A) -> #($B,$C)) -> #([$B],[$C]) {
+fn extends unzipWith(input: [$A], f: fn($A) -> ($B,$C)) -> ([$B],[$C]) {
     let result = []: $B
     let result2 = []: $C
     for x in input {
@@ -532,7 +532,7 @@ fn extends unzipWith(input: [$A], f:($A) -> #($B,$C)) -> #([$B],[$C]) {
         result.push(y[0])
         result2.push(y[1])
     }
-    return #(result,result2)
+    return (result,result2)
 }
 
 fn extends truncate(input: [$T], n: Int) -> [$T] {
@@ -550,14 +550,14 @@ fn extends intersperse(input: [$T], delim: $T) -> [$T] {
     return result
 }
 
-fn extends last(input: [$T]) -> ?$T {
+fn extends last(input: [$T]) -> Option($T) {
     if input.len() == 0 {
-        return None() @[T: $T]
+        return None($T)
     }
     return Some(input[input.len()-1])
 }
 
-fn extends anyWith(input: [$T], f:($T) -> Bool) -> Bool {
+fn extends anyWith(input: [$T], f: fn($T) -> Bool) -> Bool {
     for x in input {
         if f(x) {
             return true
@@ -566,7 +566,7 @@ fn extends anyWith(input: [$T], f:($T) -> Bool) -> Bool {
     return false
 }
 
-fn extends allWith(input: [$T], f:($T) -> Bool) -> Bool {
+fn extends allWith(input: [$T], f: fn($T) -> Bool) -> Bool {
     for x in input {
         if !f(x) {
             return false
@@ -575,7 +575,7 @@ fn extends allWith(input: [$T], f:($T) -> Bool) -> Bool {
     return true
 }
 
-fn extends dropFirst(input: [$T], f:($T) -> Bool) -> [$T] {
+fn extends dropFirst(input: [$T], f: fn($T) -> Bool) -> [$T] {
     let result = []:$T
     let found = false
     for x in input {
@@ -607,17 +607,17 @@ fn extends shuffle(input: [$T]) -> [$T] {
     return result
 }
 
-fn extends get(input: [$T], index: Int) -> ?$T {
+fn extends get(input: [$T], index: Int) -> Option($T) {
     if (index < 0) || (index >= input.len()) {
-        return None() @[T: $T]
+        return None($T)
     }
     return Some(input[index])
 }
 
-fn extends enumurate(input: [$T]) -> [#($T,Int)] {
-    let result = []: #($T,Int)
+fn extends enumurate(input: [$T]) -> [($T,Int)] {
+    let result = []: ($T,Int)
     for i <- 0; i < input.len(); i += 1 {
-        result.push(#(input[i],i))
+        result.push((input[i],i))
     }
     return result
 }
@@ -757,7 +757,7 @@ struct Bitmask {
     data: [Int]
 }
 
-fn extends bitmask(input: [$T], f:($T) -> Bool) -> Bitmask {
+fn extends bitmask(input: [$T], f: fn($T) -> Bool) -> Bitmask {
     let result = []: Int
     for x in input {
         if f(x) {

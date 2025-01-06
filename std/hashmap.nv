@@ -26,13 +26,13 @@ fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
     self.values.push(v)
 }
 
-fn extends get(self: HashMap($K,$V), k: $K) -> ?$V {
+fn extends get(self: HashMap($K,$V), k: $K) -> Option($V) {
     for key in self.keys {
         if key == k {
             return self.values[List::indexOf(self.keys, key)];
         }
     }
-    return ?$V
+    return None($V)
 }
 
 fn extends delete(self: HashMap($K,$V), k: $K) {

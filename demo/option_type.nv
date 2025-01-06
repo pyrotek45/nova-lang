@@ -1,8 +1,8 @@
 module option_typeDemo
 
 // optional types are created with ?
-let option  : ?Int = Some(10)
-let option2 : ?Int = ?Int // this is a nil value. 
+let option  : Option(Int) = Some(10)
+let option2 : Option(Int) = None(Int) // this is a nil value. 
 
 // checking if it exist
 if option.isSome() {

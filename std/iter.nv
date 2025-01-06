@@ -3,14 +3,14 @@ module iter
 import core
 
 struct Iter(A) {
-    next: () -> ?$A
+    next: fn() -> Option($A)
 }
 
 fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
     let index = Box(0)  
-    return Iter(fn() -> ?$A {
+    return Iter(fn() -> Option($A) {
         if index.value >= input.len() {
-            return ?$A
+            return None($A)
         } else {
             let result = Some(input[index.value]);
             index.value += 1
@@ -19,26 +19,26 @@ fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
     })
 }
 
-fn extends(Iter) enumerate(it: Iter($A)) -> Iter(#(Int,$A)) {
+fn extends(Iter) enumerate(it: Iter($A)) -> Iter((Int,$A)) {
     let index = Box(0)  
-    return Iter(fn() -> ?#(Int,$A) {
+    return Iter(fn() -> Option((Int,$A)) {
         let t = it::next()
         if t.isSome() {
-            let result = #(index.value, t.unwrap())
+            let result = (index.value, t.unwrap())
             index.value += 1
             return Some(result)
         } else {
-            return ?#(Int,$A)
+            return None((Int,$A))
         }
     })
 }
 
-fn extends(Iter) fromFn(input: () -> ?$A) -> Iter($A) {
+fn extends(Iter) fromFn(input: fn() -> Option($A)) -> Iter($A) {
     return Iter(input)
 }
 
-fn extends filter(it: Iter($A), f:($A) -> Bool) -> Iter($A) {
-    return Iter(fn() -> ?$A {
+fn extends filter(it: Iter($A), f: fn($A) -> Bool) -> Iter($A) {
+    return Iter(fn() -> Option($A) {
         let t = it::next()
         while t.isSome() {
             if f(t.unwrap()) {
@@ -46,23 +46,23 @@ fn extends filter(it: Iter($A), f:($A) -> Bool) -> Iter($A) {
             }
             t = it::next() 
         }
-        return ?$A
+        return None($A)
     })
 }
 
-fn extends map(it: Iter($A), f:($A) -> $B) -> Iter($B) {
-    return Iter(fn() -> ?$B {
+fn extends map(it: Iter($A), f: fn($A) -> $B) -> Iter($B) {
+    return Iter(fn() -> Option($B) {
         let t = it::next() 
         if t.isSome() {
             return Some(f(t.unwrap()))
         } else {
-            return ?$B
+            return None($B)
         }
     })
 }
 
 fn extends show(it: Iter($A)) {
-    let t: ?$A = it::next() 
+    let t: Option($A) = it::next() 
     while t.isSome() {
         println(t.unwrap())
         t = it::next() 
@@ -70,7 +70,7 @@ fn extends show(it: Iter($A)) {
 }
 
 fn extends collect(it: Iter($A)) -> [$A] {
-    let t: ?$A = it::next() 
+    let t: Option($A) = it::next() 
     let list = []:$A
     while t.isSome() {
         list.push(t.unwrap())

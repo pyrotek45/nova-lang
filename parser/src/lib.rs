@@ -138,17 +138,6 @@ fn create_environment() -> Environment {
         SymbolKind::GenericFunction,
     );
     env.insert_symbol(
-        "None",
-        TType::Function {
-            parameters: vec![TType::None],
-            return_type: Box::new(TType::Option {
-                inner: Box::new(TType::Generic { name: "T".into() }),
-            }),
-        },
-        None,
-        SymbolKind::GenericFunction,
-    );
-    env.insert_symbol(
         "print",
         TType::Function {
             parameters: vec![TType::Any],
@@ -540,32 +529,6 @@ impl Parser {
             )),
             _ => Ok(None),
         }
-    }
-
-    fn tuple_list(&mut self) -> Result<Vec<Expr>, NovaError> {
-        let mut exprs = vec![];
-        self.consume_symbol(LeftParen)?;
-
-        if !self
-            .current_token()
-            .is_some_and(|t| t.is_symbol(RightParen))
-        {
-            self.process_expression(&mut exprs)?;
-        }
-
-        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
-            self.advance();
-            if self
-                .current_token()
-                .is_some_and(|t| t.is_symbol(RightParen))
-            {
-                break;
-            }
-            self.process_expression(&mut exprs)?;
-        }
-
-        self.consume_symbol(RightParen)?;
-        Ok(exprs)
     }
 
     fn expr_list(&mut self) -> Result<Vec<Expr>, NovaError> {
@@ -1892,21 +1855,22 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token_value() {
-            Some(StructuralSymbol(Pound)) => {
-                self.consume_symbol(Pound)?;
-                let mut typelist = vec![];
+            // Some(StructuralSymbol(Pound)) => {
+            //     self.consume_symbol(Pound)?;
+            //     let mut typelist = vec![];
 
-                let expressions = self.tuple_list()?;
-                for ttype in expressions.iter() {
-                    typelist.push(ttype.get_type());
-                }
-                left = Expr::ListConstructor {
-                    ttype: TType::Tuple { elements: typelist },
-                    elements: expressions,
-                };
-            }
-            Some(StructuralSymbol(QuestionMark)) => {
-                self.consume_symbol(QuestionMark)?;
+            //     let expressions = self.tuple_list()?;
+            //     for ttype in expressions.iter() {
+            //         typelist.push(ttype.get_type());
+            //     }
+            //     left = Expr::ListConstructor {
+            //         ttype: TType::Tuple { elements: typelist },
+            //         elements: expressions,
+            //     };
+            // }
+            Some(Identifier(id)) if "None" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
                 let option_type = self.ttype()?;
                 left = Expr::Literal {
                     ttype: TType::Option {
@@ -1914,6 +1878,7 @@ impl Parser {
                     },
                     value: Atom::None,
                 };
+                self.consume_symbol(RightParen)?;
             }
             Some(&Char(value)) => {
                 self.advance();
@@ -2286,20 +2251,35 @@ impl Parser {
             Some(StructuralSymbol(LeftParen)) => {
                 self.consume_symbol(LeftParen)?;
                 let expr = self.expr()?;
-                self.consume_symbol(RightParen)?;
-                left = expr;
-                if let Some(sign) = sign {
-                    if Unary::Not == sign && left.get_type() != TType::Bool {
-                        return Err(self.generate_error(
-                            "cannot apply (Not) operation to a non bool",
-                            "Make sure expression returns a bool type",
-                        ));
+                // check if expr is a tuple
+                if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                    let mut tuple = vec![expr];
+                    while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        self.advance();
+                        tuple.push(self.expr()?);
                     }
-                    left = Expr::Unary {
-                        ttype: left.clone().get_type(),
-                        op: sign,
-                        expr: Box::new(left),
+                    self.consume_symbol(RightParen)?;
+                    let typelist: Vec<_> = tuple.iter().map(|e| e.get_type()).collect();
+                    left = Expr::ListConstructor {
+                        ttype: TType::Tuple { elements: typelist },
+                        elements: tuple,
                     };
+                } else {
+                    self.consume_symbol(RightParen)?;
+                    left = expr;
+                    if let Some(sign) = sign {
+                        if Unary::Not == sign && left.get_type() != TType::Bool {
+                            return Err(self.generate_error(
+                                "cannot apply (Not) operation to a non bool",
+                                "Make sure expression returns a bool type",
+                            ));
+                        }
+                        left = Expr::Unary {
+                            ttype: left.clone().get_type(),
+                            op: sign,
+                            expr: Box::new(left),
+                        };
+                    }
                 }
             }
             Some(Identifier(_)) => {
@@ -3020,8 +3000,7 @@ impl Parser {
 
     fn ttype(&mut self) -> Result<TType, NovaError> {
         match self.current_token_value() {
-            Some(StructuralSymbol(Pound)) => {
-                self.consume_symbol(Pound)?;
+            Some(StructuralSymbol(LeftParen)) => {
                 let mut typelist = vec![];
                 self.consume_symbol(LeftParen)?;
                 typelist.push(self.ttype()?);
@@ -3030,9 +3009,14 @@ impl Parser {
                     typelist.push(self.ttype()?);
                 }
                 self.consume_symbol(RightParen)?;
+                // if there is only one type in the tuple, return that type
+                if typelist.len() == 1 {
+                    return Ok(typelist[0].clone());
+                }
                 Ok(TType::Tuple { elements: typelist })
             }
-            Some(StructuralSymbol(LeftParen)) => {
+            Some(Identifier(id)) if "fn" == id.deref() => {
+                self.advance();
                 self.consume_symbol(LeftParen)?;
                 let mut input = vec![];
                 if !self
@@ -3080,9 +3064,11 @@ impl Parser {
                 let (generictype, _) = self.get_identifier()?;
                 Ok(TType::Generic { name: generictype })
             }
-            Some(StructuralSymbol(QuestionMark)) => {
-                self.consume_symbol(QuestionMark)?;
+            Some(Identifier(id)) if "Option" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
                 let ttype = self.ttype()?;
+                self.consume_symbol(RightParen)?;
                 if let TType::Option { .. } = ttype {
                     return Err(self.generate_error(
                         "Cannot have option directly inside an option",

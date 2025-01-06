@@ -10,7 +10,7 @@ fn extends show(self: Box($A)) {
 
 
 
-fn Gen(start: Int) -> () -> Int {
+fn Gen(start: Int) -> fn() -> Int {
     let i = Box(start)
     return fn() -> Int {
         i.value += 1
@@ -20,7 +20,7 @@ fn Gen(start: Int) -> () -> Int {
 
 // built in Option type 
 
-fn extends orError(self: ?$A, msg: String) -> $A {
+fn extends orError(self: Option($A), msg: String) -> $A {
     if self.isSome() {
         return self.unwrap()
     }
@@ -29,21 +29,21 @@ fn extends orError(self: ?$A, msg: String) -> $A {
     return unreachable() @[T: $A]
 }
 
-fn extends orDefault(self: ?$A, default: $A) -> $A {
+fn extends orDefault(self: Option($A), default: $A) -> $A {
     if self.isSome() {
         return self.unwrap()
     }
     return default
 }
 
-fn extends orDoFn(self: ?$A, f:() -> $A) -> $A {
+fn extends orDoFn(self: Option($A), f: fn() -> $A) -> $A {
     if self.isSome() {
         return self.unwrap()
     }
     return f()
 }
 
-fn extends isNone(self: ?$A) -> Bool {
+fn extends isNone(self: Option($A)) -> Bool {
     return !(self.isSome())
 }
 
@@ -54,7 +54,7 @@ enum Maybe(A) {
     Nothing
 }
 
-fn extends toMaybe(self: ?$A) -> Maybe($A) {
+fn extends toMaybe(self: Option($A)) -> Maybe($A) {
     if self.isSome() {
         return Maybe::Just(self.unwrap())
     }
@@ -76,7 +76,7 @@ enum Result(A, B) {
     Err: $B
 }
 
-fn extends toResult(self: ?$A, err: $B) -> Result($A, $B) {
+fn extends toResult(self: Option($A), err: $B) -> Result($A, $B) {
     if self.isSome() {
         return Result::Ok(self.unwrap())
     }
