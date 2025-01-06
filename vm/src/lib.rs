@@ -56,7 +56,11 @@ impl Vm {
                                 self.state.stack.push(VmData::String(index));
                             }
 
-                            _ => panic!(),
+                            _ => {
+                                return Err(NovaError::Runtime {
+                                    msg: "Error on Concat".into(),
+                                })
+                            }
                         }
                     }
                     (Some(VmData::List(l1)), Some(VmData::List(l2))) => {
@@ -69,10 +73,18 @@ impl Vm {
                                 self.state.gclock = false;
                                 self.state.stack.push(VmData::List(index));
                             }
-                            _ => panic!(),
+                            _ => {
+                                return Err(NovaError::Runtime {
+                                    msg: "Error on Concat".into(),
+                                })
+                            }
                         }
                     }
-                    _ => panic!(),
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: "Error on Concat".into(),
+                        })
+                    }
                 },
                 Code::ISSOME => match self.state.stack.pop() {
                     Some(VmData::None) => self.state.stack.push(VmData::Bool(false)),
@@ -81,9 +93,20 @@ impl Vm {
                 },
                 Code::UNWRAP => {
                     if let Some(VmData::None) = self.state.stack.last() {
-                        println!("ERROR: Tried to unwrap a none value");
-                        println!("ERROR: exiting program");
-                        std::process::exit(1)
+                        // get the position of the error
+                        if let Some(pos) = self
+                            .runtime_errors_table
+                            .get(&self.state.current_instruction)
+                        {
+                            return Err(NovaError::RuntimeWithPos {
+                                msg: "Tried to Unwrap a None value".into(),
+                                position: pos.clone(),
+                            });
+                        } else {
+                            return Err(NovaError::Runtime {
+                                msg: "Tried to Unwrap a None value".into(),
+                            });
+                        }
                     }
                 }
                 Code::DUP => self.state.stack.push(*self.state.stack.last().unwrap()),
@@ -709,7 +732,9 @@ impl Vm {
                         (VmData::List(array_index), VmData::Int(index_to_get)) => {
                             let Heap::ListAddress(newindex) = self.state.get_ref(array_index)
                             else {
-                                todo!()
+                                return Err(NovaError::Runtime {
+                                    msg: format!("Index out of bounds {}", array_index).into(),
+                                });
                             };
                             if let Heap::List(array) = self.state.get_ref(*newindex) {
                                 if array.len() <= index_to_get as usize {
@@ -744,6 +769,17 @@ impl Vm {
                         (VmData::List(array), VmData::Int(index_to)) => {
                             match self.state.get_ref(array) {
                                 Heap::List(array) => {
+                                    // test if array is out of bounds
+                                    if array.len() <= index_to as usize {
+                                        if let Some(pos) = self
+                                            .runtime_errors_table
+                                            .get(&self.state.current_instruction)
+                                        {
+                                            return Err(NovaError::RuntimeWithPos { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to).into(), position: pos.clone() });
+                                        } else {
+                                            return Err(NovaError::Runtime { msg: format!("Invalid array access , array length: {}, index tried: {}", array.len(), index_to).into() });
+                                        }
+                                    }
                                     let item = self.state.get_ref(array[index_to as usize]).clone();
                                     match item {
                                         Heap::Function(v) => {

@@ -118,6 +118,7 @@ pub enum Statement {
         identifier: Rc<str>,
         expr: Expr,
         body: Vec<Statement>,
+        position: FilePosition,
     },
     ForRange {
         identifier: Rc<str>,
@@ -136,6 +137,7 @@ pub enum Statement {
         expr: Expr,
         arms: Vec<(usize, Option<Rc<str>>, Vec<Statement>)>,
         default: Option<Vec<Statement>>,
+        position: FilePosition,
     },
 }
 
@@ -184,6 +186,7 @@ pub enum Expr {
         loops: Vec<(Rc<str>, Expr)>,
         expr: Vec<Expr>,
         guards: Vec<Expr>,
+        position: FilePosition,
     },
     Field {
         ttype: TType,

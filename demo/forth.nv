@@ -10,11 +10,9 @@ let recordquote = false
 let currentquote = []: String
 let currentword = []: String
 
-
-type t = Maybe(String)
-
 fn run(input: [String]) -> Maybe(String) {
     for line in input {
+        println(line)
         for word in line.split(' ') {
             if word.len() == 0 {
                 continue
@@ -40,6 +38,8 @@ fn run(input: [String]) -> Maybe(String) {
             }
             if let num = Cast::int(word) {
                 stack.push(Cast::string(num))
+            } elif word == "dump" {
+                println(stack)
             } elif word == "call" {
                 let w = stack.pop().unwrap()
                 return run([w])
@@ -100,7 +100,10 @@ fn run(input: [String]) -> Maybe(String) {
                 words.insert(currentword[0], currentword[1:])
                 currentword = []: String
             } elif words.get(word).isSome() {
-                return run(words.get(word).unwrap())
+                match run(words.get(word).unwrap()) {
+                    Just(z) => { return Maybe::Just(z) }
+                    _ => {}
+                }
             } else {
                 println(word)
             }
@@ -125,7 +128,7 @@ if let args = terminal::args() {
         if line == "exit" { break }
         match run([line]) {
             Just(z) => { println(z) }
-            _ => { println("Done") }
+            _ => { println("Ok") }
         }
     }
 }

@@ -230,7 +230,7 @@ pub enum Asm {
 
     NONE,
     ISSOME,
-    UNWRAP,
+    UNWRAP(FilePosition),
     FREE,
     CLONE,
 
@@ -292,7 +292,7 @@ pub enum Asm {
 
     // list operations
     PIN(FilePosition),
-    LIN,
+    LIN(FilePosition),
     NATIVE(u64),
 
     EXIT,

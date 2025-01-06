@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use common::code::Asm;
 use common::error::NovaError;
+use common::fileposition::FilePosition;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
@@ -133,6 +134,7 @@ impl Compiler {
                     identifier,
                     expr,
                     body,
+                    position,
                 } => {
                     let top = self.gen.generate();
                     let end = self.gen.generate();
@@ -201,7 +203,7 @@ impl Compiler {
                     // bind value
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    self.asm.push(Asm::LIN);
+                    self.asm.push(Asm::LIN(position.clone()));
 
                     self.asm.push(Asm::STORE(id_index as u32));
 
@@ -589,6 +591,7 @@ impl Compiler {
                     expr,
                     arms,
                     default,
+                    position,
                     ..
                 } => {
                     // we will do it old school, each arm will make a new if branch
@@ -611,14 +614,14 @@ impl Compiler {
                         let next = self.gen.generate();
                         self.asm.push(Asm::INTEGER(1_i64));
                         self.asm.push(Asm::GET(temp_matchexpr as u32));
-                        self.asm.push(Asm::LIN);
+                        self.asm.push(Asm::LIN(position.clone()));
                         self.asm.push(Asm::INTEGER(arm.0 as i64));
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::JUMPIFFALSE(next));
                         if let Some(vid) = &arm.1 {
                             self.asm.push(Asm::INTEGER(0_i64));
                             self.asm.push(Asm::GET(temp_matchexpr as u32));
-                            self.asm.push(Asm::LIN);
+                            self.asm.push(Asm::LIN(position.clone()));
                             // store the vid in the variable
 
                             if let Some(index) = self.variables.get_index(vid) {
@@ -877,14 +880,22 @@ impl Compiler {
                 self.asm.push(Asm::LIST(elements.len() as u64));
                 Ok(())
             }
-            Expr::Field { index, expr, .. } => {
+            Expr::Field {
+                index,
+                expr,
+                position,
+                ..
+            } => {
                 self.asm.push(Asm::INTEGER(*index as i64));
                 self.compile_expr(expr)?;
-                self.asm.push(Asm::LIN);
+                self.asm.push(Asm::LIN(position.clone()));
                 Ok(())
             }
             Expr::Indexed {
-                container, index, ..
+                container,
+                index,
+                position,
+                ..
             } => {
                 self.compile_expr(index)?;
                 let negitive_step = self.gen.generate();
@@ -909,7 +920,7 @@ impl Compiler {
                 self.asm.push(Asm::LABEL(negitive_step));
 
                 self.asm.push(Asm::GET(array_index as u32));
-                self.asm.push(Asm::LIN);
+                self.asm.push(Asm::LIN(position.clone()));
                 Ok(())
             }
             Expr::Call { function, args, .. } => {
@@ -1266,6 +1277,7 @@ impl Compiler {
                 expr,
                 guards,
                 loops,
+                position,
                 ..
             } => {
                 let mut loops = loops.clone();
@@ -1286,6 +1298,7 @@ impl Compiler {
                     guards.clone(),
                     list_index,
                     loops,
+                    position.clone(),
                 )?;
 
                 // return the list
@@ -1298,6 +1311,7 @@ impl Compiler {
                 start: startstep,
                 end: endstep,
                 step: stepstep,
+                position,
                 ..
             } => {
                 let top = self.gen.generate();
@@ -1414,7 +1428,7 @@ impl Compiler {
                 // bind value to identifier for (x in list) // x is identifier
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
-                self.asm.push(Asm::LIN);
+                self.asm.push(Asm::LIN(position.clone()));
                 self.asm.push(Asm::STORE(id_index as u32));
 
                 // -- expr and then push to temp array
@@ -1502,6 +1516,8 @@ impl Compiler {
         }
     }
 
+    // needs to be recursive function
+    #[allow(clippy::too_many_arguments)]
     fn for_in_loop(
         &mut self,
         identifier: Rc<str>,
@@ -1510,6 +1526,7 @@ impl Compiler {
         guards: Vec<Expr>,
         list_index: usize,
         mut loops: Vec<(Rc<str>, Expr)>,
+        position: FilePosition,
     ) -> Result<(), NovaError> {
         // compile list and create counter
         self.variables
@@ -1565,11 +1582,11 @@ impl Compiler {
         // bind value from list to identifier
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
-        self.asm.push(Asm::LIN);
+        self.asm.push(Asm::LIN(position.clone()));
         self.asm.push(Asm::STORE(id_index as u32));
         let nextloop = loops.pop();
         if let Some((identifier, list)) = nextloop {
-            self.for_in_loop(identifier, list, expr, guards, list_index, loops)?;
+            self.for_in_loop(identifier, list, expr, guards, list_index, loops, position)?;
         } else {
             // create new label for guards
             let skipcurrent = self.gen.generate();
@@ -1668,7 +1685,7 @@ impl Compiler {
                         self.asm.push(Asm::ERROR(position.clone()));
                     }
                     "None" => self.asm.push(Asm::NONE),
-                    "Option::unwrap" => self.asm.push(Asm::UNWRAP),
+                    "Option::unwrap" => self.asm.push(Asm::UNWRAP(position.clone())),
                     "Some" => {}
                     "Option::isSome" => self.asm.push(Asm::ISSOME),
                     "free" => self.asm.push(Asm::FREE),

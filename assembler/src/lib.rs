@@ -514,11 +514,16 @@ impl Assembler {
                         self.output.extend_from_slice(&t);
                     }
                 }
-                Asm::PIN(pos) => {
+                Asm::PIN(file_position) => {
                     self.output.push(Code::PINDEX);
-                    self.runtime_error_table.insert(self.output.len(), pos);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
                 }
-                Asm::LIN => self.output.push(Code::LINDEX),
+                Asm::LIN(file_position) => {
+                    self.output.push(Code::LINDEX);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
+                }
                 Asm::TCALL(index) => {
                     self.output.push(Code::TAILCALL);
                     let bytes = index.to_le_bytes();
@@ -535,7 +540,11 @@ impl Assembler {
                 Asm::POP => self.output.push(Code::POP),
                 Asm::NONE => self.output.push(Code::NONE),
                 Asm::ISSOME => self.output.push(Code::ISSOME),
-                Asm::UNWRAP => self.output.push(Code::UNWRAP),
+                Asm::UNWRAP(file_position) => {
+                    self.output.push(Code::UNWRAP);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
+                }
                 Asm::CONCAT => self.output.push(Code::CONCAT),
                 Asm::Char(v) => {
                     self.output.push(Code::CHAR);
