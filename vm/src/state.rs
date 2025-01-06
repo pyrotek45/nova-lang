@@ -4,7 +4,6 @@ use std::{
 };
 
 use common::table::Table;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Heap {
@@ -46,7 +45,7 @@ impl Heap {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VmData {
     // pointer to stack
     StackAddress(usize),

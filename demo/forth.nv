@@ -114,8 +114,8 @@ if let args = terminal::args() {
         .filter(|x: String| x.len() > 0)
 
     match run(input) {
-        Just(z) ->{ println(z) }
-        _ -> { println("Done") }
+        Just(z) =>{ println(z) }
+        _ => { println("Done") }
     }
 } else {
     while true {
@@ -123,8 +123,8 @@ if let args = terminal::args() {
         let line = readln()
         if line == "exit" { break }
         match run([line]) {
-            Just(z) ->{ println(z) }
-            _ -> { println("Done") }
+            Just(z) => { println(z) }
+            _ => { println("Done") }
         }
     }
 }
