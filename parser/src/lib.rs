@@ -439,10 +439,11 @@ impl Parser {
         self.current_token()
             .map(|t| t.position())
             // unwrap or use previous token position
-            .unwrap_or_else(|| self.input.get(self.index - 1).map_or_else(
-                || FilePosition::default(),
-                |t| t.position(),
-            ))
+            .unwrap_or_else(|| {
+                self.input
+                    .get(self.index - 1)
+                    .map_or_else(FilePosition::default, |t| t.position())
+            })
     }
 
     fn consume_operator(&mut self, op: Operator) -> Result<(), NovaError> {
@@ -2246,7 +2247,7 @@ impl Parser {
                     return Err(self.generate_error(
                         "Tuple must contain at least two elements",
                         "Add more elements to the tuple",
-                    )); 
+                    ));
                 } else {
                     let expr = self.expr()?;
                     if expr.get_type() == TType::None {
@@ -3042,7 +3043,6 @@ impl Parser {
                     {
                         self.consume_symbol(RightParen)?;
                         return Ok(TType::Tuple { elements: typelist });
-                        
                     }
                     typelist.push(self.ttype()?);
                 }
@@ -3409,7 +3409,7 @@ impl Parser {
                         pos,
                     ));
                 }
-                self.consume_operator(Operator::RightArrow)?;
+                self.consume_operator(Operator::FatArrow)?;
                 if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                     default_branch = Some(self.block()?);
                 } else {
@@ -3433,7 +3433,7 @@ impl Parser {
                 }
                 self.consume_symbol(RightParen)?;
             }
-            self.consume_operator(Operator::RightArrow)?;
+            self.consume_operator(Operator::FatArrow)?;
 
             if let Some(fields) = self
                 .environment

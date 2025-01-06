@@ -63,8 +63,8 @@ fn extends toMaybe(self: Option($A)) -> Maybe($A) {
 
 fn extends isJust(self: Maybe($A)) -> Bool {
     match self {
-        Just(x) -> {return true}
-        Nothing() -> {return false}
+        Just(x) => {return true}
+        Nothing() => {return false}
     }
     return false
 }
