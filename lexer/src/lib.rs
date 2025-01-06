@@ -32,6 +32,7 @@ impl Lexer {
     pub fn read_file(path: impl AsRef<Path>) -> Result<Self, NovaError> {
         match std::fs::read_to_string(path.as_ref()) {
             Ok(source) => Ok(Self::new(source, Some(path.as_ref()))),
+            // a very detailed error message
             Err(_) => Err(NovaError::File {
                 msg: format!(" '{}' is not a valid filepath", path.as_ref().display()).into(),
             }),

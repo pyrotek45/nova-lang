@@ -559,6 +559,7 @@ impl Compiler {
 
                         self.global
                             .insert(format!("{}::{}", identifier, field.identifier).into());
+                        let index = self.global.len() - 1;
 
                         //dbg!(format!("{}::{}", identifier, field.identifier));
 
@@ -580,7 +581,7 @@ impl Compiler {
                         self.asm.push(Asm::RET(true));
 
                         self.asm.push(Asm::LABEL(structjump));
-                        let index = self.global.len() - 1;
+
                         self.asm.push(Asm::STOREGLOBAL(index as u32));
                     }
                 }
@@ -595,43 +596,47 @@ impl Compiler {
                     // if there is a default it will jump to the default
                     // if there is no default it will jump to the end
                     let end = self.gen.generate();
+
                     self.compile_expr(expr)?;
-                    // will test the expression
-                    self.asm.push(Asm::INTEGER(1_i64));
-                    self.compile_expr(expr)?;
-                    self.asm.push(Asm::LIN);
                     // store in temp variable
                     self.variables
-                        .insert(format!("__matchexpr__{}", self.gen.generate()).into());
+                        .insert(format!("___matchexpr___{}", self.gen.generate()).into());
                     let temp_matchexpr = self.variables.len() - 1;
                     self.asm.push(Asm::STORE(temp_matchexpr as u32));
+
+                    //dbg!(temp_matchexpr);
+                    //dbg!(arms.len());
                     for arm in arms.iter() {
-                        let next = self.gen.generate();
-                        self.asm.push(Asm::GET(temp_matchexpr as u32));
-                        // self.asm.push(Asm::DUP);
-                        // self.asm.push(Asm::PRINT);
                         //dbg!(arm.0);
+                        let next = self.gen.generate();
+                        self.asm.push(Asm::INTEGER(1_i64));
+                        self.asm.push(Asm::GET(temp_matchexpr as u32));
+                        self.asm.push(Asm::LIN);
                         self.asm.push(Asm::INTEGER(arm.0 as i64));
                         self.asm.push(Asm::EQUALS);
                         self.asm.push(Asm::JUMPIFFALSE(next));
                         if let Some(vid) = &arm.1 {
                             self.asm.push(Asm::INTEGER(0_i64));
-                            self.compile_expr(expr)?;
+                            self.asm.push(Asm::GET(temp_matchexpr as u32));
                             self.asm.push(Asm::LIN);
                             // store the vid in the variable
+
                             if let Some(index) = self.variables.get_index(vid) {
                                 self.asm.push(Asm::STORE(index as u32))
                             } else {
+                                //dbg!(vid);
                                 self.variables.insert(vid.clone());
                                 let index = self.variables.len() - 1;
                                 self.asm.push(Asm::STORE(index as u32))
                             }
                         }
+
                         let arm = Ast {
                             program: arm.2.clone(),
                         };
                         self.compile_program(arm, self.filepath.clone(), false, false, false)?;
                         self.asm.pop();
+
                         self.asm.push(Asm::JMP(end));
                         self.asm.push(Asm::LABEL(next));
                     }

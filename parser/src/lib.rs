@@ -3291,6 +3291,7 @@ impl Parser {
 
     fn import_file(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("import"))?;
+        let pos = self.get_current_token_position();
         let import_filepath: PathBuf = match self.current_token_value() {
             Some(StringLiteral(path)) => {
                 let path = PathBuf::from_str(path).unwrap();
@@ -3328,8 +3329,18 @@ impl Parser {
             None => import_filepath,
         };
         let resolved_filepath: Rc<Path> = resolved_filepath.into();
-        let tokens =
-            Lexer::read_file(&resolved_filepath)?.collect::<Result<Vec<_>, NovaError>>()?;
+        let tokens = Lexer::read_file(&resolved_filepath);
+        let tokens = match tokens {
+            Ok(tokens) => tokens,
+            Err(_) => {
+                return Err(self.generate_error_with_pos(
+                    "Error Importing file",
+                    format!("Could not import file: {}", resolved_filepath.display()),
+                    pos,
+                ));
+            }
+        };
+        let tokens = tokens.collect::<Result<Vec<_>, NovaError>>()?;
         let mut parser = self.clone();
         parser.index = 0;
         parser.filepath = Some(resolved_filepath.clone());
@@ -3376,6 +3387,7 @@ impl Parser {
                 }
                 self.consume_operator(Operator::RightArrow)?;
                 default_branch = Some(self.block()?);
+
                 continue;
             }
             // collect identifiers
@@ -3403,7 +3415,11 @@ impl Parser {
                     .get(expr.get_type().custom_to_string().unwrap())
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
-                        panic!("not a custom type")
+                        return Err(self.generate_error_with_pos(
+                            "Expected custom type",
+                            format!("got {}", expr.get_type()),
+                            pos,
+                        ));
                     };
                     fields
                         .iter()
@@ -3416,6 +3432,7 @@ impl Parser {
                     fields.clone()
                 };
                 let mut tag = 0;
+
                 // mark if the variant is found
                 let mut found = false;
                 let mut vtype = TType::None;
@@ -3453,16 +3470,16 @@ impl Parser {
                 );
                 // get expression if no { }
 
-                let enum_id = enum_id.unwrap_or_default();
-                let body = if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                //let enum_id = enum_id.unwrap_or_default();
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                     let body = self.block()?;
-                    branches.push((tag, Some(enum_id.clone()), body.clone()));
+                    branches.push((tag, enum_id.clone(), body.clone()));
                     body.clone()
                 } else {
                     let body = self.expr()?;
                     branches.push((
                         tag,
-                        Some(enum_id.clone()),
+                        enum_id.clone(),
                         vec![Statement::Expression {
                             ttype: body.clone().get_type(),
                             expr: body.clone(),
@@ -3475,11 +3492,11 @@ impl Parser {
                 };
 
                 self.environment.pop_block();
-                if enum_id.is_empty() {
-                    branches.push((tag, None, body));
-                } else {
-                    branches.push((tag, Some(enum_id.clone()), body));
-                }
+                // if enum_id.is_none() {
+                //     branches.push((tag, None, body));
+                // } else {
+                //     branches.push((tag, enum_id, body));
+                // }
             }
         }
         self.consume_symbol(RightBrace)?;
@@ -3501,7 +3518,11 @@ impl Parser {
                     .get(expr.get_type().custom_to_string().unwrap())
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
-                        panic!("not a custom type")
+                        return Err(self.generate_error_with_pos(
+                            "not a custom type",
+                            "make sure the type is a custom type",
+                            pos,
+                        ));
                     };
                     fields
                         .iter()
@@ -4663,6 +4684,13 @@ impl Parser {
 
     fn block(&mut self) -> Result<Vec<Statement>, NovaError> {
         self.consume_symbol(LeftBrace)?;
+        if self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightBrace))
+        {
+            self.advance();
+            return Ok(vec![]);
+        }
         let statements = self.compound_statement()?;
         self.consume_symbol(RightBrace)?;
         Ok(statements)
