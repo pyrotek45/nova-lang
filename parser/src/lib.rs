@@ -2176,6 +2176,7 @@ impl Parser {
                             loops,
                             expr: outexpr,
                             guards,
+                            position: pos,
                         };
                     }
                     _ => {
@@ -3577,6 +3578,7 @@ impl Parser {
             expr,
             arms: branches,
             default: default_branch,
+            position: pos,
         }))
     }
 
@@ -3994,6 +3996,7 @@ impl Parser {
                         identifier,
                         expr: array,
                         body,
+                        position: arraypos,
                     }))
                 }
             }

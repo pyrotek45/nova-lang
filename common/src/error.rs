@@ -94,10 +94,12 @@ impl NovaError {
         match &self {
             NovaError::File { msg } => {
                 println!("{}: {}", "File Error".red(), msg);
+                print!("{}", "".clear());
             }
             NovaError::Lexing { msg, note, .. } => {
                 println!("{}: {}", "Lexing Error".bright_red(), msg);
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::Parsing {
                 msg, note, extra, ..
@@ -109,16 +111,20 @@ impl NovaError {
                     }
                 }
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::Runtime { msg } => {
                 println!("Runtime Error: {}", msg.bright_red());
+                print!("{}", "".clear());
             }
             NovaError::Compiler { msg, note } => {
                 println!("{}: {}", "Compiling Error".bright_red(), msg.bright_red());
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::RuntimeWithPos { msg, .. } => {
                 println!("{}: {}", "Runtime Error".bright_red(), msg.bright_red());
+                print!("{}", "".clear());
             }
             NovaError::TypeError {
                 msg,
@@ -128,6 +134,7 @@ impl NovaError {
             } => {
                 println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
                 println!("Expected type: {expected}\nFound type: {found}",);
+                print!("{}", "".clear());
             }
             NovaError::TypeMismatch {
                 expected, found, ..
@@ -138,9 +145,11 @@ impl NovaError {
                     "Type Mismatch".bright_red()
                 );
                 println!("Expected type: {expected}\nFound type: {found}",);
+                print!("{}", "".clear());
             }
             NovaError::SimpleTypeError { msg, .. } => {
                 println!("{}: {}", "Type Error".bright_red(), msg.bright_red());
+                print!("{}", "".clear());
             }
         }
     }
@@ -149,6 +158,7 @@ impl NovaError {
         match &self {
             NovaError::File { msg } => {
                 println!("{}: {}", "File Error".red(), msg);
+                print!("{}", "".clear());
             }
             NovaError::Lexing {
                 msg,
@@ -168,6 +178,7 @@ impl NovaError {
                 );
                 print_line(position, msg);
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::Parsing {
                 msg,
@@ -193,6 +204,7 @@ impl NovaError {
                     }
                 }
                 println!("{}: {}", "Note".bright_yellow(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::Runtime { msg } => {
                 println!("Runtime Error: {}", msg.bright_red());
@@ -200,6 +212,7 @@ impl NovaError {
             NovaError::Compiler { msg, note } => {
                 println!("{}", "Compiling Error".bright_red(),);
                 println!("{}\n{}", msg.bright_red(), note.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::RuntimeWithPos { msg, position } => {
                 println!(
@@ -214,6 +227,7 @@ impl NovaError {
                     position.col
                 );
                 print_line(position, msg);
+                print!("{}", "".clear());
             }
             NovaError::TypeError {
                 msg,
@@ -237,6 +251,7 @@ impl NovaError {
                     &format!("Expected type: {}\nFound type: {}", expected, found),
                 );
                 println!("{}: {}", "Note".bright_yellow(), msg.bright_yellow());
+                print!("{}", "".clear());
             }
             NovaError::TypeMismatch {
                 expected,
@@ -258,6 +273,7 @@ impl NovaError {
                     position,
                     &format!("Expected type: {}\nFound type: {}", expected, found),
                 );
+                print!("{}", "".clear());
             }
             NovaError::SimpleTypeError { msg, position } => {
                 println!(
@@ -272,6 +288,7 @@ impl NovaError {
                     position.col
                 );
                 print_line(position, msg);
+                print!("{}", "".clear());
             }
         }
     }
