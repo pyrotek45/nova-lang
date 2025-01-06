@@ -11,6 +11,7 @@ let currentquote = []: String
 let currentword = []: String
 
 
+type t = Maybe(String)
 
 fn run(input: [String]) -> Maybe(String) {
     for line in input {

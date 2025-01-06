@@ -3583,7 +3583,7 @@ impl Parser {
     // new statement for making type aliases
     // alias identifer = <type>
     fn type_alias(&mut self) -> Result<Option<Statement>, NovaError> {
-        self.consume_identifier(Some("alias"))?;
+        self.consume_identifier(Some("type"))?;
         let (alias, _) = self.get_identifier()?;
         if self.environment.custom_types.contains_key(&alias) {
             return Err(self.generate_error_with_pos(
@@ -3602,7 +3602,7 @@ impl Parser {
         match self.current_token_value() {
             Some(Identifier(id)) => match id.as_ref() {
                 "match" => self.match_statement(),
-                "alias" => self.type_alias(),
+                "type" => self.type_alias(),
                 "import" => self.import_file(),
                 "pass" => self.pass_statement(),
                 "struct" => self.struct_declaration(),
