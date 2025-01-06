@@ -1171,6 +1171,7 @@ impl Compiler {
                     common::tokens::Operator::LeftTilde => todo!(),
                     common::tokens::Operator::ExclusiveRange => todo!(),
                     common::tokens::Operator::InclusiveRange => todo!(),
+                    common::tokens::Operator::FatArrow => todo!(),
                 }
                 Ok(())
             }

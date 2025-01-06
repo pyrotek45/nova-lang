@@ -438,7 +438,11 @@ impl Parser {
     fn get_current_token_position(&self) -> FilePosition {
         self.current_token()
             .map(|t| t.position())
-            .unwrap_or_default()
+            // unwrap or use previous token position
+            .unwrap_or_else(|| self.input.get(self.index - 1).map_or_else(
+                || FilePosition::default(),
+                |t| t.position(),
+            ))
     }
 
     fn consume_operator(&mut self, op: Operator) -> Result<(), NovaError> {
@@ -2233,34 +2237,44 @@ impl Parser {
             }
             Some(StructuralSymbol(LeftParen)) => {
                 self.consume_symbol(LeftParen)?;
-                // () is void
                 if self
                     .current_token()
                     .is_some_and(|t| t.is_symbol(RightParen))
                 {
                     self.consume_symbol(RightParen)?;
-                    left = Expr::Literal {
-                        ttype: TType::Void,
-                        value: Atom::None,
-                    };
+                    // error tuple must contain at least two elements
+                    return Err(self.generate_error(
+                        "Tuple must contain at least two elements",
+                        "Add more elements to the tuple",
+                    )); 
                 } else {
                     let expr = self.expr()?;
+                    if expr.get_type() == TType::None {
+                        return Err(self.generate_error(
+                            "Tuple must not contain None",
+                            "Add a comma after the element",
+                        ));
+                    }
                     // check if expr is a tuple
                     if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                         let mut tuple = vec![expr];
                         while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                             self.advance();
-                            // if ), error
+                            // if (5,) single element tuple
                             if self
                                 .current_token()
                                 .is_some_and(|t| t.is_symbol(RightParen))
                             {
+                                break;
+                            }
+                            let expr = self.expr()?;
+                            if expr.get_type() == TType::None {
                                 return Err(self.generate_error(
-                                    "Cannot have a trailing comma in a tuple",
-                                    "Remove the trailing comma",
+                                    "Tuple must not contain None",
+                                    "Add a comma after the element",
                                 ));
                             }
-                            tuple.push(self.expr()?);
+                            tuple.push(expr);
                         }
                         self.consume_symbol(RightParen)?;
                         let typelist: Vec<_> = tuple.iter().map(|e| e.get_type()).collect();
@@ -3008,9 +3022,28 @@ impl Parser {
             Some(StructuralSymbol(LeftParen)) => {
                 let mut typelist = vec![];
                 self.consume_symbol(LeftParen)?;
+                // return error if there is no type in the tuple
+                if self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightParen))
+                {
+                    return Err(self.generate_error(
+                        "Tuple must contain at least two elements",
+                        "Add more elements to the tuple",
+                    ));
+                }
                 typelist.push(self.ttype()?);
                 while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
                     self.consume_symbol(Comma)?;
+                    // if (5,) single element tuple
+                    if self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(RightParen))
+                    {
+                        self.consume_symbol(RightParen)?;
+                        return Ok(TType::Tuple { elements: typelist });
+                        
+                    }
                     typelist.push(self.ttype()?);
                 }
                 self.consume_symbol(RightParen)?;

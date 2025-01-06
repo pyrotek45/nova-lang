@@ -73,6 +73,8 @@ pub enum Operator {
     InclusiveRange,
     /// ..
     ExclusiveRange,
+    /// fat arrow
+    FatArrow,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyWord {
