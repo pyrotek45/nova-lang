@@ -393,6 +393,7 @@ impl Iterator for Lexer {
                 '+' if self.match_literal("=") => Operator(AddAssign),
                 '-' if self.match_literal("=") => Operator(SubAssign),
                 '&' if self.match_literal("&") => Operator(And),
+                '|' if self.match_literal(">") => Operator(PipeArrow),
                 '|' if self.match_literal("|") => Operator(Or),
                 ':' if self.match_literal(":") => Operator(DoubleColon),
                 ':' => Operator(Colon),

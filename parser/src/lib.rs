@@ -1098,8 +1098,16 @@ impl Parser {
         }
     }
 
-    fn call(&mut self, identifier: Rc<str>, pos: FilePosition) -> Result<Expr, NovaError> {
+    fn call(
+        &mut self,
+        identifier: Rc<str>,
+        pos: FilePosition,
+        first: Option<Expr>,
+    ) -> Result<Expr, NovaError> {
         let mut arguments = self.get_field_arguments(&identifier, pos.clone())?;
+        if let Some(first) = first {
+            arguments.insert(0, first);
+        }
         let mut argument_types: Vec<TType> = arguments.iter().map(|t| t.get_type()).collect();
 
         if self
@@ -1697,12 +1705,12 @@ impl Parser {
             Some(StructuralSymbol(LeftSquareBracket)) => {
                 self.handle_indexing(identifier.clone(), pos.clone())?
             }
-            Some(StructuralSymbol(LeftParen)) => self.call(identifier.clone(), pos)?,
+            Some(StructuralSymbol(LeftParen)) => self.call(identifier.clone(), pos, None)?,
             _ => {
                 if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace))
                     && self.environment.custom_types.contains_key(&identifier)
                 {
-                    self.call(identifier.clone(), pos.clone())?
+                    self.call(identifier.clone(), pos.clone(), None)?
                 } else {
                     self.handle_literal_or_capture(identifier.clone(), pos.clone())?
                 }
@@ -2479,6 +2487,51 @@ impl Parser {
                 }
                 Some(StructuralSymbol(LeftSquareBracket)) => {
                     left = self.handle_chain_indexint(left)?;
+                }
+                Some(Operator(Operator::PipeArrow)) => {
+                    self.consume_operator(Operator::PipeArrow)?;
+                    let (mut identifier, pos) = self.get_identifier()?;
+                    identifier = match self.current_token_value() {
+                        Some(Operator(Operator::DoubleColon))
+                            if matches!(
+                                identifier.as_ref(),
+                                "Int" | "String" | "Float" | "Bool" | "List" | "Char" | "Option"
+                            ) =>
+                        {
+                            self.advance();
+                            let (name, _) = self.get_identifier()?;
+                            format!("{}::{}", identifier, name).into()
+                        }
+                        Some(Operator(Operator::DoubleColon))
+                            if self.environment.custom_types.contains_key(&identifier) =>
+                        {
+                            self.advance();
+                            let (name, _) = self.get_identifier()?;
+                            format!("{}::{}", identifier, name).into()
+                        }
+                        Some(Operator(Operator::DoubleColon)) if self.modules.has(&identifier) => {
+                            self.advance();
+                            let (name, _) = self.get_identifier()?;
+                            format!("{}::{}", identifier, name).into()
+                        }
+                        Some(Operator(Operator::DoubleColon)) => identifier,
+                        Some(StructuralSymbol(At)) => {
+                            self.consume_symbol(At)?;
+                            self.consume_symbol(LeftParen)?;
+                            let mut type_annotation = vec![];
+                            let ta = self.ttype()?;
+                            type_annotation.push(ta);
+                            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                                self.advance();
+                                let ta = self.ttype()?;
+                                type_annotation.push(ta);
+                            }
+                            self.consume_symbol(RightParen)?;
+                            generate_unique_string(&identifier, &type_annotation).into()
+                        }
+                        _ => identifier,
+                    };
+                    left = self.call(identifier, pos, Some(left))?;
                 }
                 _ => {
                     break;
