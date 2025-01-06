@@ -22,7 +22,7 @@ use common::{
     },
     ttype::{generate_unique_string, TType},
 };
-use dym::Lexicon;
+
 use lexer::Lexer;
 
 #[derive(Debug, Clone)]
@@ -1284,20 +1284,10 @@ impl Parser {
                         position: pos.clone(),
                     };
                 } else {
-                    return self.generate_field_not_found_error(
-                        &identifier,
-                        type_name,
-                        fields,
-                        pos,
-                    );
+                    return self.generate_field_not_found_error(&identifier, type_name, pos);
                 }
             } else {
-                return self.generate_field_not_found_error(
-                    &identifier,
-                    type_name,
-                    &[] as &[(&str, _)],
-                    pos,
-                );
+                return self.generate_field_not_found_error(&identifier, type_name, pos);
             }
         } else {
             return Err(self.generate_error_with_pos(
@@ -1330,20 +1320,11 @@ impl Parser {
         &self,
         identifier: &str,
         type_name: &str,
-        fields: &[(impl AsRef<str>, TType)],
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
-        let mut lexicon = Lexicon::new();
-        for (field_name, _) in fields.iter() {
-            lexicon.insert(field_name.as_ref());
-        }
-        let corrections = lexicon.corrections_for(identifier);
         Err(self.generate_error_with_pos(
             format!("No field '{}' found for {}", identifier, type_name),
-            format!(
-                "cannot retrieve field\nDid you mean? {}",
-                corrections.join(", ")
-            ),
+            "cannot retrieve field".to_string(),
             pos,
         ))
     }
@@ -1433,26 +1414,9 @@ impl Parser {
         identifier: &str,
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
-        let mut lexicon = Lexicon::new();
-        self.environment.values.last().iter().for_each(|table| {
-            table.iter().for_each(|(name, symbol)| {
-                if let Symbol {
-                    kind: SymbolKind::Variable,
-                    ..
-                } = symbol
-                {
-                    lexicon.insert(name);
-                }
-            })
-        });
-
-        let corrections = lexicon.corrections_for(identifier);
         Err(self.generate_error_with_pos(
             format!("'{}' does not exist", identifier),
-            format!(
-                "Cannot retrieve field\nDid you mean? {}",
-                corrections.join(", ")
-            ),
+            "Cannot retrieve field".to_string(),
             pos,
         ))
     }
@@ -1783,17 +1747,9 @@ impl Parser {
                 ttype.clone(),
             )
         } else {
-            let mut lexicon = Lexicon::new();
-            for (id, _) in self.environment.values.last().unwrap().iter() {
-                lexicon.insert(id)
-            }
-            let corrections = lexicon.corrections_for(&identifier);
             Err(self.generate_error_with_pos(
                 format!("E1 Not a valid symbol: {}", identifier),
-                format!(
-                    "Unknown identifier\nDid you mean? {}",
-                    corrections.join(", ")
-                ),
+                "Unknown identifier".to_string(),
                 position,
             ))
         }
@@ -1830,17 +1786,9 @@ impl Parser {
             );
             Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
         } else {
-            let mut lexicon = Lexicon::new();
-            for (id, _) in self.environment.values.last().unwrap().iter() {
-                lexicon.insert(id)
-            }
-            let corrections = lexicon.corrections_for(&identifier);
             Err(self.generate_error_with_pos(
                 format!("E2 Not a valid symbol: {}", identifier),
-                format!(
-                    "Unknown identifier\nDid you mean? {}",
-                    corrections.join(", ")
-                ),
+                "Unknown identifier".to_string(),
                 position,
             ))
         }
@@ -2285,35 +2233,57 @@ impl Parser {
             }
             Some(StructuralSymbol(LeftParen)) => {
                 self.consume_symbol(LeftParen)?;
-                let expr = self.expr()?;
-                // check if expr is a tuple
-                if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
-                    let mut tuple = vec![expr];
-                    while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
-                        self.advance();
-                        tuple.push(self.expr()?);
-                    }
+                // () is void
+                if self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightParen))
+                {
                     self.consume_symbol(RightParen)?;
-                    let typelist: Vec<_> = tuple.iter().map(|e| e.get_type()).collect();
-                    left = Expr::ListConstructor {
-                        ttype: TType::Tuple { elements: typelist },
-                        elements: tuple,
+                    left = Expr::Literal {
+                        ttype: TType::Void,
+                        value: Atom::None,
                     };
                 } else {
-                    self.consume_symbol(RightParen)?;
-                    left = expr;
-                    if let Some(sign) = sign {
-                        if Unary::Not == sign && left.get_type() != TType::Bool {
-                            return Err(self.generate_error(
-                                "cannot apply (Not) operation to a non bool",
-                                "Make sure expression returns a bool type",
-                            ));
+                    let expr = self.expr()?;
+                    // check if expr is a tuple
+                    if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        let mut tuple = vec![expr];
+                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                            self.advance();
+                            // if ), error
+                            if self
+                                .current_token()
+                                .is_some_and(|t| t.is_symbol(RightParen))
+                            {
+                                return Err(self.generate_error(
+                                    "Cannot have a trailing comma in a tuple",
+                                    "Remove the trailing comma",
+                                ));
+                            }
+                            tuple.push(self.expr()?);
                         }
-                        left = Expr::Unary {
-                            ttype: left.clone().get_type(),
-                            op: sign,
-                            expr: Box::new(left),
+                        self.consume_symbol(RightParen)?;
+                        let typelist: Vec<_> = tuple.iter().map(|e| e.get_type()).collect();
+                        left = Expr::ListConstructor {
+                            ttype: TType::Tuple { elements: typelist },
+                            elements: tuple,
                         };
+                    } else {
+                        self.consume_symbol(RightParen)?;
+                        left = expr;
+                        if let Some(sign) = sign {
+                            if Unary::Not == sign && left.get_type() != TType::Bool {
+                                return Err(self.generate_error(
+                                    "cannot apply (Not) operation to a non bool",
+                                    "Make sure expression returns a bool type",
+                                ));
+                            }
+                            left = Expr::Unary {
+                                ttype: left.clone().get_type(),
+                                op: sign,
+                                expr: Box::new(left),
+                            };
+                        }
                     }
                 }
             }
