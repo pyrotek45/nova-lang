@@ -1855,19 +1855,52 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token_value() {
-            // Some(StructuralSymbol(Pound)) => {
-            //     self.consume_symbol(Pound)?;
-            //     let mut typelist = vec![];
+            // if expression if test {} else {}, both branches must return the same type
+            Some(Identifier(id)) if "if" == id.deref() => {
+                self.advance();
 
-            //     let expressions = self.tuple_list()?;
-            //     for ttype in expressions.iter() {
-            //         typelist.push(ttype.get_type());
-            //     }
-            //     left = Expr::ListConstructor {
-            //         ttype: TType::Tuple { elements: typelist },
-            //         elements: expressions,
-            //     };
-            // }
+                let condition = self.expr()?;
+                // condition must be a boolean
+                if condition.get_type() != TType::Bool {
+                    return Err(self.generate_error(
+                        "Condition must be a boolean",
+                        format!("Got {}", condition.get_type()),
+                    ));
+                }
+                self.consume_symbol(LeftBrace)?;
+                let if_branch = self.expr()?;
+                self.consume_symbol(RightBrace)?;
+                self.consume_identifier(Some("else"))?;
+                self.consume_symbol(LeftBrace)?;
+                let else_branch = self.expr()?;
+                self.consume_symbol(RightBrace)?;
+                let if_type = if if_branch.get_type() == else_branch.get_type() {
+                    if_branch.get_type()
+                } else {
+                    return Err(self.generate_error(
+                        "Both branches must return the same type",
+                        format!(
+                            "Got {} and {}",
+                            if_branch.get_type(),
+                            else_branch.get_type()
+                        ),
+                    ));
+                };
+                left = Expr::IfExpr {
+                    ttype: if_type,
+                    test: Box::new(condition),
+                    body: Box::new(if_branch),
+                    alternative: Box::new(else_branch),
+                };
+            }
+            Some(Identifier(id)) if "return" == id.deref() => {
+                self.advance();
+                let ret = self.expr()?;
+                left = Expr::Return {
+                    ttype: TType::Void,
+                    expr: Box::new(ret),
+                };
+            }
             Some(Identifier(id)) if "None" == id.deref() => {
                 self.advance();
                 self.consume_symbol(LeftParen)?;
@@ -4660,6 +4693,7 @@ impl Parser {
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {
+        // check for return statement
         self.expr().map(|expr| {
             Some(Statement::Expression {
                 ttype: expr.get_type(),
