@@ -1,0 +1,25 @@
+module aoc4
+
+import std.list
+
+let matrix = readFile("aoc4.txt")
+    .chars()
+    .split('\n')
+    .filterEmpty()
+
+let selection = ['X', 'M', 'A', 'S']
+let answer = 
+    [i in 0.to(matrix.len()), j in 0.to(matrix[i].len()) | 
+        matrix.allRotations(i,j, selection.len()).count(|x: [Char]| x.equals(selection) )
+    ].sum()
+
+println(answer)
+
+let permutations = [['M', 'M', 'S', 'S'], ['M', 'S', 'S', 'M'], ['S', 'M', 'M', 'S'], ['S', 'S', 'M', 'M']]
+let answer2 = 
+    [i in 1.to(matrix.len() - 1), j in 1.to(matrix[i].len() - 1) | 
+        [matrix[i-1][j-1], matrix[i-1][j+1], matrix[i+1][j+1], matrix[i+1][j-1]] 
+    | matrix[i][j] == 'A' 
+    ].count(|x: [Char]| x.anyIn(permutations) )
+    
+println(answer2)

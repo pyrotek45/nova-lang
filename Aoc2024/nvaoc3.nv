@@ -1,0 +1,42 @@
+module aoc3
+
+import std.list
+
+let pattern = r##"mul\([0-9]+,[0-9]+\)"##
+let text = readFile("aoc3.txt")
+
+// part one
+let answer = [
+    x in Regex::captures(pattern, text), 
+    i in Regex::captures(r#"[0-9]+"#, x).chunk(2) 
+    | Cast::int(i[0]).unwrap() * Cast::int(i[1]).unwrap()
+].sum()
+
+printf("{}\n", Cast::string(answer))
+
+// part two
+let on = r##"do\(\)"##
+let off = r##"don't\(\)"##
+
+let captures = []: [String]
+
+while text.len() > 0 {
+    if let index = Regex::first(off, text) {
+        captures.push(Regex::captures(pattern, text.chars()[:index[0]].string()))
+        text = text.chars()[index[1]:].string()
+        if let dropped = Regex::first(on, text) {
+            text = text.chars()[dropped[1]:].string()
+        }
+    } else {
+        captures.push(Regex::captures(pattern, text))
+        break
+    }
+}
+
+answer = [
+    x in captures.flatten(), 
+    i in Regex::captures(r#"[0-9]+"#, x).chunk(2) 
+    | Cast::int(i[0]).unwrap() * Cast::int(i[1]).unwrap()
+].sum()
+
+printf("{}\n", Cast::string(answer))

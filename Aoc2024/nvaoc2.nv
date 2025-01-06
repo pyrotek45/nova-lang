@@ -1,0 +1,27 @@
+module aoc2
+
+import std.core
+import std.list
+import std.math
+
+let input = readFile("aoc2.txt")
+    .chars()
+    .split('\n')
+    .map(|x: [Char]| x.splitWith(' ', |x: [Char]| Cast::int(x.string()) ))
+
+fn is_safe(x: [Int]) -> Bool {
+    let diffs = x.windows(2).map(|y: [Int]| (y[1] - y[0]).abs())
+    let increasing = x.windows(2).allWith(|y: [Int]| y[0] < y[1])
+    let decreasing = x.windows(2).allWith(|y: [Int]| y[0] > y[1])
+    return (increasing || decreasing) && diffs.allWith(|d: Int| (d >= 1) && (d <= 3))
+}
+
+fn try_is_safe(x: [Int]) -> Bool {
+    return is_safe(x) || x.indices().anyWith(|i: Int| is_safe(x.remove(i)))
+}
+
+let part1 = input.count(is_safe@([Int]))
+let part2 = input.count(try_is_safe@([Int]))
+
+println(part1)
+println(part2)

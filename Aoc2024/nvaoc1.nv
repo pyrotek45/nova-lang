@@ -1,0 +1,30 @@
+module aoc1
+
+import std.core
+import std.list
+import std.tuple
+import std.math
+
+let input = readFile("aoc1.txt")
+let input_chars = input.chars()
+    .split('\n')
+    .flatmap(|x: [Char]| x.splitWith(' ', |x: [Char]| Cast::int(x.string()) ))
+    .chunk(2)
+    .map(|x: [Int]| #(x[0],x[1]))
+    .unzip()
+
+let answer = input_chars
+    .map(|x: #([Int],[Int])| x[0].quicksort().zip(x[1].quicksort()))
+    .flatten()
+    .map(|x: #(Int,Int)| (x[0] - x[1]).abs())
+    .sum()
+    
+println(answer)
+
+let answer2 = input_chars
+    .map(|x: #([Int],[Int])| x[0].compare(x[1]))
+    .flatten()
+    .map(|x: #(Int,Int,Int)| x[0] * x[1] * x[2])
+    .sum()
+
+println(answer2)

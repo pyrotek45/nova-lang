@@ -133,7 +133,7 @@ impl Vm {
                     let index = u32::from_le_bytes(self.state.next_arr());
 
                     let data = self.state.stack.pop().unwrap();
-                    //dbg!(&data,index);
+                    //dbg!(index, self.state.offset);
                     self.state.stack[self.state.offset + index as usize] = data;
                 }
 
