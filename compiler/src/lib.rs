@@ -1183,6 +1183,7 @@ impl Compiler {
                     common::tokens::Operator::ExclusiveRange => todo!(),
                     common::tokens::Operator::InclusiveRange => todo!(),
                     common::tokens::Operator::FatArrow => todo!(),
+                    common::tokens::Operator::PipeArrow => todo!(),
                 }
                 Ok(())
             }
@@ -1669,14 +1670,6 @@ impl Compiler {
                     self.compile_expr(expr)?;
                 }
                 match caller.deref() {
-                    // "println" => {
-                    //     self.asm.push(Asm::PRINT);
-                    //     self.asm.push(Asm::STRING("\n".to_string()));
-                    //     self.asm.push(Asm::PRINT);
-                    // }
-                    // "print" => {
-                    //     self.asm.push(Asm::PRINT);
-                    // }
                     "unreachable" => self.asm.push(Asm::ERROR(position.clone())),
                     "todo" => {
                         // show a panic message before exiting

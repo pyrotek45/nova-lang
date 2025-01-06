@@ -75,6 +75,8 @@ pub enum Operator {
     ExclusiveRange,
     /// fat arrow
     FatArrow,
+    /// pipe arrow
+    PipeArrow,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyWord {
