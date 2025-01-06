@@ -806,6 +806,13 @@ impl Compiler {
             Expr::ListCompConstructor { .. } => todo!(),
             Expr::Sliced { .. } => todo!(),
             Expr::StoreExpr { .. } => todo!(),
+            Expr::Return { ttype, expr } => todo!(),
+            Expr::IfExpr {
+                ttype,
+                test,
+                body,
+                alternative,
+            } => todo!(),
         }
         Ok(())
     }
@@ -1471,6 +1478,30 @@ impl Compiler {
                     self.asm.pop();
                 }
                 //self.asm.pop();
+                Ok(())
+            }
+            Expr::Return { expr, .. } => {
+                self.compile_expr(expr)?;
+                self.asm.push(Asm::RET(true));
+                Ok(())
+            }
+            Expr::IfExpr {
+                test,
+                body,
+                alternative,
+                ..
+            } => {
+                let end = self.gen.generate();
+                let next = self.gen.generate();
+                self.compile_expr(test)?;
+                self.asm.push(Asm::JUMPIFFALSE(next));
+                self.compile_expr(&body)?;
+
+                self.asm.pop();
+                self.asm.push(Asm::JMP(end));
+                self.asm.push(Asm::LABEL(next));
+                self.compile_expr(&alternative)?;
+                self.asm.push(Asm::LABEL(end));
                 Ok(())
             }
         }

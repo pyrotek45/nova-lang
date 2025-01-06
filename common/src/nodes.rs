@@ -235,6 +235,16 @@ pub enum Expr {
         expr: Box<Expr>,
         body: Vec<Statement>,
     },
+    Return {
+        ttype: TType,
+        expr: Box<Expr>,
+    },
+    IfExpr {
+        ttype: TType,
+        test: Box<Expr>,
+        body: Box<Expr>,
+        alternative: Box<Expr>,
+    },
     None,
 }
 
@@ -253,6 +263,8 @@ impl Expr {
             Expr::ListCompConstructor { ttype, .. } => ttype.clone(),
             Expr::Sliced { ttype, .. } => ttype.clone(),
             Expr::StoreExpr { ttype, .. } => ttype.clone(),
+            Expr::Return { ttype, .. } => ttype.clone(),
+            Expr::IfExpr { ttype, .. } => ttype.clone(),
         }
     }
 }
