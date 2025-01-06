@@ -1491,7 +1491,6 @@ impl Compiler {
                 self.compile_expr(test)?;
                 self.asm.push(Asm::JUMPIFFALSE(next));
                 self.compile_expr(body)?;
-
                 self.asm.pop();
                 self.asm.push(Asm::JMP(end));
                 self.asm.push(Asm::LABEL(next));
