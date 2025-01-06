@@ -94,14 +94,14 @@ impl Display for TType {
             }
             TType::Generic { name } => return write!(f, "${name}"),
             TType::List { inner } => return write!(f, "[{inner}]"),
-            TType::Option { inner } => return write!(f, "?{inner}"),
+            TType::Option { inner } => return write!(f, "Option({inner})"),
             TType::Tuple { elements } => {
-                return write!(f, "#({})", TypeList(elements));
+                return write!(f, "({})", TypeList(elements));
             }
             TType::Function {
                 parameters: args,
                 return_type,
-            } => return write!(f, "({params}) -> {return_type}", params = TypeList(args)),
+            } => return write!(f, "fn({params}) -> {return_type}", params = TypeList(args)),
         };
         f.write_str(literal)
     }

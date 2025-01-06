@@ -1,8 +1,6 @@
 use std::{borrow::Borrow, fmt};
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Table<T> {
     pub items: Vec<T>,
 }
