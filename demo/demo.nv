@@ -54,7 +54,7 @@ person.name = "bingo"
 person.display()
 
 struct Zed {
-    test: ()
+    test: fn()
 }
 
 // Creating an instance from a type
@@ -78,7 +78,7 @@ println(myIter)
 
 // Function pointers
 struct SomeFunction {
-    function: (Int,Int) -> Int
+    function: fn(Int,Int) -> Int
 }
 
 let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
@@ -137,8 +137,8 @@ generic(5.5)
 // More advance structs
 struct Counter {
     value: Int,
-    count: (Counter) -> Int,
-    reset: (Counter)
+    count: fn(Counter) -> Int,
+    reset: fn(Counter)
 }
 
 // Creating a init funciton for Counter
@@ -172,21 +172,21 @@ println(mycounter->count())
 // the normal function 'count' will be called here, not from the struct itself
 println(mycounter.count())
 
-// Option type ?type lets you represent none
-let x: ?Int = Some(20)
+// Option type lets you represent none
+let x: Option(Int) = Some(20)
 
 // import the isSome() function here
 if x.isSome() {
     println(x.unwrap())
 }
 
-x = ?Int
+x = None(Int)
 if x.isSome() {
     println("i never print")
     println(x.unwrap())
 }
 
-fn extends do(x: ?$A, f:($A)) {
+fn extends do(x: Option($A), f: fn($A)) {
     if x.isSome() {
         f(x.unwrap())
     }
@@ -203,9 +203,9 @@ str <- "hello world!"
 println(str)
 
 // Currying
-fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {   
-    return fn(y:Int) -> (Int) -> (Int) -> Int {  
-        return fn(z:Int) -> (Int) -> Int {            
+fn add(x:Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {   
+    return fn(y:Int) -> fn(Int) -> fn(Int) -> Int {  
+        return fn(z:Int) -> fn(Int) -> Int {            
             return fn(t:Int) -> Int {            
                 return x + y + z + t
             }            
@@ -217,8 +217,8 @@ inc <- add(1)(2)(3)(4)
 println(inc)
 
 
-fn curry(f:($A,$A) -> $A) -> ($A) -> ($A) -> $A {
-    return fn(x: $A) -> ($A) -> $A {
+fn curry(f: fn($A,$A) -> $A) -> fn($A) -> fn($A) -> $A {
+    return fn(x: $A) -> fn($A) -> $A {
         return fn(y: $A) -> $A {
             return f(x,y)
         }

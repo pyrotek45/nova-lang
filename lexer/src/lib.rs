@@ -352,6 +352,7 @@ impl Iterator for Lexer {
                             .chars()
                             .next()
                             .is_some_and(|c| !c.is_alphabetic() && c != '.');
+
                     let float = float || c == '.';
                     if float {
                         // Capture .

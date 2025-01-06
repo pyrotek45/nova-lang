@@ -7,7 +7,7 @@ struct One {
 }
 
 struct Two {
-    function: (Int) -> Int
+    function: fn(Int) -> Int
 }
 
 // You can use () or {} to construct a struct
