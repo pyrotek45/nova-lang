@@ -1,10 +1,11 @@
 module aoc2
 
-import std.core
-import std.list
-import std.math
+import super.std.core
+import super.std.list
+import super.std.tuple
+import super.std.math
 
-let input = readFile("aoc2.txt")
+let input = readFile("Aoc2024/aoc1.txt")
     .chars()
     .split('\n')
     .map(|x: [Char]| x.splitWith(' ', |x: [Char]| Cast::int(x.string()) ))

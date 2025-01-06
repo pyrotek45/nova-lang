@@ -1,9 +1,9 @@
 module aoc3
 
-import std.list
+import super.std.list
 
 let pattern = r##"mul\([0-9]+,[0-9]+\)"##
-let text = readFile("aoc3.txt")
+let text = readFile("Aoc2024/aoc3.txt")
 
 // part one
 let answer = [
