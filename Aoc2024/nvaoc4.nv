@@ -1,8 +1,8 @@
 module aoc4
 
-import std.list
+import super.std.list
 
-let matrix = readFile("aoc4.txt")
+let matrix = readFile("Aoc2024/aoc4.txt")
     .chars()
     .split('\n')
     .filterEmpty()
