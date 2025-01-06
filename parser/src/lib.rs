@@ -1857,6 +1857,7 @@ impl Parser {
         match self.current_token_value() {
             // if expression if test {} else {}, both branches must return the same type
             Some(Identifier(id)) if "if" == id.deref() => {
+                let pos = self.get_current_token_position();
                 self.advance();
 
                 let condition = self.expr()?;
@@ -1877,13 +1878,14 @@ impl Parser {
                 let if_type = if if_branch.get_type() == else_branch.get_type() {
                     if_branch.get_type()
                 } else {
-                    return Err(self.generate_error(
+                    return Err(self.generate_error_with_pos(
                         "Both branches must return the same type",
                         format!(
                             "Got {} and {}",
                             if_branch.get_type(),
                             else_branch.get_type()
                         ),
+                        pos,
                     ));
                 };
                 left = Expr::IfExpr {
@@ -3405,8 +3407,15 @@ impl Parser {
                     ));
                 }
                 self.consume_operator(Operator::RightArrow)?;
-                default_branch = Some(self.block()?);
-
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                    default_branch = Some(self.block()?);
+                } else {
+                    let body = self.expr()?;
+                    default_branch = Some(vec![Statement::Expression {
+                        ttype: body.clone().get_type(),
+                        expr: body,
+                    }])
+                };
                 continue;
             }
             // collect identifiers
@@ -3511,11 +3520,6 @@ impl Parser {
                 };
 
                 self.environment.pop_block();
-                // if enum_id.is_none() {
-                //     branches.push((tag, None, body));
-                // } else {
-                //     branches.push((tag, enum_id, body));
-                // }
             }
         }
         self.consume_symbol(RightBrace)?;
