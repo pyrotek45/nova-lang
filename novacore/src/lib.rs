@@ -396,7 +396,7 @@ impl NovaCore {
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, filepath, true, true, false)?;
+            .compile_program(ast, filepath, true, true, false, false)?;
         self.assembler.input = asm;
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
@@ -424,7 +424,7 @@ impl NovaCore {
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, None, true, true, false)?;
+            .compile_program(ast, None, true, true, false, false)?;
 
         self.assembler = Assembler::empty();
         self.initnova();
@@ -470,7 +470,7 @@ impl NovaCore {
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, self.filepath, true, true, false)?;
+            .compile_program(ast, self.filepath, true, true, false, false)?;
         println!("OK | Compile time: {}ms", start.elapsed().as_millis());
 
         self.assembler.input = asm;
@@ -498,7 +498,7 @@ impl NovaCore {
         self.compiler.init();
         let asm = self
             .compiler
-            .compile_program(ast, filepath, true, true, false)?;
+            .compile_program(ast, filepath, true, true, false, false)?;
         let mut dis = disassembler::new();
         dis.dis_asm(asm);
         Ok(())

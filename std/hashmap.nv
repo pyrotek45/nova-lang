@@ -47,7 +47,7 @@ fn extends show(self: HashMap($K,$V)) {
     if self.keys.len() == 0 {
         println("Empty HashMap")
     } else {
-        for i <- 0; i < self.keys.len(); i += 1 {
+        for let i = 0; i < self.keys.len(); i += 1 {
             println(Cast::string(self.keys[i] )+ " -> " + Cast::string(self.values[i]))
         }
     }

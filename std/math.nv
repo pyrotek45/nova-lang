@@ -23,7 +23,7 @@ fn extends abs(self: Int) -> Int {
 
 fn extends pow(self: Int, other: Int) -> Int {
     let result = 1
-    for i <- 0; i < other; i += 1 {
+    for let i = 0; i < other; i += 1 {
         result = result * self
     }
     return result
@@ -64,7 +64,7 @@ fn extends clamp(self: Int, min: Int, max: Int) -> Int {
 fn extends factorial(self: Int) -> Int {
     let result = 1
 
-    for i <- 2; i <= self; i += 1 {
+    for let i = 2; i <= self; i += 1 {
         result = result * i
     }
 
@@ -97,7 +97,7 @@ fn extends exp(self: Float) -> Float {
     let result = 1.0
     let term = 1.0
 
-    for n <- 1.0; n < 20.0; n += 1.0 {
+    for let n = 1.0; n < 20.0; n += 1.0 {
         term = term * self / n
         result = result + term
     }

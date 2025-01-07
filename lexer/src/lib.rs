@@ -403,7 +403,6 @@ impl Iterator for Lexer {
                 '=' if self.match_literal(">") => Operator(FatArrow),
                 '=' => Operator(Assignment),
                 '-' if self.match_literal(">") => Operator(RightArrow),
-                '<' if self.match_literal("-") => Operator(LeftArrow),
                 '>' => Operator(Greater),
                 '<' => Operator(Less),
                 '+' => Operator(Addition),

@@ -53,12 +53,6 @@ pub enum Statement {
     Continue,
     Break,
     Pass,
-    Let {
-        ttype: TType,
-        identifier: Rc<str>,
-        expr: Expr,
-        global: bool,
-    },
     Function {
         ttype: TType,
         identifier: Rc<str>,
@@ -171,6 +165,12 @@ pub enum Atom {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    Let {
+        ttype: TType,
+        identifier: Rc<str>,
+        expr: Box<Expr>,
+        global: bool,
+    },
     Closure {
         ttype: TType,
         args: Vec<Arg>,
@@ -248,6 +248,10 @@ pub enum Expr {
         body: Box<Expr>,
         alternative: Box<Expr>,
     },
+    Block {
+        ttype: TType,
+        body: Vec<Statement>,
+    },
     None,
 }
 
@@ -268,6 +272,8 @@ impl Expr {
             Expr::StoreExpr { ttype, .. } => ttype.clone(),
             Expr::Return { ttype, .. } => ttype.clone(),
             Expr::IfExpr { ttype, .. } => ttype.clone(),
+            Expr::Block { ttype, .. } => ttype.clone(),
+            Expr::Let { ttype, .. } => ttype.clone(),
         }
     }
 }

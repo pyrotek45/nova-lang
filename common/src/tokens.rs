@@ -35,8 +35,6 @@ pub enum Operator {
     Assignment,
     /// ->
     RightArrow,
-    /// <-
-    LeftArrow,
     /// >
     Greater,
     /// <
