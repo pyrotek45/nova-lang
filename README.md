@@ -46,7 +46,7 @@ Once Cargo has finished building Nova, you can run it using the following comman
 Enjoy this demo!
 
 ```swift
-/module main
+module main
 
 // Type declaration
 struct Person {
@@ -64,12 +64,6 @@ let person : Person = Person {name: "bob", age: 42}
 // Optional type annotation
 let person2 = Person("joe", 50)
 
-// Creating new variable the easy way
-person3 <- Person("bobby", 30)
-
-// Updating a variable 
-person3 = Person("jesse", 25)
-
 // Function for type
 fn extends display(self: Person) {
     println(self.name)
@@ -81,7 +75,7 @@ person.display()
 Person::display(person2)
 
 // For loop
-for i <- 0; i < 10; i += 1 {
+for let i = 0; i < 10; i += 1 {
     println(i)
 }
 
@@ -93,7 +87,7 @@ println(arr)
 
 let arr2 = []: Int.fill(10,5)
 println(arr2)
- 
+
 arr[1] = 4
 println(arr)
 
@@ -102,7 +96,7 @@ person.name = "bingo"
 person.display()
 
 struct Zed {
-    test: ()
+    test: fn()
 }
 
 // Creating an instance from a type
@@ -126,7 +120,7 @@ println(myIter)
 
 // Function pointers
 struct SomeFunction {
-    function: (Int,Int) -> Int
+    function: fn(Int,Int) -> Int
 }
 
 let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
@@ -152,9 +146,6 @@ let myIterTwo = Iter::fromVec([1,2,3,4,5])
 
 println(myIterTwo)
 
-// Creating an empty list
-mylist <- []: Int
-
 // function overloading
 fn add(x:Int,y:Int) -> Int {
     println("im adding ints")
@@ -170,7 +161,7 @@ println(add(1,3))
 println(add(1.0,3.0))
 
 // Passing an overloaded function
-myIntAdder <- add@(Int,Int)
+let myIntAdder = add@(Int,Int)
 println(myIntAdder(1,4))
 
 // Generic functions
@@ -185,8 +176,8 @@ generic(5.5)
 // More advance structs
 struct Counter {
     value: Int,
-    count: (Counter) -> Int,
-    reset: (Counter)
+    count: fn(Counter) -> Int,
+    reset: fn(Counter)
 }
 
 // Creating a init funciton for Counter
@@ -194,7 +185,7 @@ fn CounterInit() -> Counter {
     return Counter {
         value: 0,
         count: fn(self: Counter) -> Int {
-            result <- self.value
+            let result = self.value
             self.value += 1
             return result
         },
@@ -207,12 +198,12 @@ fn CounterInit() -> Counter {
 // Creating a function for counter outside of the struct
 fn extends count(self: Counter) -> Int {
     println("im in a normal function")
-    result <- self.value
+    let result = self.value
     self.value += 1
     return result
 }
 
-mycounter <- CounterInit()
+let mycounter = CounterInit()
 
 // The -> takes the function from the struct, and applys it to itself
 println(mycounter->count())
@@ -220,21 +211,21 @@ println(mycounter->count())
 // the normal function 'count' will be called here, not from the struct itself
 println(mycounter.count())
 
-// Option type ?type lets you represent none
-let x: ?Int = Some(20)
+// Option type lets you represent none
+let x: Option(Int) = Some(20)
 
 // import the isSome() function here
 if x.isSome() {
     println(x.unwrap())
 }
 
-x = ?Int
+x = None(Int)
 if x.isSome() {
     println("i never print")
     println(x.unwrap())
 }
 
-fn extends do(x: ?$A, f:($A)) {
+fn extends do(x: Option($A), f: fn($A)) {
     if x.isSome() {
         f(x.unwrap())
     }
@@ -243,7 +234,7 @@ fn extends do(x: ?$A, f:($A)) {
 x.do(fn(x:Int) {println(x)})
 
 // String manipulation
-str <- "hello world!"
+let str = "hello world!"
     .chars()
     .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
     .string()
@@ -251,9 +242,9 @@ str <- "hello world!"
 println(str)
 
 // Currying
-fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {   
-    return fn(y:Int) -> (Int) -> (Int) -> Int {  
-        return fn(z:Int) -> (Int) -> Int {            
+fn add(x:Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {   
+    return fn(y:Int) -> fn(Int) -> fn(Int) -> Int {  
+        return fn(z:Int) -> fn(Int) -> Int {            
             return fn(t:Int) -> Int {            
                 return x + y + z + t
             }            
@@ -261,12 +252,12 @@ fn add(x:Int) -> (Int) -> (Int) -> (Int) -> Int {
     }
 }
 
-inc <- add(1)(2)(3)(4)
+let inc = add(1)(2)(3)(4)
 println(inc)
 
 
-fn curry(f:($A,$A) -> $A) -> ($A) -> ($A) -> $A {
-    return fn(x: $A) -> ($A) -> $A {
+fn curry(f: fn($A,$A) -> $A) -> fn($A) -> fn($A) -> $A {
+    return fn(x: $A) -> fn($A) -> $A {
         return fn(y: $A) -> $A {
             return f(x,y)
         }
@@ -277,7 +268,7 @@ fn mul(x:Int,y:Int) -> Int {
     return x * y
 }
 
-curriedmul <- curry(mul@(Int,Int))
+let curriedmul = curry(mul@(Int,Int))
 
 println(curriedmul(5)(5))
 
@@ -286,4 +277,5 @@ import super.std.io
 
 let input = io::prompt("wow")
 println(input)
+
 ```
