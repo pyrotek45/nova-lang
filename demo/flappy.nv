@@ -21,8 +21,8 @@ fn extends showscreen(player: Player, wall: Wall, points: Int) -> Bool {
     let screen = []: Char
     screen.push('\n')
     screen.push('\r')
-    for i <- 0; i < 20; i += 1 {
-        for j <- 0; j < 35; j += 1 {
+    for let i = 0; i < 20; i += 1 {
+        for let j = 0; j < 35; j += 1 {
             if (player.x == i) && (player.y == j) {
                 screen.push(player.symbol)
             } elif wall.location == j {
