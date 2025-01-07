@@ -386,6 +386,23 @@ impl Parser {
 
     fn eof(&mut self) -> Result<(), NovaError> {
         if self.current_token().is_none() {
+            // check if forward declarations are empty
+            if !self.environment.forward_declarations.is_empty() {
+                let mut forward_decl = vec![];
+                for (id, (_, ret, pos)) in self.environment.forward_declarations.iter() {
+                    forward_decl.push((
+                        format!("{} -> {} forward declarations not resolved", id, ret),
+                        pos.clone(),
+                    ));
+                }
+                let pos = self.get_current_token_position();
+                return Err(NovaError::Parsing {
+                    msg: "Reached end of file".into(),
+                    note: "Make sure all forward declarations are resolved".into(),
+                    position: pos,
+                    extra: Some(forward_decl),
+                });
+            }
             Ok(())
         } else {
             Err(NovaError::Parsing {
@@ -4404,14 +4421,6 @@ impl Parser {
             }
         }
 
-        if self.environment.has(&identifier) {
-            return Err(self.generate_error_with_pos(
-                format!("Generic Function {identifier} already defined"),
-                "Cannot overload a generic function",
-                pos.clone(),
-            ));
-        }
-
         let mut output = TType::Void;
         if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
         } else {
@@ -4461,27 +4470,27 @@ impl Parser {
         if typeinput.is_empty() {
             typeinput.push(TType::None)
         }
-        // check if normal function exist
-        if self
-            .environment
-            .has(&generate_unique_string(&identifier, &typeinput))
-        {
-            return Err(self.generate_error_with_pos(
-                format!(
-                    "Function {identifier} with inputs {} is already defined",
-                    typeinput
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ),
-                "Cannot redefine a function with the same signature",
-                pos.clone(),
-            ));
-        }
 
         // insert function into environment
         if !generic {
+            // check if normal function exist
+            if self
+                .environment
+                .has(&generate_unique_string(&identifier, &typeinput))
+            {
+                return Err(self.generate_error_with_pos(
+                    format!(
+                        "Function {identifier} with inputs {} is already defined",
+                        typeinput
+                            .iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ),
+                    "Cannot redefine a function with the same signature",
+                    pos.clone(),
+                ));
+            }
             self.environment.insert_symbol(
                 &identifier,
                 TType::Function {
@@ -4513,7 +4522,20 @@ impl Parser {
                 SymbolKind::GenericFunction,
             );
         }
+        // check for no rightbrace
+        if self
+            .current_token()
+            .is_some_and(|t| !t.is_symbol(LeftBrace))
+        {
+            //dbg!(&identifier);
+            self.environment.forward_declarations.insert(
+                identifier.clone(),
+                (typeinput.clone(), output.clone(), pos.clone()),
+            );
+            return Ok(Some(Statement::ForwardDec { identifier }));
+        }
 
+        //dbg!(identifier.clone());
         self.environment.no_override.insert(identifier.clone());
         let mut generic_list = Self::collect_generics(&typeinput);
         generic_list.extend(Self::collect_generics(&[output.clone()]));
@@ -4628,6 +4650,7 @@ impl Parser {
                 ));
             }
         }
+
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
@@ -4636,7 +4659,6 @@ impl Parser {
             captures: captured,
         }))
     }
-
     fn check_returns(
         &self,
         statements: &[Statement],

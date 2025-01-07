@@ -18,6 +18,7 @@ pub struct Environment {
     pub generic_type_struct: HashMap<Rc<str>, Vec<Rc<str>>>,
     pub generic_type_map: HashMap<Rc<str>, Rc<str>>,
     pub live_generics: Vec<table::Table<Rc<str>>>,
+    pub forward_declarations: HashMap<Rc<str>, (Vec<TType>, TType, FilePosition)>,
 }
 
 impl Default for Environment {
@@ -32,6 +33,7 @@ impl Default for Environment {
             generic_type_map: HashMap::default(),
             live_generics: vec![Table::new()],
             enums: Table::new(),
+            forward_declarations: HashMap::default(),
         }
     }
 }
@@ -96,6 +98,10 @@ impl Environment {
     }
 
     pub fn has(&mut self, symbol: &str) -> bool {
+        if self.forward_declarations.contains_key(symbol) {
+            self.forward_declarations.remove(symbol);
+            return false;
+        }
         self.values.last().unwrap().contains_key(symbol)
     }
 

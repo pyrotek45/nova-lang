@@ -317,8 +317,13 @@ impl Compiler {
                     self.asm.push(Asm::LABEL(closure_jump_label));
 
                     // storeing global function
-                    let index = self.global.len() - 1;
-                    self.asm.push(Asm::STOREGLOBAL(index as u32));
+                    if let Some(index) = self.global.get_index(identifier) {
+                        self.asm.push(Asm::STOREGLOBAL(index as u32));
+                    } else {
+                        self.global.insert(identifier.clone());
+                        let index = self.global.len() - 1;
+                        self.asm.push(Asm::STOREGLOBAL(index as u32));
+                    }
                 }
 
                 Struct {
@@ -765,6 +770,10 @@ impl Compiler {
 
                     self.breaks.pop();
                     self.continues.pop();
+                }
+                common::nodes::Statement::ForwardDec { identifier, .. } => {
+                    //create a wrapper function
+                    self.global.insert(identifier.clone());
                 }
             }
         }

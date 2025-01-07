@@ -133,6 +133,9 @@ pub enum Statement {
         default: Option<Vec<Statement>>,
         position: FilePosition,
     },
+    ForwardDec {
+        identifier: Rc<str>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
