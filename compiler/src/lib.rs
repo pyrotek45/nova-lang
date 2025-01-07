@@ -849,6 +849,7 @@ impl Compiler {
             Expr::IfExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
+            Expr::Void => {}
         }
         Ok(())
     }
@@ -1585,6 +1586,7 @@ impl Compiler {
                 }
                 Ok(())
             }
+            Expr::Void => Ok(()),
         }
     }
 

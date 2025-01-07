@@ -27,7 +27,7 @@ person.display()
 Person::display(person2)
 
 // For loop
-for i <- 0; i < 10; i += 1 {
+for let i = 0; i < 10; i += 1 {
     println(i)
 }
 
@@ -98,9 +98,6 @@ let myIterTwo = Iter::fromVec([1,2,3,4,5])
 
 println(myIterTwo)
 
-// Creating an empty list
-mylist <- []: Int
-
 // function overloading
 fn add(x:Int,y:Int) -> Int {
     println("im adding ints")
@@ -116,7 +113,7 @@ println(add(1,3))
 println(add(1.0,3.0))
 
 // Passing an overloaded function
-myIntAdder <- add@(Int,Int)
+let myIntAdder = add@(Int,Int)
 println(myIntAdder(1,4))
 
 // Generic functions
@@ -140,7 +137,7 @@ fn CounterInit() -> Counter {
     return Counter {
         value: 0,
         count: fn(self: Counter) -> Int {
-            result <- self.value
+            let result = self.value
             self.value += 1
             return result
         },
@@ -153,12 +150,12 @@ fn CounterInit() -> Counter {
 // Creating a function for counter outside of the struct
 fn extends count(self: Counter) -> Int {
     println("im in a normal function")
-    result <- self.value
+    let result = self.value
     self.value += 1
     return result
 }
 
-mycounter <- CounterInit()
+let mycounter = CounterInit()
 
 // The -> takes the function from the struct, and applys it to itself
 println(mycounter->count())
@@ -189,7 +186,7 @@ fn extends do(x: Option($A), f: fn($A)) {
 x.do(fn(x:Int) {println(x)})
 
 // String manipulation
-str <- "hello world!"
+let str = "hello world!"
     .chars()
     .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
     .string()
@@ -207,7 +204,7 @@ fn add(x:Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {
     }
 }
 
-inc <- add(1)(2)(3)(4)
+let inc = add(1)(2)(3)(4)
 println(inc)
 
 
@@ -223,7 +220,7 @@ fn mul(x:Int,y:Int) -> Int {
     return x * y
 }
 
-curriedmul <- curry(mul@(Int,Int))
+let curriedmul = curry(mul@(Int,Int))
 
 println(curriedmul(5)(5))
 
