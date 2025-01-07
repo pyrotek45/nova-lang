@@ -2426,7 +2426,7 @@ impl Parser {
             None => {
                 return Err(self.generate_error("End of file error", "expected expression"));
             }
-            _ => left = Expr::None,
+            _ => left = Expr::Void,
         }
         loop {
             match self.current_token_value() {
@@ -4218,6 +4218,8 @@ impl Parser {
             expr = self.expr()?;
             ttype = expr.get_type();
         }
+
+        // if keyword in then grab expr and return the value
 
         // cant assing a void
         if expr.get_type() == TType::Void {

@@ -253,6 +253,7 @@ pub enum Expr {
         body: Vec<Statement>,
     },
     None,
+    Void,
 }
 
 impl Expr {
@@ -274,6 +275,7 @@ impl Expr {
             Expr::IfExpr { ttype, .. } => ttype.clone(),
             Expr::Block { ttype, .. } => ttype.clone(),
             Expr::Let { ttype, .. } => ttype.clone(),
+            Expr::Void => TType::Void,
         }
     }
 }
