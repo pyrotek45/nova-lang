@@ -1,7 +1,6 @@
 module loopsDemo
 
 // For loop (expression;condition;iteration)
-// <- is like a let statement, but its an expression instead, so we can use it here. 
 for let i = 0; i < 10; i += 1 {
     i.println()
 }
