@@ -12,9 +12,9 @@ fn extends show(self: Box($A)) {
 
 fn Gen(start: Int) -> fn() -> Int {
     let i = Box(start)
-    return fn() -> Int {
+    return || {
         i.value += 1
-        return i.value - 1
+        i.value - 1
     }
 }
 
