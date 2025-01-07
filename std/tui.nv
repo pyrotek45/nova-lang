@@ -22,12 +22,12 @@ fn extends show(self: SceneManager($T)) {
     let check = true
     let index = 0
 
-    let showError = fn() {
+    let showError = || {
         println("not a valid Item")
         readln()
     }
 
-    let showErrorMsg = fn(msg: String) {
+    let showErrorMsg = |msg: String| {
         println(msg)
         exit()
     }
@@ -46,7 +46,7 @@ fn extends show(self: SceneManager($T)) {
                     index += 1
                 }
                 break
-            } 
+            }
         }
 
         print("\n>> ")

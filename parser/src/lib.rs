@@ -2056,6 +2056,7 @@ impl Parser {
                         }
                     }
                 }
+
                 left = Expr::Closure {
                     ttype: TType::Function {
                         parameters: typeinput,
@@ -2583,14 +2584,16 @@ impl Parser {
                 ),
             };
         }
-        let mut output = TType::Void;
+        let output: TType;
         let statement = if let Some(StructuralSymbol(LeftBrace)) = self.current_token_value() {
             //println!("its a block");
-            let block = self.block_expr_return()?;
-            if let Some(Statement::Return { ttype, expr: _ }) = block.last() {
-                output = ttype.clone();
-            };
-            block
+            let expression = self.block_expr()?;
+            output = expression.clone().get_type();
+            let statement = vec![Statement::Return {
+                ttype: expression.get_type(),
+                expr: expression.clone(),
+            }];
+            statement
         } else {
             //println!("its an expression");
             let expression = self.expr()?;
@@ -4219,8 +4222,6 @@ impl Parser {
             ttype = expr.get_type();
         }
 
-        // if keyword in then grab expr and return the value
-
         // cant assing a void
         if expr.get_type() == TType::Void {
             return Err(self.generate_error_with_pos(
@@ -4778,35 +4779,6 @@ impl Parser {
             body: statements,
             ttype: ttype.clone(),
         })
-    }
-
-    fn block_expr_return(&mut self) -> Result<Vec<Statement>, NovaError> {
-        let pos = self.get_current_token_position();
-        self.consume_symbol(LeftBrace)?;
-        let statements = self.compound_statement()?;
-        self.consume_symbol(RightBrace)?;
-        let error = || {
-            self.generate_error_with_pos(
-                "Block must have expression as last value",
-                "",
-                pos.clone(),
-            )
-        };
-        statements.split_last().map_or_else(
-            || Err(error()),
-            |(last, initial_statements)| {
-                if let Statement::Expression { ttype, expr, .. } = last {
-                    let mut final_statements = initial_statements.to_vec();
-                    final_statements.push(Statement::Return {
-                        ttype: ttype.clone(),
-                        expr: expr.clone(),
-                    });
-                    Ok(final_statements)
-                } else {
-                    Err(error())
-                }
-            },
-        )
     }
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {

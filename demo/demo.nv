@@ -53,7 +53,7 @@ struct Zed {
 
 // Creating an instance from a type
 let zed = Zed {
-    test: fn() {
+    test: || {
         print("wow\n")
     }
 }
