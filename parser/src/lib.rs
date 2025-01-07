@@ -1816,6 +1816,9 @@ impl Parser {
         };
         let mut left: Expr;
         match self.current_token_value() {
+            Some(StructuralSymbol(LeftBrace)) => {
+                left = self.block_expr()?;
+            }
             // if expression if test {} else {}, both branches must return the same type
             Some(Identifier(id)) if "if" == id.deref() => {
                 let pos = self.get_current_token_position();
@@ -1829,13 +1832,9 @@ impl Parser {
                         format!("Got {}", condition.get_type()),
                     ));
                 }
-                self.consume_symbol(LeftBrace)?;
-                let if_branch = self.expr()?;
-                self.consume_symbol(RightBrace)?;
+                let if_branch = self.block_expr()?;
                 self.consume_identifier(Some("else"))?;
-                self.consume_symbol(LeftBrace)?;
-                let else_branch = self.expr()?;
-                self.consume_symbol(RightBrace)?;
+                let else_branch = self.block_expr()?;
                 let if_type = if if_branch.get_type() == else_branch.get_type() {
                     if_branch.get_type()
                 } else {
@@ -2254,7 +2253,7 @@ impl Parser {
                     self.consume_symbol(RightParen)?;
                     // error tuple must contain at least two elements
                     return Err(self.generate_error(
-                        "Tuple must contain at least two elements",
+                        "Tuple must contain at least one elements",
                         "Add more elements to the tuple",
                     ));
                 } else {
@@ -2350,45 +2349,6 @@ impl Parser {
                         }
                         self.consume_symbol(RightParen)?;
                         generate_unique_string(&identifier, &type_annotation).into()
-                    }
-                    Some(Operator(Operator::LeftArrow)) => {
-                        self.consume_operator(Operator::LeftArrow)?;
-                        let expr = self.expr()?;
-
-                        // cant assing a void
-                        if expr.get_type() == TType::Void {
-                            return Err(self.generate_error_with_pos(
-                                format!("Variable '{}' cannot be assinged to void", identifier),
-                                "Make sure the expression returns a value",
-                                pos.clone(),
-                            ));
-                        }
-
-                        if self.environment.has(&identifier) {
-                            return Err(self.generate_error_with_pos(
-                                format!("Variable '{}' has already been created", identifier),
-                                "",
-                                pos.clone(),
-                            ));
-                        } else {
-                            self.environment.insert_symbol(
-                                &identifier,
-                                expr.get_type(),
-                                Some(pos.clone()),
-                                SymbolKind::Variable,
-                            );
-                            return Ok(Expr::Binop {
-                                ttype: TType::Void,
-                                op: Operator::Assignment,
-                                lhs: Box::new(Expr::Literal {
-                                    ttype: expr.get_type(),
-                                    value: Atom::Id {
-                                        name: identifier.clone(),
-                                    },
-                                }),
-                                rhs: Box::new(expr),
-                            });
-                        }
                     }
                     _ => identifier,
                 };
@@ -2626,7 +2586,7 @@ impl Parser {
         let mut output = TType::Void;
         let statement = if let Some(StructuralSymbol(LeftBrace)) = self.current_token_value() {
             //println!("its a block");
-            let block = self.block_expr()?;
+            let block = self.block_expr_return()?;
             if let Some(Statement::Return { ttype, expr: _ }) = block.last() {
                 output = ttype.clone();
             };
@@ -2808,6 +2768,12 @@ impl Parser {
     }
 
     fn expr(&mut self) -> Result<Expr, NovaError> {
+        match self.current_token_value() {
+            Some(Identifier(id)) if "let" == id.deref() => {
+                return self.let_expr();
+            }
+            _ => {}
+        }
         let mut left_expr = self.top_expr()?;
         let current_pos = self.get_current_token_position();
         while self.current_token().is_some_and(|t| t.is_assign()) {
@@ -2902,7 +2868,7 @@ impl Parser {
                             Some(pos.clone()),
                             SymbolKind::Variable,
                         );
-                        let expr_block = self.block_expr_inline()?;
+                        let expr_block = self.block()?;
                         self.environment.pop_block();
 
                         if let Some(Statement::Expression { ttype, .. }) = expr_block.last() {
@@ -3663,7 +3629,6 @@ impl Parser {
                 "struct" => self.struct_declaration(),
                 "if" => self.if_statement(),
                 "while" => self.while_statement(),
-                "let" => self.let_statement(),
                 "return" => self.return_statement(),
                 "fn" => self.function_declaration(),
                 "enum" => self.enum_declaration(),
@@ -4055,6 +4020,7 @@ impl Parser {
             }
         } else {
             // Handle regular for statement
+            self.environment.push_block();
             let init = self.expr()?;
             self.consume_symbol(Semicolon)?;
             let testpos = self.get_current_token_position();
@@ -4068,7 +4034,6 @@ impl Parser {
                     testpos,
                 ));
             }
-            self.environment.push_block();
             let body = self.block()?;
             self.environment.pop_block();
             Ok(Some(Statement::For {
@@ -4198,7 +4163,7 @@ impl Parser {
         }
     }
 
-    fn let_statement(&mut self) -> Result<Option<Statement>, NovaError> {
+    fn let_expr(&mut self) -> Result<Expr, NovaError> {
         self.consume_identifier(Some("let"))?;
         let mut global = false;
         // refactor out into two parsing ways for ident. one with module and one without
@@ -4276,12 +4241,12 @@ impl Parser {
                 Some(pos.clone()),
                 SymbolKind::Variable,
             );
-            Ok(Some(Statement::Let {
-                ttype,
+            Ok(Expr::Let {
+                ttype: TType::Void,
                 identifier,
-                expr,
+                expr: Box::new(expr),
                 global,
-            }))
+            })
         }
     }
 
@@ -4779,7 +4744,41 @@ impl Parser {
         Ok(statements)
     }
 
-    fn block_expr(&mut self) -> Result<Vec<Statement>, NovaError> {
+    fn block_expr(&mut self) -> Result<Expr, NovaError> {
+        let pos = self.get_current_token_position();
+        self.consume_symbol(LeftBrace)?;
+        self.environment.push_block();
+        let statements = self.compound_statement()?;
+        self.environment.pop_block();
+        self.consume_symbol(RightBrace)?;
+        // check if last statement is a statement expression
+        let ttype = match statements.last().cloned() {
+            Some(Statement::Expression { ttype, .. }) => ttype,
+            _ => {
+                return Err(NovaError::Parsing {
+                    msg: "Block must have expression as last value".into(),
+                    position: pos,
+                    note: "".into(),
+                    extra: None,
+                })
+            }
+        };
+        // check if type is None
+        if ttype == TType::None {
+            return Err(NovaError::Parsing {
+                msg: "Block must have expression as last value".into(),
+                position: pos,
+                note: "".into(),
+                extra: None,
+            });
+        }
+        Ok(Expr::Block {
+            body: statements,
+            ttype: ttype.clone(),
+        })
+    }
+
+    fn block_expr_return(&mut self) -> Result<Vec<Statement>, NovaError> {
         let pos = self.get_current_token_position();
         self.consume_symbol(LeftBrace)?;
         let statements = self.compound_statement()?;
@@ -4806,13 +4805,6 @@ impl Parser {
                 }
             },
         )
-    }
-
-    fn block_expr_inline(&mut self) -> Result<Vec<Statement>, NovaError> {
-        self.consume_symbol(LeftBrace)?;
-        let statements = self.compound_statement()?;
-        self.consume_symbol(RightBrace)?;
-        Ok(statements)
     }
 
     fn compound_statement(&mut self) -> Result<Vec<Statement>, NovaError> {

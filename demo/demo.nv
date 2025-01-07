@@ -16,12 +16,6 @@ let person : Person = Person {name: "bob", age: 42}
 // Optional type annotation
 let person2 = Person("joe", 50)
 
-// Creating new variable the easy way
-person3 <- Person("bobby", 30)
-
-// Updating a variable 
-person3 = Person("jesse", 25)
-
 // Function for type
 fn extends display(self: Person) {
     println(self.name)

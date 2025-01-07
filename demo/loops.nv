@@ -2,12 +2,12 @@ module loopsDemo
 
 // For loop (expression;condition;iteration)
 // <- is like a let statement, but its an expression instead, so we can use it here. 
-for i <- 0; i < 10; i += 1 {
+for let i = 0; i < 10; i += 1 {
     i.println()
 }
 
 // While loops (condition)
-j <- 0
+let j = 0
 while true {
     j += 1
     if j == 5 {

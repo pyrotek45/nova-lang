@@ -139,7 +139,6 @@ fn operators() {
             Equal,
             Assignment,
             RightArrow,
-            LeftArrow,
             Greater,
             Less,
             Addition,

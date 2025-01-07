@@ -123,6 +123,7 @@ impl Compiler {
         alloc: bool,
         global: bool,
         function: bool,
+        keep: bool,
     ) -> Result<Vec<Asm>, NovaError> {
         self.filepath = filepath.into();
         // create wrapper functions for builtin functions
@@ -211,7 +212,14 @@ impl Compiler {
                     let foreach_body = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(foreach_body, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(
+                        foreach_body,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
                     self.asm.pop();
                     // -- body
 
@@ -229,30 +237,6 @@ impl Compiler {
                     self.continues.pop();
                 }
                 common::nodes::Statement::Pass => {}
-                common::nodes::Statement::Let {
-                    ttype: _,
-                    identifier,
-                    expr,
-                    global,
-                } => {
-                    self.compile_expr(expr)?;
-
-                    if *global {
-                        if let Some(index) = self.global.get_index(identifier) {
-                            self.asm.push(Asm::STOREGLOBAL(index as u32))
-                        } else {
-                            self.global.insert(identifier.clone());
-                            let index = self.global.len() - 1;
-                            self.asm.push(Asm::STOREGLOBAL(index as u32))
-                        }
-                    } else if let Some(index) = self.variables.get_index(identifier) {
-                        self.asm.push(Asm::STORE(index as u32))
-                    } else {
-                        self.variables.insert(identifier.clone());
-                        let index = self.variables.len() - 1;
-                        self.asm.push(Asm::STORE(index as u32))
-                    }
-                }
                 Function {
                     identifier,
                     parameters,
@@ -313,6 +297,7 @@ impl Compiler {
                         true,
                         false,
                         true,
+                        false,
                     )?;
 
                     // Adjust the function's offset to account for parameters and captured variables
@@ -363,7 +348,7 @@ impl Compiler {
                 }
                 Expression { ttype, expr } => {
                     self.compile_expr(expr)?;
-                    if ttype != &TType::Void {
+                    if !keep && ttype != &TType::Void {
                         self.asm.push(Asm::POP);
                     }
                 }
@@ -379,7 +364,14 @@ impl Compiler {
                     let body_ast = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(body_ast, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(
+                        body_ast,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
                     self.asm.pop();
 
                     if let Some(alternative) = alternative {
@@ -388,7 +380,14 @@ impl Compiler {
                         let alt = Ast {
                             program: alternative.clone(),
                         };
-                        self.compile_program(alt, self.filepath.clone(), false, false, false)?;
+                        self.compile_program(
+                            alt,
+                            self.filepath.clone(),
+                            false,
+                            false,
+                            false,
+                            false,
+                        )?;
                         self.asm.pop();
                         self.asm.push(Asm::LABEL(alterjump));
                     } else {
@@ -407,7 +406,14 @@ impl Compiler {
                     let whilebody = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(
+                        whilebody,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
                     self.asm.pop();
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
@@ -432,7 +438,14 @@ impl Compiler {
                     let whilebody = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(
+                        whilebody,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
                     self.asm.pop();
                     self.asm.push(Asm::LABEL(next));
                     self.compile_expr(inc)?;
@@ -459,7 +472,7 @@ impl Compiler {
                     let body = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(body, filepath.clone(), false, false, false)?;
+                    self.compile_program(body, filepath.clone(), false, false, false, false)?;
                     self.asm.pop();
                 }
                 common::nodes::Statement::Unwrap {
@@ -481,7 +494,7 @@ impl Compiler {
                     let body = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(body, self.filepath.clone(), false, false, false, false)?;
                     self.asm.pop();
                     self.asm.push(Asm::JMP(end));
                     self.asm.push(Asm::LABEL(skip));
@@ -492,6 +505,7 @@ impl Compiler {
                         self.compile_program(
                             alternative,
                             self.filepath.clone(),
+                            false,
                             false,
                             false,
                             false,
@@ -531,7 +545,7 @@ impl Compiler {
                     let body = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(body, self.filepath.clone(), false, false, false, false)?;
                     self.asm.pop();
                     self.asm.push(Asm::JMP(end));
                     self.asm.push(Asm::LABEL(skip));
@@ -543,6 +557,7 @@ impl Compiler {
                         self.compile_program(
                             alternative,
                             self.filepath.clone(),
+                            false,
                             false,
                             false,
                             false,
@@ -637,7 +652,14 @@ impl Compiler {
                         let arm = Ast {
                             program: arm.2.clone(),
                         };
-                        self.compile_program(arm, self.filepath.clone(), false, false, false)?;
+                        self.compile_program(
+                            arm,
+                            self.filepath.clone(),
+                            false,
+                            false,
+                            false,
+                            false,
+                        )?;
                         self.asm.pop();
 
                         self.asm.push(Asm::JMP(end));
@@ -647,7 +669,14 @@ impl Compiler {
                         let default = Ast {
                             program: default.clone(),
                         };
-                        self.compile_program(default, self.filepath.clone(), false, false, false)?;
+                        self.compile_program(
+                            default,
+                            self.filepath.clone(),
+                            false,
+                            false,
+                            false,
+                            false,
+                        )?;
                         self.asm.pop();
                     }
                     self.asm.push(Asm::LABEL(end));
@@ -707,7 +736,14 @@ impl Compiler {
                     let whilebody = Ast {
                         program: body.clone(),
                     };
-                    self.compile_program(whilebody, self.filepath.clone(), false, false, false)?;
+                    self.compile_program(
+                        whilebody,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
                     self.asm.pop();
 
                     self.asm.push(Asm::LABEL(next));
@@ -811,6 +847,8 @@ impl Compiler {
             Expr::StoreExpr { .. } => todo!(),
             Expr::Return { .. } => todo!(),
             Expr::IfExpr { .. } => todo!(),
+            Expr::Block { .. } => todo!(),
+            Expr::Let { .. } => todo!(),
         }
         Ok(())
     }
@@ -1177,7 +1215,6 @@ impl Compiler {
                             dbg!(&ttype);
                         }
                     }
-                    common::tokens::Operator::LeftArrow => todo!(),
                     common::tokens::Operator::RightTilde => todo!(),
                     common::tokens::Operator::LeftTilde => todo!(),
                     common::tokens::Operator::ExclusiveRange => todo!(),
@@ -1255,6 +1292,7 @@ impl Compiler {
                     true,
                     false,
                     true,
+                    false,
                 )?;
 
                 // Adjust the function's offset to account for parameters and captured variables
@@ -1481,7 +1519,7 @@ impl Compiler {
                 let body = Ast {
                     program: body.clone(),
                 };
-                self.compile_program(body, self.filepath.clone(), false, false, false)?;
+                self.compile_program(body, self.filepath.clone(), false, false, false, false)?;
                 self.asm.pop();
                 // total hack, happens when last statement gets autopopped when compiling a statement expr
                 // so we need to pop it again
@@ -1507,11 +1545,44 @@ impl Compiler {
                 self.compile_expr(test)?;
                 self.asm.push(Asm::JUMPIFFALSE(next));
                 self.compile_expr(body)?;
-                self.asm.pop();
                 self.asm.push(Asm::JMP(end));
                 self.asm.push(Asm::LABEL(next));
                 self.compile_expr(alternative)?;
                 self.asm.push(Asm::LABEL(end));
+                Ok(())
+            }
+            Expr::Block { body, .. } => {
+                //dbg!(ttype);
+                let b = Ast {
+                    program: body.clone(),
+                };
+                self.compile_program(b, self.filepath.clone(), false, false, false, true)?;
+                self.asm.pop();
+                Ok(())
+            }
+            Expr::Let {
+                identifier,
+                expr,
+                global,
+                ..
+            } => {
+                self.compile_expr(expr)?;
+
+                if *global {
+                    if let Some(index) = self.global.get_index(identifier) {
+                        self.asm.push(Asm::STOREGLOBAL(index as u32))
+                    } else {
+                        self.global.insert(identifier.clone());
+                        let index = self.global.len() - 1;
+                        self.asm.push(Asm::STOREGLOBAL(index as u32))
+                    }
+                } else if let Some(index) = self.variables.get_index(identifier) {
+                    self.asm.push(Asm::STORE(index as u32))
+                } else {
+                    self.variables.insert(identifier.clone());
+                    let index = self.variables.len() - 1;
+                    self.asm.push(Asm::STORE(index as u32))
+                }
                 Ok(())
             }
         }
