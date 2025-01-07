@@ -1,6 +1,6 @@
 module option_typeDemo
 
-// optional types are created with ?
+// optional types are created with Some(Value) and None(Type)
 let option  : Option(Int) = Some(10)
 let option2 : Option(Int) = None(Int) // this is a nil value. 
 
