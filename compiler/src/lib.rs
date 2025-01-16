@@ -27,6 +27,7 @@ pub struct Compiler {
     pub gen: Gen,
     pub breaks: Vec<u64>,
     pub continues: Vec<u64>,
+    pub global_strings: HashMap<Rc<str>, usize>,
 }
 
 pub fn new() -> Compiler {
@@ -44,10 +45,30 @@ pub fn new() -> Compiler {
         breaks: vec![],
         continues: vec![],
         native_functions_types: HashMap::default(),
+        global_strings: HashMap::default(),
     }
 }
 
 impl Compiler {
+    fn compile_string_literal(&mut self, string: &str) {
+        let index = self.insert_string_global(string.into());
+        self.asm.push(Asm::GETGLOBAL(index as u32));
+        //dbg!(&index, &string);
+    }
+
+    fn insert_string_global(&mut self, string: Rc<str>) -> usize {
+        // mangle string input to String__literal__<string>
+        let mangled_string = Rc::from(format!("String__literal__{}", string));
+        if let Some(index) = self.global_strings.get(&string) {
+            *index
+        } else {
+            self.global.insert(mangled_string);
+            let index = self.global.len() - 1;
+            self.global_strings.insert(string, index);
+            index
+        }
+    }
+
     pub fn clear(&mut self) {
         self.output.clear()
     }
@@ -77,7 +98,7 @@ impl Compiler {
         self.asm.push(Asm::FUNCTION(jump));
         self.asm.push(Asm::OFFSET(1, 0));
         self.asm.push(Asm::PRINT);
-        self.asm.push(Asm::STRING("\n".into()));
+        self.compile_string_literal("\n");
         self.asm.push(Asm::PRINT);
         self.asm.push(Asm::RET(false));
         self.asm.push(Asm::LABEL(jump));
@@ -220,6 +241,7 @@ impl Compiler {
                         false,
                         false,
                     )?;
+
                     self.asm.pop();
                     // -- body
 
@@ -312,6 +334,8 @@ impl Compiler {
 
                     // Append compiled function instructions to the current scope
                     self.gen = function_compile.gen;
+                    self.global = function_compile.global;
+                    self.global_strings = function_compile.global_strings;
                     function_compile.asm.pop(); // Remove the last instruction from function compilation
                     self.asm.extend_from_slice(&function_compile.asm);
                     self.asm.push(Asm::LABEL(closure_jump_label));
@@ -332,14 +356,15 @@ impl Compiler {
                     fields,
                 } => {
                     self.global.insert(identifier.clone());
+                    let index = self.global.len() - 1;
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
                     self.asm.push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
-                    self.asm.push(Asm::STRING(identifier.clone()));
+                    self.compile_string_literal(identifier);
                     self.asm.push(Asm::LIST(fields.len() as u64));
                     self.asm.push(Asm::RET(true));
                     self.asm.push(Asm::LABEL(structjump));
-                    let index = self.global.len() - 1;
+
                     self.asm.push(Asm::STOREGLOBAL(index as u32));
                 }
 
@@ -597,8 +622,7 @@ impl Compiler {
                         }
 
                         self.asm.push(Asm::INTEGER(tag as i64));
-                        self.asm.push(Asm::STRING(identifier.clone()));
-
+                        self.compile_string_literal(identifier);
                         self.asm.push(Asm::LIST(3_u64));
                         self.asm.push(Asm::RET(true));
 
@@ -788,8 +812,17 @@ impl Compiler {
         }
 
         if global {
-            self.asm
-                .insert(0, Asm::ALLOCGLOBBALS(self.global.len() as u32));
+            //println!("global len {}", self.global.len());
+            let mut package = vec![Asm::ALLOCGLOBBALS(self.global.len() as u32)];
+
+            for s in self.global_strings.iter() {
+                //println!("s0 {} s1 {}", s.0, s.1);
+                package.push(Asm::STRING(s.0.clone()));
+                package.push(Asm::STOREGLOBAL(*s.1 as u32));
+            }
+
+            package.extend_from_slice(&self.asm);
+            self.asm = package;
         }
 
         self.asm.push(Asm::RET(false));
@@ -881,7 +914,8 @@ impl Compiler {
                 self.asm.push(Asm::FLOAT(*float));
             }
             Atom::String { value: str } => {
-                self.asm.push(Asm::STRING(str.clone()));
+                let index = self.insert_string_global(str.clone());
+                self.asm.push(Asm::GETGLOBAL(index as u32));
             }
             Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(*int));
@@ -1316,6 +1350,8 @@ impl Compiler {
 
                 // Append compiled function instructions to the current scope
                 self.gen = function_compile.gen;
+                self.global = function_compile.global;
+                self.global_strings = function_compile.global_strings;
                 function_compile.asm.pop(); // Remove the last instruction from function compilation
                 self.asm.extend_from_slice(&function_compile.asm);
                 self.asm.push(Asm::LABEL(closure_jump_label));
@@ -1733,7 +1769,8 @@ impl Compiler {
                 self.asm.push(Asm::FLOAT(*float));
             }
             Atom::String { value: str } => {
-                self.asm.push(Asm::STRING(str.clone()));
+                let index = self.insert_string_global(str.clone());
+                self.asm.push(Asm::GETGLOBAL(index as u32));
             }
             Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(*int));
@@ -1743,9 +1780,9 @@ impl Compiler {
                 arguments: list,
                 position,
             } => {
+                // println!("Call: {}", caller);
                 if caller.deref() == "typeof" {
-                    self.asm
-                        .push(Asm::STRING(list[0].get_type().to_string().into()));
+                    self.compile_string_literal(&list[0].get_type().to_string());
                     return Ok(());
                 }
                 for expr in list {
@@ -1755,7 +1792,7 @@ impl Compiler {
                     "unreachable" => self.asm.push(Asm::ERROR(position.clone())),
                     "todo" => {
                         // show a panic message before exiting
-                        self.asm.push(Asm::STRING("Not yet implemented\n".into()));
+                        self.compile_string_literal("Not yet implemented");
                         self.asm.push(Asm::PRINT);
                         self.asm.push(Asm::ERROR(position.clone()));
                     }
@@ -1775,6 +1812,7 @@ impl Compiler {
                             self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
                         } else if let Some(index) = self.global.get_index(identifier) {
+                            //dbg!(identifier, &index);
                             self.asm.push(Asm::DCALL(index as u32));
                         } else {
                             return Err(NovaError::Compiler {
