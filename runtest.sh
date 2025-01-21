@@ -4,6 +4,8 @@ nova="./target/release/nova"
 
 # Run the tests
 $nova run demo/demo.nv
+$nova run demo/matmul.nv
+$nova run demo/dunder.nv
 $nova run demo/let.nv
 $nova run demo/loops.nv
 $nova run Aoc2024/nvaoc1.nv
@@ -20,3 +22,4 @@ $nova run std/hashmap.nv
 $nova run std/io.nv
 $nova run std/tui.nv
 $nova run std/tuple.nv
+
