@@ -6,6 +6,27 @@ struct Iter(A) {
     next: fn() -> Option($A)
 }
 
+fn extends next(it: Iter($A)) -> Option($A) {
+    return it.next()
+}
+
+fn extends(Iter) fromRange(start: Int, end: Int) -> Iter(Int) {
+    let index = Box(start)  
+    return Iter(fn() -> Option(Int) {
+        if index.value >= end {
+            return None(Int)
+        } else {
+            let result = Some(index.value);
+            index.value += 1
+            return result
+        }
+    })
+}
+
+fn extends toString(it: Iter($A)) -> String {
+    return "Iter"
+}
+
 fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
     let index = Box(0)  
     return Iter(fn() -> Option($A) {

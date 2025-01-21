@@ -2756,31 +2756,137 @@ impl Parser {
             if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.factor()?;
-                if left_expr.clone().get_type() == right_expr.clone().get_type()
-                    && (left_expr.clone().get_type() == TType::Int
-                        || left_expr.clone().get_type() == TType::Float)
-                    && (right_expr.clone().get_type() == TType::Int
-                        || right_expr.clone().get_type() == TType::Float)
-                {
-                    self.check_and_map_types(
-                        &[left_expr.clone().get_type()],
-                        &[right_expr.clone().get_type()],
-                        &mut HashMap::default(),
-                        current_pos.clone(),
-                    )?;
-                    left_expr = self.create_binop_expr(
-                        left_expr.clone(),
-                        right_expr,
-                        operation,
-                        left_expr.get_type(),
-                    );
-                } else {
-                    return Err(self.create_type_error(
-                        left_expr.clone(),
-                        right_expr.clone(),
-                        operation,
-                        current_pos.clone(),
-                    ));
+                match (left_expr.clone().get_type(), right_expr.clone().get_type()) {
+                    (TType::Int, TType::Int) | (TType::Float, TType::Float) => {
+                        self.check_and_map_types(
+                            &[left_expr.clone().get_type()],
+                            &[right_expr.clone().get_type()],
+                            &mut HashMap::default(),
+                            current_pos.clone(),
+                        )?;
+                        left_expr = self.create_binop_expr(
+                            left_expr.clone(),
+                            right_expr,
+                            operation,
+                            left_expr.get_type(),
+                        );
+                    }
+                    (_, _) => {
+                        // check dunder methods for operation
+                        let function_id: String = match operation {
+                            Operator::Multiplication => "__mul__".into(),
+                            Operator::Division => "__div__".into(),
+                            Operator::Modulo => "__mod__".into(),
+                            _ => {
+                                return Err(self.generate_error_with_pos(
+                                    "Invalid operation",
+                                    "Operation not supported",
+                                    current_pos.clone(),
+                                ));
+                            }
+                        };
+                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                            &function_id,
+                            &[left_expr.get_type(), right_expr.get_type()],
+                        )) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                            let returntype = match overload.ttype {
+                                TType::Function {
+                                    return_type,
+                                    parameters,
+                                } => {
+                                    match self.check_and_map_types(
+                                        &parameters,
+                                        &typelist,
+                                        &mut HashMap::default(),
+                                        pos.clone(),
+                                    ) {
+                                        Ok(_) => *return_type,
+                                        Err(_) => {
+                                            return Ok(self.create_binop_expr(
+                                                left_expr,
+                                                right_expr,
+                                                operation,
+                                                TType::Bool,
+                                            ))
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: returntype,
+                                value: Atom::Call {
+                                    name: generate_unique_string(
+                                        &function_id,
+                                        &[left_expr.get_type(), right_expr.get_type()],
+                                    )
+                                    .into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else if let Some(overload) = self.environment.get(&function_id) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                            let returntype = match overload.ttype {
+                                TType::Function {
+                                    return_type,
+                                    parameters,
+                                } => {
+                                    match self.check_and_map_types(
+                                        &parameters,
+                                        &typelist,
+                                        &mut HashMap::default(),
+                                        pos.clone(),
+                                    ) {
+                                        Ok(_) => *return_type,
+                                        Err(_) => {
+                                            return Ok(self.create_binop_expr(
+                                                left_expr,
+                                                right_expr,
+                                                operation,
+                                                TType::Bool,
+                                            ))
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: returntype,
+                                value: Atom::Call {
+                                    name: function_id.into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else {
+                            left_expr = self.create_binop_expr(
+                                left_expr,
+                                right_expr,
+                                operation,
+                                TType::Bool,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -2927,30 +3033,381 @@ impl Parser {
             if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
                 let right_expr = self.mid_expr()?;
+                // check if void
+                if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
+                    return Err(self.generate_error_with_pos(
+                        "Cannot compare void",
+                        "Make sure expression returns a value",
+                        current_pos.clone(),
+                    ));
+                }
                 match operation {
                     Operator::And | Operator::Or => {
                         if (left_expr.get_type() != TType::Bool)
                             || (right_expr.get_type() != TType::Bool)
                         {
-                            return Err(self.generate_error_with_pos(
-                                "Logical operation expects bool",
-                                format!("got {} {}", left_expr.get_type(), right_expr.get_type(),),
-                                current_pos.clone(),
-                            ));
+                            // check dunder method
+                            let function_id: String = match operation {
+                                Operator::And => "__and__".into(),
+                                Operator::Or => "__or__".into(),
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+
+                            if let Some(overload) = self.environment.get(&generate_unique_string(
+                                &function_id,
+                                &[left_expr.get_type(), right_expr.get_type()],
+                            )) {
+                                // get return type of function call
+                                let pos = self.get_current_token_position();
+                                let arguments = vec![left_expr.clone(), right_expr.clone()];
+                                let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                                let returntype = match overload.ttype {
+                                    TType::Function {
+                                        return_type,
+                                        parameters,
+                                    } => {
+                                        match self.check_and_map_types(
+                                            &parameters,
+                                            &typelist,
+                                            &mut HashMap::default(),
+                                            pos.clone(),
+                                        ) {
+                                            Ok(_) => *return_type,
+                                            Err(_) => {
+                                                return Ok(self.create_binop_expr(
+                                                    left_expr,
+                                                    right_expr,
+                                                    operation,
+                                                    TType::Bool,
+                                                ))
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(self.generate_error(
+                                            "Expected function",
+                                            "Make sure function is defined",
+                                        ))
+                                    }
+                                };
+                                // check if return type is bool
+                                if returntype != TType::Bool {
+                                    return Err(self.generate_error_with_pos(
+                                        "Comparison operation expects bool",
+                                        format!(
+                                            "expected {} , but found {}",
+                                            left_expr.get_type(),
+                                            right_expr.get_type(),
+                                        ),
+                                        current_pos.clone(),
+                                    ));
+                                }
+                                // return function call expression
+                                left_expr = Expr::Literal {
+                                    ttype: TType::Bool,
+                                    value: Atom::Call {
+                                        name: generate_unique_string(
+                                            &function_id,
+                                            &[left_expr.get_type(), right_expr.get_type()],
+                                        )
+                                        .into(),
+                                        arguments,
+                                        position: pos.clone(),
+                                    },
+                                };
+                            } else if let Some(overload) = self.environment.get(&function_id) {
+                                // get return type of function call
+                                let pos = self.get_current_token_position();
+                                let arguments = vec![left_expr.clone(), right_expr.clone()];
+                                let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                                let returntype = match overload.ttype {
+                                    TType::Function {
+                                        return_type,
+                                        parameters,
+                                    } => {
+                                        match self.check_and_map_types(
+                                            &parameters,
+                                            &typelist,
+                                            &mut HashMap::default(),
+                                            pos.clone(),
+                                        ) {
+                                            Ok(_) => *return_type,
+                                            Err(_) => {
+                                                return Ok(self.create_binop_expr(
+                                                    left_expr,
+                                                    right_expr,
+                                                    operation,
+                                                    TType::Bool,
+                                                ))
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(self.generate_error(
+                                            "Expected function",
+                                            "Make sure function is defined",
+                                        ))
+                                    }
+                                };
+                                // check if return type is bool
+                                if returntype != TType::Bool {
+                                    return Err(self.generate_error_with_pos(
+                                        "Comparison operation expects bool",
+                                        format!(
+                                            "expected {} , but found {}",
+                                            left_expr.get_type(),
+                                            right_expr.get_type(),
+                                        ),
+                                        current_pos.clone(),
+                                    ));
+                                }
+                                // return function call expression
+                                left_expr = Expr::Literal {
+                                    ttype: TType::Bool,
+                                    value: Atom::Call {
+                                        name: function_id.into(),
+                                        arguments,
+                                        position: pos.clone(),
+                                    },
+                                };
+                            } else {
+                                left_expr = self.create_binop_expr(
+                                    left_expr,
+                                    right_expr,
+                                    operation,
+                                    TType::Bool,
+                                );
+                            }
+                        } else {
+                            left_expr = self.create_binop_expr(
+                                left_expr,
+                                right_expr,
+                                operation,
+                                TType::Bool,
+                            );
                         }
-                        left_expr =
-                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
                     Operator::Greater
                     | Operator::GreaterOrEqual
                     | Operator::LessOrEqual
                     | Operator::Less => {
                         match (left_expr.get_type(), right_expr.get_type()) {
-                            (TType::Int, TType::Int) => {}
-                            (TType::Float, TType::Float) => {}
+                            (TType::Int, TType::Int) => {
+                                left_expr = self.create_binop_expr(
+                                    left_expr,
+                                    right_expr,
+                                    operation,
+                                    TType::Bool,
+                                );
+                            }
+                            (TType::Float, TType::Float) => {
+                                left_expr = self.create_binop_expr(
+                                    left_expr,
+                                    right_expr,
+                                    operation,
+                                    TType::Bool,
+                                );
+                            }
                             _ => {
+                                // check dunder method
+                                let function_id: String = match operation {
+                                    Operator::Greater => "__gt__".into(),
+                                    Operator::GreaterOrEqual => "__ge__".into(),
+                                    Operator::Less => "__lt__".into(),
+                                    Operator::LessOrEqual => "__le__".into(),
+                                    _ => {
+                                        return Err(self.generate_error(
+                                            "Expected function",
+                                            "Make sure function is defined",
+                                        ))
+                                    }
+                                };
+
+                                if let Some(overload) =
+                                    self.environment.get(&generate_unique_string(
+                                        &function_id,
+                                        &[left_expr.get_type(), right_expr.get_type()],
+                                    ))
+                                {
+                                    // get return type of function call
+                                    let pos = self.get_current_token_position();
+                                    let arguments = vec![left_expr.clone(), right_expr.clone()];
+                                    let typelist =
+                                        vec![left_expr.get_type(), right_expr.get_type()];
+                                    let returntype = match overload.ttype {
+                                        TType::Function {
+                                            return_type,
+                                            parameters,
+                                        } => {
+                                            match self.check_and_map_types(
+                                                &parameters,
+                                                &typelist,
+                                                &mut HashMap::default(),
+                                                pos.clone(),
+                                            ) {
+                                                Ok(_) => *return_type,
+                                                Err(_) => {
+                                                    return Ok(self.create_binop_expr(
+                                                        left_expr,
+                                                        right_expr,
+                                                        operation,
+                                                        TType::Bool,
+                                                    ))
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            return Err(self.generate_error(
+                                                "Expected function",
+                                                "Make sure function is defined",
+                                            ))
+                                        }
+                                    };
+                                    // check if return type is bool
+                                    if returntype != TType::Bool {
+                                        return Err(self.generate_error_with_pos(
+                                            "Comparison operation expects bool",
+                                            format!(
+                                                "expected {} , but found {}",
+                                                left_expr.get_type(),
+                                                right_expr.get_type(),
+                                            ),
+                                            current_pos.clone(),
+                                        ));
+                                    }
+                                    // return function call expression
+                                    left_expr = Expr::Literal {
+                                        ttype: TType::Bool,
+                                        value: Atom::Call {
+                                            name: generate_unique_string(
+                                                &function_id,
+                                                &[left_expr.get_type(), right_expr.get_type()],
+                                            )
+                                            .into(),
+                                            arguments,
+                                            position: pos.clone(),
+                                        },
+                                    };
+                                } else if let Some(overload) = self.environment.get(&function_id) {
+                                    // get return type of function call
+                                    let pos = self.get_current_token_position();
+                                    let arguments = vec![left_expr.clone(), right_expr.clone()];
+                                    let typelist =
+                                        vec![left_expr.get_type(), right_expr.get_type()];
+                                    let returntype = match overload.ttype {
+                                        TType::Function {
+                                            return_type,
+                                            parameters,
+                                        } => {
+                                            match self.check_and_map_types(
+                                                &parameters,
+                                                &typelist,
+                                                &mut HashMap::default(),
+                                                pos.clone(),
+                                            ) {
+                                                Ok(_) => *return_type,
+                                                Err(_) => {
+                                                    return Ok(self.create_binop_expr(
+                                                        left_expr,
+                                                        right_expr,
+                                                        operation,
+                                                        TType::Bool,
+                                                    ))
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            return Err(self.generate_error(
+                                                "Expected function",
+                                                "Make sure function is defined",
+                                            ))
+                                        }
+                                    };
+                                    // check if return type is bool
+                                    if returntype != TType::Bool {
+                                        return Err(self.generate_error_with_pos(
+                                            "Comparison operation expects bool",
+                                            format!(
+                                                "expected {} , but found {}",
+                                                left_expr.get_type(),
+                                                right_expr.get_type(),
+                                            ),
+                                            current_pos.clone(),
+                                        ));
+                                    }
+                                    // return function call expression
+                                    left_expr = Expr::Literal {
+                                        ttype: TType::Bool,
+                                        value: Atom::Call {
+                                            name: function_id.into(),
+                                            arguments,
+                                            position: pos.clone(),
+                                        },
+                                    };
+                                } else {
+                                    left_expr = self.create_binop_expr(
+                                        left_expr,
+                                        right_expr,
+                                        operation,
+                                        TType::Bool,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // check dunder method
+                        let function_id: String = match operation {
+                            Operator::Equal => "__eq__".into(),
+                            Operator::NotEqual => "__ne__".into(),
+                            _ => "".into(),
+                        };
+                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                            &function_id,
+                            &[left_expr.get_type(), right_expr.get_type()],
+                        )) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                            let returntype = match overload.ttype {
+                                TType::Function {
+                                    return_type,
+                                    parameters,
+                                } => {
+                                    match self.check_and_map_types(
+                                        &parameters,
+                                        &typelist,
+                                        &mut HashMap::default(),
+                                        pos.clone(),
+                                    ) {
+                                        Ok(_) => *return_type,
+                                        Err(_) => {
+                                            return Ok(self.create_binop_expr(
+                                                left_expr,
+                                                right_expr,
+                                                operation,
+                                                TType::Bool,
+                                            ))
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // check if return type is bool
+                            if returntype != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    "Comparison operation expects int or float",
+                                    "Comparison operation expects bool",
                                     format!(
                                         "expected {} , but found {}",
                                         left_expr.get_type(),
@@ -2959,13 +3416,82 @@ impl Parser {
                                     current_pos.clone(),
                                 ));
                             }
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: TType::Bool,
+                                value: Atom::Call {
+                                    name: generate_unique_string(
+                                        &function_id,
+                                        &[left_expr.get_type(), right_expr.get_type()],
+                                    )
+                                    .into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else if let Some(overload) = self.environment.get(&function_id) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                            let returntype = match overload.ttype {
+                                TType::Function {
+                                    return_type,
+                                    parameters,
+                                } => {
+                                    match self.check_and_map_types(
+                                        &parameters,
+                                        &typelist,
+                                        &mut HashMap::default(),
+                                        pos.clone(),
+                                    ) {
+                                        Ok(_) => *return_type,
+                                        Err(_) => {
+                                            return Ok(self.create_binop_expr(
+                                                left_expr,
+                                                right_expr,
+                                                operation,
+                                                TType::Bool,
+                                            ))
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // check if return type is bool
+                            if returntype != TType::Bool {
+                                return Err(self.generate_error_with_pos(
+                                    "Comparison operation expects bool",
+                                    format!(
+                                        "expected {} , but found {}",
+                                        left_expr.get_type(),
+                                        right_expr.get_type(),
+                                    ),
+                                    current_pos.clone(),
+                                ));
+                            }
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: TType::Bool,
+                                value: Atom::Call {
+                                    name: function_id.into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else {
+                            left_expr = self.create_binop_expr(
+                                left_expr,
+                                right_expr,
+                                operation,
+                                TType::Bool,
+                            );
                         }
-                        left_expr =
-                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
-                    }
-                    _ => {
-                        left_expr =
-                            self.create_binop_expr(left_expr, right_expr, operation, TType::Bool);
                     }
                 }
             }
@@ -3010,12 +3536,78 @@ impl Parser {
                         }
                     }
                     (_, _) => {
-                        return Err(self.create_type_error(
-                            left_expr.clone(),
-                            right_expr.clone(),
-                            operation,
-                            current_pos.clone(),
-                        ));
+                        let function_id: String = match operation {
+                            Operator::Addition => "__add__".into(),
+                            Operator::Subtraction => "__sub__".into(),
+                            _ => {
+                                return Err(self.create_type_error(
+                                    left_expr.clone(),
+                                    right_expr.clone(),
+                                    operation,
+                                    current_pos.clone(),
+                                ))
+                            }
+                        };
+
+                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                            &function_id,
+                            &[left_expr.get_type(), right_expr.get_type()],
+                        )) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let returntype = match overload.ttype {
+                                TType::Function { return_type, .. } => *return_type,
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: returntype,
+                                value: Atom::Call {
+                                    name: generate_unique_string(
+                                        &function_id,
+                                        &[left_expr.get_type(), right_expr.get_type()],
+                                    )
+                                    .into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else if let Some(overload) = self.environment.get(&function_id) {
+                            // get return type of function call
+                            let pos = self.get_current_token_position();
+                            let arguments = vec![left_expr.clone(), right_expr.clone()];
+                            let returntype = match overload.ttype {
+                                TType::Function { return_type, .. } => *return_type,
+                                _ => {
+                                    return Err(self.generate_error(
+                                        "Expected function",
+                                        "Make sure function is defined",
+                                    ))
+                                }
+                            };
+                            // return function call expression
+                            left_expr = Expr::Literal {
+                                ttype: returntype,
+                                value: Atom::Call {
+                                    name: function_id.into(),
+                                    arguments,
+                                    position: pos.clone(),
+                                },
+                            };
+                        } else {
+                            left_expr = self.create_binop_expr(
+                                left_expr,
+                                right_expr,
+                                operation,
+                                TType::Bool,
+                            );
+                        }
                     }
                 }
             }
@@ -4319,10 +4911,13 @@ impl Parser {
 
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("fn"))?;
-
+        let builtin_types = [
+            "List", "Option", "Function", "Tuple", "Bool", "Int", "Float", "String", "Char",
+        ];
         let mut is_extended = false;
         let mut is_mod = false;
         let mut get_first = false;
+        // check if dunder method
         // check to see if next is the extends keyword with a custom type name and get the custom type name
         let mut custom_type = Rc::default();
         if self.current_token().is_some_and(|t| t.is_id("extends")) {
@@ -4332,7 +4927,9 @@ impl Parser {
                 self.consume_symbol(LeftParen)?;
                 (custom_type, _) = self.get_identifier()?;
                 // check to see if its a valid custom type
-                if !self.environment.custom_types.contains_key(&custom_type) {
+                if !self.environment.custom_types.contains_key(&custom_type)
+                    && !builtin_types.contains(&&*custom_type)
+                {
                     return Err(self.generate_error_with_pos(
                         format!("Custom type {} does not exist", custom_type),
                         "Cannot extend a non existent custom type",
@@ -4362,15 +4959,82 @@ impl Parser {
 
         let (mut identifier, pos) = self.get_identifier()?;
 
-        if is_extended || is_mod {
-            identifier = format!("{}::{}", custom_type, identifier).into();
-        }
-
         // get parameters
         self.consume_symbol(LeftParen)?;
         let parameters = self.parameter_list()?;
         self.consume_symbol(RightParen)?;
         // get output type
+
+        let mut output = TType::Void;
+        if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+        } else {
+            self.consume_operator(Operator::RightArrow)?;
+            output = self.ttype()?;
+        }
+        // retrieve types for input
+        let mut typeinput = vec![];
+        for arg in parameters.iter() {
+            typeinput.push(arg.0.clone())
+        }
+        // is function using generics?
+        let generic = Self::is_generic(&typeinput);
+
+        // check if dunder method
+        match identifier.as_ref() {
+            id @ "__add__"
+            | id @ "__sub__"
+            | id @ "__mul__"
+            | id @ "__div__"
+            | id @ "__mod__"
+            | id @ "__eq__"
+            | id @ "__ne__"
+            | id @ "__lt__"
+            | id @ "__le__"
+            | id @ "__gt__"
+            | id @ "__ge__" => {
+                if parameters.len() != 2 {
+                    return Err(self.generate_error_with_pos(
+                        format!("Dunder method {id} expects Two parameters"),
+                        format!("got {}", parameters.len()),
+                        pos.clone(),
+                    ));
+                }
+                if is_extended {
+                    // return error
+                    return Err(self.generate_error_with_pos(
+                        format!("Cannot extend from {id} "),
+                        "Cannot extend from dunder methods",
+                        pos.clone(),
+                    ));
+                }
+                // if generic {
+                //     return Err(self.generate_error_with_pos(
+                //         format!("Cannot create generic function for {id}"),
+                //         "Cannot create generic function for dunder methods",
+                //         pos.clone(),
+                //     ));
+                // }
+                if is_mod {
+                    return Err(self.generate_error_with_pos(
+                        format!("Cannot create module function for {id}"),
+                        "Cannot create module function for dunder methods",
+                        pos.clone(),
+                    ));
+                }
+                if get_first {
+                    return Err(self.generate_error_with_pos(
+                        format!("Cannot extend from {id} "),
+                        "Cannot extend from dunder methods",
+                        pos.clone(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        if is_extended || is_mod {
+            identifier = format!("{}::{}", custom_type, identifier).into();
+        }
 
         if !is_extended && get_first {
             //println!("{} {}", identifier, parameters.len());
@@ -4421,19 +5085,6 @@ impl Parser {
             }
         }
 
-        let mut output = TType::Void;
-        if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
-        } else {
-            self.consume_operator(Operator::RightArrow)?;
-            output = self.ttype()?;
-        }
-        // retrieve types for input
-        let mut typeinput = vec![];
-        for arg in parameters.iter() {
-            typeinput.push(arg.0.clone())
-        }
-        // is function using generics?
-        let generic = Self::is_generic(&typeinput);
         // build helper vecs
         let mut input = vec![];
         for (ttype, identifier) in parameters.clone() {
@@ -4522,6 +5173,7 @@ impl Parser {
                 SymbolKind::GenericFunction,
             );
         }
+        //println!("{} {}", identifier, parameters.len());
         // check for no rightbrace
         if self
             .current_token()
@@ -4770,32 +5422,19 @@ impl Parser {
     }
 
     fn block_expr(&mut self) -> Result<Expr, NovaError> {
-        let pos = self.get_current_token_position();
         self.consume_symbol(LeftBrace)?;
         self.environment.push_block();
         let statements = self.compound_statement()?;
         self.environment.pop_block();
         self.consume_symbol(RightBrace)?;
         // check if last statement is a statement expression
-        let ttype = match statements.last().cloned() {
+        let mut ttype = match statements.last().cloned() {
             Some(Statement::Expression { ttype, .. }) => ttype,
-            _ => {
-                return Err(NovaError::Parsing {
-                    msg: "Block must have expression as last value".into(),
-                    position: pos,
-                    note: "".into(),
-                    extra: None,
-                })
-            }
+            _ => TType::Void,
         };
         // check if type is None
         if ttype == TType::None {
-            return Err(NovaError::Parsing {
-                msg: "Block must have expression as last value".into(),
-                position: pos,
-                note: "".into(),
-                extra: None,
-            });
+            ttype = TType::Void;
         }
         Ok(Expr::Block {
             body: statements,

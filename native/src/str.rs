@@ -125,7 +125,7 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
                     if index > 0 {
                         sbuild += ", ";
                     }
-                    sbuild += &format!("{:?}", state.get_ref(*item));
+                    sbuild += &format!("{}", state.get_ref(*item));
                 }
                 sbuild += "]";
             } else {

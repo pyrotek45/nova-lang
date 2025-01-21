@@ -435,6 +435,16 @@ fn print_help() {
     println!("\tbanner         // print a random banner");
     println!("\tast [code]     // print the ast of the code");
     println!("\tback           // go back to the previous session");
+
+    // print size of vm data enum and heap
+
+    println!("\nNova Stats");
+    println!("--------------------------------");
+    println!("VM Data Size:");
+    println!("\t{} bytes", std::mem::size_of::<vm::state::VmData>());
+    println!("Heap Size:");
+    println!("\t{} bytes", std::mem::size_of::<vm::state::Heap>());
+    println!("--------------------------------");
 }
 
 fn compile_file_or_exit(file: &Path) -> NovaCore {

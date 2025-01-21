@@ -168,6 +168,21 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::io::printf,
         );
+        // format function, same as printf but returns a string
+        self.add_function(
+            "format",
+            TType::Function {
+                parameters: vec![
+                    TType::String,
+                    TType::List {
+                        inner: Box::new(TType::String),
+                    },
+                ],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::format,
+        );
         self.add_function(
             "terminal::args",
             TType::Function {
@@ -212,6 +227,16 @@ impl NovaCore {
         );
         self.add_function(
             "Cast::string",
+            TType::Function {
+                parameters: vec![TType::Generic { name: "a".into() }],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::to_string,
+        );
+        // alias for toString
+        self.add_function(
+            "toString",
             TType::Function {
                 parameters: vec![TType::Generic { name: "a".into() }],
                 return_type: Box::new(TType::String),

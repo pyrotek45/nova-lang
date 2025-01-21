@@ -10,7 +10,7 @@ use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
 use common::table::Table;
-use common::ttype::TType;
+use common::ttype::{generate_unique_string, TType};
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -28,6 +28,7 @@ pub struct Compiler {
     pub breaks: Vec<u64>,
     pub continues: Vec<u64>,
     pub global_strings: HashMap<Rc<str>, usize>,
+    pub unrolled_index: HashMap<Rc<str>, usize>,
 }
 
 pub fn new() -> Compiler {
@@ -46,6 +47,7 @@ pub fn new() -> Compiler {
         continues: vec![],
         native_functions_types: HashMap::default(),
         global_strings: HashMap::default(),
+        unrolled_index: HashMap::default(),
     }
 }
 
@@ -718,82 +720,150 @@ impl Compiler {
                     step,
                     body,
                 } => {
-                    let top = self.gen.generate();
-                    let end = self.gen.generate();
-                    let next = self.gen.generate();
+                    match (&start_expr, &end_expr) {
+                        (
+                            Expr::Literal {
+                                value: Atom::Integer { value: start },
+                                ..
+                            },
+                            Expr::Literal {
+                                value: Atom::Integer { value: end },
+                                ..
+                            },
+                        ) if *end < 255 => {
+                            // unroll loop
 
-                    self.breaks.push(end);
-                    self.continues.push(next);
+                            let endp = self.gen.generate();
+                            self.breaks.push(endp);
 
-                    // start of range
-                    self.compile_expr(start_expr)?;
-                    if let Some(index) = self.variables.get_index(identifier) {
-                        self.asm.push(Asm::STORE(index as u32))
-                    } else {
-                        self.variables.insert(identifier.clone());
-                        let index = self.variables.len() - 1;
-                        self.asm.push(Asm::STORE(index as u32))
-                    }
-
-                    // top of loop
-                    self.asm.push(Asm::LABEL(top));
-                    // test if we are at the end
-                    self.compile_expr(end_expr)?;
-                    if let Some(index) = self.variables.get_index(identifier) {
-                        self.asm.push(Asm::GET(index as u32))
-                    }
-                    // todo inclusive
-                    if *inclusive {
-                        self.asm.push(Asm::IGTR);
-                    } else {
-                        let sc = self.gen.generate();
-                        self.asm.push(Asm::IGTR);
-                        self.asm.push(Asm::DUP);
-                        self.asm.push(Asm::NOT);
-                        self.asm.push(Asm::JUMPIFFALSE(sc));
-                        self.asm.push(Asm::POP);
-                        self.compile_expr(end_expr)?;
-                        if let Some(index) = self.variables.get_index(identifier) {
-                            self.asm.push(Asm::GET(index as u32))
+                            if *inclusive {
+                                for value in *start..*end {
+                                    let nextp = self.gen.generate();
+                                    self.continues.push(nextp);
+                                    self.unrolled_index
+                                        .insert(identifier.clone(), value as usize);
+                                    let whilebody = Ast {
+                                        program: body.clone(),
+                                    };
+                                    self.compile_program(
+                                        whilebody,
+                                        self.filepath.clone(),
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                    )?;
+                                    self.asm.pop();
+                                    self.unrolled_index.remove(identifier);
+                                    self.asm.push(Asm::LABEL(nextp));
+                                    self.continues.pop();
+                                }
+                            } else {
+                                for value in *start..=*end {
+                                    let nextp = self.gen.generate();
+                                    self.continues.push(nextp);
+                                    self.unrolled_index
+                                        .insert(identifier.clone(), value as usize);
+                                    let whilebody = Ast {
+                                        program: body.clone(),
+                                    };
+                                    self.compile_program(
+                                        whilebody,
+                                        self.filepath.clone(),
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                    )?;
+                                    self.asm.pop();
+                                    self.unrolled_index.remove(identifier);
+                                    self.asm.push(Asm::LABEL(nextp));
+                                    self.continues.pop();
+                                }
+                            }
+                            self.asm.push(Asm::LABEL(endp));
+                            self.breaks.pop();
+                            self.continues.pop();
                         }
-                        self.asm.push(Asm::EQUALS);
-                        self.asm.push(Asm::LABEL(sc))
-                    }
+                        _ => {
+                            let top = self.gen.generate();
+                            let end = self.gen.generate();
+                            let next = self.gen.generate();
 
-                    self.asm.push(Asm::JUMPIFFALSE(end));
+                            self.breaks.push(end);
+                            self.continues.push(next);
 
-                    let whilebody = Ast {
-                        program: body.clone(),
-                    };
-                    self.compile_program(
-                        whilebody,
-                        self.filepath.clone(),
-                        false,
-                        false,
-                        false,
-                        false,
-                    )?;
-                    self.asm.pop();
+                            // start of range
+                            self.compile_expr(start_expr)?;
+                            if let Some(index) = self.variables.get_index(identifier) {
+                                self.asm.push(Asm::STORE(index as u32))
+                            } else {
+                                self.variables.insert(identifier.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32))
+                            }
 
-                    self.asm.push(Asm::LABEL(next));
-                    if let Some(index) = self.variables.get_index(identifier) {
-                        self.asm.push(Asm::GET(index as u32))
-                    }
-                    if let Some(step) = step {
-                        self.compile_expr(step)?;
-                        self.asm.push(Asm::IADD);
-                    } else {
-                        self.asm.push(Asm::INTEGER(1));
-                        self.asm.push(Asm::IADD);
-                    }
-                    if let Some(index) = self.variables.get_index(identifier) {
-                        self.asm.push(Asm::STORE(index as u32))
-                    }
-                    self.asm.push(Asm::BJMP(top));
-                    self.asm.push(Asm::LABEL(end));
+                            // top of loop
+                            self.asm.push(Asm::LABEL(top));
+                            // test if we are at the end
+                            self.compile_expr(end_expr)?;
+                            if let Some(index) = self.variables.get_index(identifier) {
+                                self.asm.push(Asm::GET(index as u32))
+                            }
+                            // todo inclusive
+                            if *inclusive {
+                                self.asm.push(Asm::IGTR);
+                            } else {
+                                let sc = self.gen.generate();
+                                self.asm.push(Asm::IGTR);
+                                self.asm.push(Asm::DUP);
+                                self.asm.push(Asm::NOT);
+                                self.asm.push(Asm::JUMPIFFALSE(sc));
+                                self.asm.push(Asm::POP);
+                                self.compile_expr(end_expr)?;
+                                if let Some(index) = self.variables.get_index(identifier) {
+                                    self.asm.push(Asm::GET(index as u32))
+                                }
+                                self.asm.push(Asm::EQUALS);
+                                self.asm.push(Asm::LABEL(sc))
+                            }
 
-                    self.breaks.pop();
-                    self.continues.pop();
+                            self.asm.push(Asm::JUMPIFFALSE(end));
+
+                            let whilebody = Ast {
+                                program: body.clone(),
+                            };
+                            self.compile_program(
+                                whilebody,
+                                self.filepath.clone(),
+                                false,
+                                false,
+                                false,
+                                false,
+                            )?;
+                            self.asm.pop();
+
+                            self.asm.push(Asm::LABEL(next));
+                            if let Some(index) = self.variables.get_index(identifier) {
+                                self.asm.push(Asm::GET(index as u32))
+                            }
+                            if let Some(step) = step {
+                                self.compile_expr(step)?;
+                                self.asm.push(Asm::IADD);
+                            } else {
+                                self.asm.push(Asm::INTEGER(1));
+                                self.asm.push(Asm::IADD);
+                            }
+                            if let Some(index) = self.variables.get_index(identifier) {
+                                self.asm.push(Asm::STORE(index as u32))
+                            }
+                            self.asm.push(Asm::BJMP(top));
+                            self.asm.push(Asm::LABEL(end));
+
+                            self.breaks.pop();
+                            self.continues.pop();
+                        }
+                    }
                 }
                 common::nodes::Statement::ForwardDec { identifier, .. } => {
                     //create a wrapper function
@@ -1056,7 +1126,7 @@ impl Compiler {
                         } else if lhs.get_type() == TType::Float {
                             self.asm.push(Asm::FLSS);
                         } else {
-                            dbg!(&ttype);
+                            todo!();
                         }
                     }
                     common::tokens::Operator::Assignment => {
@@ -1758,10 +1828,12 @@ impl Compiler {
                     self.asm.push(Asm::GET(index as u32));
                 } else if let Some(index) = self.global.get_index(identifier) {
                     self.asm.push(Asm::GETGLOBAL(index as u32));
+                } else if let Some(value) = self.unrolled_index.get(identifier) {
+                    self.asm.push(Asm::INTEGER(*value as i64));
                 } else {
                     return Err(NovaError::Compiler {
-                        msg: format!("Identifier \"{}\" not found", identifier).into(),
-                        note: "Identifier could not be loaded".into(),
+                        msg: format!("Function \"{}\" not found", identifier).into(),
+                        note: "Function could not be loaded".into(),
                     });
                 }
             }
@@ -1813,7 +1885,28 @@ impl Compiler {
                             self.asm.push(Asm::CALL);
                         } else if let Some(index) = self.global.get_index(identifier) {
                             //dbg!(identifier, &index);
+                            if "println" == identifier || "print" == identifier {
+                                // look for toString function
+                                let typelist =
+                                    list.iter().map(|x| x.get_type()).collect::<Vec<TType>>();
+
+                                if let Some(index) = self.global.get_index(
+                                    generate_unique_string("toString", &typelist).as_str(),
+                                ) {
+                                    self.asm.push(Asm::DCALL(index as u32));
+                                } else if let Some(firsttype) = typelist[0].custom_to_string() {
+                                    if let Some(index) = self
+                                        .global
+                                        .get_index(format!("{}::toString", firsttype).as_str())
+                                    {
+                                        self.asm.push(Asm::DCALL(index as u32));
+                                    }
+                                }
+                            }
+
                             self.asm.push(Asm::DCALL(index as u32));
+                        } else if let Some(value) = self.unrolled_index.get(identifier) {
+                            self.asm.push(Asm::INTEGER(*value as i64));
                         } else {
                             return Err(NovaError::Compiler {
                                 msg: format!("Function \"{}\" not found", identifier).into(),

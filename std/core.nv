@@ -4,6 +4,10 @@ struct Box(A) {
     value: $A
 }
 
+fn extends toString(self: Box($A)) -> String {
+    return Cast::string(self.value)
+}
+
 fn extends show(self: Box($A)) {
     println(Cast::string(self.value))
 }
@@ -69,11 +73,28 @@ fn extends isJust(self: Maybe($A)) -> Bool {
     return false
 }
 
+fn extends toString(self: Maybe($A)) -> String {
+    let result = ""
+    match self {
+        Just(x) => {result = "Just(" + Cast::string(x) + ")"}
+        Nothing() => {result = "Nothing"}
+    }
+    return result
+}
+
 // result type
 
 enum Result(A, B) {
     Ok: $A,
     Err: $B
+}
+
+fn extends isOk(self: Result($A, $B)) -> Bool {
+    match self {
+        Ok(x) => {return true}
+        Err(x) => {return false}
+    }
+    return false
 }
 
 fn extends toResult(self: Option($A), err: $B) -> Result($A, $B) {
@@ -83,6 +104,14 @@ fn extends toResult(self: Option($A), err: $B) -> Result($A, $B) {
     return Result::Err(err)
 }
 
+fn extends toString(self: Result($A, $B)) -> String {
+    let result = ""
+    match self {
+        Ok(x) => {result = "Ok(" + Cast::string(x) + ")"}
+        Err(x) => {result = "Err(" + Cast::string(x) + ")"}
+    }
+    return result
+}
 // basic list functions
 
 fn extends iota(n: Int) -> [Int] {

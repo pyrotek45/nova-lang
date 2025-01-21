@@ -2,7 +2,7 @@ use std::{io::stdout, time::Duration};
 
 use common::error::NovaError;
 use crossterm::{
-    cursor::MoveTo,
+    cursor::{MoveTo, MoveToNextLine},
     event::{self, Event, KeyCode, KeyEvent},
     execute, terminal,
 };
@@ -16,6 +16,7 @@ pub fn rawmode(state: &mut state::State) -> Result<(), NovaError> {
             terminal::disable_raw_mode().expect("Could not disable raw mode")
         }
     }
+    execute!(stdout(), MoveToNextLine(0)).unwrap();
     Ok(())
 }
 

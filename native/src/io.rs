@@ -55,6 +55,25 @@ fn printf_with_array(format_string: &str, args: Vec<Rc<str>>) {
     print!("{}", formatted);
 }
 
+fn format_with_array(format_string: &str, args: Vec<Rc<str>>) -> String {
+    let mut arg_iter = args.iter();
+    let mut formatted = String::new();
+    let mut segments = format_string.split("{}").peekable();
+
+    while let Some(segment) = segments.next() {
+        formatted.push_str(segment);
+        if segments.peek().is_some() {
+            if let Some(arg) = arg_iter.next() {
+                formatted.push_str(arg);
+            } else {
+                formatted.push_str("{}");
+            }
+        }
+    }
+
+    formatted.to_string()
+}
+
 // printf function for the VM that takes an array of strings // and the format string as arguments
 pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
     let mut strings = vec![];
@@ -81,6 +100,53 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
                     }
                 }
                 printf_with_array(format_string, strings.into_iter().cloned().collect());
+            } else {
+                return Err(NovaError::Runtime {
+                    msg: "Invalid arguments for printf".into(),
+                });
+            }
+        } else {
+            return Err(NovaError::Runtime {
+                msg: "Invalid arguments for printf".into(),
+            });
+        }
+    } else {
+        return Err(NovaError::Runtime {
+            msg: "Invalid arguments for printf".into(),
+        });
+    }
+    Ok(())
+}
+
+// format function for the VM that takes an array of strings and returns string
+pub fn format(state: &mut state::State) -> Result<(), NovaError> {
+    let mut strings = vec![];
+    let args = state.stack.pop();
+    let str_index = state.stack.pop();
+
+    if let (Some(VmData::List(args)), Some(VmData::String(str_index))) = (args, str_index) {
+        if let Heap::String(format_string) = state.get_ref(str_index) {
+            if let Heap::List(args) = state.get_ref(args) {
+                // gather string arguments
+                for arg in args.iter() {
+                    if let Heap::StringAddress(string) = state.get_ref(*arg) {
+                        if let Heap::String(string) = state.get_ref(*string) {
+                            strings.push(string);
+                        } else {
+                            return Err(NovaError::Runtime {
+                                msg: "Invalid arguments for printf".into(),
+                            });
+                        }
+                    } else {
+                        return Err(NovaError::Runtime {
+                            msg: "Invalid arguments for printf".into(),
+                        });
+                    }
+                }
+                let index = state.allocate_string(
+                    format_with_array(format_string, strings.into_iter().cloned().collect()).into(),
+                );
+                state.stack.push(VmData::String(index));
             } else {
                 return Err(NovaError::Runtime {
                     msg: "Invalid arguments for printf".into(),

@@ -1,0 +1,162 @@
+module terminal_Snake
+
+import wstd.list
+
+let H = 20
+let W = 40
+
+struct Coord {
+    x: Int,
+    y: Int
+}
+
+struct Snake {
+    head: Coord,
+    body: [Coord],
+    direction: Int
+}
+
+fn extends(Snake) new() -> Snake {
+    return Snake {
+        head: Coord {x: 4, y: 4},
+        body: [
+            Coord {x: 4, y: 5}, 
+            Coord {x: 4, y: 6},
+        ],
+        direction: 1
+    }
+}
+
+// return true if the snake is still alive
+fn extends move(snake: Snake, direction: Int, apple: Coord, points: Box(Int)) -> Bool {
+
+    let new_Snake = Snake {
+        head: Coord {x: 0, y: 0},
+        body: []: Coord,
+        direction: direction
+    }
+
+    let head = snake.head
+
+    if direction == 0 {
+        new_Snake.head = Coord {x: head.x, y: head.y - 1}
+    } elif direction == 1 {
+        new_Snake.head = Coord {x: head.x + 1, y: head.y}
+    } elif direction == 2 {
+        new_Snake.head = Coord {x: head.x, y: head.y + 1}
+    } elif direction == 3 {
+        new_Snake.head = Coord {x: head.x - 1, y: head.y}
+    }
+
+    if (new_Snake.head.x < 0) 
+    || (new_Snake.head.x >= H) 
+    || (new_Snake.head.y < 0) 
+    || (new_Snake.head.y >= W) {
+        return false
+    }
+
+    for b in snake.body {
+        if (new_Snake.head.x == b.x) && (new_Snake.head.y == b.y) {
+            return false
+        }
+    }
+
+    if (new_Snake.head.x == apple.x) && (new_Snake.head.y == apple.y) {
+        apple.x = random(0, H - 1)
+        apple.y = random(0, W - 1)
+        points.value += 1
+    } else {
+        snake.body.pop()
+    }
+
+    new_Snake.body.push(head)
+
+    for b in snake.body {
+        new_Snake.body.push(b)
+    }
+
+    snake = new_Snake
+    return true
+}
+
+
+fn showScreen(snake: Snake, apple: Coord, points: Box(Int)) {
+    let screen = []: Char
+    screen.push('\n')
+    screen.push('\r')
+    for i in 0..H {
+        for j in 0..W {
+            if (snake.head.x == i) && (snake.head.y == j) {
+                screen.push('@')
+            } elif(i == apple.x) && (j == apple.y) {
+                screen.push('A')
+            } else {
+                let found = false
+                for let k = 0; k < snake.body.len(); k += 1 {
+                    if (snake.body[k].x == i) && (snake.body[k].y == j) {
+                        screen.push('o')
+                        found = true
+                        break
+                    }
+                }
+                if !found {
+                    screen.push('.')
+                }
+            }
+        }
+        screen.push('\n')
+        screen.push('\r')
+    }
+    print("press q to exit: Points: "); println(points.value)
+    println(screen.string())
+}
+
+fn run(game: fn()) {
+    terminal::rawmode(true)
+    terminal::hideCursor()
+    game()
+    terminal::rawmode(false)
+    terminal::showCursor()
+}
+
+run(): || {
+    let input = None(Char)
+    let alive = true
+    let snake = Snake::new()
+    let direction = 1
+    let apple = Coord {x: 5, y: 5}
+    let points = Box(0)
+    let speed = 300 * (1 + points.value)
+    while alive {
+        terminal::clearScreen()
+        showScreen(snake, apple, points)
+        input = terminal::rawread(speed)
+        if input.isSome() {
+            if input == 'q' {
+                break
+            }
+            if input == 'w' {
+                direction = 3
+            } elif input == 'd' {
+                direction = 2
+            } elif input == 's' {
+                direction = 1
+            } elif input == 'a' {
+                direction = 0
+            }
+        }
+        alive = snake.move(direction, apple,points)
+        if !alive {
+            println("You died!")
+        }
+        if points.value > 10 {
+            speed = 200
+        } elif points.value > 20 {
+            speed = 100
+        } elif points.value > 30 {
+            speed = 50
+        } elif points.value > 40 {
+            speed = 25
+        }
+    }
+}

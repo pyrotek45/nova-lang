@@ -8,6 +8,18 @@ struct HashMap(K,V) {
     values: [$V],
 }
 
+fn extends toString(self: HashMap($K,$V)) -> String {
+    let result = "{"
+    for let i = 0; i < self.keys.len(); i += 1 {
+        result += Cast::string(self.keys[i]) + " => " + Cast::string(self.values[i])
+        if i != self.keys.len() - 1 {
+            result += ", "
+        }
+    }
+    result += "}"
+    return result
+}
+
 fn  extends(HashMap) default() -> HashMap($K,$V) {
     return HashMap {
         keys: []:$K,
