@@ -1,6 +1,6 @@
 module terminal_Snake
 
-import wstd.list
+import super.std.list
 
 let H = 20
 let W = 40
