@@ -1,4 +1,6 @@
+use core::fmt;
 use std::{
+    fmt::{Display, Formatter},
     io::{self, Write},
     rc::Rc,
 };
@@ -34,17 +36,6 @@ pub enum Heap {
     None,
 }
 
-impl Heap {
-    pub fn get_string(&self) -> &str {
-        match self {
-            Heap::String(s) => s,
-            _ => {
-                panic!()
-            }
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VmData {
     // pointer to stack
@@ -66,6 +57,47 @@ pub enum VmData {
     String(usize),
 
     None,
+}
+
+impl Display for Heap {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Heap::ClosureAddress(v) => write!(f, "Closure Address ({})", v),
+            Heap::Function(v) => write!(f, "Function Pointer ({})", v),
+            Heap::Int(v) => write!(f, "{}", v),
+            Heap::Float(v) => write!(f, "{}", v),
+            Heap::Bool(v) => write!(f, "{}", v),
+            Heap::ListAddress(v) => write!(f, "List Address ({})", v),
+            Heap::List(v) => {
+                write!(f, "[")?;
+                for i in 0..v.len() {
+                    write!(f, "{}", v[i])?;
+                    if i != v.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Heap::StringAddress(v) => write!(f, "String Address ({})", v),
+            Heap::String(v) => write!(f, "{}", v),
+            Heap::None => write!(f, "None"),
+            Heap::Closure(_, _) => write!(f, "Closure"),
+            Heap::Struct(_, _) => write!(f, "Struct"),
+            Heap::StructAddress(v) => write!(f, "Struct Address ({})", v),
+            Heap::Char(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+impl Heap {
+    pub fn get_string(&self) -> &str {
+        match self {
+            Heap::String(s) => s,
+            _ => {
+                panic!()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

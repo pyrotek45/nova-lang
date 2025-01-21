@@ -6,17 +6,18 @@ fn extends clear(list: [$T]) {
     list = []: $T
 }
 
-fn extends equals(a: [$T], b: [$T]) -> Bool {
+fn __eq__(a: [$T], b: [$T]) -> Bool {
     if a.len() != b.len() {
         return false
     }
-    for i in 0.to(a.len()) {
+    for i in 0..a.len() {
         if a[i] != b[i] {
             return false
         }
     }
     return true
 }
+
 
 fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     for let i = 0; i < ammount; i += 1 {
@@ -265,6 +266,15 @@ fn extends sum(input: [Int]) -> Int {
     }
     return result
 }
+
+fn extends sum(input: [Float]) -> Float {
+    let result = 0.0
+    for let i = 0; i < input.len(); i += 1 {
+        result += input[i]
+    }
+    return result
+}
+
 
 fn extends product(input: [Int]) -> Int {
     let result = 1
@@ -635,7 +645,7 @@ fn extends join(input: [$T], delim: $T) -> [$T] {
 
 fn extends anyIn(input: [$T], values: [[$T]]) -> Bool {
     for x in values {
-        if input.equals(x) {
+        if input == x {
             return true
         }
     }

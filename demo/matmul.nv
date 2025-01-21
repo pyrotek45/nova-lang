@@ -1,0 +1,125 @@
+module main
+
+import std.list
+
+struct Vector {
+	backing: [Float],
+}
+
+fn extends(Vector) default(size: Int) -> Vector {
+	return Vector {
+		backing: []:Float.fill(0.0, size)
+	}
+}
+
+fn  __src__(self: Vector) -> String {
+	return format("{}", Cast::string(self.backing))
+}
+
+fn  __mul__(self: Vector, other: Vector) -> Vector {
+	return Vector {
+		backing: self.backing.zip(other.backing).map(fn(x: (Float, Float)) -> Float { return x[0] * x[1] })
+	}
+}
+
+fn extends dot(self: Vector, other: Vector) -> Float {
+	return (self * other).backing.sum()
+}
+
+struct Shape {
+	rows: Int,
+	columns: Int,
+}
+
+fn __eq__(self: Shape, other: Shape) -> Bool {
+	return (self.rows == other.rows) && (self.columns == other.columns)
+}
+
+struct Matrix {
+	shape: Shape,
+	backing: [Float],
+}
+
+fn toString(self: Matrix) -> String {
+	return format("{} x {} : {}", Cast::string(self.shape.rows), Cast::string(self.shape.columns), Cast::string(self.backing))
+}
+
+fn extends toMatrix(self: [[Float]]) -> Matrix {
+	return Matrix {
+		shape: Shape {
+			rows: self.len(),
+			columns: self[0].len(),
+		},
+		backing: self.flatten(),
+	}
+}
+
+fn extends rowCount(self: Matrix) -> Int {
+	return self.shape.rows
+}
+
+fn extends columnCount(self: Matrix) -> Int {
+	return self.shape.columns
+}
+
+fn extends get(self: Matrix, r: Int, c: Int) -> Float {
+	return self.backing[r * self.columnCount() + c]
+}
+
+fn extends getRow(self: Matrix, r: Int) -> Vector {
+	let startingIndex = r * self.columnCount()
+	return Vector {
+		backing: range(startingIndex, startingIndex + self.columnCount()).map(fn(i: Int) -> Float { return self.backing[i] })
+	}
+}
+
+fn extends transpose(self: Matrix) -> Matrix {
+    let backing = [x in 0.to(self.columnCount()), y in 0.to(self.rowCount()) | self.get(y, x)]
+
+	return Matrix {
+		shape: Shape {
+			rows: self.columnCount(),
+			columns: self.rowCount(),
+		},
+		backing: backing,
+	}
+}
+
+fn extends matMul(self: Matrix, other: Matrix) -> Matrix {
+	let newRowCount = self.rowCount()
+	let newColumnCount = other.columnCount()
+
+    let otherT = other.transpose()
+    let backing = [x in 0.to(newRowCount), y in 0.to(newColumnCount) | self.getRow(x).dot(otherT.getRow(y))]
+
+	return Matrix {
+		shape: Shape {
+			rows: newRowCount,
+			columns: newColumnCount,
+		},
+		backing: backing,
+	}
+}
+
+fn __eq__(self: Matrix, other: Matrix) -> Bool {
+	return (self.shape == other.shape) && (self.backing == other.backing)
+}
+
+fn extends toString(self: Matrix) -> String {
+    return format("{} x {} : {}", Cast::string(self.shape.rows), Cast::string(self.shape.columns), Cast::string(self.backing))
+}
+
+let mat1 = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]].toMatrix()
+let mat2 = [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]].toMatrix()
+
+let matr = [[27.0, 30.0, 33.0], [61.0, 68.0, 75.0], [95.0, 106.0, 117.0]].toMatrix()
+
+println(mat1)
+println(mat2)
+
+let matt = mat1.matMul(mat2)
+
+println(matt)
+println(matr)
+
+println(matt == matr)
