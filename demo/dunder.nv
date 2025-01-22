@@ -1,0 +1,114 @@
+module dunder
+
+struct SimpleType {
+    value: Int,
+}
+
+fn toString(self: SimpleType) -> String {
+    return format("{}", Cast::string(self.value))
+}
+
+fn __add__(self: SimpleType, other: SimpleType) -> SimpleType {
+    return SimpleType {
+        value: self.value + other.value,
+    }
+}
+
+println(SimpleType { value: 1 } + SimpleType { value: 2 })
+
+fn __sub__(self: SimpleType, other: SimpleType) -> SimpleType {
+    return SimpleType {
+        value: self.value - other.value,
+    }
+}
+
+println(SimpleType { value: 1 } - SimpleType { value: 2 })
+
+fn __mul__(self: SimpleType, other: SimpleType) -> SimpleType {
+    return SimpleType {
+        value: self.value * other.value,
+    }
+}
+
+println(SimpleType { value: 2 } * SimpleType { value: 3 })
+
+fn __div__(self: SimpleType, other: SimpleType) -> SimpleType {
+    return SimpleType {
+        value: self.value / other.value,
+    }
+}
+
+println(SimpleType { value: 6 } / SimpleType { value: 3 })
+
+fn __eq__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value == other.value
+}
+
+println(SimpleType { value: 1 } == SimpleType { value: 1 })
+println(SimpleType { value: 1 } == SimpleType { value: 2 })
+
+fn __ne__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value != other.value
+}
+
+println(SimpleType { value: 1 } != SimpleType { value: 1 })
+println(SimpleType { value: 1 } != SimpleType { value: 2 })
+
+fn __lt__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value < other.value
+}
+
+println(SimpleType { value: 1 } < SimpleType { value: 2 })
+println(SimpleType { value: 2 } < SimpleType { value: 1 })
+
+fn __le__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value <= other.value
+}
+
+println(SimpleType { value: 1 } <= SimpleType { value: 2 })
+println(SimpleType { value: 2 } <= SimpleType { value: 1 })
+println(SimpleType { value: 1 } <= SimpleType { value: 1 })
+
+fn __gt__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value > other.value
+}
+
+println(SimpleType { value: 2 } > SimpleType { value: 1 })
+println(SimpleType { value: 1 } > SimpleType { value: 2 })
+
+fn __ge__(self: SimpleType, other: SimpleType) -> Bool {
+    return self.value >= other.value
+}
+
+println(SimpleType { value: 2 } >= SimpleType { value: 1 })
+println(SimpleType { value: 1 } >= SimpleType { value: 2 })
+println(SimpleType { value: 1 } >= SimpleType { value: 1 })
+
+
+fn __mod__(self: SimpleType, other: SimpleType) -> SimpleType {
+    return SimpleType {
+        value: self.value % other.value,
+    }
+}
+
+println(SimpleType { value: 5 } % SimpleType { value: 3 })
+
+fn __and__(self: SimpleType, other: SimpleType) -> Bool {
+    return if( self.value != 0) && (other.value != 0) {
+        true
+    } else {
+        false
+    }
+}
+
+println(SimpleType { value: 5 } && SimpleType { value: 3 })
+
+fn __or__(self: SimpleType, other: SimpleType) -> Bool {
+    return if( self.value != 0) || (other.value != 0) {
+        true
+    } else {
+        false
+    }
+}
+
+println(SimpleType { value: 5 } || SimpleType { value: 3 })
