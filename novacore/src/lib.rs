@@ -235,15 +235,15 @@ impl NovaCore {
             native::str::to_string,
         );
         // alias for toString
-        self.add_function(
-            "toString",
-            TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::str::to_string,
-        );
+        // self.add_function(
+        //     "toString",
+        //     TType::Function {
+        //         parameters: vec![TType::Generic { name: "a".into() }],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::str::to_string,
+        // );
         self.add_function(
             "Cast::float",
             TType::Function {

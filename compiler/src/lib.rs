@@ -10,7 +10,7 @@ use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
 use common::nodes::{Ast, Atom, Expr};
 use common::table::Table;
-use common::ttype::{generate_unique_string, TType};
+use common::ttype::TType;
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
@@ -1889,16 +1889,12 @@ impl Compiler {
                                 // look for toString function
                                 let typelist =
                                     list.iter().map(|x| x.get_type()).collect::<Vec<TType>>();
-
-                                if let Some(index) = self.global.get_index(
-                                    generate_unique_string("toString", &typelist).as_str(),
-                                ) {
-                                    self.asm.push(Asm::DCALL(index as u32));
-                                } else if let Some(firsttype) = typelist[0].custom_to_string() {
-                                    if let Some(index) = self
-                                        .global
-                                        .get_index(format!("{}::toString", firsttype).as_str())
-                                    {
+                                //dbg!(typelist[0].custom_to_string());
+                                if let Some(firsttype) = typelist[0].custom_to_string() {
+                                    //dbg!(firsttype);
+                                    if let Some(index) = self.global.get_index(
+                                        format!("{}::toString_{}", firsttype, firsttype).as_str(),
+                                    ) {
                                         self.asm.push(Asm::DCALL(index as u32));
                                     }
                                 }

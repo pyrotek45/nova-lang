@@ -9,15 +9,15 @@ fn hello() {
 hello()
 
 // Nova uses universal function call syntax. Any function can be called this way.
-fn show(input: String) {
-    input.println()
+fn extends show(input: String) {
+    println(input)
 }
 
 "wow".show()
 
 // This makes it easy to chain
-fn square(x:Int) -> Int {
+fn extends square(x:Int) -> Int {
     return x * x
 }
 
-5.square().square().println()
+5.square().square() |> println()

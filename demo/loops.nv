@@ -2,7 +2,7 @@ module loopsDemo
 
 // For loop (expression;condition;iteration)
 for let i = 0; i < 10; i += 1 {
-    i.println()
+    println(i)
 }
 
 // While loops (condition)
@@ -15,5 +15,5 @@ while true {
     if j == 10 {
         break  // this will break the loop
     }
-    j.println()
+    println(j)
 }

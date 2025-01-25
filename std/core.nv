@@ -12,8 +12,6 @@ fn extends show(self: Box($A)) {
     println(Cast::string(self.value))
 }
 
-
-
 fn Gen(start: Int) -> fn() -> Int {
     let i = Box(start)
     return || {
