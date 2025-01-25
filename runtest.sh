@@ -8,6 +8,10 @@ $nova run demo/matmul.nv
 $nova run demo/dunder.nv
 $nova run demo/let.nv
 $nova run demo/loops.nv
+$nova run demo/function.nv
+$nova run demo/structs.nv
+$nova run demo/option_type.nv
+$nova run demo/fib.nv
 $nova run Aoc2024/nvaoc1.nv
 $nova run Aoc2024/nvaoc2.nv
 $nova run Aoc2024/nvaoc3.nv

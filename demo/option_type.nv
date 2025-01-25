@@ -6,9 +6,9 @@ let option2 : Option(Int) = None(Int) // this is a nil value.
 
 // checking if it exist
 if option.isSome() {
-    option.unwrap().println()
+    option.unwrap() |> println()
 }
 
 if option2.isSome() {
-    option2.unwrap().println()
+    option2.unwrap() |> println()
 }

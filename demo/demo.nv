@@ -4,7 +4,7 @@ module main
 struct Person {
     name: String,
     age: Int,
-};
+}
 
 // Hello world
 println("hello world!")

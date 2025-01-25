@@ -4,7 +4,8 @@ struct SimpleType {
     value: Int,
 }
 
-fn toString(self: SimpleType) -> String {
+// when Overloading toString, the function must be named toString and be extended to the type
+fn extends toString(self: SimpleType) -> String {
     return format("{}", Cast::string(self.value))
 }
 

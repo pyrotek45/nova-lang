@@ -7,4 +7,4 @@ fn fib(n: Int) -> Int {
     return fib(n - 1) + fib(n - 2)
 }
 
-println(fib(40))
+println(fib(20))

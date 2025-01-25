@@ -6,10 +6,19 @@ struct Vector {
 	backing: [Float],
 }
 
-fn extends(Vector) default(size: Int) -> Vector {
+
+fn extends(Vector) default(size: Int, value: Float) -> Vector {
 	return Vector {
-		backing: []:Float.fill(0.0, size)
+		backing: []:Float.fill(value, size)
 	}
+}
+
+fn extends(Vector) default(size: Int) -> Vector {
+	return Vector::default(size, 0.0)
+}
+
+fn extends(Vector) default() -> Vector {
+	return Vector::default(0)
 }
 
 fn  __src__(self: Vector) -> String {
@@ -40,8 +49,8 @@ struct Matrix {
 	backing: [Float],
 }
 
-fn toString(self: Matrix) -> String {
-	return format("{} x {} : {}", Cast::string(self.shape.rows), Cast::string(self.shape.columns), Cast::string(self.backing))
+fn extends toString(self: Matrix) -> String {
+    return format("{} x {} : {}", Cast::string(self.shape.rows), Cast::string(self.shape.columns), Cast::string(self.backing))
 }
 
 fn extends toMatrix(self: [[Float]]) -> Matrix {
@@ -103,10 +112,6 @@ fn extends matMul(self: Matrix, other: Matrix) -> Matrix {
 
 fn __eq__(self: Matrix, other: Matrix) -> Bool {
 	return (self.shape == other.shape) && (self.backing == other.backing)
-}
-
-fn extends toString(self: Matrix) -> String {
-    return format("{} x {} : {}", Cast::string(self.shape.rows), Cast::string(self.shape.columns), Cast::string(self.backing))
 }
 
 let mat1 = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]].toMatrix()

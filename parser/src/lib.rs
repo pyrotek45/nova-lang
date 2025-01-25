@@ -738,10 +738,9 @@ impl Parser {
         if argument_types.is_empty() {
             argument_types.push(TType::None)
         }
-        let old_identifier = identifier.clone();
-        identifier = if self.environment.custom_types.contains_key(&identifier) {
-            identifier
-        } else if let Some(TType::Custom { name, .. }) = argument_types.first() {
+        // used last time for stuff like random.println() but removed for now
+        // let old_identifier = identifier.clone();
+        identifier = if let Some(TType::Custom { name, .. }) = argument_types.first() {
             if self.environment.custom_types.contains_key(name.as_ref()) {
                 format!("{}::{}", name, identifier).into()
             } else {
@@ -822,40 +821,6 @@ impl Parser {
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
-                    ttype: function_type.clone(),
-                    pos: Some(pos.clone()),
-                    kind: SymbolKind::Captured,
-                },
-            );
-            self.handle_function_call(
-                function_type,
-                function_id,
-                function_kind,
-                arguments,
-                argument_types,
-                pos,
-            )
-        } else if let Some((function_type, function_id, function_kind)) = self
-            .environment
-            .get_function_type(&old_identifier, &argument_types)
-        {
-            self.handle_function_call(
-                function_type,
-                function_id,
-                function_kind,
-                arguments,
-                argument_types,
-                pos,
-            )
-        } else if let Some((function_type, function_id, function_kind)) =
-            self.environment.get_type_capture(&old_identifier)
-        {
-            //println!("captured id {}", identifier);
-            let pos = self.get_current_token_position();
-            self.environment.captured.last_mut().unwrap().insert(
-                identifier.clone(),
-                Symbol {
-                    id: old_identifier.clone(),
                     ttype: function_type.clone(),
                     pos: Some(pos.clone()),
                     kind: SymbolKind::Captured,
@@ -5084,7 +5049,7 @@ impl Parser {
                 .into();
             }
         }
-
+        //dbg!(identifier.clone());
         // build helper vecs
         let mut input = vec![];
         for (ttype, identifier) in parameters.clone() {
@@ -5302,7 +5267,7 @@ impl Parser {
                 ));
             }
         }
-
+        //dbg!(identifier.clone());
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
