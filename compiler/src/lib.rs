@@ -1896,6 +1896,12 @@ impl Compiler {
                                         format!("{}::toString_{}", firsttype, firsttype).as_str(),
                                     ) {
                                         self.asm.push(Asm::DCALL(index as u32));
+                                        // handles generic toString for datatypes
+                                    } else if let Some(index) = self
+                                        .global
+                                        .get_index(format!("{}::toString", firsttype).as_str())
+                                    {
+                                        self.asm.push(Asm::DCALL(index as u32));
                                     }
                                 }
                             }
