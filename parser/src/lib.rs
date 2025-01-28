@@ -2739,9 +2739,45 @@ impl Parser {
                     (_, _) => {
                         // check dunder methods for operation
                         let function_id: String = match operation {
-                            Operator::Multiplication => "__mul__".into(),
-                            Operator::Division => "__div__".into(),
-                            Operator::Modulo => "__mod__".into(),
+                            Operator::Multiplication => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__mul__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
+                                        operation,
+                                        current_pos.clone(),
+                                    ));
+                                }
+                            }
+                            Operator::Division => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__div__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
+                                        operation,
+                                        current_pos.clone(),
+                                    ));
+                                }
+                            }
+                            Operator::Modulo => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__mod__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
+                                        operation,
+                                        current_pos.clone(),
+                                    ));
+                                }
+                            }
                             _ => {
                                 return Err(self.generate_error_with_pos(
                                     "Invalid operation",
@@ -3013,8 +3049,32 @@ impl Parser {
                         {
                             // check dunder method
                             let function_id: String = match operation {
-                                Operator::And => "__and__".into(),
-                                Operator::Or => "__or__".into(),
+                                Operator::And => {
+                                    if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                        format!("{}::__and__", custom).into()
+                                    } else {
+                                        // error if no custom method
+                                        return Err(self.create_type_error(
+                                            left_expr.clone(),
+                                            right_expr.clone(),
+                                            operation,
+                                            current_pos.clone(),
+                                        ));
+                                    }
+                                }
+                                Operator::Or => {
+                                    if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                        format!("{}::__or__", custom).into()
+                                    } else {
+                                        // error if no custom method
+                                        return Err(self.create_type_error(
+                                            left_expr.clone(),
+                                            right_expr.clone(),
+                                            operation,
+                                            current_pos.clone(),
+                                        ));
+                                    }
+                                }
                                 _ => {
                                     return Err(self.generate_error(
                                         "Expected function",
@@ -3181,10 +3241,66 @@ impl Parser {
                             _ => {
                                 // check dunder method
                                 let function_id: String = match operation {
-                                    Operator::Greater => "__gt__".into(),
-                                    Operator::GreaterOrEqual => "__ge__".into(),
-                                    Operator::Less => "__lt__".into(),
-                                    Operator::LessOrEqual => "__le__".into(),
+                                    Operator::Greater => {
+                                        if let Some(custom) =
+                                            left_expr.get_type().custom_to_string()
+                                        {
+                                            format!("{}::__gt__", custom).into()
+                                        } else {
+                                            // error if no custom method
+                                            return Err(self.create_type_error(
+                                                left_expr.clone(),
+                                                right_expr.clone(),
+                                                operation,
+                                                current_pos.clone(),
+                                            ));
+                                        }
+                                    }
+                                    Operator::GreaterOrEqual => {
+                                        if let Some(custom) =
+                                            left_expr.get_type().custom_to_string()
+                                        {
+                                            format!("{}::__ge__", custom).into()
+                                        } else {
+                                            // error if no custom method
+                                            return Err(self.create_type_error(
+                                                left_expr.clone(),
+                                                right_expr.clone(),
+                                                operation,
+                                                current_pos.clone(),
+                                            ));
+                                        }
+                                    }
+                                    Operator::Less => {
+                                        if let Some(custom) =
+                                            left_expr.get_type().custom_to_string()
+                                        {
+                                            format!("{}::__lt__", custom).into()
+                                        } else {
+                                            // error if no custom method
+                                            return Err(self.create_type_error(
+                                                left_expr.clone(),
+                                                right_expr.clone(),
+                                                operation,
+                                                current_pos.clone(),
+                                            ));
+                                        }
+                                    }
+                                    Operator::LessOrEqual => {
+                                        if let Some(custom) =
+                                            left_expr.get_type().custom_to_string()
+                                        {
+                                            format!("{}::__le__", custom).into()
+                                        } else {
+                                            // error if no custom method
+                                            return Err(self.create_type_error(
+                                                left_expr.clone(),
+                                                right_expr.clone(),
+                                                operation,
+                                                current_pos.clone(),
+                                            ));
+                                        }
+                                    }
                                     _ => {
                                         return Err(self.generate_error(
                                             "Expected function",
@@ -3328,8 +3444,33 @@ impl Parser {
                     _ => {
                         // check dunder method
                         let function_id: String = match operation {
-                            Operator::Equal => "__eq__".into(),
-                            Operator::NotEqual => "__ne__".into(),
+                            Operator::Equal => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__eq__", custom).into()
+                                } else {
+                                    left_expr = self.create_binop_expr(
+                                        left_expr,
+                                        right_expr,
+                                        operation,
+                                        TType::Bool,
+                                    );
+                                    return  Ok(left_expr);
+                                }
+                            }
+                            Operator::NotEqual => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__ne__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    left_expr = self.create_binop_expr(
+                                        left_expr,
+                                        right_expr,
+                                        operation,
+                                        TType::Bool,
+                                    );
+                                    return  Ok(left_expr);
+                                }
+                            }
                             _ => "".into(),
                         };
                         if let Some(overload) = self.environment.get(&generate_unique_string(
@@ -3502,8 +3643,32 @@ impl Parser {
                     }
                     (_, _) => {
                         let function_id: String = match operation {
-                            Operator::Addition => "__add__".into(),
-                            Operator::Subtraction => "__sub__".into(),
+                            Operator::Addition => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__add__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
+                                        operation,
+                                        current_pos.clone(),
+                                    ));
+                                }
+                            }
+                            Operator::Subtraction => {
+                                if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                    format!("{}::__sub__", custom).into()
+                                } else {
+                                    // error if no custom method
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
+                                        operation,
+                                        current_pos.clone(),
+                                    ));
+                                }
+                            }
                             _ => {
                                 return Err(self.create_type_error(
                                     left_expr.clone(),
@@ -3514,6 +3679,7 @@ impl Parser {
                             }
                         };
 
+                        //dbg!(function_id.clone());
                         if let Some(overload) = self.environment.get(&generate_unique_string(
                             &function_id,
                             &[left_expr.get_type(), right_expr.get_type()],
@@ -3566,12 +3732,12 @@ impl Parser {
                                 },
                             };
                         } else {
-                            left_expr = self.create_binop_expr(
-                                left_expr,
-                                right_expr,
-                                operation,
-                                TType::Bool,
-                            );
+                            // error if no custom method, let user know that the operation is not supported
+                            return Err(self.generate_error_with_pos(
+                                "Operation not supported",
+                                format!("Try implementing the method {}", function_id),
+                                current_pos.clone(),
+                            ));
                         }
                     }
                 }
@@ -4946,7 +5112,10 @@ impl Parser {
 
         // check if dunder method
         match identifier.as_ref() {
+
             id @ "__add__"
+            | id @ "__and__"
+            | id @ "__or__"
             | id @ "__sub__"
             | id @ "__mul__"
             | id @ "__div__"
@@ -4964,14 +5133,14 @@ impl Parser {
                         pos.clone(),
                     ));
                 }
-                if is_extended {
-                    // return error
-                    return Err(self.generate_error_with_pos(
-                        format!("Cannot extend from {id} "),
-                        "Cannot extend from dunder methods",
-                        pos.clone(),
-                    ));
-                }
+                // if is_extended {
+                //     // return error
+                //     return Err(self.generate_error_with_pos(
+                //         format!("Cannot extend from {id} "),
+                //         "Cannot extend from dunder methods",
+                //         pos.clone(),
+                //     ));
+                // }
                 // if generic {
                 //     return Err(self.generate_error_with_pos(
                 //         format!("Cannot create generic function for {id}"),
@@ -4986,10 +5155,10 @@ impl Parser {
                         pos.clone(),
                     ));
                 }
-                if get_first {
+                if !get_first {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot extend from {id} "),
-                        "Cannot extend from dunder methods",
+                        format!("Must extend from {id}"),
+                        "dunder methods must extends from a custom type",
                         pos.clone(),
                     ));
                 }
