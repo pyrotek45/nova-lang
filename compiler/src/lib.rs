@@ -869,6 +869,51 @@ impl Compiler {
                     //create a wrapper function
                     self.global.insert(identifier.clone());
                 }
+                common::nodes::Statement::WhileLet {
+                    identifier,
+                    expr,
+                    body,
+                } => {
+                    let top = self.gen.generate();
+                    let end = self.gen.generate();
+                    let next = self.gen.generate();
+                    self.breaks.push(end);
+                    self.continues.push(next);
+                    self.asm.push(Asm::LABEL(top));
+                    self.compile_expr(expr)?;
+                    if let Some(index) = self.variables.get_index(identifier) {
+                        self.asm.push(Asm::STORE(index as u32))
+                    } else {
+                        self.variables.insert(identifier.clone());
+                        let index = self.variables.len() - 1;
+                        self.asm.push(Asm::STORE(index as u32))
+                    }
+                    // get the value
+                    if let Some(index) = self.variables.get_index(identifier) {
+                        self.asm.push(Asm::GET(index as u32))
+                    }
+                    if let Some(index) = self.native_functions.get_index("Option::isSome") {
+                        self.asm.push(Asm::NATIVE(index as u64))
+                    }
+                    self.asm.push(Asm::ISSOME);
+                    self.asm.push(Asm::JUMPIFFALSE(end));
+                    let whilebody = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(
+                        whilebody,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
+                    self.asm.pop();
+                    self.asm.push(Asm::BJMP(top));
+                    self.asm.push(Asm::LABEL(end));
+                    self.breaks.pop();
+                    self.continues.pop();
+                }
             }
         }
 

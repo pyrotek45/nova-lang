@@ -2738,7 +2738,7 @@ impl Parser {
                         let function_id: String = match operation {
                             Operator::Multiplication => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__mul__", custom).into()
+                                    format!("{}::__mul__", custom)
                                 } else {
                                     // error if no custom method
                                     return Err(self.create_type_error(
@@ -2751,7 +2751,7 @@ impl Parser {
                             }
                             Operator::Division => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__div__", custom).into()
+                                    format!("{}::__div__", custom)
                                 } else {
                                     // error if no custom method
                                     return Err(self.create_type_error(
@@ -2764,7 +2764,7 @@ impl Parser {
                             }
                             Operator::Modulo => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__mod__", custom).into()
+                                    format!("{}::__mod__", custom)
                                 } else {
                                     // error if no custom method
                                     return Err(self.create_type_error(
@@ -3048,7 +3048,7 @@ impl Parser {
                             let function_id: String = match operation {
                                 Operator::And => {
                                     if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                        format!("{}::__and__", custom).into()
+                                        format!("{}::__and__", custom)
                                     } else {
                                         // error if no custom method
                                         return Err(self.create_type_error(
@@ -3061,7 +3061,7 @@ impl Parser {
                                 }
                                 Operator::Or => {
                                     if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                        format!("{}::__or__", custom).into()
+                                        format!("{}::__or__", custom)
                                     } else {
                                         // error if no custom method
                                         return Err(self.create_type_error(
@@ -3242,9 +3242,8 @@ impl Parser {
                                         if let Some(custom) =
                                             left_expr.get_type().custom_to_string()
                                         {
-                                            format!("{}::__gt__", custom).into()
+                                            format!("{}::__gt__", custom)
                                         } else {
-                                    
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3257,9 +3256,8 @@ impl Parser {
                                         if let Some(custom) =
                                             left_expr.get_type().custom_to_string()
                                         {
-                                            format!("{}::__ge__", custom).into()
+                                            format!("{}::__ge__", custom)
                                         } else {
-                 
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3272,9 +3270,8 @@ impl Parser {
                                         if let Some(custom) =
                                             left_expr.get_type().custom_to_string()
                                         {
-                                            format!("{}::__lt__", custom).into()
+                                            format!("{}::__lt__", custom)
                                         } else {
-                                     
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3287,9 +3284,8 @@ impl Parser {
                                         if let Some(custom) =
                                             left_expr.get_type().custom_to_string()
                                         {
-                                            format!("{}::__le__", custom).into()
+                                            format!("{}::__le__", custom)
                                         } else {
-                               
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3443,7 +3439,7 @@ impl Parser {
                         let function_id: String = match operation {
                             Operator::Equal => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__eq__", custom).into()
+                                    format!("{}::__eq__", custom)
                                 } else {
                                     left_expr = self.create_binop_expr(
                                         left_expr,
@@ -3456,9 +3452,8 @@ impl Parser {
                             }
                             Operator::NotEqual => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__ne__", custom).into()
+                                    format!("{}::__ne__", custom)
                                 } else {
-
                                     left_expr = self.create_binop_expr(
                                         left_expr,
                                         right_expr,
@@ -3642,7 +3637,7 @@ impl Parser {
                         let function_id: String = match operation {
                             Operator::Addition => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__add__", custom).into()
+                                    format!("{}::__add__", custom)
                                 } else {
                                     // error if no custom method
                                     return Err(self.create_type_error(
@@ -3655,7 +3650,7 @@ impl Parser {
                             }
                             Operator::Subtraction => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                    format!("{}::__sub__", custom).into()
+                                    format!("{}::__sub__", custom)
                                 } else {
                                     // error if no custom method
                                     return Err(self.create_type_error(
@@ -4787,23 +4782,65 @@ impl Parser {
 
     fn while_statement(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("while"))?;
-        let testpos = self.get_current_token_position();
-        let test = self.top_expr()?;
-        if test.get_type() != TType::Bool && test.get_type() != TType::Void {
-            return Err(self.generate_error_with_pos(
-                "test expression must return a bool",
-                format!("got {}", test.get_type()),
-                testpos,
-            ));
-        }
-        self.environment.push_block();
-        let statements = self.block()?;
-        self.environment.pop_block();
+        // check for let keyword
+        if self.current_token().is_some_and(|t| t.is_id("let")) {
+            self.advance();
+            let (identifier, pos) = self.get_identifier()?;
+            self.consume_operator(Operator::Assignment)?;
+            let expr = self.expr()?;
+            let inner = if let TType::Option { inner } = expr.get_type() {
+                inner
+            } else {
+                return Err(self.generate_error_with_pos(
+                    "unwrap expects an option type",
+                    format!("got {}", expr.get_type()),
+                    pos.clone(),
+                ));
+            };
 
-        Ok(Some(Statement::While {
-            test,
-            body: statements,
-        }))
+            // make sure symbol doesn't already exist
+            if self.environment.has(&identifier) {
+                Err(self.generate_error_with_pos(
+                    format!("Symbol '{}' is already instantiated", identifier),
+                    "Cannot reinstantiate the same symbol in the same scope",
+                    pos.clone(),
+                ))
+            } else {
+                self.environment.push_block();
+                self.environment.insert_symbol(
+                    &identifier,
+                    *inner.clone(),
+                    Some(pos),
+                    SymbolKind::Variable,
+                );
+                let statements = self.block()?;
+                self.environment.pop_block();
+
+                Ok(Some(Statement::WhileLet {
+                    identifier,
+                    expr,
+                    body: statements,
+                }))
+            }
+        } else {
+            let testpos = self.get_current_token_position();
+            let test = self.top_expr()?;
+            if test.get_type() != TType::Bool && test.get_type() != TType::Void {
+                return Err(self.generate_error_with_pos(
+                    "test expression must return a bool",
+                    format!("got {}", test.get_type()),
+                    testpos,
+                ));
+            }
+            self.environment.push_block();
+            let statements = self.block()?;
+            self.environment.pop_block();
+
+            Ok(Some(Statement::While {
+                test,
+                body: statements,
+            }))
+        }
     }
 
     fn if_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -5481,7 +5518,7 @@ impl Parser {
                         if body_return && alt_return {
                             return Ok(true);
                         }
-                    } 
+                    }
                     // return true if all branches have a return, otherwise do nothing
                     if body_return {
                         return Ok(true);
@@ -5523,7 +5560,7 @@ impl Parser {
                         if body_return && alt_return {
                             return Ok(true);
                         }
-                    } 
+                    }
                     // check expr
                     self.will_return(
                         &[Statement::Expression {
@@ -5682,6 +5719,17 @@ impl Parser {
                 Statement::Continue => {}
                 Statement::Break => {}
                 Statement::Unwrap { .. } => {}
+                Statement::WhileLet { expr, body, .. } => {
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
             }
         }
 
