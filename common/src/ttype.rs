@@ -52,6 +52,15 @@ impl TType {
     pub fn custom_to_string(&self) -> Option<&str> {
         match self {
             TType::Custom { name, .. } => Some(name),
+            TType::List { .. } => Some("List"),
+            TType::Option { .. } => Some("Option"),
+            TType::Tuple { .. } => Some("Tuple"),
+            TType::Function { .. } => Some("Function"),
+            TType::Char => Some("Char"),
+            TType::String => Some("String"),
+            TType::Int => Some("Int"),
+            TType::Float => Some("Float"),
+            TType::Bool => Some("Bool"),
             _ => None,
         }
     }
