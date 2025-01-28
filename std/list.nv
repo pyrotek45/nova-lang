@@ -6,7 +6,7 @@ fn extends clear(list: [$T]) {
     list = []: $T
 }
 
-fn __eq__(a: [$T], b: [$T]) -> Bool {
+fn extends __eq__(a: [$T], b: [$T]) -> Bool {
     if a.len() != b.len() {
         return false
     }
