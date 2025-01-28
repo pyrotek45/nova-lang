@@ -5,7 +5,7 @@ import super.std.list
 import super.std.tuple
 import super.std.math
 
-let input = readFile("Aoc2024/aoc1.txt")
+let input = readFile("Aoc2024/aoc2.txt")
     .chars()
     .split('\n')
     .map(|x: [Char]| x.splitWith(' ', |x: [Char]| Cast::int(x.string()) ))

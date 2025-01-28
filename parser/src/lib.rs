@@ -2014,29 +2014,26 @@ impl Parser {
 
                 // check return types
 
-                let (_, has_return) =
-                    self.check_returns(&statements, output.clone(), pos.clone())?;
-                if !has_return && output != TType::Void {
-                    if let Some(Statement::Pass) = statements.last() {
-                        // do nothing
+                // if output void, insert return as last statement if one wasnt added
+                if output == TType::Void {
+                    if let Some(Statement::Return { .. }) = statements.last() {
                     } else {
-                        return Err(self.generate_error(
-                            "Function is missing a return statement in a branch",
-                            "Function missing return",
-                        ));
+                        statements.push(Statement::Return {
+                            ttype: output.clone(),
+                            expr: Expr::None,
+                        });
                     }
                 }
 
-                if output == TType::Void {
-                    match statements.last() {
-                        Some(Statement::Return { .. }) => {}
-                        _ => {
-                            statements.push(Statement::Return {
-                                ttype: output.clone(),
-                                expr: Expr::None,
-                            });
-                        }
-                    }
+                // if last statement isnt a return error
+                let will_return = self.will_return(&statements, output.clone(), pos.clone())?;
+                //dbg!(will_return);
+                if !will_return {
+                    return Err(self.generate_error_with_pos(
+                        "E2 Function must return a value",
+                        "Last statement is not a return",
+                        pos,
+                    ));
                 }
 
                 left = Expr::Closure {
@@ -3247,7 +3244,7 @@ impl Parser {
                                         {
                                             format!("{}::__gt__", custom).into()
                                         } else {
-                                            // error if no custom method
+                                    
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3262,7 +3259,7 @@ impl Parser {
                                         {
                                             format!("{}::__ge__", custom).into()
                                         } else {
-                                            // error if no custom method
+                 
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3277,7 +3274,7 @@ impl Parser {
                                         {
                                             format!("{}::__lt__", custom).into()
                                         } else {
-                                            // error if no custom method
+                                     
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3292,7 +3289,7 @@ impl Parser {
                                         {
                                             format!("{}::__le__", custom).into()
                                         } else {
-                                            // error if no custom method
+                               
                                             return Err(self.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
@@ -3454,21 +3451,21 @@ impl Parser {
                                         operation,
                                         TType::Bool,
                                     );
-                                    return  Ok(left_expr);
+                                    return Ok(left_expr);
                                 }
                             }
                             Operator::NotEqual => {
                                 if let Some(custom) = left_expr.get_type().custom_to_string() {
                                     format!("{}::__ne__", custom).into()
                                 } else {
-                                    // error if no custom method
+
                                     left_expr = self.create_binop_expr(
                                         left_expr,
                                         right_expr,
                                         operation,
                                         TType::Bool,
                                     );
-                                    return  Ok(left_expr);
+                                    return Ok(left_expr);
                                 }
                             }
                             _ => "".into(),
@@ -5112,7 +5109,6 @@ impl Parser {
 
         // check if dunder method
         match identifier.as_ref() {
-
             id @ "__add__"
             | id @ "__and__"
             | id @ "__or__"
@@ -5424,11 +5420,11 @@ impl Parser {
             }
         }
         // if last statement isnt a return error
-        let (_, has_return) = self.check_returns(&statements, output.clone(), pos.clone())?;
-        if !has_return && output != TType::Void {
+        let will_return = self.will_return(&statements, output.clone(), pos.clone())?;
+        if !will_return && output != TType::Void {
             if let Some(Statement::Pass) = statements.last() {
                 // do nothing
-            } else if !has_return {
+            } else if !will_return {
                 return Err(self.generate_error_with_pos(
                     "Function is missing a return statement in a branch",
                     "Function missing return",
@@ -5436,6 +5432,7 @@ impl Parser {
                 ));
             }
         }
+
         //dbg!(identifier.clone());
         Ok(Some(Statement::Function {
             ttype: output,
@@ -5445,90 +5442,250 @@ impl Parser {
             captures: captured,
         }))
     }
-    fn check_returns(
+
+    // function to see if all returns are valid and to see if stuff like if statements have returns, match statements have returns ect
+    fn will_return(
         &self,
         statements: &[Statement],
         return_type: TType,
         pos: FilePosition,
-    ) -> Result<(TType, bool), NovaError> {
-        statements
-            .iter()
-            .try_fold(false, |has_return, statement| match statement {
-                Statement::Pass => Ok(true),
+    ) -> Result<bool, NovaError> {
+        for statement in statements.iter() {
+            match statement {
                 Statement::Return { ttype, .. } => {
-                    if ttype != &return_type {
-                        Err(self.generate_error_with_pos(
-                            "Return type does not match function return type",
-                            format!("Expected {} got {}", return_type, ttype),
-                            pos.clone(),
-                        ))
-                    } else {
-                        Ok(true)
+                    match self.check_and_map_types(
+                        &[ttype.clone()],
+                        &[return_type.clone()],
+                        &mut HashMap::default(),
+                        pos.clone(),
+                    ) {
+                        Ok(_) => {}
+                        _ => {
+                            return Err(self.generate_error_with_pos(
+                                format!("Cannot return {} from function", ttype),
+                                format!("Expected {}", return_type),
+                                pos.clone(),
+                            ));
+                        }
                     }
+                    return Ok(true);
                 }
                 Statement::If {
                     body, alternative, ..
                 } => {
-                    let (body_return_type, body_has_return) =
-                        self.check_returns(body, return_type.clone(), pos.clone())?;
-                    let alternative_result = alternative
-                        .as_ref()
-                        .map(|alt| self.check_returns(alt, return_type.clone(), pos.clone()))
-                        .transpose()?;
-
-                    match alternative_result {
-                        Some((alternative_return_type, alternative_has_return))
-                            if body_return_type == alternative_return_type =>
-                        {
-                            Ok(body_has_return && alternative_has_return)
+                    // check if all branches have a return
+                    // recurse into body and alternative
+                    let body_return = self.will_return(body, return_type.clone(), pos.clone())?;
+                    if let Some(alt) = alternative {
+                        let alt_return = self.will_return(alt, return_type.clone(), pos.clone())?;
+                        if body_return && alt_return {
+                            return Ok(true);
                         }
-                        Some(_) => Err(self.generate_error(
-                            "Function is missing a return statement in a branch",
-                            "All branches of if-else must have a return statement",
-                        )),
-                        None => Ok(body_has_return),
+                    } 
+                    // return true if all branches have a return, otherwise do nothing
+                    if body_return {
+                        return Ok(true);
                     }
+                }
+                Statement::Expression { expr, .. } => {
+                    // check if expression is a return
+                    if let Expr::Return { expr, ttype: _ } = expr {
+                        match self.check_and_map_types(
+                            &[expr.get_type()],
+                            &[return_type.clone()],
+                            &mut HashMap::default(),
+                            pos.clone(),
+                        ) {
+                            Ok(_) => {}
+                            _ => {
+                                return Err(self.generate_error_with_pos(
+                                    format!("Cannot return {} from function", expr.get_type()),
+                                    format!("Expected {}", return_type),
+                                    pos.clone(),
+                                ));
+                            }
+                        }
+                        return Ok(true);
+                    }
+                }
+                Statement::Pass => {
+                    return Ok(true);
                 }
                 Statement::IfLet {
-                    body, alternative, ..
+                    expr,
+                    body,
+                    alternative,
+                    ..
                 } => {
-                    let (body_return_type, body_has_return) =
-                        self.check_returns(body, return_type.clone(), pos.clone())?;
-                    let alternative_result = alternative
-                        .as_ref()
-                        .map(|alt| self.check_returns(alt, return_type.clone(), pos.clone()))
-                        .transpose()?;
-
-                    match alternative_result {
-                        Some((alternative_return_type, alternative_has_return))
-                            if body_return_type == alternative_return_type =>
-                        {
-                            Ok(body_has_return && alternative_has_return)
+                    let body_return = self.will_return(body, return_type.clone(), pos.clone())?;
+                    if let Some(alt) = alternative {
+                        let alt_return = self.will_return(alt, return_type.clone(), pos.clone())?;
+                        if body_return && alt_return {
+                            return Ok(true);
                         }
-                        Some(_) => Err(self.generate_error(
-                            "Function is missing a return statement in a branch",
-                            "All branches of if-else must have a return statement",
-                        )),
-                        None => Ok(body_has_return),
+                    } 
+                    // check expr
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    // return true if all branches have a return, otherwise do nothing
+                    if body_return {
+                        return Ok(true);
                     }
                 }
-                Statement::Match { arms, default, .. } => {
-                    let mut has_return = has_return;
-                    for arm in arms {
-                        let (_, arm_has_return) =
-                            self.check_returns(&arm.2, return_type.clone(), pos.clone())?;
-                        has_return = has_return && arm_has_return;
+                Statement::While { test, body } => {
+                    // check if test is a return
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: test.get_type(),
+                            expr: test.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
+                Statement::For {
+                    init,
+                    test,
+                    inc,
+                    body,
+                } => {
+                    // check if init, test, and inc are returns
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: init.get_type(),
+                            expr: init.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: test.get_type(),
+                            expr: test.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: inc.get_type(),
+                            expr: inc.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
+                Statement::Foreach { expr, body, .. } => {
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
+                Statement::ForRange {
+                    start,
+                    end,
+                    step,
+                    body,
+                    ..
+                } => {
+                    // check if start, end, and step are returns
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: start.get_type(),
+                            expr: start.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: end.get_type(),
+                            expr: end.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    if let Some(step) = step {
+                        self.will_return(
+                            &[Statement::Expression {
+                                ttype: step.get_type(),
+                                expr: step.clone(),
+                            }],
+                            return_type.clone(),
+                            pos.clone(),
+                        )?;
                     }
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
+                Statement::Block { body, .. } => {
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
+                Statement::Match {
+                    expr,
+                    arms,
+                    default,
+                    ..
+                } => {
+                    // if all branches have a return, then return true
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    let mut arms_return = vec![];
+                    for arm in arms.iter() {
+                        for statement in arm.2.iter() {
+                            arms_return.push(self.will_return(
+                                &[statement.clone()],
+                                return_type.clone(),
+                                pos.clone(),
+                            )?);
+                        }
+                    }
+
                     if let Some(default) = default {
-                        let (_, default_has_return) =
-                            self.check_returns(default, return_type.clone(), pos.clone())?;
-                        has_return = has_return && default_has_return;
+                        for statement in default.iter() {
+                            arms_return.push(self.will_return(
+                                &[statement.clone()],
+                                return_type.clone(),
+                                pos.clone(),
+                            )?);
+                        }
                     }
-                    Ok(has_return)
+
+                    // if all true, then return true, else do nothing
+                    if arms_return.iter().all(|x| *x) {
+                        return Ok(true);
+                    }
                 }
-                _ => Ok(has_return),
-            })
-            .map(|has_return| (return_type.clone(), has_return))
+                // if all branches have a return, then return true
+                Statement::Enum { .. } => {}
+                Statement::Struct { .. } => {}
+                Statement::Function { .. } => {}
+                Statement::ForwardDec { .. } => {}
+                Statement::Continue => {}
+                Statement::Break => {}
+                Statement::Unwrap { .. } => {}
+            }
+        }
+
+        Ok(false)
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {

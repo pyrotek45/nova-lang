@@ -11,7 +11,7 @@ fn extends next(it: Iter($A)) -> Option($A) {
 }
 
 fn extends(Iter) fromRange(start: Int, end: Int) -> Iter(Int) {
-    let index = Box(start)  
+    let index = Box(start);  
     return Iter(fn() -> Option(Int) {
         if index.value >= end {
             return None(Int)
