@@ -18,7 +18,6 @@ fn extends __eq__(a: [$T], b: [$T]) -> Bool {
     return true
 }
 
-
 fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     for let i = 0; i < ammount; i += 1 {
         list.push(input)

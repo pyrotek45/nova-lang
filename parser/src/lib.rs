@@ -5519,10 +5519,6 @@ impl Parser {
                             return Ok(true);
                         }
                     }
-                    // return true if all branches have a return, otherwise do nothing
-                    if body_return {
-                        return Ok(true);
-                    }
                 }
                 Statement::Expression { expr, .. } => {
                     // check if expression is a return
@@ -5570,10 +5566,7 @@ impl Parser {
                         return_type.clone(),
                         pos.clone(),
                     )?;
-                    // return true if all branches have a return, otherwise do nothing
-                    if body_return {
-                        return Ok(true);
-                    }
+   
                 }
                 Statement::While { test, body } => {
                     // check if test is a return
