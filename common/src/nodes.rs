@@ -102,6 +102,11 @@ pub enum Statement {
         test: Expr,
         body: Vec<Statement>,
     },
+    WhileLet {
+        identifier: Rc<str>,
+        expr: Expr,
+        body: Vec<Statement>,
+    },
     For {
         init: Expr,
         test: Expr,
