@@ -822,28 +822,8 @@ impl Vm {
 
                 Code::GETGLOBAL => {
                     let index = u32::from_le_bytes(self.state.next_arr());
-                    // if ref type copy heap as well
                     let item = self.state.stack[index as usize];
-                    match item {
-                        VmData::String(i) => {
-                            let newindex = self.state.allocate_new_heap();
-                            self.state.copy_heap(i, newindex);
-                            self.state.stack.push(VmData::String(newindex));
-                        }
-                        VmData::List(i) => {
-                            let newindex = self.state.allocate_new_heap();
-                            self.state.copy_heap(i, newindex);
-                            self.state.stack.push(VmData::List(newindex));
-                        }
-                        VmData::Closure(i) => {
-                            let newindex = self.state.allocate_new_heap();
-                            self.state.copy_heap(i, newindex);
-                            self.state.stack.push(VmData::Closure(newindex));
-                        }
-                        _ => {
-                            self.state.stack.push(item);
-                        }
-                    }
+                    self.state.stack.push(item);
                 }
 
                 Code::CALL => {
@@ -943,7 +923,8 @@ impl Vm {
                                 let clone = self.state.allocate_array(newarray);
                                 self.state.stack.push(VmData::List(clone))
                             }
-                            _ => {
+                            a => {
+                                dbg!(a);
                                 todo!()
                             }
                         }
