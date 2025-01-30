@@ -924,8 +924,8 @@ impl Vm {
                                 self.state.stack.push(VmData::List(clone))
                             }
                             a => {
-                                dbg!(a);
-                                todo!()
+                                // put it back
+                                self.state.stack.push(a);
                             }
                         }
                     }
