@@ -154,9 +154,7 @@ impl Vm {
                 // with offset
                 Code::STORE => {
                     let index = u32::from_le_bytes(self.state.next_arr());
-
                     let data = self.state.stack.pop().unwrap();
-                    //dbg!(index, self.state.offset);
                     self.state.stack[self.state.offset + index as usize] = data;
                 }
 
@@ -164,9 +162,8 @@ impl Vm {
                 // from offset
                 Code::GET => {
                     let index = u32::from_le_bytes(self.state.next_arr());
-                    let item = &self.state.stack[self.state.offset + index as usize];
-                    //dbg!(&item);
-                    self.state.stack.push(*item);
+                    let item = self.state.stack[self.state.offset + index as usize];
+                    self.state.stack.push(item);
                 }
 
                 // jumps back to the callsite of a function
@@ -825,7 +822,28 @@ impl Vm {
 
                 Code::GETGLOBAL => {
                     let index = u32::from_le_bytes(self.state.next_arr());
-                    self.state.stack.push(self.state.stack[index as usize]);
+                    // if ref type copy heap as well
+                    let item = self.state.stack[index as usize];
+                    match item {
+                        VmData::String(i) => {
+                            let newindex = self.state.allocate_new_heap();
+                            self.state.copy_heap(i, newindex);
+                            self.state.stack.push(VmData::String(newindex));
+                        }
+                        VmData::List(i) => {
+                            let newindex = self.state.allocate_new_heap();
+                            self.state.copy_heap(i, newindex);
+                            self.state.stack.push(VmData::List(newindex));
+                        }
+                        VmData::Closure(i) => {
+                            let newindex = self.state.allocate_new_heap();
+                            self.state.copy_heap(i, newindex);
+                            self.state.stack.push(VmData::Closure(newindex));
+                        }
+                        _ => {
+                            self.state.stack.push(item);
+                        }
+                    }
                 }
 
                 Code::CALL => {

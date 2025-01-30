@@ -5566,7 +5566,6 @@ impl Parser {
                         return_type.clone(),
                         pos.clone(),
                     )?;
-   
                 }
                 Statement::While { test, body } => {
                     // check if test is a return
