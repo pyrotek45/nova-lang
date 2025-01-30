@@ -1887,7 +1887,9 @@ impl Compiler {
             }
             Atom::String { value: str } => {
                 let index = self.insert_string_global(str.clone());
+                // clone string to prevent mutation
                 self.asm.push(Asm::GETGLOBAL(index as u32));
+                self.asm.push(Asm::CLONE);
             }
             Atom::Integer { value: int } => {
                 self.asm.push(Asm::INTEGER(*int));
