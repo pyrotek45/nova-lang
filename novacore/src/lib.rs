@@ -108,8 +108,9 @@ impl NovaCore {
         self.parser.modules.insert("terminal".into());
         self.parser.modules.insert("Cast".into());
         self.parser.modules.insert("Regex".into());
+        self.parser.modules.insert("raylib".into());
         // add regex captures function, takes two strings and returns a list of strings
-        // add printf
+        // add printf function
         self.add_function(
             "printf",
             TType::Function {
@@ -129,6 +130,128 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::regex::regex_captures,
+        );
+        // raylib init
+        self.add_function(
+            "raylib::init",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int, TType::Int, TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_init,
+        );
+        // add raylib sleep function
+        self.add_function(
+            "raylib::sleep",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_sleep,
+        );
+        // add raylib draw function
+        self.add_function(
+            "raylib::rendering",
+            TType::Function {
+                parameters: vec![TType::Tuple {
+                    elements: vec![TType::Int, TType::Int, TType::Int],
+                }],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_rendering,
+        );
+        // add raylib draw text function
+        self.add_function(
+            "raylib::drawText",
+            TType::Function {
+                parameters: vec![
+                    TType::String,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_text,
+        );
+        // raylib clear screen function
+        self.add_function(
+            "raylib::clear",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_clear,
+        );
+        // raylib draw fps
+        self.add_function(
+            "raylib::drawFPS",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_fps,
+        );
+        // raylib mouse position
+        self.add_function(
+            "raylib::mousePosition",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Tuple {
+                    elements: vec![TType::Int, TType::Int],
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_mouse_position,
+        );
+        // raylib rectangle
+        self.add_function(
+            "raylib::drawRectangle",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_rectangle,
+        );
+        // return key pressed which returns Option<string>
+        self.add_function(
+            "raylib::getKey",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_key_as_string,
+        );
+        // is key pressed which returns bool
+        self.add_function(
+            "raylib::isKeyPressed",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_key_down,
         );
         // add regex match, takes two strings and returns a bool
         self.add_function(

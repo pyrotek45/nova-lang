@@ -6,11 +6,13 @@ use reedline::{
     DefaultValidator, Emacs, FileBackedHistory, KeyCode, KeyModifiers, MenuBuilder, ReedlineEvent,
     ReedlineMenu,
 };
+
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::exit,
 };
+
 fn main() {
     if entry_command().is_none() {
         print_help();

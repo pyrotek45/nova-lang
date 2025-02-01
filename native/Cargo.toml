@@ -11,3 +11,5 @@ common = { path = "../common" }
 vm = { path = "../vm"}
 rand = "0.8.5"
 regex = "1.11.1"
+# add features to raylib custom frame control
+raylib = { version = "5.0.0", features = ["custom_frame_control"] }

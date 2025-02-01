@@ -1,11 +1,51 @@
-use core::fmt;
+use ::std::fmt;
+use common::error::NovaError;
+use common::table::Table;
+use raylib::prelude::*;
 use std::{
+    cell::RefCell,
     fmt::{Display, Formatter},
     io::{self, Write},
     rc::Rc,
 };
 
-use common::table::Table;
+#[derive(Debug, Clone)]
+pub enum Draw {
+    Text {
+        text: Rc<str>,
+        x: i32,
+        y: i32,
+        size: i32,
+        color: Color,
+    },
+    FPS {
+        x: i32,
+        y: i32,
+    },
+    Rectangle {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        color: Color,
+    },
+    Circle {
+        x: i32,
+        y: i32,
+        radius: i32,
+        color: Color,
+    },
+    Line {
+        start_x: i32,
+        start_y: i32,
+        end_x: i32,
+        end_y: i32,
+        color: Color,
+    },
+    ClearBackground {
+        color: Color,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Heap {
@@ -98,6 +138,16 @@ impl Heap {
             }
         }
     }
+
+    // get integer value
+    pub fn get_int(&self) -> i64 {
+        match self {
+            Heap::Int(i) => *i,
+            _ => {
+                panic!()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +165,9 @@ pub struct State {
     pub gc_count: usize,
     pub garbage_collected: usize,
     pub gclock: bool,
+    pub raylib: Option<Rc<RefCell<RaylibHandle>>>,
+    pub raylib_thread: Option<RaylibThread>,
+    pub draw_queue: Vec<Draw>,
 }
 
 pub fn new() -> State {
@@ -132,6 +185,9 @@ pub fn new() -> State {
         gc_count: 0,
         garbage_collected: 0,
         gclock: false,
+        raylib: None,
+        raylib_thread: None,
+        draw_queue: vec![],
     }
 }
 

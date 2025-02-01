@@ -2913,7 +2913,7 @@ impl Parser {
                     | Expr::None => {
                         return Err(self.generate_error_with_pos(
                             "Error: left hand side of `=` must be assignable",
-                            "Cannot assign a value to a literal value",
+                            format!("{:?} is not assignable", left_expr),
                             current_pos.clone(),
                         ));
                     }
