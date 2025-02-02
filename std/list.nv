@@ -53,16 +53,6 @@ fn extends filter(list: [$A], f: fn($A) -> Bool) -> [$A] {
     return result
 }
 
-fn extends remove(list: [$K], index: Int) -> [$K] {
-    let result = []:$K
-    for let i = 0; i < list.len(); i += 1 {
-        if i != index {
-            result.push(list[i])
-        }
-    }
-    return result
-}
-
 fn extends foreach(list: [$A], f: fn($A)) {
     for x in list {
         f(x)

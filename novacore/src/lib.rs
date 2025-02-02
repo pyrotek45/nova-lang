@@ -109,6 +109,21 @@ impl NovaCore {
         self.parser.modules.insert("Cast".into());
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
+        // add remove for list
+        self.add_function(
+            "List::remove",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "a".into() }),
+                    },
+                    TType::Int,
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::remove,
+        );
         // add regex captures function, takes two strings and returns a list of strings
         // add printf function
         self.add_function(
@@ -155,9 +170,7 @@ impl NovaCore {
         self.add_function(
             "raylib::rendering",
             TType::Function {
-                parameters: vec![TType::Tuple {
-                    elements: vec![TType::Int, TType::Int, TType::Int],
-                }],
+                parameters: vec![TType::None],
                 return_type: Box::new(TType::Bool),
             },
             common::nodes::SymbolKind::Function,
@@ -185,7 +198,9 @@ impl NovaCore {
         self.add_function(
             "raylib::clear",
             TType::Function {
-                parameters: vec![TType::None],
+                parameters: vec![TType::Tuple {
+                    elements: vec![TType::Int, TType::Int, TType::Int],
+                }],
                 return_type: Box::new(TType::Void),
             },
             common::nodes::SymbolKind::Function,

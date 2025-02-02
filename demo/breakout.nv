@@ -1,0 +1,379 @@
+module ray
+
+import super.std.list
+
+let width = 800
+let height = 600
+
+raylib::init("Breakout Game", width, height, 120)
+
+let speed = 10
+let x = 200
+let y = 200
+
+// make text bounce around the screen like dvd logo
+let x_speed = 2
+let y_speed = 2
+// make skyblue background
+let bgColor = (135, 206, 235)
+let logoColor = (0, 0, 0)
+
+struct Ball {
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    color: (Int, Int, Int),
+    speed_x: Int,
+    speed_y: Int,
+}
+
+let balls = [
+    Ball {
+        x: 200,
+        y: 200,
+        width: 10,
+        height: 10,
+        color: (0, 0, 0),
+        speed_x: 2,
+        speed_y: 2,
+    }
+]
+
+struct Paddle {
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    color: (Int, Int, Int),
+    speed: Int,
+}
+
+let paddle = Paddle {
+    x: 200,
+    y: height - 20,
+    width: 100,
+    height: 20,
+    // blue
+    color: (0, 0, 255),
+    speed: 6,
+}
+
+let redx = width / 2
+let rexy = height / 2
+
+// Define a struct to represent a brick
+struct Brick {
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    color: (Int, Int, Int),
+    alive: Bool,
+}
+
+// Create a list of bricks
+let bricks = [
+    // first row
+    Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    // second row
+    Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    // third row
+    Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+]
+
+fn refillBricks() {
+    bricks = [
+        // first row
+        Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        // second row
+        Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        // third row
+        Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    ]
+}
+
+enum State {
+    Menu,
+    Game,
+    GameOver,
+    Win
+}
+
+let state = State::Menu()
+
+let gravity = 2
+struct Powerup {
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    color: (Int, Int, Int),
+    speed_x: Int,
+    speed_y: Int,
+    on: Bool,
+}
+
+let powerup = Powerup {
+    x: 200,
+    y: 200,
+    width: 20,
+    height: 20,
+    color: (0, 180, 0),
+    speed_x: 4,
+    speed_y: 4,
+    on: false,
+}
+
+
+fn updateGame() {
+
+
+    // // Move the balls in the ball list
+    for i in 0..balls.len() {
+        let ball = balls[i]
+      // Draw the ball
+        raylib::drawRectangle(ball.x, ball.y, ball.width, ball.height, ball.color)
+
+        ball.x += ball.speed_x
+        ball.y += ball.speed_y
+
+        // // Bounce the ball off the walls
+        if (ball.x <= 0) 
+        || (ball.x >= width - ball.width) {
+            ball.speed_x = -(ball.speed_x)
+        }
+        if (ball.y <= 0 ) 
+        || (ball.y >= height - ball.height) {
+            ball.speed_y = -(ball.speed_y)
+        }
+
+        // Bounce the ball off the paddle
+        if (ball.x + ball.width >= paddle.x) 
+        && (ball.x <= paddle.x + paddle.width)
+        && (ball.y + ball.height >= paddle.y)
+        && (ball.y <= paddle.y + paddle.height) {
+            ball.speed_y = -(ball.speed_y)
+        }
+
+        // if ball goes below the paddle, game over
+        if ball.y >= height - ball.height {
+            // if balls.len() > 1 {
+            if balls.len() > 1 {
+                balls.remove(i)
+            } else {
+                state = State::GameOver()
+            }
+        }
+
+        // // check if ball collides with any other balls
+        // for j in 0..balls.len() {
+        //     if i != j {
+        //         let other = balls[j]
+        //         if (ball.x + ball.width >= other.x) 
+        //         && (ball.x <= other.x + other.width) 
+        //         && (ball.y + ball.height >= other.y) 
+        //         && (ball.y <= other.y + other.height) {
+        //             ball.speed_y = -(ball.speed_y)
+        //             other.speed_y = -(other.speed_y)
+        //         }
+        //         // x axis collision
+        //         if (ball.y + ball.height >= other.y)
+        //         && (ball.y <= other.y + other.height)
+        //         && (ball.x + ball.width >= other.x)
+        //         && (ball.x <= other.x + other.width) {
+        //             ball.speed_x = -(ball.speed_x)
+        //             other.speed_x = -(other.speed_x)
+        //         }
+
+        //     }
+        // }
+    }
+
+    // move powerup if on
+    if powerup.on {
+        raylib::drawRectangle(powerup.x, powerup.y, powerup.width, powerup.height, powerup.color)
+        powerup.y += powerup.speed_y
+        if (powerup.x + powerup.width >= paddle.x) 
+        && (powerup.x <= paddle.x + paddle.width)
+        && (powerup.y + powerup.height >= paddle.y)
+        && (powerup.y <= paddle.y + paddle.height) {
+            powerup.on = false
+            // make paddle bigger
+            paddle.width += 20
+
+        }
+    } 
+
+
+    // Draw the paddle
+    raylib::drawRectangle(paddle.x, paddle.y, paddle.width, paddle.height, paddle.color)
+
+    // Move the paddle
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        paddle.x += paddle.speed
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        paddle.x -= paddle.speed
+    }
+
+    // Keep the paddle on the screen
+    if paddle.x <= 0 {
+        paddle.x = 0
+    }
+    if paddle.x >= width - paddle.width {
+        paddle.x = width - paddle.width
+    }
+
+
+
+    // Draw all bricks and check for collisions
+    for i in 0..bricks.len() {
+        let brick = bricks[i]
+        if brick.alive {
+            raylib::drawRectangle(brick.x, brick.y, brick.width, brick.height, brick.color)
+            let addball = false
+            // Check for collision with the balls and spawn new ball
+            for ball in balls {
+                if (ball.x + ball.width >= brick.x) 
+                && (ball.x <= brick.x + brick.width) 
+                && (ball.y + ball.height >= brick.y) 
+                && (ball.y <= brick.y + brick.height) {
+                    ball.speed_y = -(ball.speed_y)
+                    brick.alive = false
+                    addball = true
+                    // spawn powerup 50% of the time
+                    if (random(0, 100) > 50)
+                    && !(powerup.on) {
+                        powerup.on = true
+                        powerup.x = brick.x + brick.width / 2
+                        powerup.y = brick.y + brick.height / 2
+                    }
+                }
+            }
+
+            // 25% chance to spawn a new ball
+            if (addball)
+            && (random(0, 100) > 75) {
+                balls.push(Ball {
+                    x: brick.x + brick.width / 2,
+                    y: brick.y + brick.height / 2,
+                    width: 10,
+                    height: 10,
+                    color: (0, 0, 0),
+                    speed_x: 2,
+                    speed_y: 2,
+                })
+            }
+        }
+    }
+
+    // if raylib::isKeyPressed("KEY_SPACE") {
+    //     // raylib::drawText("SPACE", 10, 10, 60, (255, 0, 0))
+    //     // refill bricks
+    //     refillBricks()
+
+    // }
+
+    // Check if all bricks are destroyed
+    let all_dead = true
+    for brick in bricks {
+        if brick.alive {
+            all_dead = false
+        }
+    }
+    if all_dead {
+        balls = [
+            Ball {
+                x: 200,
+                y: 200,
+                width: 10,
+                height: 10,
+                color: (0, 0, 0),
+                speed_x: 2,
+                speed_y: 2,
+            }
+        ]
+        state = State::Win()
+    }
+}
+
+while raylib::rendering() {
+    raylib::clear(bgColor)
+    raylib::drawFPS(10, 10)
+
+    match state {
+        Menu => {
+            raylib::drawText("Press SPACE to start", width / 2 - 200, height / 2, 40, (255, 0, 0))
+            if raylib::isKeyPressed("KEY_SPACE") {
+                state = State::Game()
+            }
+        }
+        Game => {
+            updateGame()
+        }
+        GameOver => {
+            raylib::drawText("Game Over", width / 2 - 150, height / 2, 40, (255, 0, 0))
+            paddle.width = 100
+            refillBricks()
+            balls = [
+                Ball {
+                    x: 200,
+                    y: 200,
+                    width: 10,
+                    height: 10,
+                    color: (0, 0, 0),
+                    speed_x: 2,
+                    speed_y: 2,
+                }
+            ]
+            if raylib::isKeyPressed("KEY_SPACE") {
+                state = State::Menu()
+            }
+        }
+        Win => {
+            raylib::drawText("You Win!", width / 2 - 150, height / 2, 40, (255, 0, 0))
+            paddle.width = 100
+            refillBricks()
+            balls = [
+                Ball {
+                    x: 200,
+                    y: 200,
+                    width: 10,
+                    height: 10,
+                    color: (0, 0, 0),
+                    speed_x: 2,
+                    speed_y: 2,
+                }
+            ]
+            if raylib::isKeyPressed("KEY_SPACE") {
+                state = State::Menu()
+            }
+        }
+    }
+
+}

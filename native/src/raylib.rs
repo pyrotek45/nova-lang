@@ -80,34 +80,6 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
-    let color = state.stack.pop().unwrap();
-    let (r, g, b) = match color {
-        VmData::List(index) => {
-            // get value from heap
-            let tuple = state.get_ref(index);
-            match tuple {
-                Heap::List(pointers) => {
-                    // vec of pointers to get the values
-                    let mut r = state.get_ref(pointers[0]).get_int();
-                    let mut g = state.get_ref(pointers[1]).get_int();
-                    let mut b = state.get_ref(pointers[2]).get_int();
-                    (r, g, b)
-                }
-                _ => {
-                    return Err(NovaError::Runtime {
-                        msg: "Expected tuple".into(),
-                    })
-                }
-            }
-        }
-        _ => {
-            return Err(NovaError::Runtime {
-                msg: "Expected tuple".into(),
-            })
-        }
-    };
-    let color = Color::new(r as u8, g as u8, b as u8, 255);
-
     if let Some(rl) = state.raylib.as_ref() {
         let thread = state.raylib_thread.as_ref().unwrap().clone();
         let mut rl = state.raylib.as_ref().unwrap().borrow_mut();
@@ -115,7 +87,6 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
         let window_should_close = rl.window_should_close();
         let mut d = rl.begin_drawing(&thread);
 
-        d.clear_background(color);
         // use state draw_queue to draw all the items while emptying the queue
         for draw in state.draw_queue.drain(..) {
             match draw {
@@ -154,7 +125,9 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
                     end_y,
                     color,
                 } => todo!(),
-                Draw::ClearBackground { color } => todo!(),
+                Draw::ClearBackground { color } => {
+                    d.clear_background(color);
+                }
             }
         }
 
@@ -270,11 +243,34 @@ pub fn raylib_draw_text(state: &mut state::State) -> Result<(), NovaError> {
 
 // clear the screen
 pub fn raylib_clear(state: &mut state::State) -> Result<(), NovaError> {
-    // raylib_check_window(state)?;
-    let thread = state.raylib_thread.as_ref().unwrap().clone();
-    let mut rl: RefMut<RaylibHandle> = state.raylib.as_ref().unwrap().borrow_mut();
-    let mut d = rl.begin_drawing(&thread);
-    d.clear_background(Color::WHITE);
+    let color = state.stack.pop().unwrap();
+    let (r, g, b) = match color {
+        VmData::List(index) => {
+            // get value from heap
+            let tuple = state.get_ref(index);
+            match tuple {
+                Heap::List(pointers) => {
+                    // vec of pointers to get the values
+                    let mut r = state.get_ref(pointers[0]).get_int();
+                    let mut g = state.get_ref(pointers[1]).get_int();
+                    let mut b = state.get_ref(pointers[2]).get_int();
+                    (r, g, b)
+                }
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected tuple".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected tuple".into(),
+            })
+        }
+    };
+    let color = Color::new(r as u8, g as u8, b as u8, 255);
+    state.draw_queue.push(Draw::ClearBackground { color });
     Ok(())
 }
 

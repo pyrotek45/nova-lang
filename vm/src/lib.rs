@@ -653,19 +653,25 @@ impl Vm {
                             match item {
                                 VmData::Function(v) => self.state.heap[index] = Heap::Function(v),
                                 VmData::Int(v) => self.state.heap[index] = Heap::Int(v),
-                                VmData::Float(_) => todo!(),
-                                VmData::Bool(_) => todo!(),
+                                VmData::Float(v) => self.state.heap[index] = Heap::Float(v),
+                                VmData::Bool(v) => self.state.heap[index] = Heap::Bool(v),
                                 VmData::List(v) => {
                                     //dbg!(&self.state.heap[v]);
                                     self.state.heap[index] = Heap::ListAddress(v)
                                 }
-                                VmData::None => todo!(),
+                                VmData::None => self.state.heap[index] = Heap::None,
                                 VmData::String(v) => {
                                     self.state.heap[index] = Heap::StringAddress(v)
                                 }
-                                VmData::Closure(_) => todo!(),
-                                VmData::StackAddress(_) => todo!(),
-                                VmData::Struct(_) => todo!(),
+                                VmData::Closure(v) => {
+                                    self.state.heap[index] = Heap::ClosureAddress(v)
+                                }
+                                VmData::StackAddress(v) => {
+                                    self.state.heap[index] = Heap::ListAddress(v)
+                                }
+                                VmData::Struct(v) => {
+                                    self.state.heap[index] = Heap::StructAddress(v)
+                                }
                                 VmData::Char(v) => self.state.heap[index] = Heap::Char(v),
                             };
                         }
