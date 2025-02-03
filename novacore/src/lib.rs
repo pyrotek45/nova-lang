@@ -268,6 +268,16 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_key_down,
         );
+        // raylib gettimeframe
+        self.add_function(
+            "raylib::getFrameTime",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_frame_time,
+        );
         // add regex match, takes two strings and returns a bool
         self.add_function(
             "Regex::matches",

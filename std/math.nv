@@ -126,3 +126,19 @@ fn round(n: Float) -> Int {
     // since its a Float, should be safe to cast
     return Cast::int(n + 0.5).unwrap()
 }
+
+// module doesnt work on floats
+fn sin(self: Float) -> Float {
+    let x = self
+    let result = 0.0
+    let term = x
+    let sign = 1.0
+
+    for let n = 1.0; n < 20.0; n += 2.0 {
+        result = result + sign * term
+        term = term * x * x / (n * (n + 1.0))
+        sign = -sign
+    }
+
+    return result
+}

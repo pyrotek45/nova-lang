@@ -46,7 +46,7 @@ fn extends orDoFn(self: Option($A), f: fn() -> $A) -> $A {
 }
 
 fn extends isNone(self: Option($A)) -> Bool {
-    return !(self.isSome())
+    return !self.isSome()
 }
 
 // Maybe type

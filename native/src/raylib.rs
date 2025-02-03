@@ -480,3 +480,11 @@ pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
     state.stack.push(VmData::Bool(is_down));
     Ok(())
 }
+
+// raylib gettimeframe
+pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let time = state.raylib.as_ref().unwrap().borrow_mut().get_time();
+    state.stack.push(VmData::Float(time as f64));
+    Ok(())
+}

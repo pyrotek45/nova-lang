@@ -1,11 +1,14 @@
 module ray
 
 import super.std.list
+import super.std.math
 
 let width = 800
 let height = 600
 
-raylib::init("Breakout Game", width, height, 120)
+let t = sin(6.0)
+
+raylib::init("Breakout Game", width, height, 60 * 2)
 
 let speed = 10
 let x = 200
@@ -62,6 +65,35 @@ let paddle = Paddle {
 let redx = width / 2
 let rexy = height / 2
 
+enum Direction {
+    Left,
+    Right,
+}
+
+fn extends __eq__(self: Direction, other: Direction) -> Bool {
+    match self {
+        Left => {
+            match other {
+                Left => {
+                    return true
+                }
+                _ => {
+                    return false
+                }
+            }
+        }
+        Right => {
+            match other {
+                Right => {
+                    return true
+                }
+                _ => {
+                    return false
+                }
+            }
+        }
+    }
+}
 // Define a struct to represent a brick
 struct Brick {
     x: Int,
@@ -70,50 +102,51 @@ struct Brick {
     height: Int,
     color: (Int, Int, Int),
     alive: Bool,
+    direction: Direction,
 }
 
 // Create a list of bricks
 let bricks = [
     // first row
-    Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
     // second row
-    Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
     // third row
-    Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-    Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+    Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+    Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
 ]
 
 fn refillBricks() {
     bricks = [
         // first row
-        Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 50, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 200, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 350, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 500, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 650, y: 50, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
         // second row
-        Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 50, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 200, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 350, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 500, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 650, y: 100, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
         // third row
-        Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
-        Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true },
+        Brick { x: 50, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 200, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 350, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 500, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
+        Brick { x: 650, y: 150, width: 100, height: 30, color: (255, 0, 0), alive: true, direction: Direction::Right() },
     ]
 }
 
@@ -150,7 +183,47 @@ let powerup = Powerup {
 }
 
 
+
 fn updateGame() {
+    // println(raylib::getFrameTime())
+    // move bricks left and right like sine wave without sin function
+    let distance = 1
+    for brick in bricks {
+        match brick.direction {
+            Right => {
+                brick.x += distance
+            }
+            Left => {
+                brick.x += -distance
+            }
+        }
+
+        // clamp bricks to the screen
+        if brick.x <= 0 {
+            brick.x = 0
+            brick.direction = Direction::Right()
+        }
+        if brick.x >= width - brick.width {
+            brick.x = width - brick.width
+            brick.direction = Direction::Left()
+        }
+
+        // check collision with other bricks
+        for other in bricks.filter(|b: Brick| b.alive) {
+            if brick != other {
+                if brick.x + brick.width >= other.x 
+                && brick.x <= other.x + other.width 
+                && brick.y + brick.height >= other.y
+                && brick.y <= other.y + other.height {
+                    if brick.direction == Direction::Right() {
+                        brick.direction = Direction::Left()
+                    } else {
+                        brick.direction = Direction::Right()
+                    }
+                }
+            }
+        }
+    }
 
 
     // // Move the balls in the ball list
@@ -163,21 +236,21 @@ fn updateGame() {
         ball.y += ball.speed_y
 
         // // Bounce the ball off the walls
-        if (ball.x <= 0) 
-        || (ball.x >= width - ball.width) {
-            ball.speed_x = -(ball.speed_x)
+        if ball.x <= 0 
+        || ball.x >= width - ball.width {
+            ball.speed_x = -ball.speed_x
         }
-        if (ball.y <= 0 ) 
-        || (ball.y >= height - ball.height) {
-            ball.speed_y = -(ball.speed_y)
+        if ball.y <= 0 
+        || ball.y >= height - ball.height {
+            ball.speed_y = -ball.speed_y
         }
 
         // Bounce the ball off the paddle
-        if (ball.x + ball.width >= paddle.x) 
-        && (ball.x <= paddle.x + paddle.width)
-        && (ball.y + ball.height >= paddle.y)
-        && (ball.y <= paddle.y + paddle.height) {
-            ball.speed_y = -(ball.speed_y)
+        if ball.x + ball.width >= paddle.x
+        && ball.x <= paddle.x + paddle.width
+        && ball.y + ball.height >= paddle.y
+        && ball.y <= paddle.y + paddle.height {
+            ball.speed_y = -ball.speed_y
         }
 
         // if ball goes below the paddle, game over
@@ -190,7 +263,7 @@ fn updateGame() {
             }
         }
 
-        // // check if ball collides with any other balls
+        // check if ball collides with any other balls
         // for j in 0..balls.len() {
         //     if i != j {
         //         let other = balls[j]
@@ -218,10 +291,10 @@ fn updateGame() {
     if powerup.on {
         raylib::drawRectangle(powerup.x, powerup.y, powerup.width, powerup.height, powerup.color)
         powerup.y += powerup.speed_y
-        if (powerup.x + powerup.width >= paddle.x) 
-        && (powerup.x <= paddle.x + paddle.width)
-        && (powerup.y + powerup.height >= paddle.y)
-        && (powerup.y <= paddle.y + paddle.height) {
+        if powerup.x + powerup.width >= paddle.x 
+        && powerup.x <= paddle.x + paddle.width
+        && powerup.y + powerup.height >= paddle.y
+        && powerup.y <= paddle.y + paddle.height {
             powerup.on = false
             // make paddle bigger
             paddle.width += 20
@@ -259,16 +332,16 @@ fn updateGame() {
             let addball = false
             // Check for collision with the balls and spawn new ball
             for ball in balls {
-                if (ball.x + ball.width >= brick.x) 
-                && (ball.x <= brick.x + brick.width) 
-                && (ball.y + ball.height >= brick.y) 
-                && (ball.y <= brick.y + brick.height) {
+                if ball.x + ball.width >= brick.x
+                && ball.x <= brick.x + brick.width 
+                && ball.y + ball.height >= brick.y 
+                && ball.y <= brick.y + brick.height {
                     ball.speed_y = -(ball.speed_y)
                     brick.alive = false
                     addball = true
                     // spawn powerup 50% of the time
                     if (random(0, 100) > 50)
-                    && !(powerup.on) {
+                    && !powerup.on {
                         powerup.on = true
                         powerup.x = brick.x + brick.width / 2
                         powerup.y = brick.y + brick.height / 2
@@ -277,8 +350,8 @@ fn updateGame() {
             }
 
             // 25% chance to spawn a new ball
-            if (addball)
-            && (random(0, 100) > 75) {
+            if addball
+            && random(0, 100) > 75 {
                 balls.push(Ball {
                     x: brick.x + brick.width / 2,
                     y: brick.y + brick.height / 2,
@@ -300,13 +373,7 @@ fn updateGame() {
     // }
 
     // Check if all bricks are destroyed
-    let all_dead = true
-    for brick in bricks {
-        if brick.alive {
-            all_dead = false
-        }
-    }
-    if all_dead {
+    if !bricks.anyWith(|b: Brick| b.alive) {
         balls = [
             Ball {
                 x: 200,
@@ -325,7 +392,9 @@ fn updateGame() {
 while raylib::rendering() {
     raylib::clear(bgColor)
     raylib::drawFPS(10, 10)
-
+    if raylib::isKeyPressed("KEY_Q") {
+        break
+    }
     match state {
         Menu => {
             raylib::drawText("Press SPACE to start", width / 2 - 200, height / 2, 40, (255, 0, 0))

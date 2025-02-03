@@ -18,6 +18,16 @@ fn extends __eq__(a: [$T], b: [$T]) -> Bool {
     return true
 }
 
+fn extends dropIndex(list: [$T], index: Int) -> [$T] {
+    let result = []: $T
+    for i in 0..list.len() {
+        if i != index {
+            result.push(list[i])
+        }
+    }
+    return result
+}
+
 fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
     for let i = 0; i < ammount; i += 1 {
         list.push(input)
@@ -231,7 +241,7 @@ fn extends foldr(input: [$T], f: fn($T,$T) -> $T) -> $T {
 
 fn extends slice(input: [$T], start: Int, end: Int) -> [$T] {
     let result = []: $T
-    if (start < 0) || (end > input.len()) {
+    if start < 0 || end > input.len() {
         return []: $T
     }
     for let i = start; i < end; i += 1 {
