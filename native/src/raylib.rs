@@ -6,11 +6,8 @@ use std::{
 };
 
 use common::error::NovaError;
-use rand::Rng;
 use raylib::prelude::*;
 use vm::state::{self, Draw, Heap, VmData};
-
-use crate::time::sleep;
 
 // function each time the raylib is called to check if the window is closed, but doesnt push anything to the stack or exits if it is closed
 pub fn raylib_check_window(state: &mut state::State) -> Result<(), NovaError> {
@@ -64,7 +61,7 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
             })
         }
     };
-    let (mut rl, thread) = raylib::init().size(w as i32, h as i32).title(&text).build();
+    let (mut rl, thread) = raylib::init().size(w as i32, h as i32).title(text).build();
     rl.set_target_fps(fps as u32);
     state.raylib = Some(Rc::new(RefCell::new(rl)));
     state.raylib_thread = Some(thread);
@@ -73,7 +70,7 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
     let mut rl = state.raylib.as_ref().unwrap().borrow_mut();
     let thread = state.raylib_thread.as_ref().unwrap();
 
-    let mut d = rl.begin_drawing(&thread);
+    let mut d = rl.begin_drawing(thread);
     d.clear_background(Color::WHITE);
 
     Ok(())
@@ -98,10 +95,10 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
                     color,
                 } => {
                     // will use default color since its prototype
-                    d.draw_text(&text, x as i32, y as i32, size as i32, color);
+                    d.draw_text(&text, x, y, size, color);
                 }
                 Draw::FPS { x, y } => {
-                    d.draw_fps(x as i32, y as i32);
+                    d.draw_fps(x, y);
                 }
                 Draw::Rectangle {
                     x,
@@ -110,7 +107,7 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
                     height,
                     color,
                 } => {
-                    d.draw_rectangle(x as i32, y as i32, width as i32, height as i32, color);
+                    d.draw_rectangle(x, y, width, height, color);
                 }
                 Draw::Circle {
                     x,
@@ -152,8 +149,7 @@ pub fn raylib_sleep(state: &mut state::State) -> Result<(), NovaError> {
             })
         }
     };
-    let thread = state.raylib_thread.as_ref().unwrap();
-    let mut rl: RefMut<RaylibHandle> = state.raylib.as_ref().unwrap().borrow_mut();
+    let rl: RefMut<RaylibHandle> = state.raylib.as_ref().unwrap().borrow_mut();
     rl.wait_time(ms as f64);
     Ok(())
 }
@@ -171,9 +167,9 @@ pub fn raylib_draw_text(state: &mut state::State) -> Result<(), NovaError> {
             match tuple {
                 Heap::List(pointers) => {
                     // vec of pointers to get the values
-                    let mut r = state.get_ref(pointers[0]).get_int();
-                    let mut g = state.get_ref(pointers[1]).get_int();
-                    let mut b = state.get_ref(pointers[2]).get_int();
+                    let r = state.get_ref(pointers[0]).get_int();
+                    let g = state.get_ref(pointers[1]).get_int();
+                    let b = state.get_ref(pointers[2]).get_int();
                     (r, g, b)
                 }
                 _ => {
@@ -251,9 +247,9 @@ pub fn raylib_clear(state: &mut state::State) -> Result<(), NovaError> {
             match tuple {
                 Heap::List(pointers) => {
                     // vec of pointers to get the values
-                    let mut r = state.get_ref(pointers[0]).get_int();
-                    let mut g = state.get_ref(pointers[1]).get_int();
-                    let mut b = state.get_ref(pointers[2]).get_int();
+                    let r = state.get_ref(pointers[0]).get_int();
+                    let g = state.get_ref(pointers[1]).get_int();
+                    let b = state.get_ref(pointers[2]).get_int();
                     (r, g, b)
                 }
                 _ => {
@@ -295,7 +291,6 @@ pub fn raylib_draw_fps(state: &mut state::State) -> Result<(), NovaError> {
 // raylib get mouse position -> returns tuple (x, y)
 pub fn raylib_get_mouse_position(state: &mut state::State) -> Result<(), NovaError> {
     // raylib_check_window(state)?;
-    let thread = state.raylib_thread.as_ref().unwrap().clone();
     let pos = {
         let rl = state.raylib.as_ref().unwrap().borrow_mut();
         rl.get_mouse_position()
@@ -321,9 +316,9 @@ pub fn raylib_draw_rectangle(state: &mut state::State) -> Result<(), NovaError> 
             match tuple {
                 Heap::List(pointers) => {
                     // vec of pointers to get the values
-                    let mut r = state.get_ref(pointers[0]).get_int();
-                    let mut g = state.get_ref(pointers[1]).get_int();
-                    let mut b = state.get_ref(pointers[2]).get_int();
+                    let r = state.get_ref(pointers[0]).get_int();
+                    let g = state.get_ref(pointers[1]).get_int();
+                    let b = state.get_ref(pointers[2]).get_int();
                     (r, g, b)
                 }
                 _ => {
@@ -485,6 +480,6 @@ pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
 pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> {
     // raylib_check_window(state)?;
     let time = state.raylib.as_ref().unwrap().borrow_mut().get_time();
-    state.stack.push(VmData::Float(time as f64));
+    state.stack.push(VmData::Float(time));
     Ok(())
 }

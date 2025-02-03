@@ -214,7 +214,10 @@ impl Token {
     }
 
     pub fn is_logical_op(&self) -> bool {
-        matches!(&self.value, TokenValue::Operator(Operator::And | Operator::Or))
+        matches!(
+            &self.value,
+            TokenValue::Operator(Operator::And | Operator::Or)
+        )
     }
 
     pub fn is_op(&self, op: Operator) -> bool {

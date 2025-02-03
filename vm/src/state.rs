@@ -1,5 +1,4 @@
 use ::std::fmt;
-use common::error::NovaError;
 use common::table::Table;
 use raylib::prelude::*;
 use std::{
