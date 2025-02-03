@@ -1667,7 +1667,7 @@ impl Parser {
                         )?;
                         return_type =
                             Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
-                            // dbg!(arguments.clone(), return_type.clone(), left_expr.clone());
+                        // dbg!(arguments.clone(), return_type.clone(), left_expr.clone());
 
                         Expr::Call {
                             ttype: *return_type,
@@ -2299,7 +2299,6 @@ impl Parser {
                     } else {
                         self.consume_symbol(RightParen)?;
                         left = expr;
-
                     }
                 }
             }
@@ -2386,14 +2385,11 @@ impl Parser {
                     }
                     _ => identifier,
                 };
-                
-
 
                 let leftt = self.anchor(identifier.clone(), pos)?;
                 left = leftt;
 
                 // dbg!(self.current_token(), identifier.clone());
-
             }
             Some(&Integer(value)) => {
                 self.advance();
@@ -3106,7 +3102,7 @@ impl Parser {
         while self.current_token().is_some_and(|t| t.is_relop()) {
             if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
-                let right_expr = self. mid_expr()?;
+                let right_expr = self.mid_expr()?;
                 // check if void
                 if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
                     return Err(self.generate_error_with_pos(
@@ -3499,8 +3495,6 @@ impl Parser {
         Ok(left_expr)
     }
 
-
-
     fn logical_top_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.top_expr()?;
         let current_pos = self.get_current_token_position();
@@ -3692,13 +3686,11 @@ impl Parser {
                         }
                     }
                     _ => {}
-                   
                 }
             }
         }
         Ok(left_expr)
     }
-
 
     fn mid_expr(&mut self) -> Result<Expr, NovaError> {
         let mut left_expr = self.term()?;
