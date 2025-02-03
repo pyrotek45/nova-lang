@@ -4133,7 +4133,7 @@ impl Parser {
     }
 
     fn alternative(&mut self) -> Result<Vec<Statement>, NovaError> {
-        let test = self.top_expr()?;
+        let test = self.expr()?;
         let pos = self.get_current_token_position();
         if test.get_type() != TType::Bool {
             return Err(self.generate_error_with_pos(
