@@ -41,3 +41,20 @@ pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
     }
     Ok(())
 }
+
+// remove at index
+pub fn remove(state: &mut state::State) -> Result<(), NovaError> {
+    if let (Some(VmData::Int(index)), Some(VmData::List(list_index))) =
+        (state.stack.pop(), state.stack.pop())
+    {
+        if let Heap::List(mut array) = state.get_ref(list_index).clone() {
+            array.remove(index as usize);
+            state.heap[list_index] = Heap::List(array.clone());
+        } else {
+            panic!()
+        }
+    } else {
+        panic!()
+    }
+    Ok(())
+}
