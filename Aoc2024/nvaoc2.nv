@@ -18,7 +18,7 @@ fn is_safe(x: [Int]) -> Bool {
 }
 
 fn try_is_safe(x: [Int]) -> Bool {
-    return is_safe(x) || x.indices().anyWith(|i: Int| is_safe(x.remove(i)))
+    return is_safe(x) || x.indices().anyWith(|i: Int| is_safe(x.dropIndex(i)))
 }
 
 let part1 = input.count(is_safe@([Int]))

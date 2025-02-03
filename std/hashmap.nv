@@ -50,8 +50,8 @@ fn extends get(self: HashMap($K,$V), k: $K) -> Option($V) {
 fn extends delete(self: HashMap($K,$V), k: $K) {
     let index = List::indexOf(self.keys, k)
     if index != -1 {
-        self.keys = List::remove(self.keys, index)
-        self.values = List::remove(self.values, index)
+        self.keys.remove(index)
+        self.values.remove(index)
     }
 }
 

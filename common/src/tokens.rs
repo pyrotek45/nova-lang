@@ -204,8 +204,6 @@ impl Token {
             &self.value,
             TokenValue::Operator(
                 Operator::Equal
-                    | Operator::And
-                    | Operator::Or
                     | Operator::GreaterOrEqual
                     | Operator::LessOrEqual
                     | Operator::Greater
@@ -213,6 +211,10 @@ impl Token {
                     | Operator::NotEqual
             )
         )
+    }
+
+    pub fn is_logical_op(&self) -> bool {
+        matches!(&self.value, TokenValue::Operator(Operator::And | Operator::Or))
     }
 
     pub fn is_op(&self, op: Operator) -> bool {
