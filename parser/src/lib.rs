@@ -1327,6 +1327,10 @@ impl Parser {
     fn chain(&mut self, mut lhs: Expr) -> Result<Expr, NovaError> {
         let (identifier, pos) = self.get_identifier()?;
         match self.current_token_value() {
+            Some(Operator(Operator::RightArrow)) => {
+                self.advance();
+                lhs = self.method(identifier, lhs, pos)?;
+            }
             Some(Operator(Operator::DoubleColon)) => {
                 let mut rhs = lhs.clone();
                 while self
@@ -1656,13 +1660,15 @@ impl Parser {
                             arguments.iter().map(|arg| arg.get_type()).collect();
                         let mut type_map = HashMap::default();
                         self.check_and_map_types(
-                            &parameters,
                             &input_types,
+                            &parameters,
                             &mut type_map,
                             field_position.clone(),
                         )?;
                         return_type =
                             Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
+                            // dbg!(arguments.clone(), return_type.clone(), left_expr.clone());
+
                         Expr::Call {
                             ttype: *return_type,
                             name: field,
@@ -2380,9 +2386,13 @@ impl Parser {
                     }
                     _ => identifier,
                 };
+                
 
-                let leftt = self.anchor(identifier, pos)?;
+
+                let leftt = self.anchor(identifier.clone(), pos)?;
                 left = leftt;
+
+                // dbg!(self.current_token(), identifier.clone());
 
             }
             Some(&Integer(value)) => {
