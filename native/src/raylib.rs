@@ -11,12 +11,16 @@ use vm::state::{self, Draw, Heap, VmData};
 
 // function each time the raylib is called to check if the window is closed, but doesnt push anything to the stack or exits if it is closed
 pub fn raylib_check_window(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(rl) = state.raylib.as_ref() {
+    if let Some(_rl) = state.raylib.as_ref() {
         let rl = state.raylib.as_ref().unwrap().borrow_mut();
         let window_should_close = rl.window_should_close();
         if window_should_close {
             exit(0);
         }
+    } else {
+        return Err(NovaError::Runtime {
+            msg: "Raylib not initialized".into(),
+        });
     }
     Ok(())
 }
@@ -77,7 +81,7 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(rl) = state.raylib.as_ref() {
+    if let Some(_rl) = state.raylib.as_ref() {
         let thread = state.raylib_thread.as_ref().unwrap().clone();
         let mut rl = state.raylib.as_ref().unwrap().borrow_mut();
 
@@ -114,16 +118,29 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
                     y,
                     radius,
                     color,
-                } => todo!(),
+                } => {
+                    d.draw_circle(x, y, radius as f32, color);
+                }
                 Draw::Line {
                     start_x,
                     start_y,
                     end_x,
                     end_y,
                     color,
-                } => todo!(),
+                } => {
+                    d.draw_line(start_x, start_y, end_x, end_y, color);
+                }
                 Draw::ClearBackground { color } => {
                     d.clear_background(color);
+                }
+                Draw::Sprite {
+                    x,
+                    y,
+                    sprite_index: texture,
+                } => {
+                    //dbg!(texture.clone());
+                    let texture = state.textures[texture].clone();
+                    d.draw_texture(&*texture, x, y, Color::WHITE);
                 }
             }
         }
@@ -481,5 +498,204 @@ pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> 
     // raylib_check_window(state)?;
     let time = state.raylib.as_ref().unwrap().borrow_mut().get_time();
     state.stack.push(VmData::Float(time));
+    Ok(())
+}
+
+// raylib load texture, will need to convert it to list of integers to store in heap
+pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    // get size of the texture
+    let x = state.stack.pop().unwrap();
+    let y = state.stack.pop().unwrap();
+    let (x, y) = match (x, y) {
+        (VmData::Int(x), VmData::Int(y)) => (x, y),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    let path = match state.stack.pop().unwrap() {
+        VmData::String(index) => match state.get_ref(index) {
+            Heap::String(path) => path,
+            _ => {
+                return Err(NovaError::Runtime {
+                    msg: "Expected string".into(),
+                })
+            }
+        },
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected string".into(),
+            })
+        }
+    };
+
+    // there is no texture type in nova, so we will store the texture in the heap as a list of integers
+    let thread = state.raylib_thread.as_ref().unwrap().clone();
+    let mut texture = state
+        .raylib
+        .as_ref()
+        .unwrap()
+        .borrow_mut()
+        .load_texture(&thread, path)
+        .unwrap();
+    texture.height *= y as i32;
+    texture.width *= x as i32;
+    let texture = Rc::new(texture);
+    state.textures.push(texture.clone());
+    let index = state.textures.len() - 1;
+    state.stack.push(VmData::Int(index as i64));
+
+    Ok(())
+}
+
+// raylib draw texture
+pub fn raylib_draw_texture(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let y = state.stack.pop().unwrap();
+    let x = state.stack.pop().unwrap();
+    let texture = state.stack.pop().unwrap();
+    let (x, y) = match (x, y) {
+        (VmData::Int(x), VmData::Int(y)) => (x, y),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    let texture = match texture {
+        VmData::Int(index) => index as usize,
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+
+    state.draw_queue.push(Draw::Sprite {
+        x: x as i32,
+        y: y as i32,
+        sprite_index: texture,
+    });
+
+    Ok(())
+}
+
+// raylib draw circle
+pub fn raylib_draw_circle(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let color = state.stack.pop().unwrap();
+    let (r, g, b) = match color {
+        VmData::List(index) => {
+            // get value from heap
+            let tuple = state.get_ref(index);
+            match tuple {
+                Heap::List(pointers) => {
+                    // vec of pointers to get the values
+                    let r = state.get_ref(pointers[0]).get_int();
+                    let g = state.get_ref(pointers[1]).get_int();
+                    let b = state.get_ref(pointers[2]).get_int();
+                    (r, g, b)
+                }
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected tuple".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected tuple".into(),
+            })
+        }
+    };
+    let color = Color::new(r as u8, g as u8, b as u8, 255);
+    let radius = state.stack.pop().unwrap();
+    let y = state.stack.pop().unwrap();
+    let x = state.stack.pop().unwrap();
+    let (x, y) = match (x, y) {
+        (VmData::Int(x), VmData::Int(y)) => (x, y),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    let radius = match radius {
+        VmData::Int(radius) => radius,
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    state.draw_queue.push(Draw::Circle {
+        x: x as i32,
+        y: y as i32,
+        radius: radius as i32,
+        color,
+    });
+    Ok(())
+}
+
+// raylib draw line
+pub fn raylib_draw_line(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let color = state.stack.pop().unwrap();
+    let (r, g, b) = match color {
+        VmData::List(index) => {
+            // get value from heap
+            let tuple = state.get_ref(index);
+            match tuple {
+                Heap::List(pointers) => {
+                    // vec of pointers to get the values
+                    let r = state.get_ref(pointers[0]).get_int();
+                    let g = state.get_ref(pointers[1]).get_int();
+                    let b = state.get_ref(pointers[2]).get_int();
+                    (r, g, b)
+                }
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected tuple".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected tuple".into(),
+            })
+        }
+    };
+    let color = Color::new(r as u8, g as u8, b as u8, 255);
+    let end_y = state.stack.pop().unwrap();
+    let end_x = state.stack.pop().unwrap();
+    let start_y = state.stack.pop().unwrap();
+    let start_x = state.stack.pop().unwrap();
+    let (start_x, start_y) = match (start_x, start_y) {
+        (VmData::Int(x), VmData::Int(y)) => (x, y),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    let (end_x, end_y) = match (end_x, end_y) {
+        (VmData::Int(x), VmData::Int(y)) => (x, y),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+    state.draw_queue.push(Draw::Line {
+        start_x: start_x as i32,
+        start_y: start_y as i32,
+        end_x: end_x as i32,
+        end_y: end_y as i32,
+        color,
+    });
     Ok(())
 }

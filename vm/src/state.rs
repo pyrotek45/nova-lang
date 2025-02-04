@@ -44,6 +44,11 @@ pub enum Draw {
     ClearBackground {
         color: Color,
     },
+    Sprite {
+        x: i32,
+        y: i32,
+        sprite_index: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -167,6 +172,18 @@ pub struct State {
     pub raylib: Option<Rc<RefCell<RaylibHandle>>>,
     pub raylib_thread: Option<RaylibThread>,
     pub draw_queue: Vec<Draw>,
+    pub textures: Vec<Rc<Texture2D>>,
+}
+
+impl Drop for State {
+    fn drop(&mut self) {
+        if let Some(raylib) = &self.raylib {
+            let raylib = raylib.borrow_mut();
+            // clear all sprites in the texture
+            self.textures.clear();
+            drop(raylib);
+        }
+    }
 }
 
 pub fn new() -> State {
@@ -187,6 +204,7 @@ pub fn new() -> State {
         raylib: None,
         raylib_thread: None,
         draw_queue: vec![],
+        textures: vec![],
     }
 }
 

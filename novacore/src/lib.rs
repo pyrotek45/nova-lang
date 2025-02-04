@@ -109,6 +109,10 @@ impl NovaCore {
         self.parser.modules.insert("Cast".into());
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
+        self.parser
+            .environment
+            .custom_types
+            .insert("Sprite".into(), vec![]);
         // add remove for list
         self.add_function(
             "List::remove",
@@ -145,6 +149,71 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::regex::regex_captures,
+        );
+        // raylib circle
+        self.add_function(
+            "raylib::drawCircle",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_circle,
+        );
+        // raylib line
+        self.add_function(
+            "raylib::drawLine",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_line,
+        );
+        // raylib load sprite function
+        self.add_function(
+            "raylib::loadSprite",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int, TType::Int],
+                return_type: Box::new(TType::Custom {
+                    name: "Sprite".into(),
+                    type_params: vec![],
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_load_texture,
+        );
+        // raylib draw sprite function
+        self.add_function(
+            "raylib::drawSprite",
+            TType::Function {
+                parameters: vec![
+                    TType::Custom {
+                        name: "Sprite".into(),
+                        type_params: vec![],
+                    },
+                    TType::Int,
+                    TType::Int,
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_texture,
         );
         // raylib init
         self.add_function(
