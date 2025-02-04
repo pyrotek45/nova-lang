@@ -581,7 +581,7 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
     };
     // get current path the file is in from pathbuf and join it with the path
     let current_path = state.current_dir.clone();
-    dbg!(&current_path);
+    // dbg!(&current_path);
     let path = current_path.join(path.to_string());
 
     // there is no texture type in nova, so we will store the texture in the heap as a list of integers
