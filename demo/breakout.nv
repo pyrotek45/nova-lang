@@ -6,8 +6,6 @@ import super.std.math
 let width = 800
 let height = 600
 
-let t = sin(6.0)
-
 raylib::init("Breakout Game", width, height, 60 * 2)
 
 let speed = 10

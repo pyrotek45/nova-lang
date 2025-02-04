@@ -205,6 +205,18 @@ let timer = Timer {
 
 timer.set(5.0)
 
+struct UpDate {
+    update: [fn()],
+}
+
+fn extends update(update: UpDate) {
+    for f in update.update {
+        f()
+    }
+}
+
+
+
 fn running() {
     let currentTime = round(raylib::getTime())
 
@@ -543,12 +555,16 @@ fn running() {
     raylib::drawText(format("Player Points: {}", Cast::string(player.points)), 300, 7, 30, (255, 255, 255))
 }
 
+let GameWorld = UpDate {
+    update: [running@()],
+}
+
 while raylib::rendering() {
 
     match game {
         Running => {
             // game is running
-            running()
+            GameWorld.update()
         }
         Paused => {
             // game is paused

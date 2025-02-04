@@ -1,4 +1,4 @@
-use std::{path::Path, rc::Rc};
+use std::{path::{Path, PathBuf}, rc::Rc};
 
 use assembler::Assembler;
 use common::{
@@ -653,7 +653,15 @@ impl NovaCore {
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
-        self.vm.state.current_dir = self.filepath.as_ref().map_or_else(String::new, |path| path.to_string_lossy().into_owned());
+        self.vm.state.current_dir = PathBuf::from(
+            self.filepath
+                .as_ref()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        );
         Ok(())
     }
 

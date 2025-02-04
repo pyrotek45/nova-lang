@@ -2332,14 +2332,20 @@ impl Parser {
                         self.consume_symbol(At)?;
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
-                        let ta = self.ttype()?;
-                        type_annotation.push(ta);
-                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        // if ) then push none and return
+                        if self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
                             self.advance();
+                            type_annotation.push(TType::None);
+                        } else {
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
+                            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                                self.advance();
+                                let ta = self.ttype()?;
+                                type_annotation.push(ta);
+                            }
+                            self.consume_symbol(RightParen)?;
                         }
-                        self.consume_symbol(RightParen)?;
                         generate_unique_string(&identifier, &type_annotation).into()
                     }
                     _ => identifier,
@@ -2373,14 +2379,20 @@ impl Parser {
                         self.consume_symbol(At)?;
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
-                        let ta = self.ttype()?;
-                        type_annotation.push(ta);
-                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        // if ) then push none and return
+                        if self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
                             self.advance();
+                            type_annotation.push(TType::None);
+                        } else {
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
+                            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                                self.advance();
+                                let ta = self.ttype()?;
+                                type_annotation.push(ta);
+                            }
+                            self.consume_symbol(RightParen)?;
                         }
-                        self.consume_symbol(RightParen)?;
                         generate_unique_string(&identifier, &type_annotation).into()
                     }
                     _ => identifier,
@@ -3992,6 +4004,7 @@ impl Parser {
                         "String" => TType::String,
                         "Any" => TType::Any,
                         "Char" => TType::Char,
+                        "None" => TType::None,
                         _ => break 'builtin None,
                     })
                 };
