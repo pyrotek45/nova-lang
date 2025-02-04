@@ -225,6 +225,16 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_init,
         );
+        // raylib get time
+        self.add_function(
+            "raylib::getTime",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_time,
+        );
         // add raylib sleep function
         self.add_function(
             "raylib::sleep",

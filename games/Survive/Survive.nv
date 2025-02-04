@@ -179,8 +179,46 @@ let bosses = []: Boss
 
 let game = GameState::Running()
 
+struct Timer {
+    lifetime: Float,
+}
+
+fn extends set(timer: Timer, time: Float) {
+    timer.lifetime = time
+}
+
+fn extends update(timer: Timer) {
+    timer.lifetime -= raylib::getFrameTime()
+}
+
+fn extends isDone(timer: Timer) -> Bool {
+    return timer.lifetime <= 0.0 
+}
+
+fn extends reset(timer: Timer) {
+    timer.lifetime = 0.0
+}
+
+let timer = Timer {
+    lifetime: 0.0,
+}
+
+timer.set(5.0)
+
 fn running() {
-    let currentTime = round(raylib::getFrameTime())
+    let currentTime = round(raylib::getTime())
+
+    // update timer
+    timer.update()
+
+    // if timer is done, reset timer and add points
+    if timer.isDone() {
+        timer.set(5.0)
+        // draw to terminal time done
+        term.print("Timer done!")
+        term.print("Player gets points!")
+        player.points += 10
+    }
     player.points += 1
     // events trigger randomly at 2% chance every 5 seconds, if eventOn is off
     if currentTime % 5 == 0 

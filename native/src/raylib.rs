@@ -545,8 +545,8 @@ pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
 // raylib gettimeframe
 pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> {
     // raylib_check_window(state)?;
-    let time = state.raylib.as_ref().unwrap().borrow_mut().get_time();
-    state.stack.push(VmData::Float(time));
+    let time = state.raylib.as_ref().unwrap().borrow_mut().get_frame_time();
+    state.stack.push(VmData::Float(time.into()));
     Ok(())
 }
 
@@ -752,5 +752,13 @@ pub fn raylib_draw_line(state: &mut state::State) -> Result<(), NovaError> {
         end_y: end_y as i32,
         color,
     });
+    Ok(())
+}
+
+// get time
+pub fn raylib_get_time(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let time = state.raylib.as_ref().unwrap().borrow_mut().get_time();
+    state.stack.push(VmData::Float(time));
     Ok(())
 }
