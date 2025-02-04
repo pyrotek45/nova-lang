@@ -1,0 +1,574 @@
+module janky
+
+import super.super.std.math
+import super.super.std.list
+
+let width = 800
+let height = 600
+raylib::init("Survive!", width, height, 60)
+
+let scale = 5
+let alien = raylib::loadSprite("blipjoy1.png", scale , scale )
+
+enum GameState {
+    Running,
+    Paused,
+    GameOver,
+    Win,
+}
+
+struct Player {
+    x: Int,
+    y: Int,
+    speed: Int,
+    sprite: Sprite,
+    visible: Bool,
+    life: Int,
+    points: Int,
+}
+
+fn extends render(player: Player) {
+    if player.visible {
+        raylib::drawSprite(player.sprite, player.x, player.y)
+    }
+}
+
+fn extends move(player: Player, x: Int, y: Int) {
+    player.x += player.speed * x
+    player.y += player.speed * y
+}
+
+
+
+// going to emulate a terminal
+struct Terminal {
+    output: [String],
+    x: Int,
+    y: Int,
+}
+
+fn extends print(terminal: Terminal, text: String) {
+    // only keep the last five lines
+    terminal.output.push(text)
+    if terminal.output.len() > 5 {
+        terminal.output = terminal.output[1:]
+    }
+}
+
+fn extends clear(terminal: Terminal) {
+    terminal.output = []: String
+}
+
+// terminal will render last five lines
+fn extends render(terminal: Terminal) {
+    let elements = terminal.output[:5]
+    let i = 0
+    let padding = 25
+    let x = terminal.x
+    let y = terminal.y
+    // render each line, first one is at 10, 10
+    // the rest are 10, 15, 10, 20, 10, 25, etc
+    // no magic numbers
+
+    for elem in elements {
+        i += 1
+        raylib::drawText(elem, x, y + padding * i, 30, (255, 255, 255))
+    }
+}
+
+let term = Terminal {
+    x: 10,
+    y: 440,
+    output: []: String,
+}
+
+// game has you moving around the screen and random events happen that you have to deal with
+// events and what happens are printed to the terminal
+enum Event {
+    Mob,
+    Boss,
+    Item,
+    Trap,   
+    None,
+}
+
+enum EventOn {
+    On,
+    Off,
+}
+
+// space events every 5 seconds
+// 2% chance of event happening
+
+// next Event wont happen untill last event is resolved
+// if mob, you have to fight it
+// if boss, you have to fight it
+// if item, you have to pick it up
+// if trap, you have to avoid it
+
+struct Mob {
+    x: Int,
+    y: Int,
+    speed: Int,
+    size: Int,
+}
+
+fn extends render(mob: Mob) {
+    raylib::drawRectangle(mob.x, mob.y, mob.size, mob.size, (255, 0, 0))
+}
+
+fn extends move(mob: Mob, x: Int, y: Int) {
+    mob.x += mob.speed * x
+    mob.y += mob.speed * y
+}
+
+struct Trap {
+    x: Int,
+    y: Int,
+    size: Int,
+}
+
+fn extends render(trap: Trap) {
+    raylib::drawRectangle(trap.x, trap.y, trap.size, trap.size, (255, 200, 50))
+}
+
+struct Boss {
+    x: Int,
+    y: Int,
+    speed: Int,
+    size: Int,
+}
+
+fn extends render(boss: Boss) {
+    // make cool color for boss
+    raylib::drawRectangle(boss.x, boss.y, boss.size, boss.size, (255, 0, 180))
+}
+
+fn extends move(boss: Boss, x: Int, y: Int) {
+    boss.x += boss.speed * x
+    boss.y += boss.speed * y
+}
+
+struct Item {
+    x: Int,
+    y: Int,
+    size: Int,
+}
+
+fn extends render(item: Item) {
+    raylib::drawRectangle(item.x, item.y, item.size, item.size, (0, 255, 0))
+}
+
+let player = Player {
+    x: 100,
+    y: 100,
+    speed: 8,
+    visible: true,
+    sprite: alien,
+    life: 1000,
+    points: 0,
+}
+
+let currentEvent = Event::None()
+let eventOn = EventOn::Off
+
+let mobs = []: Mob
+let traps = []: Trap
+let items = []: Item
+let bosses = []: Boss
+
+let game = GameState::Running()
+
+fn running() {
+    let currentTime = round(raylib::getFrameTime())
+    player.points += 1
+    // events trigger randomly at 2% chance every 5 seconds, if eventOn is off
+    if currentTime % 5 == 0 
+    && eventOn == EventOn::Off {
+        let eventChance = random(0, 100)
+        if eventChance < 2 {
+            eventOn = EventOn::On
+            // set event to random event
+            let event = random(0, 4)
+            if event == 0 {
+                currentEvent = Event::Mob()
+            } elif event == 1 {
+                currentEvent = Event::Boss()
+            } elif event == 2 {
+                currentEvent = Event::Item()
+            } elif event == 3 {
+                currentEvent = Event::Trap()
+            }
+
+
+            // print event to terminal
+            match currentEvent {
+                Mob => {
+                    term.print("Mob spawned!")
+                }
+                Boss => {
+                    term.print("Boss spawned!")
+                }
+                Item => {
+                    term.print("Item spawned!")
+                }
+                Trap => {
+                    term.print("Trap spawned!")
+                }
+                None => {}
+            }
+        } 
+    }
+
+
+    // handle events
+    // spawn mobs, red squares that move around the screen
+    // spawn boss, red square that moves around the screen
+
+    match currentEvent {
+        Mob => {
+            // spawn a mob
+            if mobs.len() < 30 {
+                let mob = Mob {
+                    x: random(0, 800),
+                    y: random(40, 440),
+                    speed: 1,
+                    size: 10,
+                }
+                mobs.push(mob)
+            }
+            currentEvent = Event::None()
+            eventOn = EventOn::Off
+        }
+        Boss => {
+            // spawn a boss
+            if bosses.len() < 5 {
+                let boss = Boss {
+                    x: random(0, 800),
+                    y: random(40, 440),
+                    speed: 1,
+                    size: 20,
+                }
+                bosses.push(boss)
+            }
+            currentEvent = Event::None()
+            eventOn = EventOn::Off
+            // move boss around the screen
+            // if player collides with boss, player takes damage
+        }
+        Item => {
+            // spawn an item
+            if items.len() < 10 {
+                let item = Item {
+                    x: random(0, 800),
+                    y: random(40, 440),
+                    size: 10,
+                }
+                items.push(item)
+            }
+            currentEvent = Event::None()
+            eventOn = EventOn::Off
+            // if player collides with item, player picks up item
+        }
+        Trap => {
+            // spawn a trap
+            if traps.len() < 10 {
+                let trap = Trap {
+                    x: random(0, 800),
+                    y: random(40, 440),
+                    size: 25,
+                }
+                traps.push(trap)
+            }
+            currentEvent = Event::None()
+            eventOn = EventOn::Off
+            // if player collides with trap, player takes damage
+        }
+        None => {
+            // no event
+        }
+    }
+
+    // mobs
+    for mob in mobs {
+        mob.render()
+        // move mob around the screen, slowly chasing the player but mob is slow and player is fast
+
+        let mob_x_direction = if player.x > mob.x { 1 } else { -1 }
+        let mob_y_direction = if player.y > mob.y { 1 } else { -1 }
+        // mobs should spread out from each other
+        for otherMob in mobs {
+            if mob.x <= otherMob.x + 10 
+            && mob.x + 10 >= otherMob.x 
+            && mob.y <= otherMob.y + 10 
+            && mob.y + 10 >= otherMob.y {
+                // move randomly if they collide
+                mob_x_direction += random(-2, 2)
+                mob_y_direction += random(-2, 2)
+            }
+        }
+        // clamp mob to screen
+        mob.x = mob.x.clamp(0, 800 - 10)
+        mob.y = mob.y.clamp(40, 440 - 10)
+
+        mob.move(mob_x_direction, mob_y_direction)
+
+        // if player collides with mob, player takes damage
+        if mob.x <= player.x + 50 
+        && mob.x + 10 >= player.x 
+        && mob.y <= player.y + 50 
+        && mob.y + 10 >= player.y {
+            player.life -= 2
+            term.print("Player takes damage!")
+        }
+    }
+
+    // bosses
+    for boss in bosses {
+        boss.render()
+        // move boss around the screen, slowly chasing the player but boss is slow and player is fast
+
+        let boss_x_direction = if player.x > boss.x { 3 } else { -3 }
+        let boss_y_direction = if player.y > boss.y { 3 } else { -3 }
+
+        // bosses should spread out from each other
+        for otherBoss in bosses {
+            if boss.x <= otherBoss.x + 10 
+            && boss.x + 10 >= otherBoss.x 
+            && boss.y <= otherBoss.y + 10 
+            && boss.y + 10 >= otherBoss.y {
+                // move randomly if they collide
+                boss_x_direction += random(-1, 1)
+                boss_y_direction += random(-1, 1)
+            }
+        }
+        // clamp boss to screen
+        boss.x = boss.x.clamp(0, 800 - 10)
+        boss.y = boss.y.clamp(40, 440 - 10)
+
+        boss.move(boss_x_direction, boss_y_direction)
+
+        // if player collides with boss, player takes damage
+        if boss.x <= player.x + 50 
+        && boss.x + 10 >= player.x 
+        && boss.y <= player.y + 50 
+        && boss.y + 10 >= player.y {
+            player.life -= 10
+            term.print("Player takes damage!")
+        }
+
+        // if boss collides with a mob, it gets sligthly faster and eats the mob
+        for mob in mobs {
+            if boss.x <= mob.x + 10 
+            && boss.x + 10 >= mob.x 
+            && boss.y <= mob.y + 10 
+            && boss.y + 10 >= mob.y {
+                // spawn a trap
+                let trap = Trap {
+                    x: random(0, 800),
+                    y: random(40, 440),
+                    size: 25,
+                }
+                traps.push(trap)
+                // remove mob
+                mobs = mobs.filter(|x: Mob| x.x != mob.x && x.y != mob.y)
+                // add points
+                player.points += 50
+                term.print("Mob died from boss!")
+            }
+        }
+    }
+
+    // items, green squares that player can pick up for points and health, can also kill an enemy
+    for item in items {
+        item.render()
+        // if player collides with item, player picks up item
+        if item.x <= player.x + 50 
+        && item.x + 10 >= player.x 
+        && item.y <= player.y + 50 
+        && item.y + 10 >= player.y {
+            term.print("Player picks up item!")
+            player.points += 100
+            player.life += 100
+            // remove item from items
+            items = items.filter(|x: Item| x.x != item.x && x.y != item.y)
+            // random chance to remove some mobs or bosses
+            let removeChance = random(0, 100)
+            if removeChance < 25 {
+                if mobs.len() > 0 {
+                    mobs = mobs[1:]
+                    term.print("Removed a mob!")
+                }
+            } elif removeChance < 50 {
+                if bosses.len() > 0 {
+                    bosses = bosses[1:]
+                    term.print("Removed a boss!")
+                }
+            } elif removeChance < 75 {
+                if traps.len() > 0 {
+                    traps = traps[1:]
+                    term.print("Removed a trap!")
+                }
+            }
+        }
+    }
+    // traps, red squares that player has to avoid
+    for trap in traps {
+        trap.render()
+        // if player collides with trap, player takes damage
+        if trap.x <= player.x + 50 
+        && trap.x + 10 >= player.x 
+        && trap.y <= player.y + 50 
+        && trap.y + 10 >= player.y {
+            player.life -= 5
+            term.print("Player takes damage!")
+        }
+
+        // if mob or boss collides with trap, mob or boss gets removed
+        for mob in mobs {
+            if trap.x <= mob.x + 10 
+            && trap.x + 10 >= mob.x 
+            && trap.y <= mob.y + 10 
+            && trap.y + 10 >= mob.y {
+                mobs = mobs.filter(|x: Mob| x.x != mob.x && x.y != mob.y)
+                // add points and remove trap
+                player.points += 50
+                traps = traps.filter(|x: Trap| x.x != trap.x && x.y != trap.y)
+                term.print("mod died from trap!")
+            }
+        }
+
+        for boss in bosses {
+            if trap.x <= boss.x + 10 
+            && trap.x + 10 >= boss.x 
+            && trap.y <= boss.y + 10 
+            && trap.y + 10 >= boss.y {
+                bosses = bosses.filter(|x: Boss| x.x != boss.x && x.y != boss.y)
+                // add points and remove trap
+                player.points += 150
+                traps = traps.filter(|x: Trap| x.x != trap.x && x.y != trap.y)
+                term.print("Boss died from trap!")
+            }
+        }
+    }
+    // player life check if player life is 0, game over
+    if player.life <= 0 {
+        game = GameState::GameOver()
+    }
+
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        player.move(1, 0)
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        player.move(-1, 0)
+    }
+    if raylib::isKeyPressed("KEY_UP") {
+        player.move(0, -1)
+    }
+    if raylib::isKeyPressed("KEY_DOWN") {
+        player.move(0, 1)
+    }
+
+    // bound player to screen within lines
+    player.x = player.x.clamp(0, 800 - 50)
+    player.y = player.y.clamp(40, 440 - 50)
+
+    // space makes the player invisible or visible
+    if let key = raylib::getKey() {
+        if key == "KEY_SPACE" {
+            player.visible = !player.visible
+        } elif key == "KEY_ENTER" {
+            term.print("Hello, World!")
+        } elif key == "KEY_R" {
+            term.print("Goodbye, World!")
+        } elif key == "KEY_Q" {
+            game = GameState::GameOver()
+        } elif key == "KEY_C" {
+            term.clear()
+        } elif key == "KEY_S" {
+            term.print("You pressed S")
+        } elif key == "KEY_P" {
+            game = GameState::Paused()
+        }
+    }
+
+
+    // draw lines in a box to create boundaries
+    // top line
+    raylib::drawLine(0, 40, 800, 40, (255, 255, 255))
+    // bottom line
+    raylib::drawLine(0, 440, 800, 440, (255, 255, 255))
+
+    player.render()
+    term.render()
+    raylib::drawText(format("Player Life: {}", Cast::string(player.life)), 10, 7, 30, (255, 255, 255))
+    raylib::drawText(format("Player Points: {}", Cast::string(player.points)), 300, 7, 30, (255, 255, 255))
+}
+
+while raylib::rendering() {
+
+    match game {
+        Running => {
+            // game is running
+            running()
+        }
+        Paused => {
+            // game is paused
+            // print paused to terminal and ask to resume
+            // in middlle of screen
+            // draw black rectangle behind text
+            let middle_x = width / 2 - 80
+            let middle_y = height / 2 - 50
+            raylib::drawRectangle(middle_x - 100, middle_y - 50, 200, 100, (0, 0, 0))
+            raylib::drawText("Paused", middle_x - 50, middle_y - 25, 30, (255, 255, 255))
+            raylib::drawText("Press P to resume", middle_x - 100, middle_y, 30, (255, 255, 255))
+            raylib::drawText("Press Q to quit", middle_x - 75, middle_y + 25, 30, (255, 255, 255))
+            if let key = raylib::getKey() {
+                if key == "KEY_P" {
+                    game = GameState::Running()
+                    term.clear()
+                } elif key == "KEY_Q" {
+                    break
+                }
+            }
+        }
+        GameOver => {
+            // game is over
+            // print game over to terminal and ask to play again
+            // in middlle of screen
+            // draw black rectangle behind text
+            let middle_x = width / 2 - 80
+            let middle_y = height / 2 - 50
+            raylib::drawRectangle(middle_x - 100, middle_y - 50, 200, 100, (0, 0, 0))
+            // print score
+            raylib::drawText(format("Player Score: {}", Cast::string(player.points)), middle_x - 100, middle_y - 75, 30, (255, 255, 255))
+            raylib::drawText("Game Over", middle_x - 50, middle_y - 25, 30, (255, 255, 255))
+            raylib::drawText("Press R to play again", middle_x - 100, middle_y, 30, (255, 255, 255))
+            raylib::drawText("Press Q to quit", middle_x - 75, middle_y + 25, 30, (255, 255, 255))
+
+            if let key = raylib::getKey() {
+                if key == "KEY_R" {
+                    game = GameState::Running()
+                    player.life = 1000
+                    mobs = []: Mob
+                    bosses = []: Boss
+                    items = []: Item
+                    traps = []: Trap
+                    currentEvent = Event::None()
+                    eventOn = EventOn::Off
+
+                    player.points = 0
+                    term.clear()
+                } elif key == "KEY_Q" {
+                    break
+                }
+            }
+        }
+        Win => {
+            // game is won
+        }
+    }
+
+
+    raylib::clear((0, 0, 0))
+}

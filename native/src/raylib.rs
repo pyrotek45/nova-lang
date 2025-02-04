@@ -531,11 +531,6 @@ pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
         "KEY_F10" => KeyboardKey::KEY_F10,
         "KEY_F11" => KeyboardKey::KEY_F11,
         "KEY_F12" => KeyboardKey::KEY_F12,
-        _ => {
-            return Err(NovaError::Runtime {
-                msg: format!("Invalid key: {}", key).into(),
-            })
-        }
         a => {
             return Err(NovaError::Runtime {
                 msg: format!("Invalid key: {}", a).into(),
@@ -584,6 +579,11 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
             })
         }
     };
+    // get current path the file is in
+    let current_path = state.current_dir.clone();
+    // remove last file name from path
+    let current_path = current_path.rsplitn(2, '/').collect::<Vec<&str>>()[1];
+    let path = format!("{}/{}", current_path, path);
 
     // there is no texture type in nova, so we will store the texture in the heap as a list of integers
     let thread = state.raylib_thread.as_ref().unwrap().clone();
@@ -592,8 +592,9 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
         .as_ref()
         .unwrap()
         .borrow_mut()
-        .load_texture(&thread, path)
+        .load_texture(&thread, &path)
         .unwrap();
+
     texture.height *= y as i32;
     texture.width *= x as i32;
     let texture = Rc::new(texture);

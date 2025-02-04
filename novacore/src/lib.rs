@@ -643,6 +643,7 @@ impl NovaCore {
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
+        self.vm.state.current_dir = self.filepath.as_ref().map_or_else(String::new, |path| path.to_string_lossy().into_owned());
         Ok(())
     }
 

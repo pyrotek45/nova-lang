@@ -173,6 +173,7 @@ pub struct State {
     pub raylib_thread: Option<RaylibThread>,
     pub draw_queue: Vec<Draw>,
     pub textures: Vec<Rc<Texture2D>>,
+    pub current_dir: String,
 }
 
 impl Drop for State {
@@ -190,6 +191,7 @@ pub fn new() -> State {
     State {
         program: vec![],
         current_instruction: 0,
+        current_dir: String::new(),
         stack: vec![],
         callstack: vec![],
         offset: 0,
