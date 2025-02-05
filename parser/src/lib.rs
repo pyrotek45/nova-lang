@@ -3334,12 +3334,13 @@ impl Parser {
                                         },
                                     };
                                 } else {
-                                    left_expr = self.create_binop_expr(
-                                        left_expr,
-                                        right_expr,
+                                    // return error 
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
                                         operation,
-                                        TType::Bool,
-                                    );
+                                        current_pos.clone(),
+                                    ));
                                 }
                             }
                         }

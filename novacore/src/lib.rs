@@ -347,6 +347,28 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_key_down,
         );
+        // mouse get button pressed which returns Option<string>
+        self.add_function(
+            "raylib::getMouseButton",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_mouse_button_pressed,
+        );
+        // is mouse button pressed which returns bool
+        self.add_function(
+            "raylib::isMousePressed",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_mouse_button_down,
+        );
         // raylib gettimeframe
         self.add_function(
             "raylib::getFrameTime",

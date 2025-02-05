@@ -761,3 +761,86 @@ pub fn raylib_get_time(state: &mut state::State) -> Result<(), NovaError> {
     state.stack.push(VmData::Float(time));
     Ok(())
 }
+
+// get mouse click
+pub fn raylib_is_mouse_button_down(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let button = state.stack.pop().unwrap();
+    let button = match button {
+        VmData::String(index) => {
+            let button = state.get_ref(index);
+            match button {
+                Heap::String(button) => button,
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected string".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected string".into(),
+            })
+        }
+    };
+    let button = button.to_string();
+    let button = button.as_str();
+    let button = match button {
+        "MOUSE_LEFT_BUTTON" => MouseButton::MOUSE_BUTTON_LEFT,
+        "MOUSE_RIGHT_BUTTON" => MouseButton::MOUSE_BUTTON_RIGHT,
+        "MOUSE_MIDDLE_BUTTON" => MouseButton::MOUSE_BUTTON_MIDDLE,
+        a => {
+            return Err(NovaError::Runtime {
+                msg: format!("Invalid button: {}", a).into(),
+            })
+        }
+    };
+    let is_down = state.raylib.as_ref().unwrap().borrow_mut().is_mouse_button_down(button);
+    state.stack.push(VmData::Bool(is_down));
+    Ok(())
+}
+
+// get mouse buttof pressed
+pub fn raylib_get_mouse_button_pressed(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let button = state.stack.pop().unwrap();
+    let button = match button {
+        VmData::String(index) => {
+            let button = state.get_ref(index);
+            match button {
+                Heap::String(button) => button,
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected string".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected string".into(),
+            })
+        }
+    };
+    let button = button.to_string();
+    let button = button.as_str();
+    let button = match button {
+        "MOUSE_LEFT_BUTTON" => MouseButton::MOUSE_BUTTON_LEFT,
+        "MOUSE_RIGHT_BUTTON" => MouseButton::MOUSE_BUTTON_RIGHT,
+        "MOUSE_MIDDLE_BUTTON" => MouseButton::MOUSE_BUTTON_MIDDLE,
+        a => {
+            return Err(NovaError::Runtime {
+                msg: format!("Invalid button: {}", a).into(),
+            })
+        }
+    };
+    let is_down = state
+        .raylib
+        .as_ref()
+        .unwrap()
+        .borrow_mut()
+        .is_mouse_button_pressed(button);
+    state.stack.push(VmData::Bool(is_down));
+    Ok(())
+}
