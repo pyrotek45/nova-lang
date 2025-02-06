@@ -194,6 +194,7 @@ impl Parser {
                 (a, TType::Any) if a != &TType::None => {
                     continue;
                 }
+
                 (
                     TType::Tuple {
                         elements: elements1,
@@ -219,8 +220,16 @@ impl Parser {
                             position: pos.clone(),
                         });
                     }
-                    if let Some(mapped_type) = type_map.get(name1) {
-                        if mapped_type != t2 {
+                    let typemap_clone: HashMap<Rc<str>, TType> = type_map.clone();
+                    if let Some(mapped_type) = typemap_clone.get(name1) {
+                        //dbg!(name1, mapped_type, t2);
+                        if let (TType::Dyn { own, contract }, Some(name)) =
+                            (mapped_type, t2.custom_to_string())
+                        {
+                            //dbg!(own, contract);
+                            let name_rc = Rc::from(name);
+                            self.check_contracts(type_map, &pos, t1, t2, own, contract, &name_rc)?;
+                        } else if mapped_type != t2 {
                             return Err(NovaError::TypeMismatch {
                                 expected: mapped_type.clone(),
                                 found: t2.clone(),
@@ -294,6 +303,20 @@ impl Parser {
                         });
                     }
                 }
+                (TType::Dyn { own, contract: c1 }, TType::Custom { name, .. }) => {
+                    self.check_contracts(type_map, &pos, t1, t2, own, c1, name)?;
+                }
+                (TType::Dyn { own, .. }, TType::Generic { name }) => {
+                    if name == own {
+                        continue;
+                    } else {
+                        return Err(NovaError::TypeMismatch {
+                            expected: TType::Generic { name: own.clone() },
+                            found: TType::Generic { name: name.clone() },
+                            position: pos.clone(),
+                        });
+                    }
+                }
                 _ if t1 == t2 => continue,
                 _ => {
                     return Err(NovaError::TypeMismatch {
@@ -304,6 +327,104 @@ impl Parser {
                 }
             }
         }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn check_contracts(
+        &self,
+        type_map: &mut HashMap<Rc<str>, TType>,
+        pos: &FilePosition,
+        t1: &TType,
+        t2: &TType,
+        own: &Rc<str>,
+        c1: &[(Rc<str>, TType)],
+        name: &Rc<str>,
+    ) -> Result<(), NovaError> {
+        let contract_names = c1.iter().map(|(n, _)| n).collect::<Vec<_>>();
+        if let Some(fields) = self.environment.custom_types.get(name.as_ref()) {
+            if let Some(mapped_type) = type_map.get(own) {
+                if mapped_type != t2 {
+                    return Err(NovaError::TypeMismatch {
+                        expected: mapped_type.clone(),
+                        found: t2.clone(),
+                        position: pos.clone(),
+                    });
+                }
+            } else {
+                type_map.insert(own.clone(), t2.clone());
+            }
+
+            if contract_names.len() > fields.len() {
+                return Err(NovaError::TypeMismatch {
+                    expected: t1.clone(),
+                    found: t2.clone(),
+                    position: pos.clone(),
+                });
+            }
+
+            let new_fields = if let Some(generic_params) = self
+                .environment
+                .generic_type_struct
+                .get(t2.custom_to_string().unwrap())
+            {
+                let TType::Custom { type_params, .. } = t2 else {
+                    return Err(self.generate_error_with_pos(
+                        "Expected custom type",
+                        format!("got {}", t2),
+                        pos.clone(),
+                    ));
+                };
+                fields
+                    .iter()
+                    .map(|(name, ttype)| {
+                        let new_ttype =
+                            Self::replace_generic_types(ttype, generic_params, type_params);
+                        (name.clone(), new_ttype)
+                    })
+                    .collect()
+            } else {
+                fields.clone()
+            };
+
+            for contract_name in contract_names.iter() {
+                if !new_fields
+                    .iter()
+                    .any(|(field_name, _)| field_name == *contract_name)
+                {
+                    return Err(NovaError::TypeMismatch {
+                        expected: t1.clone(),
+                        found: t2.clone(),
+                        position: pos.clone(),
+                    });
+                }
+
+                let field_type = c1
+                    .iter()
+                    .find(|(n, _)| n == *contract_name)
+                    .map(|(_, t)| t)
+                    .unwrap();
+
+                let new_field = new_fields
+                    .iter()
+                    .find(|(n, _)| n == *contract_name)
+                    .map(|(_, t)| t)
+                    .unwrap();
+
+                self.check_and_map_types(
+                    &[field_type.clone()],
+                    &[new_field.clone()],
+                    type_map,
+                    pos.clone(),
+                )?;
+            }
+        } else {
+            return Err(NovaError::TypeMismatch {
+                expected: t1.clone(),
+                found: t2.clone(),
+                position: pos.clone(),
+            });
+        };
         Ok(())
     }
 
@@ -1185,7 +1306,11 @@ impl Parser {
         }
     }
 
-    fn replace_generic_types(ttype: &TType, x: &[impl AsRef<str>], type_params: &[TType]) -> TType {
+    pub fn replace_generic_types(
+        ttype: &TType,
+        x: &[impl AsRef<str>],
+        type_params: &[TType],
+    ) -> TType {
         match ttype {
             TType::Generic { name: n } => {
                 if let Some(index) = x.iter().position(|x| x.as_ref() == n.deref()) {
@@ -1244,6 +1369,14 @@ impl Parser {
                     elements: new_elements,
                 }
             }
+            TType::Dyn { own, .. } => {
+                // rc is generic name
+                if let Some(index) = x.iter().position(|x| x.as_ref() == own.deref()) {
+                    type_params[index].clone()
+                } else {
+                    ttype.clone()
+                }
+            }
         }
     }
 
@@ -1285,11 +1418,33 @@ impl Parser {
                 return self.generate_field_not_found_error(&identifier, type_name, pos);
             }
         } else {
-            return Err(self.generate_error_with_pos(
-                format!("E1 Not a valid field access: {}", identifier),
-                format!("{} is not a custom type", lhs.get_type()),
-                pos,
-            ));
+            // check if dynamic type with fields in contract
+            if let TType::Dyn { contract, .. } = lhs.get_type() {
+                // map type to own type
+                // if contract hs identifier, then it is a field
+                // need type at same index its found at
+                //dbg!(&contract);
+                if let Some((name, field_type)) = contract
+                    .iter()
+                    .find(|(name, _)| name.as_ref() == identifier.as_ref())
+                {
+                    //dbg!(name);
+                    lhs = Expr::DynField {
+                        ttype: field_type.clone(),
+                        name: name.clone(),
+                        expr: Box::new(lhs),
+                        position: pos.clone(),
+                    };
+                } else {
+                    return self.generate_field_not_found_error(&identifier, "Dyn", pos);
+                }
+            } else {
+                return Err(self.generate_error_with_pos(
+                    format!("E1 Not a valid field access: {}", identifier),
+                    format!("{} is not a custom type", lhs.get_type()),
+                    pos,
+                ));
+            }
         }
         Ok(lhs)
     }
@@ -2333,7 +2488,10 @@ impl Parser {
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
                         // if ) then push none and return
-                        if self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_symbol(RightParen))
+                        {
                             self.advance();
                             type_annotation.push(TType::None);
                         } else {
@@ -2380,7 +2538,10 @@ impl Parser {
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
                         // if ) then push none and return
-                        if self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_symbol(RightParen))
+                        {
                             self.advance();
                             type_annotation.push(TType::None);
                         } else {
@@ -3334,7 +3495,7 @@ impl Parser {
                                         },
                                     };
                                 } else {
-                                    // return error 
+                                    // return error
                                     return Err(self.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
@@ -3992,6 +4153,31 @@ impl Parser {
                 self.consume_symbol(RightSquareBracket)?;
                 Ok(TType::List {
                     inner: Box::new(inner),
+                })
+            }
+            Some(Identifier(id)) if "Dyn" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
+                let (owned, _) = self.get_identifier()?;
+                let mut fields = vec![];
+                self.consume_operator(Operator::Assignment)?;
+                loop {
+                    let (field, _) = self.get_identifier()?;
+                    self.consume_operator(Operator::Colon)?;
+                    let field_type = self.ttype()?;
+                    fields.push((field, field_type));
+                    if !self
+                        .current_token()
+                        .is_some_and(|t| t.is_op(Operator::Addition))
+                    {
+                        break;
+                    }
+                    self.advance();
+                }
+                self.consume_symbol(RightParen)?;
+                Ok(TType::Dyn {
+                    own: owned,
+                    contract: fields,
                 })
             }
             Some(Identifier(_)) => {
@@ -5176,6 +5362,9 @@ impl Parser {
                     if Self::is_generic(elements) {
                         return true;
                     }
+                }
+                TType::Dyn { .. } => {
+                    return true;
                 }
                 _ => {}
             }

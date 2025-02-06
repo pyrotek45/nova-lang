@@ -114,6 +114,7 @@ impl Vm {
                 Code::POP => {
                     self.state.stack.pop();
                 }
+
                 Code::NATIVE => {
                     let index = u64::from_le_bytes(self.state.next_arr());
 
@@ -939,6 +940,120 @@ impl Vm {
                 Code::NONE => {
                     self.state.stack.push(VmData::None);
                 }
+                Code::GETF => {
+                    let (Some(VmData::String(index)), Some(VmData::List(struct_index))) =
+                        (self.state.stack.pop(), self.state.stack.pop())
+                    else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::String and VmData::List".into(),
+                        });
+                    };
+
+                    let (Heap::List(list_index), Heap::String(field_name_item)) =
+                        (self.state.get_ref(struct_index), self.state.get_ref(index))
+                    else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::List and VmData::String".into(),
+                        });
+                    };
+
+                    let Heap::ListAddress(list) = self.state.get_ref(*list_index.last().unwrap())
+                    else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected Heap::ListAddress".into(),
+                        });
+                    };
+
+                    let (Heap::List(array), Heap::List(elem)) =
+                        (self.state.get_ref(*list), self.state.get_ref(struct_index))
+                    else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected Heap::List".into(),
+                        });
+                    };
+
+                    for (i, f) in array.iter().enumerate() {
+                        let Heap::StringAddress(field) = self.state.get_ref(*f) else {
+                            continue;
+                        };
+                        let Heap::String(field_name) = self.state.get_ref(*field) else {
+                            continue;
+                        };
+
+                        if field_name_item == field_name {
+                            self.state.stack.push(self.state.to_vmdata(elem[i]));
+                            break;
+                        }
+                    }
+                }
+
+                Code::PINF => {
+                    let field = self.state.stack.pop();
+                    let struct_index = self.state.stack.pop();
+
+                    let (Some(VmData::String(index)), Some(VmData::StackAddress(struct_index))) =
+                        (field, struct_index)
+                    else {
+                        dbg!(field, struct_index);
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::String and VmData::List".into(),
+                        });
+                    };
+                    // get string from heap
+                    let Heap::String(field_name_item) = self.state.get_ref(index) else {
+                        dbg!(index);
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::String and VmData::List".into(),
+                        });
+                    };
+
+                    let item = &self.state.stack[self.state.offset + struct_index];
+
+                    let VmData::List(struct_index) = item else {
+                        dbg!(item);
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::List and VmData::String".into(),
+                        });
+                    };
+
+                    let Heap::List(list_index) = self.state.get_ref(*struct_index) else {
+                        dbg!(item);
+                        return Err(NovaError::Runtime {
+                            msg: "Expected VmData::List and VmData::String".into(),
+                        });
+                    };
+
+                    //dbg!(list_index);
+
+                    let Heap::ListAddress(list) = self.state.get_ref(*list_index.last().unwrap())
+                    else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected Heap::ListAddress".into(),
+                        });
+                    };
+                    //dbg!(list);
+                    let Heap::List(array) = self.state.get_ref(*list) else {
+                        return Err(NovaError::Runtime {
+                            msg: "Expected Heap::List".into(),
+                        });
+                    };
+                    //dbg!(array);
+                    for (i, f) in array.iter().enumerate() {
+                        let Heap::StringAddress(field) = self.state.get_ref(*f) else {
+                            continue;
+                        };
+                        let Heap::String(field_name) = self.state.get_ref(*field) else {
+                            continue;
+                        };
+
+                        if field_name_item == field_name {
+                            // push pointer of the field
+                            self.state.stack.push(VmData::List(list_index[i]));
+                            break;
+                        }
+                    }
+                }
+
                 error => {
                     dbg!(error);
                 }

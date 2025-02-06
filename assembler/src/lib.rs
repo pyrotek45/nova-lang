@@ -556,6 +556,8 @@ impl Assembler {
                     self.runtime_error_table
                         .insert(self.output.len(), file_position);
                 }
+                Asm::GETF => self.output.push(Code::GETF),
+                Asm::PINF => self.output.push(Code::PINF),
             }
         }
 

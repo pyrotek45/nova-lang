@@ -363,7 +363,14 @@ impl Compiler {
                     self.asm.push(Asm::FUNCTION(structjump));
                     self.asm.push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
                     self.compile_string_literal(identifier);
+
+                    // compile a list of the field names themselves in the same order
+                    for field in fields.iter() {
+                        self.asm.push(Asm::STRING(field.identifier.clone()));
+                    }
                     self.asm.push(Asm::LIST(fields.len() as u64));
+
+                    self.asm.push(Asm::LIST((fields.len() + 1) as u64));
                     self.asm.push(Asm::RET(true));
                     self.asm.push(Asm::LABEL(structjump));
 
@@ -1007,6 +1014,11 @@ impl Compiler {
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
             Expr::Void => {}
+            Expr::DynField { expr, name, .. } => {
+                self.getref_expr(expr)?;
+                self.asm.push(Asm::STRING(name.clone()));
+                self.asm.push(Asm::PINF);
+            }
         }
         Ok(())
     }
@@ -1747,6 +1759,13 @@ impl Compiler {
                 Ok(())
             }
             Expr::Void => Ok(()),
+            Expr::DynField { name, expr, .. } => {
+                self.compile_expr(expr)?;
+                self.asm.push(Asm::STRING(name.clone()));
+                self.asm.push(Asm::GETF);
+                //println!("getf");
+                Ok(())
+            }
         }
     }
 

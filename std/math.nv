@@ -31,7 +31,7 @@ fn extends pow(self: Int, other: Int) -> Int {
 
 // approximation method to calculate square root
 // sorry if it's not 100% accurate
-fn extends sqrt(self: Float) -> Float {
+fn sqrt(self: Float) -> Float {
     let x = Cast::float(self).unwrap()
     let y = (x + 1.0) / 2.0
 
@@ -43,8 +43,8 @@ fn extends sqrt(self: Float) -> Float {
     return x
 }
 
-fn extends sqrt(self: Int) -> Float {
-    return Cast::float(self).unwrap().sqrt()
+fn sqrt(self: Int) -> Float {
+    return sqrt(Cast::float(self).unwrap())
 }
 
 // limit a value between a minimum and a maximum value

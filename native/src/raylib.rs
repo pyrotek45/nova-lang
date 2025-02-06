@@ -67,6 +67,7 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
     };
     let (mut rl, thread) = raylib::init().size(w as i32, h as i32).title(text).build();
     rl.set_target_fps(fps as u32);
+
     state.raylib = Some(Rc::new(RefCell::new(rl)));
     state.raylib_thread = Some(thread);
 
@@ -139,7 +140,7 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
                     sprite_index: texture,
                 } => {
                     //dbg!(texture.clone());
-                    let texture = state.textures[texture].clone();
+                    let texture = state.sprites[texture].clone();
                     d.draw_texture(&*texture, x, y, Color::WHITE);
                 }
             }
@@ -597,8 +598,8 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
     texture.height *= y as i32;
     texture.width *= x as i32;
     let texture = Rc::new(texture);
-    state.textures.push(texture.clone());
-    let index = state.textures.len() - 1;
+    state.sprites.push(texture.clone());
+    let index = state.sprites.len() - 1;
     state.stack.push(VmData::Int(index as i64));
 
     Ok(())
@@ -796,13 +797,18 @@ pub fn raylib_is_mouse_button_down(state: &mut state::State) -> Result<(), NovaE
             })
         }
     };
-    let is_down = state.raylib.as_ref().unwrap().borrow_mut().is_mouse_button_down(button);
+    let is_down = state
+        .raylib
+        .as_ref()
+        .unwrap()
+        .borrow_mut()
+        .is_mouse_button_down(button);
     state.stack.push(VmData::Bool(is_down));
     Ok(())
 }
 
-// get mouse buttof pressed
-pub fn raylib_get_mouse_button_pressed(state: &mut state::State) -> Result<(), NovaError> {
+// get mouse button released
+pub fn raylib_get_mouse_button_released(state: &mut state::State) -> Result<(), NovaError> {
     // raylib_check_window(state)?;
     let button = state.stack.pop().unwrap();
     let button = match button {
@@ -840,7 +846,257 @@ pub fn raylib_get_mouse_button_pressed(state: &mut state::State) -> Result<(), N
         .as_ref()
         .unwrap()
         .borrow_mut()
-        .is_mouse_button_pressed(button);
+        .is_mouse_button_released(button);
     state.stack.push(VmData::Bool(is_down));
+    Ok(())
+}
+
+// is key released
+pub fn raylib_is_key_released(state: &mut state::State) -> Result<(), NovaError> {
+    // raylib_check_window(state)?;
+    let key = state.stack.pop().unwrap();
+    let key = match key {
+        VmData::String(index) => {
+            let key = state.get_ref(index);
+            match key {
+                Heap::String(key) => key,
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected string".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected string".into(),
+            })
+        }
+    };
+    let key = key.to_string();
+    let key = key.as_str();
+    let key = match key {
+        "KEY_A" => KeyboardKey::KEY_A,
+        "KEY_B" => KeyboardKey::KEY_B,
+        "KEY_C" => KeyboardKey::KEY_C,
+        "KEY_D" => KeyboardKey::KEY_D,
+        "KEY_E" => KeyboardKey::KEY_E,
+        "KEY_F" => KeyboardKey::KEY_F,
+        "KEY_G" => KeyboardKey::KEY_G,
+        "KEY_H" => KeyboardKey::KEY_H,
+        "KEY_I" => KeyboardKey::KEY_I,
+        "KEY_J" => KeyboardKey::KEY_J,
+        "KEY_K" => KeyboardKey::KEY_K,
+        "KEY_L" => KeyboardKey::KEY_L,
+        "KEY_M" => KeyboardKey::KEY_M,
+        "KEY_N" => KeyboardKey::KEY_N,
+        "KEY_O" => KeyboardKey::KEY_O,
+        "KEY_P" => KeyboardKey::KEY_P,
+        "KEY_Q" => KeyboardKey::KEY_Q,
+        "KEY_R" => KeyboardKey::KEY_R,
+        "KEY_S" => KeyboardKey::KEY_S,
+        "KEY_T" => KeyboardKey::KEY_T,
+        "KEY_U" => KeyboardKey::KEY_U,
+        "KEY_V" => KeyboardKey::KEY_V,
+        "KEY_W" => KeyboardKey::KEY_W,
+        "KEY_X" => KeyboardKey::KEY_X,
+        "KEY_Y" => KeyboardKey::KEY_Y,
+        "KEY_Z" => KeyboardKey::KEY_Z,
+        "KEY_ZERO" => KeyboardKey::KEY_ZERO,
+        "KEY_ONE" => KeyboardKey::KEY_ONE,
+        "KEY_TWO" => KeyboardKey::KEY_TWO,
+        "KEY_THREE" => KeyboardKey::KEY_THREE,
+        "KEY_FOUR" => KeyboardKey::KEY_FOUR,
+        "KEY_FIVE" => KeyboardKey::KEY_FIVE,
+        "KEY_SIX" => KeyboardKey::KEY_SIX,
+        "KEY_SEVEN" => KeyboardKey::KEY_SEVEN,
+        "KEY_EIGHT" => KeyboardKey::KEY_EIGHT,
+        "KEY_NINE" => KeyboardKey::KEY_NINE,
+        "KEY_SPACE" => KeyboardKey::KEY_SPACE,
+        "KEY_ENTER" => KeyboardKey::KEY_ENTER,
+        "KEY_BACKSPACE" => KeyboardKey::KEY_BACKSPACE,
+        "KEY_DELETE" => KeyboardKey::KEY_DELETE,
+        "KEY_TAB" => KeyboardKey::KEY_TAB,
+        "KEY_ESCAPE" => KeyboardKey::KEY_ESCAPE,
+        "KEY_RIGHT" => KeyboardKey::KEY_RIGHT,
+        "KEY_LEFT" => KeyboardKey::KEY_LEFT,
+        "KEY_UP" => KeyboardKey::KEY_UP,
+        "KEY_DOWN" => KeyboardKey::KEY_DOWN,
+        "KEY_LEFT_CONTROL" => KeyboardKey::KEY_LEFT_CONTROL,
+        "KEY_LEFT_SHIFT" => KeyboardKey::KEY_LEFT_SHIFT,
+        "KEY_LEFT_ALT" => KeyboardKey::KEY_LEFT_ALT,
+        "KEY_LEFT_SUPER" => KeyboardKey::KEY_LEFT_SUPER,
+        "KEY_RIGHT_CONTROL" => KeyboardKey::KEY_RIGHT_CONTROL,
+        "KEY_RIGHT_SHIFT" => KeyboardKey::KEY_RIGHT_SHIFT,
+        "KEY_RIGHT_ALT" => KeyboardKey::KEY_RIGHT_ALT,
+        "KEY_RIGHT_SUPER" => KeyboardKey::KEY_RIGHT_SUPER,
+        "KEY_BACK" => KeyboardKey::KEY_BACK,
+        "KEY_GRAVE" => KeyboardKey::KEY_GRAVE,
+        "KEY_SLASH" => KeyboardKey::KEY_SLASH,
+        "KEY_BACKSLASH" => KeyboardKey::KEY_BACKSLASH,
+        "KEY_COMMA" => KeyboardKey::KEY_COMMA,
+        "KEY_PERIOD" => KeyboardKey::KEY_PERIOD,
+        "KEY_SEMICOLON" => KeyboardKey::KEY_SEMICOLON,
+        "KEY_APOSTROPHE" => KeyboardKey::KEY_APOSTROPHE,
+        "KEY_LEFT_BRACKET" => KeyboardKey::KEY_LEFT_BRACKET,
+        "KEY_RIGHT_BRACKET" => KeyboardKey::KEY_RIGHT_BRACKET,
+        "KEY_EQUAL" => KeyboardKey::KEY_EQUAL,
+        "KEY_MINUS" => KeyboardKey::KEY_MINUS,
+        "KEY_KP_0" => KeyboardKey::KEY_KP_0,
+        "KEY_KP_1" => KeyboardKey::KEY_KP_1,
+        "KEY_KP_2" => KeyboardKey::KEY_KP_2,
+        "KEY_KP_3" => KeyboardKey::KEY_KP_3,
+        "KEY_KP_4" => KeyboardKey::KEY_KP_4,
+        "KEY_KP_5" => KeyboardKey::KEY_KP_5,
+        "KEY_KP_6" => KeyboardKey::KEY_KP_6,
+        "KEY_KP_7" => KeyboardKey::KEY_KP_7,
+        "KEY_KP_8" => KeyboardKey::KEY_KP_8,
+        "KEY_KP_9" => KeyboardKey::KEY_KP_9,
+        "KEY_KP_DECIMAL" => KeyboardKey::KEY_KP_DECIMAL,
+        "KEY_KP_DIVIDE" => KeyboardKey::KEY_KP_DIVIDE,
+        "KEY_KP_MULTIPLY" => KeyboardKey::KEY_KP_MULTIPLY,
+        "KEY_KP_SUBTRACT" => KeyboardKey::KEY_KP_SUBTRACT,
+        "KEY_KP_ADD" => KeyboardKey::KEY_KP_ADD,
+        "KEY_KP_ENTER" => KeyboardKey::KEY_KP_ENTER,
+        "KEY_KP_EQUAL" => KeyboardKey::KEY_KP_EQUAL,
+        "KEY_F1" => KeyboardKey::KEY_F1,
+        "KEY_F2" => KeyboardKey::KEY_F2,
+        "KEY_F3" => KeyboardKey::KEY_F3,
+        "KEY_F4" => KeyboardKey::KEY_F4,
+        "KEY_F5" => KeyboardKey::KEY_F5,
+        "KEY_F6" => KeyboardKey::KEY_F6,
+        "KEY_F7" => KeyboardKey::KEY_F7,
+        "KEY_F8" => KeyboardKey::KEY_F8,
+        "KEY_F9" => KeyboardKey::KEY_F9,
+        "KEY_F10" => KeyboardKey::KEY_F10,
+        "KEY_F11" => KeyboardKey::KEY_F11,
+        "KEY_F12" => KeyboardKey::KEY_F12,
+        a => {
+            return Err(NovaError::Runtime {
+                msg: format!("Invalid key: {}", a).into(),
+            })
+        }
+    };
+    let is_released = state
+        .raylib
+        .as_ref()
+        .unwrap()
+        .borrow_mut()
+        .is_key_released(key);
+    state.stack.push(VmData::Bool(is_released));
+    Ok(())
+}
+
+// build sprite from int and array of ints -> returns sprite index as int
+pub fn create_sprite_from_array(state: &mut state::State) -> Result<(), NovaError> {
+    //dbg!(&state.stack);
+
+    let pixel_data = state.stack.pop().unwrap();
+    let scale = state.stack.pop().unwrap();
+    let height = state.stack.pop().unwrap();
+    let width = state.stack.pop().unwrap();
+
+    let size = match scale {
+        VmData::Int(size) => size as i32,
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+
+    let (width, height) = match (width, height) {
+        (VmData::Int(width), VmData::Int(height)) => (width as i32, height as i32),
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected integer".into(),
+            })
+        }
+    };
+
+    let pixel_data = match pixel_data {
+        VmData::List(index) => {
+            let data = state.get_ref(index);
+            match data {
+                Heap::List(pointers) => {
+                    let mut pixels = Vec::new();
+                    for pointer in pointers {
+                        let color_tuple = state.get_ref(*pointer);
+                        match color_tuple {
+                            Heap::ListAddress(list_address) => {
+                                // get list from heap
+                                let list = state.get_ref(*list_address);
+                                match list {
+                                    Heap::List(pointers) => {
+                                        let r = state.get_ref(pointers[0]).get_int() as u8;
+                                        let g = state.get_ref(pointers[1]).get_int() as u8;
+                                        let b = state.get_ref(pointers[2]).get_int() as u8;
+                                        let a = 255_u8;
+                                        pixels.push(r);
+                                        pixels.push(g);
+                                        pixels.push(b);
+                                        pixels.push(a);
+                                    }
+                                    _ => {
+                                        return Err(NovaError::Runtime {
+                                            msg: "Expected list".into(),
+                                        })
+                                    }
+                                }
+                            }
+                            a => {
+                                dbg!(a);
+                                return Err(NovaError::Runtime {
+                                    msg: "Expected list of color tuples".into(),
+                                });
+                            }
+                        }
+                    }
+                    pixels
+                }
+                _ => {
+                    return Err(NovaError::Runtime {
+                        msg: "Expected list".into(),
+                    })
+                }
+            }
+        }
+        _ => {
+            return Err(NovaError::Runtime {
+                msg: "Expected list".into(),
+            })
+        }
+    };
+
+    let thread = state.raylib_thread.as_ref().unwrap().clone();
+    let mut rl = state.raylib.as_ref().unwrap().borrow_mut();
+
+    // Create an image from the pixel data
+    let mut image = Image::gen_image_color(width, height, Color::WHITE);
+    // use pixel data to set the image
+    let mut index = 0;
+    for y in 0..height {
+        for x in 0..width {
+            let (r, g, b, a) = (
+                pixel_data[index],
+                pixel_data[index + 1],
+                pixel_data[index + 2],
+                pixel_data[index + 3],
+            );
+            let color = Color::new(r, g, b, a);
+            image.draw_pixel(x, y, color);
+            index += 4;
+        }
+    }
+    let mut texture = rl.load_texture_from_image(&thread, &image).unwrap();
+    // dbg!(&texture);
+    texture.height *= size;
+    texture.width *= size;
+    // Store the texture in the state
+    let texture = Rc::new(texture);
+    state.sprites.push(texture.clone());
+    let index = state.sprites.len() - 1;
+    state.stack.push(VmData::Int(index as i64));
+
     Ok(())
 }

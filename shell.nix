@@ -16,6 +16,8 @@ pkgs.mkShell {
         pkgs.xorg.libXcursor
         pkgs.xorg.libXi
         pkgs.xorg.libX11
+        pkgs.rust-analyzer
+        pkgs.cmake
     ];
 
     shellHook = ''

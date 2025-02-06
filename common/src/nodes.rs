@@ -203,6 +203,12 @@ pub enum Expr {
         expr: Box<Expr>,
         position: FilePosition,
     },
+    DynField {
+        ttype: TType,
+        name: Rc<str>,
+        expr: Box<Expr>,
+        position: FilePosition,
+    },
     Indexed {
         ttype: TType,
         name: Rc<str>,
@@ -284,6 +290,7 @@ impl Expr {
             Expr::Block { ttype, .. } => ttype.clone(),
             Expr::Let { ttype, .. } => ttype.clone(),
             Expr::Void => TType::Void,
+            Expr::DynField { ttype, .. } => ttype.clone(),
         }
     }
 }

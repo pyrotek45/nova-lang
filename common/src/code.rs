@@ -128,6 +128,9 @@ impl Code {
 
     pub const EXIT: u8 = 77;
     pub const ERROR: u8 = 78;
+
+    pub const GETF: u8 = 79;
+    pub const PINF: u8 = 80;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -207,6 +210,8 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::DUP => "DUP",
         Code::ISSOME => "ISSOME",
         Code::UNWRAP => "UNWRAP",
+        Code::PINF => "PINF",
+        Code::GETF => "GETF",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -297,4 +302,7 @@ pub enum Asm {
 
     EXIT,
     ERROR(FilePosition),
+
+    GETF,
+    PINF,
 }

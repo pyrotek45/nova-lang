@@ -12,6 +12,7 @@ $nova run demo/function.nv
 $nova run demo/structs.nv
 $nova run demo/option_type.nv
 $nova run demo/fib.nv
+$nova run demo/vtable.nv
 $nova run Aoc2024/nvaoc1.nv
 $nova run Aoc2024/nvaoc2.nv
 $nova run Aoc2024/nvaoc3.nv

@@ -79,6 +79,8 @@ impl Disassembler {
                 Asm::CONCAT => println!("    concat"),
                 Asm::Char(v) => println!("    char: {v}"),
                 Asm::ERROR(_) => println!("    error"),
+                Asm::GETF => println!("    getf"),
+                Asm::PINF => println!("    pinf"),
             }
         }
         println!();

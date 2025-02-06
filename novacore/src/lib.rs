@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, rc::Rc};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use assembler::Assembler;
 use common::{
@@ -347,17 +350,15 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_key_down,
         );
-        // mouse get button pressed which returns Option<string>
+        // is key released
         self.add_function(
-            "raylib::getMouseButton",
+            "raylib::isKeyReleased",
             TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::String),
-                }),
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
             },
             common::nodes::SymbolKind::Function,
-            native::raylib::raylib_get_mouse_button_pressed,
+            native::raylib::raylib_is_key_released,
         );
         // is mouse button pressed which returns bool
         self.add_function(
@@ -369,6 +370,16 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_mouse_button_down,
         );
+        // is mouse button released which returns bool
+        self.add_function(
+            "raylib::isMouseReleased",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_mouse_button_released,
+        );
         // raylib gettimeframe
         self.add_function(
             "raylib::getFrameTime",
@@ -379,6 +390,29 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_get_frame_time,
         );
+        // build sprite function which rtakes width and height, and list of tuples (int, int, int)
+        self.add_function(
+            "raylib::buildSprite",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::List {
+                        inner: Box::new(TType::Tuple {
+                            elements: vec![TType::Int, TType::Int, TType::Int],
+                        }),
+                    },
+                ],
+                return_type: Box::new(TType::Custom {
+                    name: "Sprite".into(),
+                    type_params: vec![],
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::create_sprite_from_array,
+        );
+
         // add regex match, takes two strings and returns a bool
         self.add_function(
             "Regex::matches",

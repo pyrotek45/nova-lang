@@ -172,7 +172,7 @@ pub struct State {
     pub raylib: Option<Rc<RefCell<RaylibHandle>>>,
     pub raylib_thread: Option<RaylibThread>,
     pub draw_queue: Vec<Draw>,
-    pub textures: Vec<Rc<Texture2D>>,
+    pub sprites: Vec<Rc<Texture2D>>,
     pub current_dir: std::path::PathBuf,
 }
 
@@ -181,7 +181,7 @@ impl Drop for State {
         if let Some(raylib) = &self.raylib {
             let raylib = raylib.borrow_mut();
             // clear all sprites in the texture
-            self.textures.clear();
+            self.sprites.clear();
             drop(raylib);
         }
     }
@@ -206,7 +206,7 @@ pub fn new() -> State {
         raylib: None,
         raylib_thread: None,
         draw_queue: vec![],
-        textures: vec![],
+        sprites: vec![],
     }
 }
 

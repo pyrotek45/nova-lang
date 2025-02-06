@@ -34,6 +34,10 @@ pub enum TType {
     Tuple {
         elements: Vec<TType>,
     },
+    Dyn {
+        own: Rc<str>,
+        contract: Vec<(Rc<str>, TType)>,
+    },
 }
 
 impl TType {
@@ -111,6 +115,18 @@ impl Display for TType {
                 parameters: args,
                 return_type,
             } => return write!(f, "fn({params}) -> {return_type}", params = TypeList(args)),
+            TType::Dyn { own, contract } => {
+                write!(f, "{own}{{ ")?;
+                let mut contract_iter = contract.iter().peekable();
+                while let Some((name, ttype)) = contract_iter.next() {
+                    write!(f, "{name}: {ttype}")?;
+                    if contract_iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, " }}")?;
+                return Ok(());
+            }
         };
         f.write_str(literal)
     }

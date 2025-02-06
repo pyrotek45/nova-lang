@@ -105,7 +105,7 @@ impl Environment {
         self.values.last().unwrap().contains_key(symbol)
     }
 
-    pub fn get(&mut self, symbol: &str) -> Option<Symbol> {
+    pub fn get(&self, symbol: &str) -> Option<Symbol> {
         self.values.last().unwrap().get(symbol).cloned()
     }
 
