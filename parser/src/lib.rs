@@ -876,12 +876,10 @@ impl Parser {
                      format!("Option::{}", identifier)
                 }
                 TType::Function { parameters, .. } => {
-                    let repeated_elements: String = "(_)".repeat(parameters.len());
-                     format!("Function{}::{}",repeated_elements, identifier)
+                     format!("Function::{}", identifier)
                 }
                 TType::Tuple { elements } => {
-                    let repeated_elements: String = "(_)".repeat(elements.len());
-                     format!("Tuple{}::{}",repeated_elements, identifier)
+                     format!("Tuple::{}", identifier)
                 }
                 TType::Bool => {
                      format!("Bool::{}", identifier)
@@ -5515,12 +5513,10 @@ impl Parser {
                         format!("Option::{}", identifier)
                     }
                     TType::Function { parameters, .. } => {
-                        let repeated_elements: String = "(_)".repeat(parameters.len());
-                        format!("Function{}::{}", repeated_elements, identifier)
+                        format!("Function::{}",  identifier)
                     }
                     TType::Tuple { elements } => {
-                        let repeated_elements: String = "(_)".repeat(elements.len());
-                        format!("Tuple{}::{}", repeated_elements, identifier)
+                        format!("Tuple::{}",  identifier)
                     }
                     TType::Bool => {
                         format!("Bool::{}", identifier)
