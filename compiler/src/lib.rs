@@ -1108,11 +1108,11 @@ impl Compiler {
             } => {
                 self.compile_expr(index)?;
                 let negitive_step = self.gen.generate();
-
                 self.compile_expr(container)?;
                 self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
+                    .insert(format!("__arrayexprin__{}", self.gen.generate()).into());
                 let array_index = self.variables.len() - 1;
+
                 self.asm.push(Asm::STORE(array_index as u32));
 
                 self.asm.push(Asm::DUP);
@@ -1120,11 +1120,13 @@ impl Compiler {
                 self.asm.push(Asm::ILSS);
                 self.asm.push(Asm::JUMPIFFALSE(negitive_step));
                 self.asm.push(Asm::GET(array_index as u32));
+
                 if let Some(index) = self.native_functions.get_index("List::len") {
                     self.asm.push(Asm::NATIVE(index as u64))
                 } else {
                     todo!()
                 }
+
                 self.asm.push(Asm::IADD);
                 self.asm.push(Asm::LABEL(negitive_step));
 

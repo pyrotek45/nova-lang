@@ -157,7 +157,7 @@ impl Heap {
 #[derive(Debug, Clone)]
 pub struct State {
     pub program: Vec<u8>,
-    pub heap: Vec<Heap>,
+    pub heap: fxhash::FxHashMap<usize, Heap>,
     pub free_space: Vec<usize>,
     pub callstack: Vec<usize>,
     pub stack: Vec<VmData>,
@@ -174,6 +174,7 @@ pub struct State {
     pub draw_queue: Vec<Draw>,
     pub sprites: Vec<Rc<Texture2D>>,
     pub current_dir: std::path::PathBuf,
+    pub latency: u128,
 }
 
 impl Drop for State {
@@ -196,10 +197,10 @@ pub fn new() -> State {
         callstack: vec![],
         offset: 0,
         window: vec![],
-        heap: vec![],
+        heap: fxhash::FxHashMap::default(),
         free_space: vec![],
         used_data: Table::new(),
-        threshold: 999999999,
+        threshold: 50,
         gc_count: 0,
         garbage_collected: 0,
         gclock: false,
@@ -207,6 +208,7 @@ pub fn new() -> State {
         raylib_thread: None,
         draw_queue: vec![],
         sprites: vec![],
+        latency: 16,
     }
 }
 
@@ -219,7 +221,7 @@ impl State {
         if index >= self.heap.len() {
             return;
         }
-        match &self.heap[index] {
+        match &self.heap[&index] {
             Heap::ClosureAddress(v) => {
                 self.print_heap(*v);
             }
@@ -281,7 +283,7 @@ impl State {
 
     #[inline(always)]
     pub fn to_vmdata(&self, index: usize) -> VmData {
-        match self.heap[index] {
+        match self.heap[&index] {
             Heap::ClosureAddress(v) => VmData::Closure(v),
             Heap::Function(v) => VmData::Function(v),
             Heap::Int(v) => VmData::Int(v),
@@ -328,7 +330,7 @@ impl State {
     pub fn check_usage(&mut self, index: usize) {
         if !self.used_data.has(&index) {
             self.used_data.insert(index);
-            let href = &self.heap[index];
+            let href = &self.heap[&index];
             match href {
                 Heap::List(list) => {
                     for i in list.clone() {
@@ -351,12 +353,11 @@ impl State {
         }
 
         // only run when out of free space and over threshold
-        if self.threshold <= self.heap.len() {
-            self.threshold = self.heap.len() * 11 / 10;
-            //dbg!(&self.threshold);
-        } else {
+        if self.threshold > self.heap.len() {
             return;
         }
+
+        // let latency = time::Instant::now();
 
         self.gc_count += 1;
         self.used_data.clear();
@@ -375,15 +376,32 @@ impl State {
             }
         }
 
-        for i in 0..self.heap.len() {
-            if !self.used_data.has(&i) {
-                self.free_heap(i);
-                self.garbage_collected += 1;
-                if i == self.heap.len() {
-                    self.heap.pop();
-                }
-            }
+        self.garbage_collected = 0;
+        let keys_to_remove: Vec<usize> = self
+            .heap
+            .keys()
+            .filter(|&&i| !self.used_data.has(&i))
+            .cloned()
+            .collect();
+
+        for i in keys_to_remove {
+            self.garbage_collected += 1;
+            self.heap.remove(&i);
         }
+
+        let delta = (self.heap.len().saturating_sub(self.garbage_collected) / 10) + 1;
+        self.threshold = self.heap.len() * (2 * delta);
+
+        // // print debug info
+        // println!(
+        //     "collected {}, threshold {}, heap length {}, latency {}, delta {}",
+        //     self.garbage_collected,
+        //     self.threshold,
+        //     self.heap.len(),
+        //     latency.elapsed().as_millis(),
+        //     delta
+        // );
+
         //dbg!(&self.garbage_collected);
     }
 
@@ -394,158 +412,78 @@ impl State {
 
     #[inline(always)]
     pub fn get_ref(&self, index: usize) -> &Heap {
-        &self.heap[index]
+        &self.heap[&index]
+    }
+
+    fn allocate_to_heap(&mut self, item: Heap) -> usize {
+        self.collect_garbage();
+        let mut index = 0;
+        let mut index2 = self.heap.len();
+        let mut fromstart = true;
+        //let time = time::Instant::now();
+        loop {
+            if fromstart {
+                if self.heap.contains_key(&index) {
+                    index += 1;
+                    fromstart = false;
+                } else {
+                    break;
+                }
+            } else if self.heap.contains_key(&index2) {
+                index2 -= 1;
+                fromstart = true;
+            } else {
+                index = index2;
+                break;
+            }
+        }
+        // println!("allocated in {}ms at {}", time.elapsed().as_millis(), index);
+        self.heap.insert(index, item);
+        index
     }
 
     #[inline(always)]
     pub fn allocate_vmdata_to_heap(&mut self, item: VmData) -> usize {
         match item {
-            VmData::Function(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::Function(v);
-                    space
-                } else {
-                    self.heap.push(Heap::Function(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::Int(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::Int(v);
-                    space
-                } else {
-                    self.heap.push(Heap::Int(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::Float(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::Float(v);
-                    space
-                } else {
-                    self.heap.push(Heap::Float(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::Bool(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::Bool(v);
-                    space
-                } else {
-                    self.heap.push(Heap::Bool(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::List(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::ListAddress(v);
-                    space
-                } else {
-                    self.heap.push(Heap::ListAddress(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::None => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::None;
-                    space
-                } else {
-                    self.heap.push(Heap::None);
-                    self.heap.len() - 1
-                }
-            }
-            VmData::String(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::StringAddress(v);
-                    space
-                } else {
-                    self.heap.push(Heap::StringAddress(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::Closure(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::ClosureAddress(v);
-                    space
-                } else {
-                    self.heap.push(Heap::ClosureAddress(v));
-                    self.heap.len() - 1
-                }
-            }
+            VmData::Function(v) => self.allocate_to_heap(Heap::Function(v)),
+            VmData::Int(v) => self.allocate_to_heap(Heap::Int(v)),
+            VmData::Float(v) => self.allocate_to_heap(Heap::Float(v)),
+            VmData::Bool(v) => self.allocate_to_heap(Heap::Bool(v)),
+            VmData::List(v) => self.allocate_to_heap(Heap::ListAddress(v)),
+            VmData::None => self.allocate_to_heap(Heap::None),
+            VmData::String(v) => self.allocate_to_heap(Heap::StringAddress(v)),
+            VmData::Closure(v) => self.allocate_to_heap(Heap::ClosureAddress(v)),
             VmData::StackAddress(_) => todo!(),
-            VmData::Struct(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::StructAddress(v);
-                    space
-                } else {
-                    self.heap.push(Heap::StructAddress(v));
-                    self.heap.len() - 1
-                }
-            }
-            VmData::Char(v) => {
-                if let Some(space) = self.free_space.pop() {
-                    self.heap[space] = Heap::Char(v);
-                    space
-                } else {
-                    self.heap.push(Heap::Char(v));
-                    self.heap.len() - 1
-                }
-            }
+            VmData::Struct(v) => self.allocate_to_heap(Heap::StructAddress(v)),
+            VmData::Char(v) => self.allocate_to_heap(Heap::Char(v)),
         }
     }
 
     #[inline(always)]
     pub fn copy_heap(&mut self, copy: usize, target: usize) {
-        self.heap[target] = self.heap[copy].clone();
+        if let Some(copy_value) = self.heap.get(&copy).cloned() {
+            self.heap.insert(target, copy_value);
+        }
     }
 
     #[inline(always)]
     pub fn delete_heap(&mut self, index: usize) {
-        self.heap[index] = Heap::None
+        self.heap.insert(index, Heap::None);
     }
 
     #[inline(always)]
     pub fn allocate_new_heap(&mut self) -> usize {
-        if let Some(space) = self.free_space.pop() {
-            space
-        } else {
-            self.collect_garbage();
-            if let Some(space) = self.free_space.pop() {
-                self.heap[space] = Heap::None;
-                space
-            } else {
-                self.heap.push(Heap::None);
-                self.heap.len() - 1
-            }
-        }
+        self.allocate_to_heap(Heap::None)
     }
 
     #[inline(always)]
     pub fn allocate_array(&mut self, array: Vec<usize>) -> usize {
-        if let Some(space) = self.free_space.pop() {
-            self.heap[space] = Heap::List(array);
-            space
-        } else {
-            self.heap.push(Heap::List(array));
-            self.heap.len() - 1
-        }
+        self.allocate_to_heap(Heap::List(array))
     }
 
     #[inline(always)]
     pub fn allocate_string(&mut self, str: Rc<str>) -> usize {
-        if let Some(space) = self.free_space.pop() {
-            self.heap[space] = Heap::String(str);
-            space
-        } else {
-            self.collect_garbage();
-            if let Some(space) = self.free_space.pop() {
-                self.heap[space] = Heap::String(str);
-                space
-            } else {
-                self.heap.push(Heap::String(str));
-                self.heap.len() - 1
-            }
-        }
+        self.allocate_to_heap(Heap::String(str))
     }
 
     #[inline(always)]

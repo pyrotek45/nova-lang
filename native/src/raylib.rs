@@ -82,6 +82,7 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
+    // state.collect_garbage();
     if let Some(_rl) = state.raylib.as_ref() {
         let thread = state.raylib_thread.as_ref().unwrap().clone();
         let mut rl = state.raylib.as_ref().unwrap().borrow_mut();

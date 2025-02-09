@@ -875,10 +875,10 @@ impl Parser {
                 TType::Option { .. } => {
                      format!("Option::{}", identifier)
                 }
-                TType::Function { parameters, .. } => {
+                TType::Function {  .. } => {
                      format!("Function::{}", identifier)
                 }
-                TType::Tuple { elements } => {
+                TType::Tuple { ..} => {
                      format!("Tuple::{}", identifier)
                 }
                 TType::Bool => {
@@ -5512,11 +5512,11 @@ impl Parser {
                     TType::Option { .. } => {
                         format!("Option::{}", identifier)
                     }
-                    TType::Function { parameters, .. } => {
-                        format!("Function::{}",  identifier)
+                    TType::Function { .. } => {
+                        format!("Function::{}", identifier)
                     }
-                    TType::Tuple { elements } => {
-                        format!("Tuple::{}",  identifier)
+                    TType::Tuple { .. } => {
+                        format!("Tuple::{}", identifier)
                     }
                     TType::Bool => {
                         format!("Bool::{}", identifier)

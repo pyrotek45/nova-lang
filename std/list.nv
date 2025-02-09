@@ -6,18 +6,6 @@ fn extends clear(list: [$T]) {
     list = []: $T
 }
 
-fn extends __eq__(a: [$T], b: [$T]) -> Bool {
-    if a.len() != b.len() {
-        return false
-    }
-    for i in 0..a.len() {
-        if a[i] != b[i] {
-            return false
-        }
-    }
-    return true
-}
-
 fn extends dropIndex(list: [$T], index: Int) -> [$T] {
     let result = []: $T
     for i in 0..list.len() {
