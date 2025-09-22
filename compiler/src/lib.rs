@@ -252,7 +252,7 @@ impl Compiler {
                     self.asm.push(Asm::INTEGER(1));
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::IADD);
-                    self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+                    self.asm.push(Asm::INTEGER(tempcounter_index as i64));
                     self.asm.push(Asm::ASSIGN);
                     self.asm.push(Asm::BJMP(top));
                     self.asm.push(Asm::LABEL(end));
@@ -307,7 +307,7 @@ impl Compiler {
                     if captured.is_empty() {
                         self.asm.push(Asm::FUNCTION(closure_jump_label));
                     } else {
-                        self.asm.push(Asm::LIST(captured.len() as u64));
+                        self.asm.push(Asm::INTEGER(captured.len() as i64));
                         self.asm.push(Asm::CLOSURE(closure_jump_label));
                     }
 
@@ -950,47 +950,39 @@ impl Compiler {
                 // self.output.push(Code::NONE)
             }
             Expr::ListConstructor { .. } => todo!(),
-            Expr::Field {
-                index,
-                expr,
-                position,
-                ..
-            } => {
+            Expr::Field { index, expr, .. } => {
                 // dbg!(id, t);
                 self.asm.push(Asm::INTEGER(*index as i64));
-                self.getref_expr(expr)?;
-                self.asm.push(Asm::PIN(position.clone()));
+                self.compile_expr(expr)?;
+                // self.asm.push(Asm::PIN(position.clone()));
             }
             Expr::Indexed {
-                container,
-                index,
-                position,
-                ..
+                container, index, ..
             } => {
                 self.compile_expr(index)?;
 
-                let negitive_step = self.gen.generate();
+                // let negitive_step = self.gen.generate();
+                // self.compile_expr(container)?;
+                // self.variables
+                //     .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
+                // let array_index = self.variables.len() - 1;
+                // self.asm.push(Asm::STORE(array_index as u32));
+
+                // self.asm.push(Asm::DUP);
+                // self.asm.push(Asm::INTEGER(0));
+                // self.asm.push(Asm::ILSS);
+                // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
+                // self.asm.push(Asm::GET(array_index as u32));
+                // if let Some(index) = self.native_functions.get_index("List::len") {
+                //     self.asm.push(Asm::NATIVE(index as u64))
+                // } else {
+                //     todo!()
+                // }
+                // self.asm.push(Asm::IADD);
+                // self.asm.push(Asm::LABEL(negitive_step));
+
                 self.compile_expr(container)?;
-                self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
-                let array_index = self.variables.len() - 1;
-                self.asm.push(Asm::STORE(array_index as u32));
-
-                self.asm.push(Asm::DUP);
-                self.asm.push(Asm::INTEGER(0));
-                self.asm.push(Asm::ILSS);
-                self.asm.push(Asm::JUMPIFFALSE(negitive_step));
-                self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64))
-                } else {
-                    todo!()
-                }
-                self.asm.push(Asm::IADD);
-                self.asm.push(Asm::LABEL(negitive_step));
-
-                self.getref_expr(container)?;
-                self.asm.push(Asm::PIN(position.clone()));
+                //self.asm.push(Asm::PIN(position.clone()));
             }
             Expr::Call { .. } => todo!(),
             Expr::Unary { .. } => todo!(),
@@ -1018,11 +1010,11 @@ impl Compiler {
             }
             Atom::Id { name } => {
                 if let Some(index) = self.variables.get_index(name) {
-                    self.asm.push(Asm::STACKREF(index as u32));
+                    self.asm.push(Asm::INTEGER(index as i64));
                 } else {
                     self.variables.insert(name.clone());
                     let index = self.variables.len() - 1;
-                    self.asm.push(Asm::STACKREF(index as u32));
+                    self.asm.push(Asm::INTEGER(index as i64));
                 }
             }
             Atom::Float { value: float } => {
@@ -1071,7 +1063,7 @@ impl Compiler {
                 Ok(())
             }
             Expr::ListConstructor { elements, .. } => {
-                for x in elements {
+                for x in elements.iter() {
                     self.compile_expr(x)?;
                 }
                 self.asm.push(Asm::LIST(elements.len() as u64));
@@ -1095,28 +1087,28 @@ impl Compiler {
                 ..
             } => {
                 self.compile_expr(index)?;
-                let negitive_step = self.gen.generate();
+                // let negitive_step = self.gen.generate();
 
                 self.compile_expr(container)?;
-                self.variables
-                    .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
-                let array_index = self.variables.len() - 1;
-                self.asm.push(Asm::STORE(array_index as u32));
+                // self.variables
+                //     .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
+                // let array_index = self.variables.len() - 1;
+                // self.asm.push(Asm::STORE(array_index as u32));
 
-                self.asm.push(Asm::DUP);
-                self.asm.push(Asm::INTEGER(0));
-                self.asm.push(Asm::ILSS);
-                self.asm.push(Asm::JUMPIFFALSE(negitive_step));
-                self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64))
-                } else {
-                    todo!()
-                }
-                self.asm.push(Asm::IADD);
-                self.asm.push(Asm::LABEL(negitive_step));
+                // self.asm.push(Asm::DUP);
+                // self.asm.push(Asm::INTEGER(0));
+                // self.asm.push(Asm::ILSS);
+                // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
+                // self.asm.push(Asm::GET(array_index as u32));
+                // if let Some(index) = self.native_functions.get_index("List::len") {
+                //     self.asm.push(Asm::NATIVE(index as u64))
+                // } else {
+                //     todo!()
+                // }
+                // self.asm.push(Asm::IADD);
+                // self.asm.push(Asm::LABEL(negitive_step));
 
-                self.asm.push(Asm::GET(array_index as u32));
+                // self.asm.push(Asm::GET(array_index as u32));
                 self.asm.push(Asm::LIN(position.clone()));
                 Ok(())
             }
@@ -1177,8 +1169,23 @@ impl Compiler {
                     common::tokens::Operator::Assignment => {
                         self.compile_expr(rhs)?;
                         self.getref_expr(lhs)?;
-
-                        self.asm.push(Asm::ASSIGN)
+                        match **lhs {
+                            Expr::Field { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            Expr::Indexed { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            _ => self.asm.push(Asm::ASSIGN),
+                        }
                     }
                     common::tokens::Operator::Addition => {
                         self.compile_expr(lhs)?;
@@ -1349,7 +1356,23 @@ impl Compiler {
                             }
                         }
                         self.getref_expr(lhs)?;
-                        self.asm.push(Asm::ASSIGN)
+                        match **lhs {
+                            Expr::Field { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            Expr::Indexed { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            _ => self.asm.push(Asm::ASSIGN),
+                        }
                     }
                     common::tokens::Operator::SubAssign => {
                         self.compile_expr(lhs)?;
@@ -1363,7 +1386,23 @@ impl Compiler {
                         }
                         self.getref_expr(lhs)?;
 
-                        self.asm.push(Asm::ASSIGN)
+                        match **lhs {
+                            Expr::Field { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            Expr::Indexed { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            _ => self.asm.push(Asm::ASSIGN),
+                        }
                     }
                     common::tokens::Operator::Concat => {
                         self.compile_expr(lhs)?;
@@ -1437,7 +1476,7 @@ impl Compiler {
                 if captured.is_empty() {
                     self.asm.push(Asm::FUNCTION(closure_jump_label));
                 } else {
-                    self.asm.push(Asm::LIST(captured.len() as u64));
+                    self.asm.push(Asm::INTEGER(captured.len() as i64));
                     self.asm.push(Asm::CLOSURE(closure_jump_label));
                 }
 
@@ -1650,7 +1689,7 @@ impl Compiler {
                 }
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::IADD);
-                self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+                self.asm.push(Asm::INTEGER(tempcounter_index as i64));
                 self.asm.push(Asm::ASSIGN);
                 self.asm.push(Asm::BJMP(top));
                 self.asm.push(Asm::LABEL(end));
@@ -1853,7 +1892,7 @@ impl Compiler {
         self.asm.push(Asm::INTEGER(1));
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::IADD);
-        self.asm.push(Asm::STACKREF(tempcounter_index as u32));
+        self.asm.push(Asm::INTEGER(tempcounter_index as i64));
         self.asm.push(Asm::ASSIGN);
         self.asm.push(Asm::BJMP(top));
         self.asm.push(Asm::LABEL(end));

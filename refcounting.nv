@@ -1,0 +1,75 @@
+module ref_test
+
+// this file is a test for the refcounting
+// for the nova vm
+// we will test the refcounting by creating list, and function and closures
+// and see if the refcounting is correct
+// we will also test the refcounting by creating a list of lists
+// and see if the refcounting is correct
+
+// test 1: the refcounting of a list
+let v = [4,5,6]
+let t = [v]
+
+// print output 
+println(v)
+println(t)
+
+// expect the refcount of v to be 2
+// expect the refcount of t to be 1
+
+// test 2: the refcounting of a cllosure
+fn id() -> fn() -> [Int] {
+  return fn() -> [Int] {
+    return v
+  }
+}
+
+let r = id()
+println(r())
+let q = id()
+println(q)
+println(q())
+
+// expect the refcount of v to be 4
+// expect the refcount of t to be 1
+// expect the refcount of r to be 1
+
+// fn into(d: $T) -> $T {
+//   return d
+// }
+
+// let c = [46,35,2]
+// c = into(c)
+// c = into(c)
+// c = into([4,3,2,1])
+// c = into(c)
+// c = into(c)
+// println(c)
+
+// println("hello world")
+
+// let captured = [1,2,3]
+
+// fn set() -> fn(Int) {
+//     return fn(x: Int) {
+//         captured = [x,x,x]
+//         println(captured)
+//     }
+// }
+
+// let f = set()
+// f(5)
+// println(captured)
+// f(7)
+// println(captured)
+
+// let a = [1,2,3]
+// let b = [7,7,7]
+// let c = b
+
+// c = [2,2,2]
+
+// a = [4,5,6]
+
+// println(b)
