@@ -110,146 +110,146 @@ impl NovaCore {
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
         // add remove for list
-        self.add_function(
-            "List::remove",
-            TType::Function {
-                parameters: vec![
-                    TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
-                    },
-                    TType::Int,
-                ],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::list::remove,
-        );
-        // add regex captures function, takes two strings and returns a list of strings
-        // add printf function
-        self.add_function(
-            "printf",
-            TType::Function {
-                parameters: vec![TType::String],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::io::printf,
-        );
-        self.add_function(
-            "Regex::captures",
-            TType::Function {
-                parameters: vec![TType::String, TType::String],
-                return_type: Box::new(TType::List {
-                    inner: Box::new(TType::String),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::regex::regex_captures,
-        );
-        // add regex match, takes two strings and returns a bool
-        self.add_function(
-            "Regex::matches",
-            TType::Function {
-                parameters: vec![TType::String, TType::String],
-                return_type: Box::new(TType::Bool),
-            },
-            common::nodes::SymbolKind::Function,
-            native::regex::regex_match,
-        );
-        self.add_function(
-            "Regex::first",
-            TType::Function {
-                parameters: vec![TType::String, TType::String],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Tuple {
-                        elements: vec![TType::Int, TType::Int, TType::String],
-                    }),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::regex::regex_first,
-        );
-        // add printf function
-        self.add_function(
-            "printf",
-            TType::Function {
-                parameters: vec![
-                    TType::String,
-                    TType::List {
-                        inner: Box::new(TType::String),
-                    },
-                ],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::io::printf,
-        );
-        // format function, same as printf but returns a string
-        self.add_function(
-            "format",
-            TType::Function {
-                parameters: vec![
-                    TType::String,
-                    TType::List {
-                        inner: Box::new(TType::String),
-                    },
-                ],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::Function,
-            native::io::format,
-        );
-        self.add_function(
-            "terminal::args",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::List {
-                        inner: Box::new(TType::String),
-                    }),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::retrieve_command_line_args,
-        );
-        self.add_function(
-            "terminal::hideCursor",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::hide_cursor,
-        );
-        self.add_function(
-            "terminal::showCursor",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::show_cursor,
-        );
-        self.add_function(
-            "Cast::int",
-            TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Int),
-                }),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::str::to_int,
-        );
-        self.add_function(
-            "Cast::string",
-            TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::str::to_string,
-        );
+        // self.add_function(
+        //     "List::remove",
+        //     TType::Function {
+        //         parameters: vec![
+        //             TType::List {
+        //                 inner: Box::new(TType::Generic { name: "a".into() }),
+        //             },
+        //             TType::Int,
+        //         ],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::list::remove,
+        // );
+        // // add regex captures function, takes two strings and returns a list of strings
+        // // add printf function
+        // self.add_function(
+        //     "printf",
+        //     TType::Function {
+        //         parameters: vec![TType::String],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::io::printf,
+        // );
+        // self.add_function(
+        //     "Regex::captures",
+        //     TType::Function {
+        //         parameters: vec![TType::String, TType::String],
+        //         return_type: Box::new(TType::List {
+        //             inner: Box::new(TType::String),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::regex::regex_captures,
+        // );
+        // // add regex match, takes two strings and returns a bool
+        // self.add_function(
+        //     "Regex::matches",
+        //     TType::Function {
+        //         parameters: vec![TType::String, TType::String],
+        //         return_type: Box::new(TType::Bool),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::regex::regex_match,
+        // );
+        // self.add_function(
+        //     "Regex::first",
+        //     TType::Function {
+        //         parameters: vec![TType::String, TType::String],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Tuple {
+        //                 elements: vec![TType::Int, TType::Int, TType::String],
+        //             }),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::regex::regex_first,
+        // );
+        // // add printf function
+        // self.add_function(
+        //     "printf",
+        //     TType::Function {
+        //         parameters: vec![
+        //             TType::String,
+        //             TType::List {
+        //                 inner: Box::new(TType::String),
+        //             },
+        //         ],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::io::printf,
+        // );
+        // // format function, same as printf but returns a string
+        // self.add_function(
+        //     "format",
+        //     TType::Function {
+        //         parameters: vec![
+        //             TType::String,
+        //             TType::List {
+        //                 inner: Box::new(TType::String),
+        //             },
+        //         ],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::io::format,
+        // );
+        // self.add_function(
+        //     "terminal::args",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::List {
+        //                 inner: Box::new(TType::String),
+        //             }),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::retrieve_command_line_args,
+        // );
+        // self.add_function(
+        //     "terminal::hideCursor",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::hide_cursor,
+        // );
+        // self.add_function(
+        //     "terminal::showCursor",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::show_cursor,
+        // );
+        // self.add_function(
+        //     "Cast::int",
+        //     TType::Function {
+        //         parameters: vec![TType::Generic { name: "a".into() }],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Int),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::str::to_int,
+        // );
+        // self.add_function(
+        //     "Cast::string",
+        //     TType::Function {
+        //         parameters: vec![TType::Generic { name: "a".into() }],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::str::to_string,
+        // );
         // alias for toString
         // self.add_function(
         //     "toString",
@@ -260,171 +260,171 @@ impl NovaCore {
         //     common::nodes::SymbolKind::GenericFunction,
         //     native::str::to_string,
         // );
-        self.add_function(
-            "Cast::float",
-            TType::Function {
-                parameters: vec![TType::Any],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Float),
-                }),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::float::int_to_float,
-        );
-        self.add_function(
-            "List::len",
-            TType::Function {
-                parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
-                }],
-                return_type: Box::new(TType::Int),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::list::len,
-        );
-        self.add_function(
-            "sleep",
-            TType::Function {
-                parameters: vec![TType::Int],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::time::sleep,
-        );
-        self.add_function(
-            "terminal::rawmode",
-            TType::Function {
-                parameters: vec![TType::Bool],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::rawmode,
-        );
-        self.add_function(
-            "terminal::getch",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Char),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::getch,
-        );
-        self.add_function(
-            "terminal::rawread",
-            TType::Function {
-                parameters: vec![TType::Int],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Char),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::rawread,
-        );
-        self.add_function(
-            "readln",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::io::read_line,
-        );
-        self.add_function(
-            "terminal::clearScreen",
-            TType::Function {
-                parameters: vec![TType::None],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::Function,
-            native::terminal::clear_screen,
-        );
-        self.add_function(
-            "List::push",
-            TType::Function {
-                parameters: vec![
-                    TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
-                    },
-                    TType::Generic { name: "a".into() },
-                ],
-                return_type: Box::new(TType::Void),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::list::push,
-        );
-        self.add_function(
-            "List::pop",
-            TType::Function {
-                parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
-                }],
-                return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
-                }),
-            },
-            common::nodes::SymbolKind::GenericFunction,
-            native::list::pop,
-        );
-        self.add_function(
-            "random",
-            TType::Function {
-                parameters: vec![TType::Int, TType::Int],
-                return_type: Box::new(TType::Int),
-            },
-            common::nodes::SymbolKind::Function,
-            native::random::random_int,
-        );
-        self.add_function(
-            "String::len",
-            TType::Function {
-                parameters: vec![TType::String],
-                return_type: Box::new(TType::Int),
-            },
-            common::nodes::SymbolKind::Function,
-            native::str::strlen,
-        );
-        self.add_function(
-            "String::chars",
-            TType::Function {
-                parameters: vec![TType::String],
-                return_type: Box::new(TType::List {
-                    inner: Box::new(TType::Char),
-                }),
-            },
-            common::nodes::SymbolKind::Function,
-            native::str::str_to_chars,
-        );
-        self.add_function(
-            "List::string",
-            TType::Function {
-                parameters: vec![TType::List {
-                    inner: Box::new(TType::Char),
-                }],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::Function,
-            native::str::chars_to_str,
-        );
-        self.add_function(
-            "chr",
-            TType::Function {
-                parameters: vec![TType::Int],
-                return_type: Box::new(TType::Char),
-            },
-            common::nodes::SymbolKind::Function,
-            native::char::int_to_char,
-        );
-        self.add_function(
-            "readFile",
-            TType::Function {
-                parameters: vec![TType::String],
-                return_type: Box::new(TType::String),
-            },
-            common::nodes::SymbolKind::Function,
-            native::io::read_file,
-        );
+        // self.add_function(
+        //     "Cast::float",
+        //     TType::Function {
+        //         parameters: vec![TType::Any],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Float),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::float::int_to_float,
+        // );
+        // self.add_function(
+        //     "List::len",
+        //     TType::Function {
+        //         parameters: vec![TType::List {
+        //             inner: Box::new(TType::Generic { name: "a".into() }),
+        //         }],
+        //         return_type: Box::new(TType::Int),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::list::len,
+        // );
+        // self.add_function(
+        //     "sleep",
+        //     TType::Function {
+        //         parameters: vec![TType::Int],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::time::sleep,
+        // );
+        // self.add_function(
+        //     "terminal::rawmode",
+        //     TType::Function {
+        //         parameters: vec![TType::Bool],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::rawmode,
+        // );
+        // self.add_function(
+        //     "terminal::getch",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Char),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::getch,
+        // );
+        // self.add_function(
+        //     "terminal::rawread",
+        //     TType::Function {
+        //         parameters: vec![TType::Int],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Char),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::rawread,
+        // );
+        // self.add_function(
+        //     "readln",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::io::read_line,
+        // );
+        // self.add_function(
+        //     "terminal::clearScreen",
+        //     TType::Function {
+        //         parameters: vec![TType::None],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::terminal::clear_screen,
+        // );
+        // self.add_function(
+        //     "List::push",
+        //     TType::Function {
+        //         parameters: vec![
+        //             TType::List {
+        //                 inner: Box::new(TType::Generic { name: "a".into() }),
+        //             },
+        //             TType::Generic { name: "a".into() },
+        //         ],
+        //         return_type: Box::new(TType::Void),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::list::push,
+        // );
+        // self.add_function(
+        //     "List::pop",
+        //     TType::Function {
+        //         parameters: vec![TType::List {
+        //             inner: Box::new(TType::Generic { name: "a".into() }),
+        //         }],
+        //         return_type: Box::new(TType::Option {
+        //             inner: Box::new(TType::Generic { name: "a".into() }),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::GenericFunction,
+        //     native::list::pop,
+        // );
+        // self.add_function(
+        //     "random",
+        //     TType::Function {
+        //         parameters: vec![TType::Int, TType::Int],
+        //         return_type: Box::new(TType::Int),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::random::random_int,
+        // );
+        // self.add_function(
+        //     "String::len",
+        //     TType::Function {
+        //         parameters: vec![TType::String],
+        //         return_type: Box::new(TType::Int),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::str::strlen,
+        // );
+        // self.add_function(
+        //     "String::chars",
+        //     TType::Function {
+        //         parameters: vec![TType::String],
+        //         return_type: Box::new(TType::List {
+        //             inner: Box::new(TType::Char),
+        //         }),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::str::str_to_chars,
+        // );
+        // self.add_function(
+        //     "List::string",
+        //     TType::Function {
+        //         parameters: vec![TType::List {
+        //             inner: Box::new(TType::Char),
+        //         }],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::str::chars_to_str,
+        // );
+        // self.add_function(
+        //     "chr",
+        //     TType::Function {
+        //         parameters: vec![TType::Int],
+        //         return_type: Box::new(TType::Char),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::char::int_to_char,
+        // );
+        // self.add_function(
+        //     "readFile",
+        //     TType::Function {
+        //         parameters: vec![TType::String],
+        //         return_type: Box::new(TType::String),
+        //     },
+        //     common::nodes::SymbolKind::Function,
+        //     native::io::read_file,
+        // );
     }
 
     fn process(&mut self) -> Result<(), NovaError> {
@@ -433,6 +433,7 @@ impl NovaCore {
         self.parser.input = tokenlist;
         self.parser.parse()?;
         let ast = self.parser.ast.clone();
+        //dbg!(&ast);
         let filepath = self.filepath.clone();
         self.compiler.init();
         let asm = self

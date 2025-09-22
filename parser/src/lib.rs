@@ -2381,7 +2381,9 @@ impl Parser {
                             type_annotation.push(ta);
                         }
                         self.consume_symbol(RightParen)?;
-                        generate_unique_string(&identifier, &type_annotation).into()
+                        let t = generate_unique_string(&identifier, &type_annotation).into();
+                        dbg!(&t);
+                        t
                     }
                     _ => identifier,
                 };
@@ -3992,6 +3994,7 @@ impl Parser {
                         "String" => TType::String,
                         "Any" => TType::Any,
                         "Char" => TType::Char,
+                        "None" => TType::None,
                         _ => break 'builtin None,
                     })
                 };
@@ -5565,7 +5568,7 @@ impl Parser {
             }
         }
 
-        //dbg!(identifier.clone());
+        // dbg!(identifier.clone());
         Ok(Some(Statement::Function {
             ttype: output,
             identifier,
