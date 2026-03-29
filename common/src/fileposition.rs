@@ -1,4 +1,4 @@
-use std::{path::Path, rc::Rc};
+use std::{fmt, path::Path, rc::Rc};
 
 use crate::error::{NovaError, NovaResult};
 
@@ -7,6 +7,16 @@ pub struct FilePosition {
     pub filepath: Option<Rc<Path>>,
     pub line: usize,
     pub col: usize,
+}
+
+impl fmt::Display for FilePosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let file = self
+            .filepath
+            .as_deref()
+            .unwrap_or(Path::new("repl"));
+        write!(f, "{}:{}:{}", file.display(), self.line, self.col)
+    }
 }
 
 impl Default for FilePosition {

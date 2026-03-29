@@ -181,7 +181,7 @@ impl Iterator for Lexer {
                             return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated Block comment(/* ... */)".into(),
                                 note: format!(
-                                    "no terminating */ in {:?}",
+                                    "no terminating */ found starting from: {}",
                                     self.consumed_from(&span),
                                 )
                                 .into(),
@@ -245,7 +245,7 @@ impl Iterator for Lexer {
                             return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated raw string literal".into(),
                                 note: format!(
-                                    "no terminating \" in {:?}",
+                                    "no terminating `\"` found starting from: {}",
                                     self.consumed_from(&span),
                                 )
                                 .into(),
@@ -281,7 +281,7 @@ impl Iterator for Lexer {
                             return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated string literal".into(),
                                 note: format!(
-                                    "no terminating \" in {:?}",
+                                    "no terminating `\"` found starting from: {}",
                                     self.consumed_from(&span),
                                 )
                                 .into(),
@@ -436,7 +436,7 @@ impl Iterator for Lexer {
                 '~' => StructuralSymbol(Tilde),
                 c => {
                     return Some(Err(Box::new(NovaError::Lexing {
-                        msg: format!("Unexpected character {c:?}").into(),
+                        msg: format!("Unexpected character `{c}`").into(),
                         note: "".into(),
                         position: self.current_position(),
                     })));

@@ -170,6 +170,14 @@ fn create_typechecker() -> TypeChecker {
     tc
 }
 
+/// Format an `Option<&Token>` for clean error messages.
+fn fmt_token_opt(token: Option<&Token>) -> String {
+    match token {
+        Some(t) => format!("{}", t),
+        None => "end of file".to_string(),
+    }
+}
+
 impl Parser {
     fn eof(&mut self) -> NovaResult<()> {
         if self.current_token().is_none() {
@@ -258,8 +266,11 @@ impl Parser {
                 Ok(())
             }
             unexpected => Err(self.generate_error(
-                format!("unexpected operator, got {unexpected:?}"),
-                format!("expected {op:?}"),
+                format!(
+                    "unexpected token {}, expected `{op}`",
+                    fmt_token_opt(unexpected)
+                ),
+                format!("expected `{op}`"),
             )),
         }
     }
@@ -271,8 +282,11 @@ impl Parser {
                 Ok(())
             }
             unexpected => Err(self.generate_error(
-                format!("unexpected symbol, got {unexpected:?}"),
-                format!("expected {:?}", sym),
+                format!(
+                    "unexpected token {}, expected `{sym}`",
+                    fmt_token_opt(unexpected)
+                ),
+                format!("expected `{sym}`"),
             )),
         }
     }
@@ -285,8 +299,11 @@ impl Parser {
                 Ok(())
             }
             unexpected => Err(self.generate_error(
-                format!("unexpected keyword, got {unexpected:?}"),
-                format!("expected {kw:?}"),
+                format!(
+                    "unexpected token {}, expected `{kw}`",
+                    fmt_token_opt(unexpected)
+                ),
+                format!("expected `{kw}`"),
             )),
         }
     }
@@ -298,10 +315,13 @@ impl Parser {
                 Ok(())
             }
             unexpected => Err(self.generate_error(
-                format!("unexpected identifier, got {unexpected:?}"),
+                format!(
+                    "unexpected token {}, expected an identifier",
+                    fmt_token_opt(unexpected)
+                ),
                 match symbol {
-                    Some(s) => format!("expecting {s}"),
-                    None => "expecting an identifier".to_string(),
+                    Some(s) => format!("expected `{s}`"),
+                    None => "expected an identifier".to_string(),
                 },
             )),
         }
@@ -334,7 +354,10 @@ impl Parser {
             Some(Operator(Operator::Subtraction)) => Ok(Some(Unary::Negative)),
             Some(Operator(Operator::Not)) => Ok(Some(Unary::Not)),
             Some(Operator(_)) => Err(self.generate_error(
-                format!("unexpected operation, got {:?}", self.current_token_value()),
+                format!(
+                    "unexpected operator {}, expected unary sign",
+                    fmt_token_opt(self.current_token())
+                ),
                 "expected unary sign ( + | - )",
             )),
             _ => Ok(None),
@@ -1291,9 +1314,9 @@ impl Parser {
                     return Err(self.generate_error_with_pos(
                         "Must index Tuple with an int",
                         format!(
-                            "Cannot index into {} with {:?}",
+                            "cannot index into {} with {}",
                             lhs.get_type(),
-                            self.current_token()
+                            fmt_token_opt(self.current_token())
                         ),
                         position,
                     ));
@@ -2795,9 +2818,18 @@ impl Parser {
                     | Expr::Unary { .. }
                     | Expr::Closure { .. }
                     | Expr::None => {
+                        let kind = match &left_expr {
+                            Expr::ListConstructor { .. } => "a list constructor",
+                            Expr::Binop { .. } => "a binary expression",
+                            Expr::Call { .. } => "a function call",
+                            Expr::Unary { .. } => "a unary expression",
+                            Expr::Closure { .. } => "a closure",
+                            Expr::None => "None",
+                            _ => "this expression",
+                        };
                         return Err(self.generate_error_with_pos(
-                            "Error: left hand side of `=` must be assignable",
-                            format!("{:?} is not assignable", left_expr),
+                            "left hand side of `=` must be assignable",
+                            format!("{kind} is not assignable"),
                             current_pos.clone(),
                         ));
                     }
@@ -3883,7 +3915,10 @@ impl Parser {
             }
             _ => Err(self.generate_error(
                 "Expected type annotation",
-                format!("Unknown type value {:?}", self.current_token()),
+                format!(
+                    "got {} but expected a type name",
+                    fmt_token_opt(self.current_token())
+                ),
             )),
         }
     }
@@ -3894,7 +3929,10 @@ impl Parser {
             _ => {
                 return Err(self.generate_error(
                     "Expected identifier",
-                    format!("Cannot assign a value to {:?}", self.current_token(),),
+                    format!(
+                        "got {} but expected an identifier",
+                        fmt_token_opt(self.current_token())
+                    ),
                 ));
             }
         };

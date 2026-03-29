@@ -619,7 +619,7 @@ impl Vm {
                     self.state.memory.store(target_index, value);
                 } else {
                     return Err(Box::new(NovaError::Runtime {
-                        msg: format!("Invalid assignment destination: {:?}", destination).into(),
+                        msg: format!("Invalid assignment destination: {}", destination).into(),
                     }));
                 }
             }
