@@ -23,6 +23,17 @@ from your first window to a complete game architecture. For the full API referen
 13. [Performance Tips](#13-performance-tips)
 14. [Common Pitfalls](#14-common-pitfalls)
 15. [Complete Example: Pong](#15-complete-example-pong)
+16. [Entity Systems](#16-entity-systems)
+    - [16.1 The Problem with One Big Struct](#161-the-problem-with-one-big-struct)
+    - [16.2 Enum-based Entity Kinds](#162-enum-based-entity-kinds)
+    - [16.3 Shared Movement and Bounds](#163-shared-movement-and-bounds)
+    - [16.4 Collision Detection](#164-collision-detection)
+    - [16.5 Collision Response with Pattern Matching](#165-collision-response-with-pattern-matching)
+    - [16.6 Per-type Drawing with the `->` Vtable Pattern](#166-per-type-drawing-with-the---vtable-pattern)
+    - [16.7 Per-type Update with `->` Dispatch](#167-per-type-update-with---dispatch)
+    - [16.8 Putting It All Together](#168-putting-it-all-together)
+    - [16.9 Layered Draw Order](#169-layered-draw-order)
+    - [16.10 Quick Reference](#1610-quick-reference)
 
 ---
 
@@ -723,3 +734,581 @@ while raylib::rendering() {
     game.draw()
 }
 ```
+
+---
+
+## 16. Entity Systems
+
+As games grow, individual structs for each entity type get unwieldy. An entity system
+gives you a clean way to store many kinds of objects together, update them uniformly,
+and dispatch drawing to each type's own logic.
+
+---
+
+### 16.1 The Problem with One Big Struct
+
+The naive approach is a single struct with a field for everything:
+
+```nova
+struct Entity {
+    kind: String,   // "player", "enemy", "bullet" ...
+    x: Int,
+    y: Int,
+    hp: Int,
+    speed: Int,
+    value: Int,     // only used by pickups
+    active: Bool,
+}
+```
+
+This works for toy examples but quickly becomes a mess — most fields are irrelevant for
+most entity types, and you need to check `kind` everywhere.
+
+---
+
+### 16.2 Enum-based Entity Kinds
+
+Give each entity type its own data by storing the type-specific state in an enum:
+
+```nova
+enum EntityKind {
+    Player,
+    Enemy:  Int,   // carries current health
+    Pickup: Int,   // carries point value
+    Bullet,
+}
+
+struct Entity {
+    x: Int,
+    y: Int,
+    w: Int,
+    h: Int,
+    vx: Int,
+    vy: Int,
+    kind: EntityKind,
+    active: Bool,
+}
+```
+
+Constructor helpers keep spawning readable:
+
+```nova
+fn mkPlayer(x: Int, y: Int) -> Entity {
+    return Entity { x: x, y: y, w: 32, h: 32, vx: 0, vy: 0,
+                    kind: EntityKind::Player(), active: true }
+}
+
+fn mkEnemy(x: Int, y: Int, hp: Int) -> Entity {
+    return Entity { x: x, y: y, w: 24, h: 24, vx: -2, vy: 0,
+                    kind: EntityKind::Enemy(hp), active: true }
+}
+
+fn mkPickup(x: Int, y: Int, pts: Int) -> Entity {
+    return Entity { x: x, y: y, w: 16, h: 16, vx: 0, vy: 0,
+                    kind: EntityKind::Pickup(pts), active: true }
+}
+
+fn mkBullet(x: Int, y: Int) -> Entity {
+    return Entity { x: x, y: y, w: 4, h: 10, vx: 0, vy: -12,
+                    kind: EntityKind::Bullet(), active: true }
+}
+```
+
+---
+
+### 16.3 Shared Movement and Bounds
+
+Movement is the same for every entity — it just applies velocity:
+
+```nova
+fn extends move(e: Entity) {
+    e.x += e.vx
+    e.y += e.vy
+}
+
+fn extends keepInBounds(e: Entity, w: Int, h: Int) {
+    if e.x < 0        { e.x = 0 }
+    if e.y < 0        { e.y = 0 }
+    if e.x + e.w > w  { e.x = w - e.w }
+    if e.y + e.h > h  { e.y = h - e.h }
+}
+```
+
+Updating the whole list in the game loop:
+
+```nova
+import super.std.list
+
+let entities = []: Entity
+
+// ... spawn some entities ...
+
+// Update all
+for e in entities {
+    e.move()
+}
+
+// Remove dead entities
+entities = entities.filter(): |e: Entity| e.active
+```
+
+---
+
+### 16.4 Collision Detection
+
+AABB (axis-aligned bounding box) overlap as an `extends` function means you can call it
+naturally on any two entities:
+
+```nova
+fn rectsOverlap(ax: Int, ay: Int, aw: Int, ah: Int,
+                bx: Int, by: Int, bw: Int, bh: Int) -> Bool {
+    return ax < bx + bw
+        && ax + aw > bx
+        && ay < by + bh
+        && ay + ah > by
+}
+
+fn extends overlaps(a: Entity, b: Entity) -> Bool {
+    return rectsOverlap(a.x, a.y, a.w, a.h,
+                        b.x, b.y, b.w, b.h)
+}
+```
+
+Checking all pairs in the loop:
+
+```nova
+import super.std.core
+
+let score = Box(0)
+
+for let i = 0; i < entities.len(); i += 1 {
+    for let j = i + 1; j < entities.len(); j += 1 {
+        if entities[i].active && entities[j].active {
+            if entities[i].overlaps(entities[j]) {
+                handleCollision(entities[i], entities[j])
+            }
+        }
+    }
+}
+```
+
+---
+
+### 16.5 Collision Response with Pattern Matching
+
+`match` on the enum lets you handle each combination cleanly, with access to the
+associated data:
+
+```nova
+fn handleCollision(a: Entity, b: Entity) {
+    match a.kind {
+        Bullet() => {
+            match b.kind {
+                Enemy(hp) => {
+                    // bullet hits enemy
+                    a.active = false
+                    if hp <= 1 {
+                        b.active = false
+                    } else {
+                        b.kind = EntityKind::Enemy(hp - 1)
+                    }
+                }
+                Player() => {
+                    // enemy bullet hits player — handle elsewhere
+                }
+                _ => { }
+            }
+        }
+        Player() => {
+            match b.kind {
+                Pickup(pts) => {
+                    score.value += pts
+                    b.active = false
+                }
+                Enemy(hp) => {
+                    // player touches enemy
+                    a.active = false
+                }
+                _ => { }
+            }
+        }
+        _ => { }
+    }
+}
+```
+
+Because the collision handler is symmetric, call it both ways for pairs that need it, or
+normalise the order first (e.g. always put the Bullet first).
+
+---
+
+### 16.6 Per-type Drawing with the `->` Vtable Pattern
+
+This is where Nova's `->` dispatch shines. Instead of a big `match` for drawing, each
+entity type carries its own `draw` function as a field. The `->` operator calls it,
+dispatching through the stored closure at runtime.
+
+```nova
+// Each entity type gets its own draw closure stored as a field.
+// The type must have a field named exactly 'draw' with signature fn(Self).
+
+struct PlayerEntity {
+    x: Int,
+    y: Int,
+    hp: Int,
+    draw: fn(PlayerEntity),
+}
+
+struct EnemyEntity {
+    x: Int,
+    y: Int,
+    hp: Int,
+    speed: Int,
+    draw: fn(EnemyEntity),
+}
+
+struct BulletEntity {
+    x: Int,
+    y: Int,
+    active: Bool,
+    draw: fn(BulletEntity),
+}
+```
+
+Construct each type with a concrete draw function baked in:
+
+```nova
+fn makePlayer(x: Int, y: Int) -> PlayerEntity {
+    return PlayerEntity {
+        x: x, y: y, hp: 3,
+        draw: fn(self: PlayerEntity) {
+            raylib::drawRectangle(self.x, self.y, 32, 32, (50, 200, 255))
+            // draw a small health pip for each hp
+            for i in 0..self.hp {
+                raylib::drawRectangle(self.x + i * 12, self.y - 10, 10, 6, (0, 255, 100))
+            }
+        }
+    }
+}
+
+fn makeEnemy(x: Int, y: Int) -> EnemyEntity {
+    return EnemyEntity {
+        x: x, y: y, hp: 2, speed: 2,
+        draw: fn(self: EnemyEntity) {
+            raylib::drawRectangle(self.x, self.y, 24, 24, (220, 60, 60))
+        }
+    }
+}
+
+fn makeBullet(x: Int, y: Int) -> BulletEntity {
+    return BulletEntity {
+        x: x, y: y, active: true,
+        draw: fn(self: BulletEntity) {
+            if self.active {
+                raylib::drawRectangle(self.x, self.y, 4, 10, (255, 255, 80))
+            }
+        }
+    }
+}
+```
+
+Now define a `Dyn` type that matches anything with a `draw` field, and write a single
+draw-all function:
+
+```nova
+type drawable = Dyn(T = draw: fn($T))
+
+fn drawAll(items: [drawable]) {
+    for item in items {
+        item->draw()   // calls PlayerEntity::draw, EnemyEntity::draw, etc.
+    }
+}
+```
+
+In the game loop:
+
+```nova
+let player  = makePlayer(400, 500)
+let enemies = [makeEnemy(100, 100), makeEnemy(300, 150)]
+let bullets = []: BulletEntity
+
+// All drawables in one call — each uses its own closure
+while raylib::rendering() {
+    raylib::clear((10, 10, 20))
+
+    player->draw()
+    for e in enemies { e->draw() }
+    for b in bullets { b->draw() }
+}
+```
+
+Or mix them all into a single `[drawable]` list if every entity type has the `draw` field:
+
+```nova
+// You can push any type that has a draw field into the same list
+// (as long as the Dyn constraint is satisfied)
+fn drawScene(players: [PlayerEntity], enemies: [EnemyEntity], bullets: [BulletEntity]) {
+    for p in players { p->draw() }
+    for e in enemies { e->draw() }
+    for b in bullets { b->draw() }
+}
+```
+
+The key point: **you never write a `match` to decide how to draw**. Each entity type knows
+how to draw itself. Adding a new entity type means writing a new struct with its own
+`draw` closure — existing code does not change.
+
+---
+
+### 16.7 Per-type Update with `->` Dispatch
+
+The same pattern works for `update`:
+
+```nova
+struct PlayerEntity {
+    x: Int, y: Int, hp: Int,
+    draw:   fn(PlayerEntity),
+    update: fn(PlayerEntity),
+}
+
+fn makePlayer(x: Int, y: Int) -> PlayerEntity {
+    return PlayerEntity {
+        x: x, y: y, hp: 3,
+        draw: fn(self: PlayerEntity) {
+            raylib::drawRectangle(self.x, self.y, 32, 32, (50, 200, 255))
+        },
+        update: fn(self: PlayerEntity) {
+            if raylib::isKeyPressed("KEY_LEFT")  { self.x -= 4 }
+            if raylib::isKeyPressed("KEY_RIGHT") { self.x += 4 }
+            if raylib::isKeyPressed("KEY_UP")    { self.y -= 4 }
+            if raylib::isKeyPressed("KEY_DOWN")  { self.y += 4 }
+        }
+    }
+}
+
+struct EnemyEntity {
+    x: Int, y: Int, hp: Int, speed: Int,
+    draw:   fn(EnemyEntity),
+    update: fn(EnemyEntity),
+}
+
+fn makeEnemy(x: Int, y: Int, spd: Int) -> EnemyEntity {
+    return EnemyEntity {
+        x: x, y: y, hp: 2, speed: spd,
+        draw: fn(self: EnemyEntity) {
+            raylib::drawRectangle(self.x, self.y, 24, 24, (220, 60, 60))
+        },
+        update: fn(self: EnemyEntity) {
+            self.x -= self.speed   // march left
+            if self.x < -24 { self.x = 820 }
+        }
+    }
+}
+
+type updatable = Dyn(T = update: fn($T))
+
+// Game loop:
+while raylib::rendering() {
+    player->update()
+    for e in enemies { e->update() }
+    for b in bullets { b->update() }
+
+    raylib::clear((10, 10, 20))
+    player->draw()
+    for e in enemies { e->draw() }
+    for b in bullets { b->draw() }
+}
+```
+
+---
+
+### 16.8 Putting It All Together
+
+Here is a minimal but complete structure for a game with multiple entity types,
+type-dispatched drawing, shared collision, and score:
+
+```nova
+module shooter
+import super.std.list
+import super.std.core
+
+let SCREEN_W = 800
+let SCREEN_H = 600
+
+// ── Collision helper ───────────────────────────────────────────────
+fn rectsOverlap(ax: Int, ay: Int, aw: Int, ah: Int,
+                bx: Int, by: Int, bw: Int, bh: Int) -> Bool {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+// ── Entity kinds ───────────────────────────────────────────────────
+enum Tag { Player, Enemy: Int, Bullet, Pickup: Int }
+
+struct Entity {
+    x: Int,
+    y: Int,
+    w: Int,
+    h: Int,
+    vx: Int,
+    vy: Int,
+    tag: Tag,
+    active: Bool,
+    draw: fn(Entity),
+}
+
+// ── Constructors ───────────────────────────────────────────────────
+fn mkPlayer(x: Int, y: Int) -> Entity {
+    return Entity {
+        x: x, y: y, w: 32, h: 32, vx: 0, vy: 0,
+        tag: Tag::Player(), active: true,
+        draw: fn(self: Entity) {
+            raylib::drawRectangle(self.x, self.y, self.w, self.h, (50, 200, 255))
+        }
+    }
+}
+
+fn mkEnemy(x: Int, y: Int, hp: Int) -> Entity {
+    return Entity {
+        x: x, y: y, w: 24, h: 24, vx: -1, vy: 0,
+        tag: Tag::Enemy(hp), active: true,
+        draw: fn(self: Entity) {
+            match self.tag {
+                Enemy(hp) => {
+                    let r = 80 + hp * 40
+                    raylib::drawRectangle(self.x, self.y, self.w, self.h, (r, 60, 60))
+                }
+                _ => { }
+            }
+        }
+    }
+}
+
+fn mkBullet(x: Int, y: Int) -> Entity {
+    return Entity {
+        x: x, y: y, w: 4, h: 10, vx: 0, vy: -12,
+        tag: Tag::Bullet(), active: true,
+        draw: fn(self: Entity) {
+            if self.active {
+                raylib::drawRectangle(self.x, self.y, self.w, self.h, (255, 255, 80))
+            }
+        }
+    }
+}
+
+// ── Shared logic ───────────────────────────────────────────────────
+fn extends move(e: Entity) {
+    e.x += e.vx
+    e.y += e.vy
+}
+
+fn extends overlaps(a: Entity, b: Entity) -> Bool {
+    return rectsOverlap(a.x, a.y, a.w, a.h, b.x, b.y, b.w, b.h)
+}
+
+let score = Box(0)
+
+fn handleCollision(a: Entity, b: Entity) {
+    match a.tag {
+        Bullet() => {
+            match b.tag {
+                Enemy(hp) => {
+                    a.active = false
+                    if hp <= 1 { b.active = false }
+                    else { b.tag = Tag::Enemy(hp - 1) }
+                    score.value += 10
+                }
+                _ => { }
+            }
+        }
+        _ => { }
+    }
+}
+
+// ── Game ───────────────────────────────────────────────────────────
+raylib::init("Shooter", SCREEN_W, SCREEN_H, 60)
+
+let player  = mkPlayer(SCREEN_W / 2, SCREEN_H - 60)
+let enemies = [mkEnemy(100, 80, 1), mkEnemy(300, 80, 2), mkEnemy(500, 80, 3)]
+let bullets = []: Entity
+
+let fire_cooldown = Box(0)
+
+while raylib::rendering() {
+    // Input
+    if raylib::isKeyPressed("KEY_LEFT")  { player.x -= 5 }
+    if raylib::isKeyPressed("KEY_RIGHT") { player.x += 5 }
+    if raylib::isKeyPressed("KEY_SPACE") && fire_cooldown.value <= 0 {
+        bullets.push(mkBullet(player.x + 14, player.y - 10))
+        fire_cooldown.value = 12
+    }
+    if fire_cooldown.value > 0 { fire_cooldown.value -= 1 }
+
+    // Move
+    for b in bullets { b.move() }
+    for e in enemies { e.move() }
+
+    // Collisions — bullets vs enemies
+    for b in bullets {
+        for e in enemies {
+            if b.active && e.active && b.overlaps(e) {
+                handleCollision(b, e)
+            }
+        }
+    }
+
+    // Cull dead entities
+    bullets = bullets.filter(): |b: Entity| b.active
+    enemies = enemies.filter(): |e: Entity| e.active
+
+    // Draw — each entity calls its own closure via ->
+    raylib::clear((10, 10, 20))
+    player->draw()
+    for e in enemies { e->draw() }
+    for b in bullets { b->draw() }
+
+    raylib::drawText("Score: " + Cast::string(score.value), 10, 10, 24, (255, 255, 255))
+    raylib::drawFPS(10, SCREEN_H - 25)
+}
+```
+
+The draw loop has no `match`, no `if kind == ...`. Each entity draws itself. Adding a
+new entity type — a shield powerup, a boss, an explosion effect — means writing one new
+constructor function with its own `draw` closure. Nothing else changes.
+
+---
+
+### 16.9 Layered Draw Order
+
+When entities need to draw in layers (background effects behind enemies, UI on top),
+keep separate lists per layer and draw them in order:
+
+```nova
+// Spawn into the right layer
+let layer_bg      = []: Entity   // background effects, floor tiles
+let layer_world   = []: Entity   // enemies, pickups, projectiles
+let layer_player  = []: Entity   // player (always above enemies)
+let layer_ui      = []: Entity   // health bars, text popups
+
+// Draw in order — later layers appear on top
+raylib::clear((10, 10, 20))
+for e in layer_bg     { e->draw() }
+for e in layer_world  { e->draw() }
+for e in layer_player { e->draw() }
+for e in layer_ui     { e->draw() }
+```
+
+---
+
+### 16.10 Quick Reference
+
+| Pattern | How |
+|---|---|
+| Multiple entity types | `enum Tag` with associated data |
+| Per-type draw | `draw: fn(Self)` field + `item->draw()` |
+| Per-type update | `update: fn(Self)` field + `item->update()` |
+| Accept any drawable | `Dyn(T = draw: fn($T))` |
+| Shared movement | `fn extends move(e: Entity)` |
+| AABB collision | `fn extends overlaps(a: Entity, b: Entity) -> Bool` |
+| Collision response | `match a.tag { ... }` |
+| Kill dead entities | `list.filter(): \|e\| e.active` |
+| Layered draw order | Separate lists per layer, drawn in sequence |
