@@ -59,7 +59,7 @@ fn pop_bool(state: &mut state::State) -> Result<bool, NovaError> {
     }
 }
 
-/// Extract a Color from a Tuple object (Int, Int, Int) on the stack
+/// Extract a Color from a Tuple/List object (Int, Int, Int) on the stack
 fn pop_color(state: &mut state::State) -> Result<Color, NovaError> {
     match pop_or_err(state)? {
         VmData::Object(index) => {
@@ -68,7 +68,7 @@ fn pop_color(state: &mut state::State) -> Result<Color, NovaError> {
                     msg: "Invalid heap reference for color".into(),
                 })?;
                 match &obj.object_type {
-                    ObjectType::Tuple => {
+                    ObjectType::Tuple | ObjectType::List => {
                         if obj.data.len() < 3 {
                             return Err(NovaError::Runtime {
                                 msg: "Color tuple needs 3 elements".into(),
