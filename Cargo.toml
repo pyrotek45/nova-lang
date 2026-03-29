@@ -11,7 +11,8 @@ members = [
     "compiler",
     "common",
     "optimizer",
-    "parser"
+    "parser",
+    "typechecker"
 ]
 
 [profile.release]
