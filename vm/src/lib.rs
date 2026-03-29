@@ -3,6 +3,7 @@ pub mod state;
 pub type CallBack = fn(state: &mut state::State) -> NovaResult<()>;
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     io::{self, Write},
     process::exit,
@@ -14,7 +15,7 @@ use common::{
     fileposition::FilePosition,
 };
 
-use memory_manager::{Object, VmData};
+use memory_manager::{Object, ObjectType, VmData};
 use modulo::Mod;
 use state::{CallType, State};
 
@@ -38,6 +39,24 @@ pub struct VmTask {
 }
 
 impl Vm {
+    /// Look up the source position for the current instruction pointer.
+    /// Returns `RuntimeWithPos` if a position is available, otherwise `Runtime`.
+    #[inline]
+    fn runtime_error(&self, msg: impl Into<String>) -> Box<NovaError> {
+        let msg: Cow<'static, str> = Cow::Owned(msg.into());
+        if let Some(pos) = self
+            .runtime_errors_table
+            .get(&self.state.current_instruction)
+        {
+            Box::new(NovaError::RuntimeWithPos {
+                msg,
+                position: pos.clone(),
+            })
+        } else {
+            Box::new(NovaError::Runtime { msg })
+        }
+    }
+
     #[inline(always)]
     pub fn run(&mut self) -> NovaResult<()> {
         loop {
@@ -46,9 +65,9 @@ impl Vm {
                     let with_return = self.state.next_instruction();
                     if let Some(destination) = self.state.callstack.pop() {
                         if with_return == 1 {
-                            self.state.deallocate_registers_with_return();
+                            self.state.deallocate_registers_with_return()?;
                         } else {
-                            self.state.deallocate_registers();
+                            self.state.deallocate_registers()?;
                         }
                         match destination {
                             CallType::Function(target) => {
@@ -64,11 +83,7 @@ impl Vm {
                     }
                 }
                 Code::ERROR => {
-                    return Err(Box::new(NovaError::RuntimeWithPos {
-                        msg: "Error".into(),
-                        position: self.runtime_errors_table[&self.state.current_instruction]
-                            .clone(),
-                    }));
+                    return Err(self.runtime_error("Error"));
                 }
                 Code::EXIT => exit(0),
                 instruction => self.dispatch(instruction)?,
@@ -87,28 +102,16 @@ impl Vm {
 
             Code::UNWRAP => {
                 if let Some(VmData::None) = self.state.memory.stack.last() {
-                    // get the position of the error
-                    if let Some(pos) = self
-                        .runtime_errors_table
-                        .get(&self.state.current_instruction)
-                    {
-                        return Err(Box::new(NovaError::RuntimeWithPos {
-                            msg: "Tried to Unwrap a None value".into(),
-                            position: pos.clone(),
-                        }));
-                    } else {
-                        return Err(Box::new(NovaError::Runtime {
-                            msg: "Tried to Unwrap a None value".into(),
-                        }));
-                    }
+                    return Err(self.runtime_error("Tried to unwrap a None value"));
                 }
             }
 
-            Code::DUP => self
-                .state
-                .memory
-                .stack
-                .push(*self.state.memory.stack.last().unwrap()),
+            Code::DUP => {
+                let top = self.state.memory.stack.last().ok_or_else(|| {
+                    self.runtime_error("DUP: stack is empty")
+                })?;
+                self.state.memory.stack.push(*top);
+            }
 
             Code::POP => {
                 self.state.memory.pop();
@@ -166,7 +169,9 @@ impl Vm {
 
             // i think you can figure this one out
             Code::PRINT => {
-                let item = self.state.memory.stack.pop().unwrap();
+                let item = self.state.memory.stack.pop().ok_or_else(|| {
+                    self.runtime_error("PRINT: stack is empty")
+                })?;
                 match item {
                     VmData::Int(i) => print!("{}", i),
                     VmData::Float(f) => print!("{}", f),
@@ -185,7 +190,7 @@ impl Vm {
                         print!("{}", s)
                     }
                 }
-                io::stdout().flush().unwrap();
+                let _ = io::stdout().flush();
 
                 self.state.memory.dec_value(item);
             }
@@ -330,7 +335,9 @@ impl Vm {
 
             Code::STOREGLOBAL => {
                 let index = u32::from_le_bytes(self.state.next_arr());
-                let item = self.state.memory.stack.pop().unwrap();
+                let item = self.state.memory.stack.pop().ok_or_else(|| {
+                    self.runtime_error("STOREGLOBAL: stack is empty")
+                })?;
                 self.state.memory.stack[index as usize] = item;
             }
 
@@ -347,16 +354,15 @@ impl Vm {
 
             Code::CLOSURE => {
                 let Some(VmData::Int(size)) = self.state.memory.stack.pop() else {
-                    panic!("Error on Closure")
+                    return Err(self.runtime_error("CLOSURE: expected integer size on stack"));
                 };
 
                 let mut myarray = vec![];
                 for _ in 0..size {
-                    if let Some(value) = self.state.memory.stack.pop() {
-                        myarray.push(value);
-                    } else {
-                        todo!()
-                    }
+                    let value = self.state.memory.stack.pop().ok_or_else(|| {
+                        self.runtime_error("CLOSURE: not enough values on stack for capture")
+                    })?;
+                    myarray.push(value);
                 }
 
                 myarray.reverse();
@@ -395,15 +401,16 @@ impl Vm {
                         }
                     }
                     _ => {
-                        dbg!(callee);
-                        todo!()
+                        return Err(self.runtime_error(
+                            format!("DIRECTCALL: cannot call value {}", callee),
+                        ));
                     }
                 }
             }
 
             Code::CALL => {
                 let Some(callee) = self.state.memory.stack.pop() else {
-                    todo!()
+                    return Err(self.runtime_error("CALL: stack is empty"));
                 };
                 match callee {
                     VmData::Object(index) => {
@@ -427,8 +434,9 @@ impl Vm {
                         self.state.goto(target);
                     }
                     a => {
-                        dbg!(a);
-                        todo!()
+                        return Err(self.runtime_error(
+                            format!("CALL: cannot call value {}", a),
+                        ));
                     }
                 }
             }
@@ -455,14 +463,9 @@ impl Vm {
                     self.state.memory.stack.push(VmData::Bool(result))
                 }
                 (a, b) => {
-                    dbg!(a, b);
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "IGTR Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(self.runtime_error(
+                        format!("IGTR: expected two integers, got {} and {}", a.unwrap_or(VmData::None), b.unwrap_or(VmData::None)),
+                    ));
                 }
             },
 
@@ -508,10 +511,17 @@ impl Vm {
             }
             Code::JUMPIFFALSE => {
                 let jump = u32::from_le_bytes(self.state.next_arr());
-                if let VmData::Bool(test) = self.state.memory.stack.pop().unwrap() {
+                let value = self.state.memory.stack.pop().ok_or_else(|| {
+                    self.runtime_error("JUMPIFFALSE: stack is empty")
+                })?;
+                if let VmData::Bool(test) = value {
                     if !test {
                         self.state.current_instruction += jump as usize;
                     }
+                } else {
+                    return Err(self.runtime_error(
+                        format!("JUMPIFFALSE: expected Bool, got {}", value),
+                    ));
                 }
             }
 
@@ -628,11 +638,10 @@ impl Vm {
                 let size = u64::from_le_bytes(self.state.next_arr());
                 let mut myarray = vec![];
                 for _ in 0..size {
-                    if let Some(value) = self.state.memory.stack.pop() {
-                        myarray.push(value);
-                    } else {
-                        todo!()
-                    }
+                    let value = self.state.memory.stack.pop().ok_or_else(|| {
+                        self.runtime_error("NEWLIST: not enough values on stack")
+                    })?;
+                    myarray.push(value);
                 }
                 myarray.reverse();
                 self.state.memory.push_list(myarray);
@@ -656,7 +665,11 @@ impl Vm {
                 }
                 let string = match String::from_utf8(string) {
                     Ok(ok) => ok,
-                    Err(_) => todo!(),
+                    Err(e) => {
+                        return Err(self.runtime_error(
+                            format!("STRING: invalid UTF-8 bytes: {}", e),
+                        ));
+                    }
                 };
 
                 self.state.memory.push_string(string);
@@ -677,24 +690,31 @@ impl Vm {
 
             Code::CONCAT => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                 (Some(VmData::Object(index1)), Some(VmData::Object(index2))) => {
-                    let object2 = self.state.memory.ref_from_heap(index1).unwrap();
-                    let object1 = self.state.memory.ref_from_heap(index2).unwrap();
-                    let new_data = object1
-                        .data
-                        .iter()
-                        .cloned()
-                        .chain(object2.data.iter().cloned())
-                        .collect::<Vec<VmData>>();
-                    let new_object = Object::new(object1.object_type.clone(), new_data);
+                    let (new_object_type, new_data) = {
+                        let object1 = self.state.memory.ref_from_heap(index2)
+                            .ok_or_else(|| Box::new(NovaError::Runtime {
+                                msg: "CONCAT: invalid heap reference".into(),
+                            }))?;
+                        let object2 = self.state.memory.ref_from_heap(index1)
+                            .ok_or_else(|| Box::new(NovaError::Runtime {
+                                msg: "CONCAT: invalid heap reference".into(),
+                            }))?;
+                        let combined = object1
+                            .data
+                            .iter()
+                            .cloned()
+                            .chain(object2.data.iter().cloned())
+                            .collect::<Vec<VmData>>();
+                        (object1.object_type.clone(), combined)
+                    };
+                    let new_object = Object::new(new_object_type, new_data);
                     let result = self.state.memory.allocate(new_object);
                     self.state.memory.dec(index1);
                     self.state.memory.dec(index2);
                     self.state.memory.stack.push(VmData::Object(result));
                 }
                 _ => {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: "Error on Concat".into(),
-                    }))
+                    return Err(self.runtime_error("CONCAT: expected two list/tuple/string objects"));
                 }
             },
 
@@ -702,19 +722,44 @@ impl Vm {
                 let (Some(array), Some(index)) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    todo!()
+                    return Err(self.runtime_error("Index: not enough values on stack"));
                 };
                 match (array, index) {
                     (VmData::Object(object), VmData::Int(index)) => {
-                        let heap_object = self.state.memory.ref_from_heap(object).unwrap();
-                        if let Some(item) = heap_object.data.get(index as usize) {
-                            self.state.memory.push(*item);
+                        // Gather what we need while the borrow is active
+                        let (len, type_name, item) = {
+                            let heap_object = self.state.memory.ref_from_heap(object)
+                                .ok_or_else(|| Box::new(NovaError::Runtime {
+                                    msg: "Index: invalid heap reference".into(),
+                                }))?;
+                            let type_name = match &heap_object.object_type {
+                                ObjectType::List => "List",
+                                ObjectType::Tuple => "Tuple",
+                                ObjectType::String => "String",
+                                _ => "Object",
+                            };
+                            let len = heap_object.data.len();
+                            let item = heap_object.data.get(index as usize).copied();
+                            (len, type_name, item)
+                        };
+                        let uindex = index as usize;
+                        if uindex >= len {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Index out of bounds: index is {} but {} length is {}",
+                                    index, type_name, len
+                                ),
+                            ));
+                        }
+                        if let Some(item) = item {
+                            self.state.memory.push(item);
                         }
                         self.state.memory.dec(object);
                     }
                     (a, b) => {
-                        dbg!(a, b);
-                        todo!()
+                        return Err(self.runtime_error(
+                            format!("Index: expected (Object, Int), got ({}, {})", a, b),
+                        ));
                     }
                 }
             }
@@ -725,33 +770,44 @@ impl Vm {
                     self.state.memory.stack.pop(),
                     self.state.memory.stack.pop(),
                 ) else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(self.runtime_error("PINDEX: not enough values on stack"));
                 };
 
                 match (array, index, value) {
                     (VmData::Object(object), VmData::Int(index), value) => {
-                        let old_value = {
-                            let heap_object = self.state.memory.ref_from_heap_mut(object).unwrap();
-                            heap_object.data.get(index as usize).cloned()
+                        // First check bounds
+                        let (len, old_value) = {
+                            let heap_object = self.state.memory.ref_from_heap(object)
+                                .ok_or_else(|| Box::new(NovaError::Runtime {
+                                    msg: "PINDEX: invalid heap reference".into(),
+                                }))?;
+                            let len = heap_object.data.len();
+                            let old = heap_object.data.get(index as usize).cloned();
+                            (len, old)
                         };
+                        let uindex = index as usize;
+                        if uindex >= len {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Index out of bounds: index is {} but length is {}",
+                                    index, len
+                                ),
+                            ));
+                        }
                         if let Some(old) = old_value {
                             self.state.memory.dec_value(old);
-                            let heap_object = self.state.memory.ref_from_heap_mut(object).unwrap();
-                            if let Some(item) = heap_object.data.get_mut(index as usize) {
-                                *item = value;
+                            if let Some(heap_object) = self.state.memory.ref_from_heap_mut(object) {
+                                if let Some(item) = heap_object.data.get_mut(uindex) {
+                                    *item = value;
+                                }
                             }
                         }
                         self.state.memory.dec(object);
                     }
                     (a, b, c) => {
-                        dbg!(a, b, c);
-                        todo!()
+                        return Err(self.runtime_error(
+                            format!("PINDEX: expected (Object, Int, value), got ({}, {}, {})", a, b, c),
+                        ));
                     }
                 }
             }
@@ -798,8 +854,9 @@ impl Vm {
                 // Pop the struct name string
                 let struct_name = match self.state.memory.stack.pop() {
                     Some(VmData::Object(idx)) => {
-                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
-                        let name = obj.as_string().unwrap_or_default();
+                        let name = self.state.memory.ref_from_heap(idx)
+                            .and_then(|o| o.as_string())
+                            .unwrap_or_default();
                         self.state.memory.dec(idx);
                         name
                     }
@@ -811,8 +868,9 @@ impl Vm {
                 for _ in 0..num_fields {
                     match self.state.memory.stack.pop() {
                         Some(VmData::Object(idx)) => {
-                            let obj = self.state.memory.ref_from_heap(idx).unwrap();
-                            let name = obj.as_string().unwrap_or_default();
+                            let name = self.state.memory.ref_from_heap(idx)
+                                .and_then(|o| o.as_string())
+                                .unwrap_or_default();
                             self.state.memory.dec(idx);
                             field_names.push(name);
                         }
@@ -858,51 +916,39 @@ impl Vm {
                 let (Some(field_name_val), Some(object_val)) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: "GETF: not enough arguments".into(),
-                    }));
+                    return Err(self.runtime_error("GETF: not enough arguments"));
                 };
 
                 // Get field name string
                 let field_name = match field_name_val {
                     VmData::Object(idx) => {
-                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
-                        let name = obj.as_string().unwrap_or_default();
+                        let name = self.state.memory.ref_from_heap(idx)
+                            .and_then(|o| o.as_string())
+                            .unwrap_or_default();
                         self.state.memory.dec(idx);
                         name
                     }
                     _ => {
-                        return Err(Box::new(NovaError::Runtime {
-                            msg: "GETF: field name must be a string".into(),
-                        }));
+                        return Err(self.runtime_error("GETF: field name must be a string"));
                     }
                 };
 
                 match object_val {
                     VmData::Object(obj_idx) => {
-                        let heap_obj = self.state.memory.ref_from_heap(obj_idx).unwrap();
+                        let heap_obj = self.state.memory.ref_from_heap(obj_idx).ok_or_else(|| {
+                            self.runtime_error("GETF: invalid heap reference")
+                        })?;
                         if let Some(value) = heap_obj.get(&field_name) {
                             self.state.memory.push(value);
                         } else {
-                            if let Some(pos) = self
-                                .runtime_errors_table
-                                .get(&self.state.current_instruction)
-                            {
-                                return Err(Box::new(NovaError::RuntimeWithPos {
-                                    msg: format!("Field '{}' not found", field_name).into(),
-                                    position: pos.clone(),
-                                }));
-                            }
-                            return Err(Box::new(NovaError::Runtime {
-                                msg: format!("Field '{}' not found", field_name).into(),
-                            }));
+                            return Err(self.runtime_error(
+                                format!("Field '{}' not found on object", field_name),
+                            ));
                         }
                         self.state.memory.dec(obj_idx);
                     }
                     _ => {
-                        return Err(Box::new(NovaError::Runtime {
-                            msg: "GETF: expected an object".into(),
-                        }));
+                        return Err(self.runtime_error("GETF: expected an object"));
                     }
                 }
             }
@@ -914,23 +960,20 @@ impl Vm {
                     self.state.memory.stack.pop(),
                     self.state.memory.stack.pop(),
                 ) else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: "PINF: not enough arguments".into(),
-                    }));
+                    return Err(self.runtime_error("PINF: not enough arguments"));
                 };
 
                 // Get field name string
                 let field_name = match field_name_val {
                     VmData::Object(idx) => {
-                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
-                        let name = obj.as_string().unwrap_or_default();
+                        let name = self.state.memory.ref_from_heap(idx)
+                            .and_then(|o| o.as_string())
+                            .unwrap_or_default();
                         self.state.memory.dec(idx);
                         name
                     }
                     _ => {
-                        return Err(Box::new(NovaError::Runtime {
-                            msg: "PINF: field name must be a string".into(),
-                        }));
+                        return Err(self.runtime_error("PINF: field name must be a string"));
                     }
                 };
 
@@ -952,33 +995,22 @@ impl Vm {
                             };
                             self.state.memory.dec_value(old_value);
                         } else {
-                            if let Some(pos) = self
-                                .runtime_errors_table
-                                .get(&self.state.current_instruction)
-                            {
-                                return Err(Box::new(NovaError::RuntimeWithPos {
-                                    msg: format!("Field '{}' not found for assignment", field_name)
-                                        .into(),
-                                    position: pos.clone(),
-                                }));
-                            }
-                            return Err(Box::new(NovaError::Runtime {
-                                msg: format!("Field '{}' not found for assignment", field_name)
-                                    .into(),
-                            }));
+                            return Err(self.runtime_error(
+                                format!("Field '{}' not found for assignment", field_name),
+                            ));
                         }
                         self.state.memory.dec(obj_idx);
                     }
                     _ => {
-                        return Err(Box::new(NovaError::Runtime {
-                            msg: "PINF: expected an object".into(),
-                        }));
+                        return Err(self.runtime_error("PINF: expected an object"));
                     }
                 }
             }
 
             error => {
-                dbg!(error);
+                return Err(self.runtime_error(
+                    format!("Unknown VM opcode: {}", error),
+                ));
             }
         }
 

@@ -85,14 +85,10 @@ pub fn regex_first(state: &mut state::State) -> NovaResult<()> {
         }
     };
 
-    let captures = re.find(&text);
-
-    if captures.is_none() {
+    let Some(captures) = re.find(&text) else {
         state.memory.stack.push(VmData::None);
         return Ok(());
-    }
-
-    let captures = captures.unwrap();
+    };
     let start = captures.start() as i64;
     let end = captures.end() as i64;
     let matched_str = captures.as_str().to_string();

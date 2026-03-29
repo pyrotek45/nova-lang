@@ -34,8 +34,9 @@ system called Dyn types. This guide covers every major feature with working exam
 24. [String Operations](#24-string-operations)
 25. [Design Patterns Without OOP](#25-design-patterns-without-oop)
 26. [The Fuzzer](#26-the-fuzzer)
-27. [Tips and Tricks](#27-tips-and-tricks)
-28. [Quick Reference: Common Mistakes](#28-quick-reference-common-mistakes)
+27. [Syntax Sugar Reference](#27-syntax-sugar-reference)
+28. [Tips and Tricks](#28-tips-and-tricks)
+29. [Quick Reference: Common Mistakes](#29-quick-reference-common-mistakes)
 
 ---
 
@@ -229,6 +230,28 @@ while n > 0 {
 let opt: Option(Int) = Some(42)
 if let value = opt {
     println(value)   // value is Int here
+}
+```
+
+`if let` can have an `else` branch for the `None` case:
+
+```nova
+let opt: Option(Int) = None(Int)
+if let value = opt {
+    println(value)
+} else {
+    println("no value")
+}
+```
+
+### while let (loop while Some)
+
+`while let` repeatedly unwraps an option and runs the body while it's `Some`:
+
+```nova
+let items = [1, 2, 3]
+while let val = items.pop() {
+    println(val)   // prints 3, 2, 1
 }
 ```
 
@@ -530,7 +553,13 @@ fn extends swap(p: Pair($A, $B)) -> Pair($B, $A) {
 
 ## 11. Option Type
 
-`Option(T)` represents a value that may or may not be present.
+### The built-in Option type
+
+`Option(T)` is a **VM-level construct** — not a struct or enum. It is baked into the virtual
+machine itself. A value of type `Option(T)` is either:
+
+- `Some(value)` — the value is present (stored directly, no wrapper object)
+- `None(T)` — no value (a zero-cost null sentinel)
 
 ```nova
 let found: Option(Int) = Some(42)
@@ -541,7 +570,14 @@ if found.isSome() {
 }
 ```
 
-Use `if let` for ergonomic unwrapping:
+**Built-in methods on `Option(T)`:**
+
+| Method | Description |
+|---|---|
+| `.isSome() -> Bool` | True if a value is present |
+| `.unwrap() -> T` | Extract the value (runtime error if None) |
+
+Use `if let` for safe unwrapping — it only executes the body if the option holds a value:
 
 ```nova
 if let value = found {
@@ -549,15 +585,82 @@ if let value = found {
 }
 ```
 
-Standard library helpers (from `std/core.nv`):
+`while let` loops until the option becomes None:
+
+```nova
+let gen = Gen(0)        // from std/core
+while let n = gen() {   // stops when generator returns None
+    println(n)
+}
+```
+
+Standard library helpers (from `std/core.nv` or `std/option.nv`):
 
 ```nova
 import super.std.core
 
 let x: Option(Int) = None(Int)
-let v = x.orDefault(0)              // 0
-let v2 = x.orDoFn(|| 99)            // 99
-x.orError("Expected a value")       // prints error and exits if None
+let v  = x.orDefault(0)          // 0 — return default if None
+let v2 = x.orDoFn(|| 99)         // 99 — compute lazily if None
+let v3 = x.orError("Expected")   // exits with message if None
+let ok = x.isNone()              // true if None
+```
+
+### Option vs Maybe — what's the difference?
+
+Nova has two "nullable" concepts that look similar but are fundamentally different at the VM
+level:
+
+| | `Option(T)` | `Maybe(T)` |
+|---|---|---|
+| **Kind** | Built-in VM primitive | User-defined enum (from `std/core`) |
+| **Representation** | A direct value or a null sentinel | A heap-allocated enum object |
+| **Construction** | `Some(42)` / `None(Int)` | `Maybe::Just(42)` / `Maybe::Nothing()` |
+| **Pattern matching** | `if let` / `while let` / `.isSome()` | `match` on `Just`/`Nothing` |
+| **Performance** | Zero allocation — no heap object | Allocates an enum object on the heap |
+| **Use case** | Return values, optional parameters | When you need to pattern match, store in a list, or pass to generic code that uses `match` |
+
+```nova
+import super.std.core
+
+// Option(T) — the lightweight VM primitive
+let a: Option(Int) = Some(10)
+if let x = a { println(x) }          // pattern: if let
+
+// Maybe(T) — the full enum (from std/core)
+let b = Maybe::Just(10)
+match b {
+    Just(x)   => { println(x) }
+    Nothing() => { println("nothing") }
+}
+
+// Converting between them:
+let opt: Option(Int) = Some(42)
+let maybe = opt.toMaybe()             // Option -> Maybe::Just(42)
+```
+
+**Prefer `Option(T)`** for return values and function parameters — it's faster and integrates
+with `if let` / `while let`. **Use `Maybe(T)`** when you need to store nullable values in a
+list, match exhaustively across enum variants, or use it as an enum in generic code.
+
+### Functions that return Option
+
+The standard library's `Cast::int`, `Cast::float`, `xs.pop()`, and many others return
+`Option(T)`:
+
+```nova
+let n = Cast::int("42")           // Option(Int)
+let f = Cast::float("3.14")       // Option(Float)
+
+// Handle the option
+if let parsed = Cast::int("abc") {
+    println(parsed)
+} else {
+    println("not a number")
+}
+
+// Or use orDefault
+let safe = Cast::int("abc").orDefault(0)   // 0
 ```
 
 ---
@@ -606,6 +709,62 @@ let doubled = nums.map(|x: Int| x * 2)        // [2, 4, 6, 8, 10]
 let evens = nums.filter(|x: Int| x % 2 == 0)  // [2, 4]
 ```
 
+### Trailing closures
+
+When the last argument to a function is a closure, you can pass it **after** the closing
+parenthesis using `:` syntax. This makes function calls read more naturally:
+
+```nova
+fn apply(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+
+// Normal call:
+let a = apply(5, |x: Int| x * 2)
+
+// Trailing closure — same result, cleaner look:
+let b = apply(5): |x: Int| x * 2
+```
+
+Trailing closures work with UFCS too:
+
+```nova
+fn extends transform(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+
+let result = 10.transform(): |x: Int| x + 5   // 15
+```
+
+This is especially useful with higher-order functions:
+
+```nova
+import super.std.list
+let nums = [1, 2, 3, 4, 5]
+let big = nums.filter(): |x: Int| x > 3       // [4, 5]
+```
+
+### The bind operator (~>)
+
+The `~>` operator lets you name the result of an expression and use it in a block. The block's
+value becomes the overall expression value:
+
+```nova
+// expr ~> name { block }
+let result = 42 ~> x { x + 8 }
+// result == 50
+
+// Name a complex sub-expression
+let len_sq = [1, 2, 3, 4, 5].len() ~> n { n * n }
+// len_sq == 25
+
+// Useful for intermediate calculations
+let area = (3 + 4) ~> side { side * side }
+// area == 49
+```
+
+Think of `~>` as a lightweight `let` that works inline in expressions.
+
 ---
 
 ## 13. Lists
@@ -644,6 +803,118 @@ import super.std.list
 [0]: Int.fill(0, 5)                                            // [0,0,0,0,0]
 ```
 
+### List Slicing
+
+Nova supports Python-style list slicing with `[start:end]` syntax. Slicing returns a **new
+list** containing the selected elements.
+
+```nova
+let xs = [10, 20, 30, 40, 50]
+
+xs[0:3]     // [10, 20, 30]      — elements 0, 1, 2
+xs[2:4]     // [30, 40]          — elements 2, 3
+xs[2:]      // [30, 40, 50]      — from index 2 to end
+xs[:3]      // [10, 20, 30]      — from start to index 3
+xs[:]       // [10, 20, 30, 40, 50]  — full copy
+```
+
+### Negative Slice Indices
+
+Negative indices count from the end of the list, just like Python:
+
+```nova
+let xs = [10, 20, 30, 40, 50]
+
+xs[-2:]     // [40, 50]          — last 2 elements
+xs[:-2]     // [10, 20, 30]      — all but last 2
+xs[-3:-1]   // [30, 40]          — from 3rd-last to 2nd-last
+xs[-1:]     // [50]              — last element as a list
+xs[1:-1]    // [20, 30, 40]      — drop first and last
+```
+
+### Slice with Step (Stride)
+
+Use `$` after the end index to specify a step size:
+
+```nova
+let xs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+xs[0:8$2]   // [0, 2, 4, 6]     — every 2nd element from 0 to 8
+xs[:$3]     // [0, 3, 6, 9]     — every 3rd element
+xs[1:$2]    // [1, 3, 5, 7, 9]  — every 2nd starting at 1
+xs[2:8$3]   // [2, 5]           — every 3rd from 2 to 8
+xs[-4:-1$1] // [6, 7, 8]        — negative indices work with step too
+```
+
+The syntax is `list[start:end$step]`. Both `start` and `end` can be omitted. The step
+defaults to 1 when not specified.
+
+> **Note:** Negative indices work with slicing but NOT with regular indexing.
+> `xs[-1]` is a runtime error. Use `xs[-1:]` and take the first element, or
+> `xs[xs.len() - 1]` instead.
+
+### List Comprehensions
+
+List comprehensions create new lists by transforming and filtering existing ones:
+
+```nova
+// Basic: [variable in source | expression]
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+// squares == [1, 4, 9, 16, 25]
+```
+
+Add a **guard clause** after a second `|` to filter elements:
+
+```nova
+// With guard: [variable in source | expression | condition]
+let even_squares = [x in [1, 2, 3, 4, 5, 6] | x * x | x % 2 == 0]
+// even_squares == [4, 16, 36]
+```
+
+Multiple guards are separated by `|` and are combined with AND logic:
+
+```nova
+// Multiple guards: [x in list | expr | guard1 | guard2 | guard3]
+import super.std.core
+let filtered = [x in 1.to(21) | x | x % 2 == 0 | x > 5 | x < 15]
+// filtered == [6, 8, 10, 12, 14]
+```
+
+### Nested List Comprehensions
+
+Nested comprehensions iterate over multiple lists (like nested for loops) and produce a flat
+result:
+
+```nova
+// 2-level: [x in l1, y in l2 | expr]
+let pairs = [x in [1, 2], y in [10, 20] | x + y]
+// pairs == [11, 21, 12, 22]
+
+// 3-level: [x in l1, y in l2, z in l3 | expr]
+let triples = [x in [1, 2], y in [10, 20], z in [100, 200] | x + y + z]
+// triples == [111, 211, 121, 221, 112, 212, 122, 222]
+```
+
+Nested comprehensions can have guards too:
+
+```nova
+// Skip the diagonal (where x == y)
+let off_diag = [x in 1.to(4), y in 1.to(4) | x * 10 + y | x != y]
+// off_diag == [12, 13, 21, 23, 31, 32]
+```
+
+Use function calls in the expression body:
+
+```nova
+fn cube(n: Int) -> Int { return n * n * n }
+let cubes = [x in [1, 2, 3, 4] | cube(x)]
+// cubes == [1, 8, 27, 64]
+```
+
+> **Note:** The source in a comprehension must be a list. The range syntax `0..5` only works
+> in `for` loops. Use `.to()` from `std/core` to create a list for comprehension sources:
+> `[x in 0.to(10) | x * x]`
+
 ---
 
 ## 14. Tuples
@@ -655,6 +926,18 @@ let t = (42, "hello", true)
 let n = t[0]    // Int: 42
 let s = t[1]    // String: "hello"
 let b = t[2]    // Bool: true
+```
+
+### Single-element tuples
+
+Use a trailing comma to create a tuple with one element. Without the comma, parentheses are
+just grouping:
+
+```nova
+let single = (42,)     // a tuple containing one Int
+let grouped = (42)     // just the Int 42 — NOT a tuple
+
+single[0]              // 42
 ```
 
 Functions returning multiple values use tuples:
@@ -1358,7 +1641,265 @@ What the fuzzer checks:
 
 ---
 
-## 27. Tips and Tricks
+## 27. Syntax Sugar Reference
+
+Nova has a number of syntactic conveniences that make code cleaner. This section collects them
+all in one place with practical examples.
+
+### Range loops: `start..end` and `start..=end`
+
+`for` loops support exclusive and inclusive integer ranges directly:
+
+```nova
+// Exclusive (end not included)
+for i in 0..5 {
+    print(Cast::string(i) + " ")    // 0 1 2 3 4
+}
+
+// Inclusive (end included)
+for i in 1..=5 {
+    print(Cast::string(i) + " ")    // 1 2 3 4 5
+}
+```
+
+Ranges only work directly in `for` loops. For comprehensions, convert to a list first with
+`.to()` from `std/core`:
+
+```nova
+import super.std.core
+let squares = [x in 0.to(5) | x * x]   // [0, 1, 4, 9, 16]
+```
+
+### List slicing: `xs[start:end]`
+
+Python-style slice syntax. Returns a new list.
+
+```nova
+let xs = [10, 20, 30, 40, 50]
+
+xs[1:3]     // [20, 30]          indices 1 and 2
+xs[2:]      // [30, 40, 50]      from 2 to end
+xs[:3]      // [10, 20, 30]      from start to 3
+xs[:]       // full copy
+
+// Negative indices count from the end
+xs[-2:]     // [40, 50]          last 2
+xs[:-1]     // [10, 20, 30, 40]  all but last
+xs[-3:-1]   // [30, 40]          3rd-last to 2nd-last
+
+// Step with $
+xs[::$2]    // same as xs[:$2] — every 2nd element
+xs[:$2]     // [10, 30, 50]      every 2nd
+xs[1:$2]    // [20, 40]          every 2nd starting at 1
+xs[0:4$2]   // [10, 30]          0,2 — every 2nd up to index 4
+```
+
+> **Caution:** `xs[-1]` (negative regular index) is a runtime error. Use slicing or
+> `xs[xs.len() - 1]` for the last element.
+
+### List comprehensions: `[x in list | expr]`
+
+```nova
+// Basic
+let evens = [x in [1,2,3,4,5,6] | x | x % 2 == 0]   // [2,4,6]
+
+// Transform
+let squares = [x in [1,2,3,4,5] | x * x]             // [1,4,9,16,25]
+
+// Guard clause (filter):  [x in src | expr | condition]
+let big_sq = [x in [1,2,3,4,5] | x * x | x > 2]     // [9,16,25]
+
+// Multiple guards (AND logic):  [x in src | expr | g1 | g2]
+import super.std.core
+let mid = [x in 1.to(20) | x | x % 2 == 0 | x > 4 | x < 14]  // [6,8,10,12]
+
+// Nested (flat result — like nested for loops):
+let sums = [x in [1,2], y in [10,20] | x + y]        // [11,21,12,22]
+
+// Nested with guard:
+let pairs = [x in 1.to(4), y in 1.to(4) | (x, y) | x != y]
+
+// Side-effect before output (comma separates expressions):
+let logged = [x in [1,2,3] | print("x="+Cast::string(x)), x * 2]
+```
+
+### `if let` / `while let` — safe Option unwrapping
+
+```nova
+// if let: run body only if option holds a value, binding it to name
+let x: Option(Int) = Cast::int("42")
+if let n = x {
+    println(n)    // 42
+} else {
+    println("not a number")
+}
+
+// while let: loop while option is Some
+import super.std.core
+let counter = Gen(0)
+while let i = counter() {
+    println(i)    // prints forever (Gen never returns None unless you stop it)
+    if i >= 4 { break }
+}
+```
+
+### Trailing closures: `fn(args): |params| expr`
+
+When the last argument to a function is a closure, you can write it after `:` instead of
+inside the parentheses:
+
+```nova
+fn apply(x: Int, f: fn(Int) -> Int) -> Int { return f(x) }
+
+// These are identical:
+let a = apply(5, |x: Int| x * 2)
+let b = apply(5): |x: Int| x * 2   // trailing closure
+
+// Works with UFCS and std library:
+import super.std.list
+let evens = [1,2,3,4,5].filter(): |x: Int| x % 2 == 0   // [2,4]
+let big   = [1,2,3,4,5].map():    |x: Int| x * x        // [1,4,9,16,25]
+```
+
+### The bind operator: `expr ~> name { block }`
+
+Names an intermediate result inline without introducing a `let` statement:
+
+```nova
+// expr ~> name { use name inside }
+let r = [1,2,3,4,5].len() ~> n { n * n }   // 25
+
+// Useful for avoiding repetition:
+let area = (base * height) ~> a { a / 2 }
+
+// And for readable pipelines:
+let msg = "hello world" ~> s {
+    s.chars().filter(|c: Char| c != ' ').string()
+}
+```
+
+### Empty closures: `|| expr`
+
+Closures with no parameters use `||`:
+
+```nova
+let greet = || println("hello")
+greet()
+
+let val = || 42
+val()   // 42
+
+// Common with Box-based counters:
+import super.std.core
+let n = Box(0)
+let next = || { n.value += 1; n.value }
+```
+
+### Function references with `@(Type)`: overload selection
+
+When a function is overloaded for multiple types, use `@(Type)` to select which version:
+
+```nova
+fn process(x: Int) -> String { return "int: " + Cast::string(x) }
+fn process(x: String) -> String { return "str: " + x }
+
+let int_processor = process@(Int)       // fn(Int) -> String
+let str_processor = process@(String)    // fn(String) -> String
+```
+
+### Generic annotation `@[T: Type]`: no-data generic variants
+
+When constructing a generic enum's no-data variant, annotate the type parameter:
+
+```nova
+import super.std.core
+
+let nothing: Maybe(Int) = Maybe::Nothing() @[A: Int]
+let none: Option(Int) = None(Int)   // built-in Option doesn't need this
+```
+
+### `::` vs `->` on structs: stored functions
+
+Two operators for calling functions stored as struct fields:
+
+```nova
+struct Handler {
+    name: String,
+    handle: fn(Handler, String) -> String
+}
+
+let h = Handler { name: "test", handle: fn(self: Handler, msg: String) -> String {
+    return self.name + ": " + msg
+}}
+
+// :: calls without passing self
+h::handle("hello")              // fn is called with just the explicit args
+
+// -> calls WITH h as first argument (like method dispatch)
+h->handle("hello")              // equivalent to h.handle(h, "hello")
+```
+
+### Forward declarations: mutual recursion
+
+Declare a function's signature without a body to use it before its definition:
+
+```nova
+fn isEven(n: Int) -> Bool   // forward declaration — no body, no {}
+
+fn isOdd(n: Int) -> Bool {
+    if n == 0 { return false }
+    return isEven(n - 1)
+}
+
+fn isEven(n: Int) -> Bool {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+}
+
+println(isEven(10))   // true
+println(isOdd(7))     // true
+```
+
+### Single-element tuples
+
+A trailing comma inside parentheses creates a one-element tuple. Without the comma, parens are
+just grouping:
+
+```nova
+let pair   = (1, 2)    // (Int, Int)
+let single = (42,)     // (Int,)  — one-element tuple
+let value  = (42)      // just the Int 42
+
+single[0]              // 42
+```
+
+### All syntax sugar at a glance
+
+| Sugar | Example | What it does |
+|---|---|---|
+| Exclusive range | `for i in 0..5` | Loop 0, 1, 2, 3, 4 |
+| Inclusive range | `for i in 0..=5` | Loop 0, 1, 2, 3, 4, 5 |
+| Slice | `xs[1:3]` | Elements 1 and 2 |
+| Negative slice | `xs[-2:]` | Last 2 elements |
+| Slice with step | `xs[:$2]` | Every 2nd element |
+| Comprehension | `[x in xs \| x*x]` | Transformed list |
+| Comprehension guard | `[x in xs \| x \| x>0]` | Filtered list |
+| Nested comprehension | `[x in xs, y in ys \| x+y]` | Cross-product (flat) |
+| `if let` | `if let v = opt { }` | Safe Option unwrap |
+| `while let` | `while let v = opt { }` | Loop while Some |
+| Trailing closure | `f(x): \|y\| y+1` | Closure as last arg after `:` |
+| Bind operator | `expr ~> x { x+1 }` | Name an intermediate value |
+| Empty closure | `\|\| expr` | Zero-parameter closure |
+| Function reference | `fn@(Int)` | Select overload by type |
+| Generic annotation | `Variant() @[A: Int]` | No-data variant type hint |
+| Field call no-self | `s::fn_field()` | Call stored fn without self |
+| Field call with-self | `s->fn_field()` | Call stored fn with s as first arg |
+| Forward declaration | `fn f(x: Int) -> Int` | Signature only, enables mutual recursion |
+| Single-element tuple | `(42,)` | One-element tuple |
+
+---
+
+## 28. Tips and Tricks
 
 ### Use `elif` instead of `else if`
 
@@ -1499,7 +2040,7 @@ if let val = maybe_val {
 
 ---
 
-## 28. Quick Reference: Common Mistakes
+## 29. Quick Reference: Common Mistakes
 
 | Mistake | Fix |
 |---|---|

@@ -1,5 +1,59 @@
+// ============================================================
+// std/core.nv -- Core standard library entry point
+// ============================================================
+//
+// This module provides the essential building blocks that most
+// Nova programs need.  Import with:
+//
+//   import super.std.core
+//
+// What you get:
+//
+//   ┌─────────────────┬────────────────────────────────────────────┐
+//   │  Box(T)         │  Generic single-field wrapper struct.       │
+//   │  Gen(start)     │  Stateful integer generator closure.        │
+//   ├─────────────────┼────────────────────────────────────────────┤
+//   │  Option helpers │  orError, orDefault, orDoFn, isNone,       │
+//   │  (built-in)     │  toMaybe, toResult                         │
+//   │                 │  The Option type itself is built into the   │
+//   │                 │  VM: Some(x) is a plain stack value and     │
+//   │                 │  None(T) is the VmData::None sentinel.      │
+//   │                 │  It is NOT a heap object.                   │
+//   ├─────────────────┼────────────────────────────────────────────┤
+//   │  Maybe(T)       │  User-defined enum: Just(x) | Nothing.     │
+//   │  (heap object)  │  Stored as a tagged heap object; use for    │
+//   │                 │  pattern matching on nullable values.        │
+//   │                 │  Differs from Option: it lives on the heap  │
+//   │                 │  and is a full algebraic data type.         │
+//   ├─────────────────┼────────────────────────────────────────────┤
+//   │  Result(T,E)    │  User-defined enum: Ok(x) | Err(e).        │
+//   │  (heap object)  │  Stored as a tagged heap object; use for    │
+//   │                 │  fallible functions.                        │
+//   ├─────────────────┼────────────────────────────────────────────┤
+//   │  Range helpers  │  iota(n), range(n), range(start,end),      │
+//   │                 │  n.to(end), toStep(start,end,step)          │
+//   └─────────────────┴────────────────────────────────────────────┘
+//
+// For standalone imports of individual components:
+//   import super.std.option   // just Option helpers
+//   import super.std.maybe    // just Maybe enum
+//   import super.std.result   // just Result enum
+//
+// ============================================================
+
 module core
 
+import super.std.option
+
+// ── Box ─────────────────────────────────────────────────────────────
+// A single-field generic wrapper.  Useful for capturing a mutable
+// value in a closure (since closures capture by value).
+//
+//   let counter = Box(0)
+//   let inc = || { counter.value += 1 }
+//   inc()
+//   println(Cast::string(counter.value))  // "1"
+//
 struct Box(A) {
     value: $A
 }
@@ -12,6 +66,15 @@ fn extends show(self: Box($A)) {
     println(Cast::string(self.value))
 }
 
+// ── Gen ─────────────────────────────────────────────────────────────
+// Create a stateful counter that returns successive integers.
+// Each call to the returned closure increments by one.
+//
+//   let g = Gen(0)
+//   g()   // 0
+//   g()   // 1
+//   g()   // 2
+//
 fn Gen(start: Int) -> fn() -> Int {
     let i = Box(start)
     return || {
@@ -20,47 +83,23 @@ fn Gen(start: Int) -> fn() -> Int {
     }
 }
 
-// built in Option type 
-
-fn extends orError(self: Option($A), msg: String) -> $A {
-    if self.isSome() {
-        return self.unwrap()
-    }
-    println(msg)
-    exit()
-    return unreachable() @[T: $A]
-}
-
-fn extends orDefault(self: Option($A), default: $A) -> $A {
-    if self.isSome() {
-        return self.unwrap()
-    }
-    return default
-}
-
-fn extends orDoFn(self: Option($A), f: fn() -> $A) -> $A {
-    if self.isSome() {
-        return self.unwrap()
-    }
-    return f()
-}
-
-fn extends isNone(self: Option($A)) -> Bool {
-    return !(self.isSome())
-}
-
-// Maybe type
-
+// ── Maybe(T) ─────────────────────────────────────────────────────────
+//
+// A heap-allocated algebraic type for optional values.
+// Unlike the built-in Option(T) (a VM stack sentinel), Maybe is a
+// tagged enum object on the heap, suitable for pattern matching and
+// generic containers.
+//
+//   let x = Maybe::Just(42)
+//   let y = Maybe::Nothing() @[A: Int]
+//   match x {
+//       Just(v)  => { println(Cast::string(v)) }
+//       Nothing() => { println("nothing") }
+//   }
+//
 enum Maybe(A) {
     Just: $A,
     Nothing
-}
-
-fn extends toMaybe(self: Option($A)) -> Maybe($A) {
-    if self.isSome() {
-        return Maybe::Just(self.unwrap())
-    }
-    return Maybe::Nothing() @[A: $A]
 }
 
 fn extends isJust(self: Maybe($A)) -> Bool {
@@ -71,17 +110,77 @@ fn extends isJust(self: Maybe($A)) -> Bool {
     return false
 }
 
-fn extends toString(self: Maybe($A)) -> String {
-    let result = ""
+fn extends isNothing(self: Maybe($A)) -> Bool {
     match self {
-        Just(x) => {result = "Just(" + Cast::string(x) + ")"}
-        Nothing() => {result = "Nothing"}
+        Just(x) => {return false}
+        Nothing() => {return true}
     }
-    return result
+    return true
 }
 
-// result type
+fn extends unwrap(self: Maybe($A)) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {
+            println("error: called unwrap() on Nothing")
+            exit()
+        }
+    }
+    return unreachable() @[T: $A]
+}
 
+fn extends orDefault(self: Maybe($A), default: $A) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {return default}
+    }
+    return default
+}
+
+fn extends orDoFn(self: Maybe($A), f: fn() -> $A) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {return f()}
+    }
+    return f()
+}
+
+fn extends map(self: Maybe($A), f: fn($A) -> $B) -> Maybe($B) {
+    match self {
+        Just(x) => {return Maybe::Just(f(x))}
+        Nothing() => {return Maybe::Nothing() @[A: $B]}
+    }
+    return Maybe::Nothing() @[A: $B]
+}
+
+fn extends toString(self: Maybe($A)) -> String {
+    let s = ""
+    match self {
+        Just(x) => {s = "Just(" + Cast::string(x) + ")"}
+        Nothing() => {s = "Nothing"}
+    }
+    return s
+}
+
+fn extends toOption(self: Maybe($A)) -> Option($A) {
+    match self {
+        Just(x) => {return Some(x)}
+        Nothing() => {return None($A)}
+    }
+    return None($A)
+}
+
+// ── Result(T, E) ──────────────────────────────────────────────────────
+//
+// A heap-allocated algebraic type for fallible operations.
+// Ok(value) represents success; Err(e) represents failure.
+//
+//   fn divide(a: Int, b: Int) -> Result(Int, String) {
+//       if b == 0 { return Result::Err("division by zero") }
+//       return Result::Ok(a / b)
+//   }
+//   let v = divide(10, 2).orDefault(-1)
+//
 enum Result(A, B) {
     Ok: $A,
     Err: $B
@@ -95,6 +194,105 @@ fn extends isOk(self: Result($A, $B)) -> Bool {
     return false
 }
 
+fn extends isErr(self: Result($A, $B)) -> Bool {
+    match self {
+        Ok(x) => {return false}
+        Err(x) => {return true}
+    }
+    return true
+}
+
+fn extends unwrap(self: Result($A, $B)) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {
+            println("error: called unwrap() on Err: " + Cast::string(e))
+            exit()
+        }
+    }
+    return unreachable() @[T: $A]
+}
+
+fn extends unwrapErr(self: Result($A, $B)) -> $B {
+    match self {
+        Ok(x) => {
+            println("error: called unwrapErr() on Ok")
+            exit()
+        }
+        Err(e) => {return e}
+    }
+    return unreachable() @[T: $B]
+}
+
+fn extends orDefault(self: Result($A, $B), default: $A) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {return default}
+    }
+    return default
+}
+
+fn extends orDoFn(self: Result($A, $B), f: fn() -> $A) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {return f()}
+    }
+    return f()
+}
+
+fn extends map(self: Result($A, $B), f: fn($A) -> $C) -> Result($C, $B) {
+    match self {
+        Ok(x) => {return Result::Ok(f(x))}
+        Err(e) => {return Result::Err(e)}
+    }
+    return Result::Err(unreachable() @[T: $B])
+}
+
+fn extends mapErr(self: Result($A, $B), f: fn($B) -> $C) -> Result($A, $C) {
+    match self {
+        Ok(x) => {return Result::Ok(x)}
+        Err(e) => {return Result::Err(f(e))}
+    }
+    return Result::Ok(unreachable() @[T: $A])
+}
+
+fn extends toString(self: Result($A, $B)) -> String {
+    let s = ""
+    match self {
+        Ok(x) => {s = "Ok(" + Cast::string(x) + ")"}
+        Err(x) => {s = "Err(" + Cast::string(x) + ")"}
+    }
+    return s
+}
+
+fn extends toOption(self: Result($A, $B)) -> Option($A) {
+    match self {
+        Ok(x) => {return Some(x)}
+        Err(e) => {return None($A)}
+    }
+    return None($A)
+}
+
+// ── Option bridge functions ──────────────────────────────────────────
+// Convert between the built-in Option type and Maybe/Result.
+
+// toMaybe -- convert Option to Maybe
+//
+//   Some(42).toMaybe()         // Maybe::Just(42)
+//   None(Int).toMaybe()        // Maybe::Nothing()
+//
+fn extends toMaybe(self: Option($A)) -> Maybe($A) {
+    if self.isSome() {
+        return Maybe::Just(self.unwrap())
+    }
+    return Maybe::Nothing() @[A: $A]
+}
+
+// toResult -- convert Option to Result, using err as the Err value if None
+//
+//   Some(10).toResult("missing")    // Result::Ok(10)
+//   None(Int).toResult("missing")   // Result::Err("missing")
+//
 fn extends toResult(self: Option($A), err: $B) -> Result($A, $B) {
     if self.isSome() {
         return Result::Ok(self.unwrap())
@@ -102,48 +300,48 @@ fn extends toResult(self: Option($A), err: $B) -> Result($A, $B) {
     return Result::Err(err)
 }
 
-fn extends toString(self: Result($A, $B)) -> String {
-    let result = ""
-    match self {
-        Ok(x) => {result = "Ok(" + Cast::string(x) + ")"}
-        Err(x) => {result = "Err(" + Cast::string(x) + ")"}
-    }
-    return result
-}
-// basic list functions
+// ── Range helpers ────────────────────────────────────────────────────
+// Functions for constructing integer lists.
+// These are the backbone for list comprehensions when you need a
+// numeric source: `[i in 0.to(10) | i * 2]`.
+//
+// iota(n)               -> [0, 1, 2, ..., n-1]
+// n.to(end)             -> [n, n+1, ..., end-1]   (UFCS)
+// toStep(s, e, step)    -> [s, s+step, ..., < e]
+// range(n)              -> [0, 1, ..., n-1]        (alias for iota)
+// range(start, end)     -> [start, ..., end-1]
+//
 
 fn extends iota(n: Int) -> [Int] {
-    let result = []: Int
+    let acc = []: Int
     for let i = 0; i < n; i += 1 {
-        result.push(i)
+        acc.push(i)
     }
-    return result
-}
-
-fn extends toStep(start: Int, end: Int, step: Int) -> [Int] {
-    let result = []: Int
-    for let i = start; i < end; i += step {
-        result.push(i)
-    }
-    return result
+    return acc
 }
 
 fn extends to(self: Int, end: Int) -> [Int] {
-    let result = []: Int
+    let acc = []: Int
     for let i = self; i < end; i += 1 {
-        result.push(i)
+        acc.push(i)
     }
-    return result
+    return acc
 }
 
-// Core functions // like pythons basic functions
+fn extends toStep(start: Int, end: Int, step: Int) -> [Int] {
+    let acc = []: Int
+    for let i = start; i < end; i += step {
+        acc.push(i)
+    }
+    return acc
+}
 
 fn range(start: Int, end: Int) -> [Int] {
-    let result = []: Int
+    let acc = []: Int
     for let i = start; i < end; i += 1 {
-        result.push(i)
+        acc.push(i)
     }
-    return result
+    return acc
 }
 
 fn range(end: Int) -> [Int] {

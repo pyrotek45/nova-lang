@@ -1,0 +1,70 @@
+// ============================================================
+// std/option.nv -- Extensions for the built-in Option(T) type
+// ============================================================
+//
+// Option(T) is Nova's built-in nullable type:
+//   Some(value) -- wraps a value of type T
+//   None(T)     -- represents the absence of a value
+//
+// The built-in methods are:
+//   .isSome()  -> Bool   -- true if the option holds a value
+//   .unwrap()  -> T      -- extracts the value (panics if None)
+//
+// This module adds ergonomic helpers so you rarely need raw .unwrap().
+//
+// Usage:
+//   import super.std.option
+//
+//   let x: Option(Int) = None(Int)
+//   let v = x.orDefault(0)          // 0
+//   let w = x.orDoFn(|| 99)         // 99
+//   x.orError("missing value")      // prints error and exits if None
+//   x.isNone()                      // true
+// ============================================================
+
+module option
+
+// orError -- unwrap or print a message and exit
+//
+// Use this when a None value is an unrecoverable error:
+//   let port = config.get("port").orError("missing port config")
+//
+fn extends orError(self: Option($A), msg: String) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    println(msg)
+    exit()
+    return unreachable() @[T: $A]
+}
+
+// orDefault -- unwrap or return a fallback value
+//
+//   let n = Cast::int("abc").orDefault(0)   // 0
+//
+fn extends orDefault(self: Option($A), default: $A) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    return default
+}
+
+// orDoFn -- unwrap or compute a fallback with a closure
+//
+// The closure is only called if the option is None (lazy evaluation):
+//   let v = lookup(key).orDoFn(|| expensiveDefault())
+//
+fn extends orDoFn(self: Option($A), f: fn() -> $A) -> $A {
+    if self.isSome() {
+        return self.unwrap()
+    }
+    return f()
+}
+
+// isNone -- true if the option holds no value
+//
+//   if x.isNone() { println("nothing here") }
+//
+fn extends isNone(self: Option($A)) -> Bool {
+    return !(self.isSome())
+}

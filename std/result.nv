@@ -1,0 +1,173 @@
+// ============================================================
+// std/result.nv -- The Result(T, E) algebraic data type
+// ============================================================
+//
+// Result(T, E) represents either a successful value (Ok) or an
+// error (Err). It is the idiomatic way to return fallible values
+// in Nova without relying on Option or panicking.
+//
+//   ┌──────────────────┬──────────────────────────────────────────┐
+//   │  Result(T, E)    │  heap-allocated enum object              │
+//   │  (this module)   │  Ok: $T  -- success payload              │
+//   │                  │  Err: $E -- error payload                │
+//   └──────────────────┴──────────────────────────────────────────┘
+//
+// Unlike Option(T) (a built-in VM construct), Result is a user-
+// defined enum. Both the Ok and Err arms carry a payload, making
+// it suitable for rich error reporting.
+//
+// Usage:
+//   import super.std.result
+//
+//   fn divide(a: Int, b: Int) -> Result(Int, String) {
+//       if b == 0 {
+//           return Result::Err("division by zero")
+//       }
+//       return Result::Ok(a / b)
+//   }
+//
+//   let r = divide(10, 2)
+//   match r {
+//       Ok(v) => { println(Cast::string(v)) }
+//       Err(e) => { println("error: " + e) }
+//   }
+//
+//   // Or use helpers:
+//   let v = divide(10, 0).orDefault(-1)   // -1
+// ============================================================
+
+module result
+
+// The Result algebraic type.
+//
+// Ok(value) -- a successful result carrying a value of type T
+// Err(err)  -- a failure carrying an error value of type E
+//
+enum Result(A, B) {
+    Ok: $A,
+    Err: $B
+}
+
+// isOk -- true if this Result holds a success value
+//
+//   Result::Ok(42).isOk()    // true
+//   Result::Err("x").isOk()  // false
+//
+fn extends isOk(self: Result($A, $B)) -> Bool {
+    match self {
+        Ok(x) => {return true}
+        Err(x) => {return false}
+    }
+    return false
+}
+
+// isErr -- true if this Result holds an error
+//
+//   Result::Err("oops").isErr()  // true
+//
+fn extends isErr(self: Result($A, $B)) -> Bool {
+    match self {
+        Ok(x) => {return false}
+        Err(x) => {return true}
+    }
+    return true
+}
+
+// unwrap -- extract the Ok value, printing the error and exiting if Err
+//
+//   Result::Ok(5).unwrap()   // 5
+//
+fn extends unwrap(self: Result($A, $B)) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {
+            println("error: called unwrap() on Err: " + Cast::string(e))
+            exit()
+        }
+    }
+    return unreachable() @[T: $A]
+}
+
+// unwrapErr -- extract the Err value, exiting if Ok
+//
+fn extends unwrapErr(self: Result($A, $B)) -> $B {
+    match self {
+        Ok(x) => {
+            println("error: called unwrapErr() on Ok")
+            exit()
+        }
+        Err(e) => {return e}
+    }
+    return unreachable() @[T: $B]
+}
+
+// orDefault -- return the Ok value or a fallback
+//
+//   Result::Err("bad").orDefault(0)   // 0
+//
+fn extends orDefault(self: Result($A, $B), default: $A) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {return default}
+    }
+    return default
+}
+
+// orDoFn -- return the Ok value or compute a fallback lazily
+//
+fn extends orDoFn(self: Result($A, $B), f: fn() -> $A) -> $A {
+    match self {
+        Ok(x) => {return x}
+        Err(e) => {return f()}
+    }
+    return f()
+}
+
+// map -- transform the Ok value if present, propagating Err
+//
+//   Result::Ok(3).map(|x: Int| x * 2)  // Result::Ok(6)
+//
+fn extends map(self: Result($A, $B), f: fn($A) -> $C) -> Result($C, $B) {
+    match self {
+        Ok(x) => {return Result::Ok(f(x))}
+        Err(e) => {return Result::Err(e)}
+    }
+    return Result::Err(unreachable() @[T: $B])
+}
+
+// mapErr -- transform the Err value if present, propagating Ok
+//
+fn extends mapErr(self: Result($A, $B), f: fn($B) -> $C) -> Result($A, $C) {
+    match self {
+        Ok(x) => {return Result::Ok(x)}
+        Err(e) => {return Result::Err(f(e))}
+    }
+    return Result::Ok(unreachable() @[T: $A])
+}
+
+// toString -- human-readable representation
+//
+//   Result::Ok(42).toString()       // "Ok(42)"
+//   Result::Err("oops").toString()  // "Err(oops)"
+//
+fn extends toString(self: Result($A, $B)) -> String {
+    let output = ""
+    match self {
+        Ok(x) => {output = "Ok(" + Cast::string(x) + ")"}
+        Err(x) => {output = "Err(" + Cast::string(x) + ")"}
+    }
+    return output
+}
+
+// toOption -- convert Ok to Some, Err to None (discards the error)
+//
+//   Result::Ok(10).toOption()    // Some(10)
+//   Result::Err("bad").toOption() // None(Int)
+//
+fn extends toOption(self: Result($A, $B)) -> Option($A) {
+    match self {
+        Ok(x) => {return Some(x)}
+        Err(e) => {return None($A)}
+    }
+    return None($A)
+}
