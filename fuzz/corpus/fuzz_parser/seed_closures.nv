@@ -1,0 +1,84 @@
+module test_closures
+
+import super.std.core
+
+// Basic closure captures variable
+let captured = 10
+let get_captured = || captured
+assert(get_captured() == 10, "basic closure capture")
+
+// Closure captures mutable state via Box
+let counter = Box(0)
+let increment = fn() -> Int {
+    counter.value = counter.value + 1
+    return counter.value
+}
+assert(increment() == 1, "closure increment 1")
+assert(increment() == 2, "closure increment 2")
+assert(increment() == 3, "closure increment 3")
+
+// Multiple closures sharing state
+let shared = Box(0)
+let inc = || { shared.value += 1 }
+let get = || shared.value
+
+inc()
+inc()
+inc()
+assert(get() == 3, "shared state via closures")
+
+// Closure as argument
+fn apply_twice(f: fn() -> Int) -> Int {
+    f()
+    return f()
+}
+let c = Box(0)
+let bump = fn() -> Int {
+    c.value = c.value + 1
+    return c.value
+}
+let result = apply_twice(bump)
+assert(result == 2, "closure passed as arg")
+
+// Closure returned from function
+fn make_counter() -> fn() -> Int {
+    let state = Box(0)
+    return fn() -> Int {
+        state.value = state.value + 1
+        return state.value
+    }
+}
+let c1 = make_counter()
+let c2 = make_counter()
+assert(c1() == 1, "counter 1 first call")
+assert(c1() == 2, "counter 1 second call")
+assert(c2() == 1, "counter 2 independent")
+
+// Closure over loop variable (using Box)
+let fns = []: fn() -> Int
+for let i = 0; i < 5; i += 1 {
+    let val = i
+    fns.push(|| val)
+}
+assert(fns[0]() == 0, "closure over loop var 0")
+assert(fns[1]() == 1, "closure over loop var 1")
+assert(fns[4]() == 4, "closure over loop var 4")
+
+// Nested closures
+fn make_nested() -> fn() -> fn() -> Int {
+    let x = Box(42)
+    return fn() -> fn() -> Int {
+        return || x.value
+    }
+}
+let nested = make_nested()
+assert(nested()() == 42, "nested closure")
+
+// Generator pattern using closures
+let gen = Gen(0)
+assert(gen() == 0, "generator 0")
+assert(gen() == 1, "generator 1")
+assert(gen() == 2, "generator 2")
+assert(gen() == 3, "generator 3")
+
+println("PASS: test_closures")

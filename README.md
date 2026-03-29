@@ -1,281 +1,291 @@
-# nova-lang
+# Nova
 
-![Screenshot](nova-logo.png)
+![Nova Logo](nova-logo.png)
 
-Programming lang WIP
+Nova is a statically typed, expression-oriented programming language with:
 
-# Getting Started with Cargo and Nova
+- **No type inference** — types are explicit and checked at compile time
+- **Universal Function Call Syntax (UFCS)** — functions feel like methods
+- **First-class functions and closures** — functions are values
+- **Hybrid garbage collector** — reference counting + mark-and-sweep
+- **Structural Dyn types** — duck-typed dispatch without inheritance
+- **Generics** — type-parameterized structs and functions
 
-Nova is built in Rust, which means that you'll need to have Rust installed on your computer in order to run it. If you don't already have Rust installed, you can download it from rust-lang.org.
+Nova is compiled to bytecode and run by a stack-based virtual machine written in Rust.
 
-Once you have Rust installed, you can use Cargo to easily build and run Nova. Cargo is Rust's package manager and build tool, and it comes bundled with Rust.
+---
 
-# Installing Nova
+## Installation
 
-To install Nova using Cargo, follow these steps:
+Nova requires Rust (stable). Clone and build:
 
-Clone the Nova repository to your local machine by running the following command in your terminal:
-
-    
 ```bash
 git clone https://github.com/pyrotek45/nova-lang
-```
-
-Change your working directory to the root of the Nova repository:
-
-```bash
-
-cd nova
-```
-
-Build Nova using Cargo:
-
-```bash
-
+cd nova-lang
 cargo build --release
 ```
-This may take a few minutes, especially the first time you build Nova.
 
-Once Cargo has finished building Nova, you can run it using the following command:
+The binary will be at `./target/release/nova`.
+
+On NixOS, use:
 
 ```bash
-
- ./target/release/nova
+nix-shell --run "cargo build --release"
 ```
 
-Enjoy this demo!
+---
 
-```swift
+## Usage
+
+```
+nova run   <file.nv>   Run a Nova program
+nova check <file.nv>   Type-check without running
+nova dis   <file.nv>   Disassemble bytecode
+nova time  <file.nv>   Run and show execution time
+nova dbg   <file.nv>   Run with debug output
+nova repl              Interactive REPL
+```
+
+---
+
+## Hello, World
+
+```nova
 module main
 
-// Type declaration
-struct Person {
-    name: String,
-    age: Int,
-};
+println("Hello, World!")
+```
 
-// Hello world
-println("hello world!")
+---
 
+## A Taste of Nova
 
-// Creating instance of type
-let person : Person = Person {name: "bob", age: 42}
+```nova
+module main
 
-// Optional type annotation
-let person2 = Person("joe", 50)
-
-// Function for type
-fn extends display(self: Person) {
-    println(self.name)
-    println(self.age)
-}
-
-// import function
-person.display()
-Person::display(person2)
-
-// For loop
-for let i = 0; i < 10; i += 1 {
-    println(i)
-}
-
+import super.std.core
 import super.std.list
 
-// Array
-let arr = [1,2,3]
-println(arr)
-
-let arr2 = []: Int.fill(10,5)
-println(arr2)
-
-arr[1] = 4
-println(arr)
-
-// Changing struct value
-person.name = "bingo"
-person.display()
-
-struct Zed {
-    test: fn()
+// --- Structs ---
+struct Person {
+    name: String,
+    age: Int
 }
 
-// Creating an instance from a type
-let zed = Zed {
-    test: fn() {
-        print("wow\n")
+// --- Extends functions (UFCS) ---
+fn extends greet(p: Person) -> String {
+    return "Hello, " + p.name + "! You are " + Cast::string(p.age) + " years old."
+}
+
+let alice = Person { name: "Alice", age: 30 }
+println(alice.greet())
+
+// --- Enums and match ---
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float)
+}
+
+fn area(s: Shape) -> Float {
+    match s {
+        Circle(r)    => { return 3.14159 * r * r }
+        Rectangle(d) => { return d[0] * d[1] }
     }
+    return 0.0
 }
 
-// Now we can access its namespace and call functions directly
-zed::test()
+println(area(Shape::Circle(5.0)))
+println(area(Shape::Rectangle((4.0, 3.0))))
 
-// import iterators
-import super.std.iter
+// --- First-class functions ---
+let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let evens = nums.filter(|x: Int| x % 2 == 0)
+let squared = evens.map(|x: Int| x * x)
+println(squared)   // [4, 16, 36, 64, 100]
 
-let myIter = Iter::fromVec([1,2,3,4,5])
-    .map(fn(x:Int)->Int{return x * x})
-    .collect()
+// --- Box for shared mutable state ---
+let counter = Box(0)
+let inc = fn() -> Int {
+    counter.value = counter.value + 1
+    return counter.value
+}
+println(inc())  // 1
+println(inc())  // 2
+println(inc())  // 3
 
-println(myIter)
+// --- Pipe operator ---
+fn double(x: Int) -> Int { return x * 2 }
+fn add1(x: Int) -> Int { return x + 1 }
 
-// Function pointers
-struct SomeFunction {
-    function: fn(Int,Int) -> Int
+let result = 5 |> add1() |> double()
+println(result)   // 12
+
+// --- Generics ---
+struct Pair(A, B) {
+    fst: $A,
+    snd: $B
 }
 
-let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
-    return x * y
-})
-
-let myOtherFunc = myMul.function
-let simpleSquare = fn(x: Int) -> Int {return x * x};
-
-// Calling function pointer from a struct
-println((myMul.function)(4,99))
-println(myMul::function(4,99))
-
-// Support for most escape chars
-print("hello again!\n")
-
-println(myOtherFunc(4,7))
-
-let myIterTwo = Iter::fromVec([1,2,3,4,5])
-    .map(simpleSquare)
-    .map(simpleSquare)
-    .collect()
-
-println(myIterTwo)
-
-// function overloading
-fn add(x:Int,y:Int) -> Int {
-    println("im adding ints")
-    return x + y
+fn extends swap(p: Pair($A, $B)) -> Pair($B, $A) {
+    return Pair { fst: p.snd, snd: p.fst }
 }
 
-fn add(x:Float,y:Float) -> Float {
-    println("im adding floats")
-    return x + y
+let p = Pair { fst: 42, snd: "hello" }
+let q = p.swap()
+println(q.fst)   // "hello"
+println(q.snd)   // 42
+
+// --- Dyn types (structural dispatch) ---
+type named = Dyn(T = name: String)
+
+struct Dog { name: String, breed: String }
+struct Robot { name: String, model: Int }
+
+fn introduce(thing: Dyn(T = name: String)) -> String {
+    return "My name is " + thing.name
 }
 
-println(add(1,3))
-println(add(1.0,3.0))
+let dog = Dog { name: "Rex", breed: "Husky" }
+let bot = Robot { name: "R2D2", model: 2 }
+println(introduce(dog))
+println(introduce(bot))
+```
 
-// Passing an overloaded function
-let myIntAdder = add@(Int,Int)
-println(myIntAdder(1,4))
+---
 
-// Generic functions
-fn generic(x: $A) {
-    println(x)
-}
+## Language Guide
 
-generic("hello!")
-generic(10)
-generic(5.5)
+See [documentation/how_to_write_nova.md](documentation/how_to_write_nova.md) for the full
+language reference, including:
 
-// More advance structs
-struct Counter {
-    value: Int,
-    count: fn(Counter) -> Int,
-    reset: fn(Counter)
-}
+- Module system and imports
+- Type system rules (what the compiler rejects)
+- Every operator and its precedence quirks
+- Structs, enums, generics, closures, Dyn types
+- The standard library (`std/core`, `std/list`, `std/iter`, `std/string`, etc.)
+- Box and mutable shared state patterns
+- The garbage collector and its guarantees
+- Common mistakes and how to fix them
 
-// Creating a init funciton for Counter
-fn CounterInit() -> Counter {
-    return Counter {
-        value: 0,
-        count: fn(self: Counter) -> Int {
-            let result = self.value
-            self.value += 1
-            return result
-        },
-        reset: fn(self: Counter) {
-            self.value = 0
-        }
-    }
-}
+---
 
-// Creating a function for counter outside of the struct
-fn extends count(self: Counter) -> Int {
-    println("im in a normal function")
-    let result = self.value
-    self.value += 1
-    return result
-}
+## Standard Library
 
-let mycounter = CounterInit()
+| Module | Contents |
+|--------|----------|
+| `std/core.nv` | `Box`, `Gen`, `Maybe`, `Result`, `range()`, `Option` helpers |
+| `std/list.nv` | `map`, `filter`, `reduce`, `foreach`, `sort`, `flatten`, `concat`, ... |
+| `std/iter.nv` | Lazy `Iter` type with `map`, `filter`, `collect` |
+| `std/string.nv` | String/Char operations: trim, split, toLower, toUpper, ... |
+| `std/math.nv` | `sqrt`, `pow`, `abs`, `floor`, `ceil`, `sin`, `cos`, ... |
+| `std/io.nv` | `io::prompt`, `io::readFile` |
+| `std/hashmap.nv` | `HashMap` |
+| `std/tui.nv` | Terminal UI helpers |
 
-// The -> takes the function from the struct, and applys it to itself
-println(mycounter->count())
+---
 
-// the normal function 'count' will be called here, not from the struct itself
-println(mycounter.count())
+## Running Tests
 
-// Option type lets you represent none
-let x: Option(Int) = Some(20)
+The test suite lives in `tests/`. Run it with:
 
-// import the isSome() function here
-if x.isSome() {
-    println(x.unwrap())
-}
+```bash
+cargo build --release
+bash tests/run_tests.sh
+```
 
-x = None(Int)
-if x.isSome() {
-    println("i never print")
-    println(x.unwrap())
-}
+The suite has two parts:
 
-fn extends do(x: Option($A), f: fn($A)) {
-    if x.isSome() {
-        f(x.unwrap())
-    }
-}
+1. **Positive tests** (`tests/test_*.nv`) — programs that must compile, run, and print `PASS:`.
+   Currently **44 tests** covering: arithmetic, closures, enums, generics, GC stress, UFCS,
+   parser stress, lexer stress, Dyn types, iterators, higher-order functions, and more.
 
-x.do(fn(x:Int) {println(x)})
+2. **Type-rejection tests** (`tests/should_fail/*.nv`) — programs that the compiler **must
+   reject**. Currently **20 tests** verifying that ill-typed programs produce compile errors:
+   wrong argument types, wrong return types, undefined variables, struct field type mismatches,
+   Int/Float confusion, missing struct fields, and more.
 
-// String manipulation
-let str = "hello world!"
-    .chars()
-    .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
-    .string()
-
-println(str)
-
-// Currying
-fn add(x:Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {   
-    return fn(y:Int) -> fn(Int) -> fn(Int) -> Int {  
-        return fn(z:Int) -> fn(Int) -> Int {            
-            return fn(t:Int) -> Int {            
-                return x + y + z + t
-            }            
-        }  
-    }
-}
-
-let inc = add(1)(2)(3)(4)
-println(inc)
-
-
-fn curry(f: fn($A,$A) -> $A) -> fn($A) -> fn($A) -> $A {
-    return fn(x: $A) -> fn($A) -> $A {
-        return fn(y: $A) -> $A {
-            return f(x,y)
-        }
-    }
-}
-
-fn mul(x:Int,y:Int) -> Int {
-    return x * y
-}
-
-let curriedmul = curry(mul@(Int,Int))
-
-println(curriedmul(5)(5))
-
-// using IO struct
-import super.std.io
-
-let input = io::prompt("wow")
-println(input)
+Expected output when all tests pass:
 
 ```
+  Positive tests: 44 passed, 0 failed
+  Rejection tests: 20 passed, 0 failed
+  Total: 64 passed, 0 failed
+
+All tests passed!
+```
+
+---
+
+## Fuzzing
+
+Nova includes a fuzzing infrastructure to find panics in the lexer and parser. It uses
+`cargo-fuzz` with libFuzzer:
+
+```bash
+# Install cargo-fuzz (requires nightly Rust)
+rustup toolchain install nightly
+cargo +nightly install cargo-fuzz
+
+# Fuzz the lexer for 60 seconds
+./fuzz/run_fuzz.sh lexer 60
+
+# Fuzz the parser for 60 seconds
+./fuzz/run_fuzz.sh parser 60
+
+# Fuzz all targets
+./fuzz/run_fuzz.sh all 30
+```
+
+The fuzzer seeds from real Nova programs in `fuzz/corpus/`. Any panics are saved to
+`fuzz/artifacts/` and represent bugs to fix.
+
+---
+
+## Demo Programs
+
+The `demo/` folder contains example Nova programs:
+
+| File | Description |
+|------|-------------|
+| `demo.nv` | Kitchen-sink feature showcase |
+| `fib.nv` | Fibonacci sequence |
+| `snake.nv` | Terminal snake game |
+| `forth.nv` | Forth-like interpreter |
+| `matmul.nv` | Matrix multiplication |
+| `structs.nv` | Struct patterns |
+| `option_type.nv` | Option / Maybe usage |
+
+Run any demo:
+
+```bash
+./target/release/nova run demo/fib.nv
+```
+
+---
+
+## Project Structure
+
+```
+nova-lang/
+  novacli/       CLI entry point (run, check, dis, time, repl)
+  lexer/         Tokenizer
+  parser/        Parser + type checker
+  compiler/      Bytecode compiler
+  assembler/     Bytecode assembler
+  optimizer/     Optimization passes
+  vm/            Stack-based virtual machine + GC
+  native/        Built-in functions (IO, string, math, regex, ...)
+  common/        Shared types (AST nodes, tokens, errors, types)
+  novacore/      Orchestration layer
+  std/           Standard library (Nova source)
+  demo/          Demo programs
+  tests/         Test suite (positive + type-rejection)
+  fuzz/          Fuzzing targets
+  documentation/ Language docs and guide
+```
+
+---
+
+## License
+
+See [LICENSE](LICENSE).

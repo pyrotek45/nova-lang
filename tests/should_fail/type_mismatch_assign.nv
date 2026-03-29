@@ -1,0 +1,4 @@
+module type_mismatch_assign
+// SHOULD FAIL: assigning Int to a String variable
+let x: String = "hello"
+x = 999

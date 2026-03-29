@@ -1,0 +1,120 @@
+module test_structs
+
+// Basic struct
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+// Construction with {}
+let p1 = Point { x: 3, y: 4 }
+assert(p1.x == 3, "struct field x")
+assert(p1.y == 4, "struct field y")
+
+// Construction with ()
+let p2 = Point(10, 20)
+assert(p2.x == 10, "positional constructor x")
+assert(p2.y == 20, "positional constructor y")
+
+// Field assignment
+p1.x = 100
+assert(p1.x == 100, "field assignment")
+
+// Struct with different field types
+struct Person {
+    name: String,
+    age: Int,
+}
+
+let bob = Person { name: "Bob", age: 30 }
+assert(bob.name == "Bob", "string field")
+assert(bob.age == 30, "int field")
+
+// Extends function on struct
+fn extends display_str(self: Person) -> String {
+    return self.name + " age " + Cast::string(self.age)
+}
+assert(bob.display_str() == "Bob age 30", "extends method")
+
+// Static-like function call
+assert(Person::display_str(bob) == "Bob age 30", "static call on struct")
+
+// Struct method mutating fields
+fn extends birthday(self: Person) {
+    self.age += 1
+}
+bob.birthday()
+assert(bob.age == 31, "mutating method")
+
+// Struct with function field
+struct Callback {
+    action: fn(Int) -> Int,
+}
+
+let cb = Callback { action: |x: Int| x * x }
+assert(cb::action(5) == 25, "function field call with ::")
+
+// Struct with function field using ->
+struct Widget {
+    value: Int,
+    compute: fn(Widget) -> Int,
+}
+
+let w = Widget {
+    value: 42,
+    compute: fn(self: Widget) -> Int {
+        return self.value * 2
+    }
+}
+assert(w->compute() == 84, "-> function field dispatch")
+
+// Nested struct
+struct Rect {
+    origin: Point,
+    size: Point,
+}
+
+let r = Rect {
+    origin: Point(0, 0),
+    size: Point(100, 50),
+}
+assert(r.origin.x == 0, "nested struct origin.x")
+assert(r.size.y == 50, "nested struct size.y")
+
+// Struct with toString override
+struct Named {
+    value: Int,
+}
+
+fn extends toString(self: Named) -> String {
+    return "Named(" + Cast::string(self.value) + ")"
+}
+let n = Named { value: 7 }
+assert(n.toString() == "Named(7)", "toString override")
+
+// Generic struct
+struct Wrapper(T) {
+    inner: $T,
+}
+
+let w_int = Wrapper { inner: 42 }
+assert(w_int.inner == 42, "generic struct int")
+
+let w_str = Wrapper { inner: "hello" }
+assert(w_str.inner == "hello", "generic struct string")
+
+// Struct passed to function
+fn get_x(p: Point) -> Int {
+    return p.x
+}
+assert(get_x(Point(7, 8)) == 7, "struct as function arg")
+
+// Struct returned from function
+fn make_point(a: Int, b: Int) -> Point {
+    return Point(a, b)
+}
+let mp = make_point(11, 22)
+assert(mp.x == 11, "struct from function x")
+assert(mp.y == 22, "struct from function y")
+
+println("PASS: test_structs")

@@ -1,0 +1,6 @@
+module wrong_arg_type
+// SHOULD FAIL: passing Int where String is expected
+fn greet(name: String) {
+    println(name)
+}
+greet(42)

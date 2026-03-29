@@ -1,0 +1,275 @@
+module test_parser_stress
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// Parser Stress Tests
+// Deeply nested expressions, complex syntax patterns,
+// long chains, edge cases in grammar
+// ============================================================
+
+// ---- Deeply nested arithmetic ----
+assert(((((1 + 2) * 3) - 4) * 5) + 6 == 31, "deeply nested arith")
+assert((2 * (3 + (4 * (5 - (6 / 2))))) == 22, "deeply nested arith 2")
+assert((((10 - 3) * (2 + 5)) / 7) == 7, "deeply nested arith 3")
+
+// ---- Deeply nested boolean ----
+assert(((true && false) || (true && true)) && !(false || false), "nested bool 1")
+assert(!(!(!true)) == false, "triple not")
+assert((true || false) && (false || true) && !(false && true), "nested bool 2")
+
+// ---- Chained function calls ----
+fn add1(x: Int) -> Int { return x + 1 }
+fn mul2(x: Int) -> Int { return x * 2 }
+fn sub3(x: Int) -> Int { return x - 3 }
+
+assert(add1(mul2(sub3(10))) == 15, "chain fn calls: (10-3)*2+1=15")
+assert(mul2(add1(mul2(add1(1)))) == 10, "deep chain: 1+1=2,*2=4,+1=5,*2=10")
+
+// ---- Long list literal ----
+let long_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+assert(long_list.len() == 20, "long list literal len")
+assert(long_list[0] == 1, "long list first")
+assert(long_list[19] == 20, "long list last")
+
+// ---- Multi-line list building ----
+let built_list = []: Int
+built_list.push(100)
+built_list.push(200)
+built_list.push(300)
+built_list.push(400)
+built_list.push(500)
+assert(built_list.len() == 5, "built list len")
+assert(built_list[4] == 500, "built list last")
+
+// ---- Deeply nested if/elif/else ----
+fn classify(n: Int) -> String {
+    if n < 0 {
+        if n < -100 {
+            return "very negative"
+        } elif n < -10 {
+            return "negative"
+        } else {
+            return "slightly negative"
+        }
+    } elif n == 0 {
+        return "zero"
+    } else {
+        if n < 10 {
+            return "small positive"
+        } elif n < 100 {
+            return "medium positive"
+        } else {
+            return "large positive"
+        }
+    }
+    return "unknown"
+}
+
+assert(classify(-200) == "very negative", "classify very neg")
+assert(classify(-50) == "negative", "classify neg")
+assert(classify(-5) == "slightly negative", "classify slightly neg")
+assert(classify(0) == "zero", "classify zero")
+assert(classify(5) == "small positive", "classify small pos")
+assert(classify(50) == "medium positive", "classify med pos")
+assert(classify(500) == "large positive", "classify large pos")
+
+// ---- Nested match ----
+enum Color { Red, Green, Blue }
+enum Size { Small, Medium, Large }
+
+fn describe_combo(c: Color, s: Size) -> String {
+    match c {
+        Red() => {
+            match s {
+                Small()  => { return "small red" }
+                Medium() => { return "medium red" }
+                Large()  => { return "large red" }
+            }
+            return ""
+        }
+        Green() => { return "green" }
+        Blue()  => { return "blue" }
+    }
+    return ""
+}
+
+assert(describe_combo(Color::Red(), Size::Small()) == "small red", "nested match small red")
+assert(describe_combo(Color::Red(), Size::Large()) == "large red", "nested match large red")
+assert(describe_combo(Color::Green(), Size::Medium()) == "green", "nested match green")
+
+// ---- Complex closure expressions ----
+let ops = [
+    fn(x: Int) -> Int { return x + 1 },
+    fn(x: Int) -> Int { return x * 2 },
+    fn(x: Int) -> Int { return x - 3 },
+    fn(x: Int) -> Int { return x * x },
+    fn(x: Int) -> Int { if x > 0 { return x } return -x }
+]
+
+let val = 5
+// Apply each op
+let r0 = ops[0](val)   // 6
+let r1 = ops[1](val)   // 10
+let r2 = ops[2](val)   // 2
+let r3 = ops[3](val)   // 25
+let r4 = ops[4](-5)    // 5
+
+assert(r0 == 6, "op 0: +1")
+assert(r1 == 10, "op 1: *2")
+assert(r2 == 2, "op 2: -3")
+assert(r3 == 25, "op 3: sq")
+assert(r4 == 5, "op 4: abs")
+
+// ---- Nested closures ----
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x + n
+}
+fn make_multiplier(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x * n
+}
+fn compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return |x: Int| f(g(x))
+}
+
+let add5 = make_adder(5)
+let mul3 = make_multiplier(3)
+let add5_then_mul3 = compose(mul3, add5)
+let mul3_then_add5 = compose(add5, mul3)
+
+assert(add5_then_mul3(4) == 27, "compose (4+5)*3=27")
+assert(mul3_then_add5(4) == 17, "compose 4*3+5=17")
+
+// ---- Long string expression ----
+let s = "a" + "b" + "c" + "d" + "e" + "f" + "g" + "h" + "i" + "j"
+assert(s == "abcdefghij", "long string concat")
+assert(s.len() == 10, "long string len")
+
+// ---- Complex for loop with continue/break equivalents ----
+fn sum_odds_under(limit: Int) -> Int {
+    let total = 0
+    for let i = 0; i < limit; i += 1 {
+        if i % 2 == 0 {
+            // skip evens
+        } else {
+            total = total + i
+        }
+    }
+    return total
+}
+// odds under 10: 1+3+5+7+9 = 25
+assert(sum_odds_under(10) == 25, "sum odds under 10")
+
+// ---- Range-based for with nested expression ----
+let acc = 0
+for i in 0..10 {
+    acc = acc + (i * i)
+}
+// 0+1+4+9+16+25+36+49+64+81 = 285
+assert(acc == 285, "sum of squares 0..10")
+
+// ---- Struct with many fields ----
+struct BigStruct {
+    a: Int,
+    b: Int,
+    c: Int,
+    d: String,
+    e: Bool,
+    f: Float,
+    g: [Int]
+}
+let bs = BigStruct {
+    a: 1, b: 2, c: 3,
+    d: "hello",
+    e: true,
+    f: 3.14,
+    g: [10, 20, 30]
+}
+assert(bs.a + bs.b + bs.c == 6, "big struct int fields")
+assert(bs.d == "hello", "big struct string field")
+assert(bs.e, "big struct bool field")
+assert(bs.f == 3.14, "big struct float field")
+assert(bs.g[1] == 20, "big struct list field")
+
+// ---- Complex match with guards (if pattern) ----
+fn sign(n: Int) -> String {
+    if n == 0 {
+        return "zero"
+    }
+    if n > 0 {
+        return "positive"
+    }
+    return "negative"
+}
+assert(sign(0) == "zero", "sign 0")
+assert(sign(5) == "positive", "sign 5")
+assert(sign(-5) == "negative", "sign -5")
+
+// ---- Tuple unpacking in various positions ----
+fn swap(t: (Int, Int)) -> (Int, Int) {
+    return (t[1], t[0])
+}
+fn fst(t: (Int, String)) -> Int {
+    return t[0]
+}
+fn snd(t: (Int, String)) -> String {
+    return t[1]
+}
+
+let pair = (10, 20)
+let swapped = swap(pair)
+assert(swapped[0] == 20, "swap fst")
+assert(swapped[1] == 10, "swap snd")
+
+let labeled = (42, "hello")
+assert(fst(labeled) == 42, "fst tuple")
+assert(snd(labeled) == "hello", "snd tuple")
+
+// ---- Nested struct access ----
+struct Inner {
+    val: Int
+}
+struct Outer {
+    inner: Inner,
+    name: String
+}
+let o = Outer { inner: Inner { val: 99 }, name: "outer" }
+assert(o.inner.val == 99, "nested struct access")
+o.inner.val = 100
+assert(o.inner.val == 100, "nested struct mutation")
+
+// ---- Complex recursive function ----
+fn ackermann(m: Int, n: Int) -> Int {
+    if m == 0 {
+        return n + 1
+    }
+    if n == 0 {
+        return ackermann(m - 1, 1)
+    }
+    return ackermann(m - 1, ackermann(m, n - 1))
+}
+assert(ackermann(0, 0) == 1, "ackermann(0,0)")
+assert(ackermann(1, 1) == 3, "ackermann(1,1)")
+assert(ackermann(2, 2) == 7, "ackermann(2,2)")
+assert(ackermann(3, 3) == 61, "ackermann(3,3)")
+
+// ---- Many local variables ----
+fn many_locals() -> Int {
+    let a = 1
+    let b = 2
+    let c = 3
+    let d = 4
+    let e = 5
+    let f = 6
+    let g = 7
+    let h = 8
+    let i = 9
+    let j = 10
+    let k = a + b + c + d + e
+    let l = f + g + h + i + j
+    return k + l
+}
+assert(many_locals() == 55, "many locals sum 1-10=55")
+
+println("PASS: test_parser_stress")

@@ -1,0 +1,5 @@
+module wrong_return_type_void
+// SHOULD FAIL: function declared void but returns a value
+fn do_thing() {
+    return 42
+}

@@ -1,0 +1,8 @@
+module wrong_struct_field_type
+// SHOULD FAIL: assigning wrong type to a struct field
+struct Point {
+    x: Int,
+    y: Int
+}
+let p = Point { x: 1, y: 2 }
+p.x = "not an int"

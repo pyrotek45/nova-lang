@@ -1,0 +1,8 @@
+module wrong_struct_init_field_type
+// SHOULD FAIL: struct literal with wrong field type
+struct Color {
+    r: Int,
+    g: Int,
+    b: Int
+}
+let c = Color { r: 1.5, g: 0, b: 255 }

@@ -1,0 +1,3 @@
+module wrong_binary_op_types
+// SHOULD FAIL: adding Int and String
+let result = 42 + "hello"

@@ -1,0 +1,6 @@
+module comparison_type_mismatch
+// SHOULD FAIL: passing Bool where Int expected
+fn double(x: Int) -> Int {
+    return x * 2
+}
+let result = double(true)

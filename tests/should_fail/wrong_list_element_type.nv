@@ -1,0 +1,4 @@
+module wrong_list_element_type
+// SHOULD FAIL: pushing wrong type into a typed list
+let xs = [1, 2, 3]
+xs.push("hello")

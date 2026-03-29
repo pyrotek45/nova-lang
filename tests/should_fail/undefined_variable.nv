@@ -1,0 +1,3 @@
+module undefined_variable
+// SHOULD FAIL: using a variable that was never declared
+println(does_not_exist)

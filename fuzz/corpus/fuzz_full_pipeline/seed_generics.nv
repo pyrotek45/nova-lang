@@ -1,0 +1,91 @@
+module test_generics
+
+// Generic function (non-extends, raw $A not supported as extends type)
+fn id(x: $A) -> $A {
+    return x
+}
+
+assert(id(42) == 42, "generic id int")
+assert(id("hello") == "hello", "generic id string")
+assert(id(true), "generic id bool")
+assert(id(3.14) > 3.0, "generic id float")
+
+// Generic struct (using MyBox to avoid conflict with built-in Box)
+struct MyBox(T) {
+    value: $T,
+}
+
+let int_box = MyBox { value: 42 }
+assert(int_box.value == 42, "generic struct int")
+
+let str_box = MyBox { value: "hello" }
+assert(str_box.value == "hello", "generic struct string")
+
+// Generic extends function on concrete generic type
+fn extends unbox(b: MyBox($T)) -> $T {
+    return b.value
+}
+assert(int_box.unbox() == 42, "generic extends unbox int")
+assert(str_box.unbox() == "hello", "generic extends unbox string")
+
+// Multiple generics in struct
+struct Pair(A, B) {
+    first: $A,
+    second: $B,
+}
+
+let p = Pair { first: 1, second: "one" }
+assert(p.first == 1, "multi-generic first")
+assert(p.second == "one", "multi-generic second")
+
+// Generic enum
+enum Maybe(A) {
+    Just: $A,
+    Nothing
+}
+
+let j = Maybe::Just(99)
+fn extract(m: Maybe(Int)) -> Int {
+    match m {
+        Just(x) => { return x }
+        Nothing() => { return 0 }
+    }
+    return 0
+}
+assert(extract(j) == 99, "generic enum extract")
+
+// Generic function returning generic
+fn extends map_box(b: MyBox($A), f: fn($A) -> $B) -> MyBox($B) {
+    return MyBox { value: f(b.value) }
+}
+let doubled_box = MyBox { value: 5 }.map_box(|x: Int| x * 2)
+assert(doubled_box.value == 10, "generic map_box")
+
+// Generic with list
+fn extends first(list: [$A]) -> Option($A) {
+    if list.len() > 0 {
+        return Some(list[0])
+    }
+    return None($A)
+}
+
+let f = [1, 2, 3].first()
+assert(f.isSome(), "generic first isSome")
+assert(f.unwrap() == 1, "generic first value")
+
+let empty_first = ([]: Int).first()
+assert(!empty_first.isSome(), "generic first empty")
+
+// Function overloading with generics
+fn extends show(x: Int) -> String {
+    return "Int: " + Cast::string(x)
+}
+
+fn extends show(x: String) -> String {
+    return "String: " + x
+}
+
+assert(42.show() == "Int: 42", "overloaded show int")
+assert("hi".show() == "String: hi", "overloaded show string")
+
+println("PASS: test_generics")

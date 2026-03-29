@@ -1,0 +1,7 @@
+module extends_wrong_receiver_type
+// SHOULD FAIL: calling extends function on wrong type
+fn extends double(x: Int) -> Int {
+    return x * 2
+}
+let s = "hello"
+let result = s.double()

@@ -1,0 +1,110 @@
+module test_enums
+
+import super.std.core
+
+// Basic enum
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+let c = Color::Red()
+fn color_name(col: Color) -> String {
+    match col {
+        Red() => { return "Red" }
+        Green() => { return "Green" }
+        Blue() => { return "Blue" }
+    }
+    return "unknown"
+}
+assert(color_name(c) == "Red", "enum construction Red")
+
+let g = Color::Green()
+assert(color_name(g) == "Green", "enum construction Green")
+
+// Enum with data
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float),
+    Point
+}
+
+let circle = Shape::Circle(5.0)
+let rect = Shape::Rectangle((3.0, 4.0))
+let point = Shape::Point()
+
+// Pattern matching on enum
+fn describe(s: Shape) -> String {
+    match s {
+        Circle(r) => { return "circle" }
+        Rectangle(dims) => { return "rectangle" }
+        Point() => { return "point" }
+    }
+    return "unknown"
+}
+assert(describe(circle) == "circle", "match circle")
+assert(describe(rect) == "rectangle", "match rectangle")
+assert(describe(point) == "point", "match point")
+
+// Enum match extracting data
+fn get_radius(s: Shape) -> Float {
+    match s {
+        Circle(r) => { return r }
+        Rectangle(dims) => { return 0.0 }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+assert(get_radius(circle) == 5.0, "match extract data")
+
+// Generic enum (Maybe from std)
+enum Maybe(A) {
+    Just: $A,
+    Nothing
+}
+
+let just_val = Maybe::Just(42)
+let nothing_val = Maybe::Nothing() @[A: Int]
+
+fn is_just(m: Maybe(Int)) -> Bool {
+    match m {
+        Just(x) => { return true }
+        Nothing() => { return false }
+    }
+    return false
+}
+assert(is_just(just_val), "Maybe is Just")
+assert(!is_just(nothing_val), "Maybe is Nothing")
+
+// Extracting from Maybe
+fn get_value(m: Maybe(Int)) -> Int {
+    match m {
+        Just(x) => { return x }
+        Nothing() => { return -1 }
+    }
+    return -1
+}
+assert(get_value(just_val) == 42, "extract Maybe value")
+assert(get_value(nothing_val) == -1, "Nothing default value")
+
+// Result type
+enum MyResult(A, B) {
+    Ok: $A,
+    Err: $B
+}
+
+let ok = MyResult::Ok(100) @[B: String]
+let err = MyResult::Err("oops") @[A: Int]
+
+fn is_ok(r: MyResult(Int, String)) -> Bool {
+    match r {
+        Ok(x) => { return true }
+        Err(e) => { return false }
+    }
+    return false
+}
+assert(is_ok(ok), "Result is Ok")
+assert(!is_ok(err), "Result is Err")
+
+println("PASS: test_enums")
