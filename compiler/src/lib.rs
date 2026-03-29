@@ -361,9 +361,19 @@ impl Compiler {
                     let index = self.global.len() - 1;
                     let structjump = self.gen.generate();
                     self.asm.push(Asm::FUNCTION(structjump));
-                    self.asm.push(Asm::OFFSET((fields.len() - 1) as u32, 0_u32));
+                    // fields includes the auto-added "type" field at the end
+                    // real user fields = fields.len() - 1
+                    let num_real_fields = fields.len() - 1;
+                    self.asm
+                        .push(Asm::OFFSET(num_real_fields as u32, 0_u32));
+                    // Push field name strings (in order) for each real field
+                    for field in fields.iter().take(num_real_fields) {
+                        self.compile_string_literal(&field.identifier);
+                    }
+                    // Push struct name string
                     self.compile_string_literal(identifier);
-                    self.asm.push(Asm::LIST(fields.len() as u64));
+                    // NEWSTRUCT(num_real_fields) creates Object with Struct type + populated table
+                    self.asm.push(Asm::NEWSTRUCT(num_real_fields as u64));
                     self.asm.push(Asm::RET(true));
                     self.asm.push(Asm::LABEL(structjump));
 
@@ -998,6 +1008,11 @@ impl Compiler {
             Expr::IfExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
+            Expr::DynField { name, expr, position, .. } => {
+                self.compile_string_literal(name);
+                self.compile_expr(expr)?;
+                self.asm.push(Asm::PINF(position.clone()));
+            }
             Expr::Void => {}
         }
         Ok(())
@@ -1078,6 +1093,12 @@ impl Compiler {
                 self.asm.push(Asm::INTEGER(*index as i64));
                 self.compile_expr(expr)?;
                 self.asm.push(Asm::LIN(position.clone()));
+                Ok(())
+            }
+            Expr::DynField { name, expr, position, .. } => {
+                self.compile_expr(expr)?;
+                self.compile_string_literal(name);
+                self.asm.push(Asm::GETF(position.clone()));
                 Ok(())
             }
             Expr::Indexed {
@@ -1183,6 +1204,9 @@ impl Compiler {
                                     line: 0,
                                     col: 0,
                                 }));
+                            }
+                            Expr::DynField { .. } => {
+                                // PINF is already emitted inside getref_expr
                             }
                             _ => self.asm.push(Asm::ASSIGN),
                         }

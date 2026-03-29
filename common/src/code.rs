@@ -120,6 +120,11 @@ impl Code {
     pub const TAILCALL: u8 = 75;
     pub const STOREFAST: u8 = 76;
     pub const BLOCK: u8 = 77;
+
+    // Struct construction & dynamic field access
+    pub const NEWSTRUCT: u8 = 78;
+    pub const GETF: u8 = 79;
+    pub const PINF: u8 = 80;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -199,6 +204,12 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::DUP => "DUP",
         Code::ISSOME => "ISSOME",
         Code::UNWRAP => "UNWRAP",
+        Code::CONCAT => "CONCAT",
+        Code::EXIT => "EXIT",
+        Code::ERROR => "ERROR",
+        Code::NEWSTRUCT => "NEWSTRUCT",
+        Code::GETF => "GETF",
+        Code::PINF => "PINF",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -286,6 +297,11 @@ pub enum Asm {
     PIN(FilePosition),
     LIN(FilePosition),
     NATIVE(u64),
+
+    // struct & dynamic field access
+    NEWSTRUCT(u64),
+    GETF(FilePosition),
+    PINF(FilePosition),
 
     EXIT,
     ERROR(FilePosition),

@@ -1,7 +1,7 @@
-//use common::error::{runtime_error, NovaError};
 use common::error::NovaError;
-use std::{fs, io, rc::Rc};
-use vm::state::{self, Heap, VmData};
+use std::{fs, io};
+use vm::memory_manager::{ObjectType, VmData};
+use vm::state;
 
 pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
     let mut input = String::new();
@@ -12,31 +12,36 @@ pub fn read_line(state: &mut state::State) -> Result<(), NovaError> {
         })?;
     // removing newline token
     input.pop();
-    let index = state.allocate_string(input.into());
-    state.stack.push(VmData::String(index));
+    state.memory.push_string(input);
     Ok(())
 }
 
 pub fn read_file(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::String(index)) = state.stack.pop() {
-        if let Heap::String(path) = state.get_ref(index) {
-            match fs::read_to_string(path.to_string()) {
-                Ok(string) => {
-                    let index = state.allocate_string(string.into());
-                    state.stack.push(VmData::String(index));
-                }
-                Err(e) => {
-                    return Err(NovaError::Runtime {
-                        msg: format!("Error reading file: {e}").into(),
-                    })
-                }
+    if let Some(VmData::Object(index)) = state.memory.stack.pop() {
+        let path = {
+            let obj = state.memory.ref_from_heap(index).ok_or(NovaError::Runtime {
+                msg: "Invalid heap reference".into(),
+            })?;
+            obj.as_string().ok_or(NovaError::Runtime {
+                msg: "Expected a string path".into(),
+            })?
+        };
+        state.memory.dec(index);
+        match fs::read_to_string(&path) {
+            Ok(string) => {
+                state.memory.push_string(string);
+            }
+            Err(e) => {
+                return Err(NovaError::Runtime {
+                    msg: format!("Error reading file: {e}").into(),
+                })
             }
         }
     }
     Ok(())
 }
 
-fn printf_with_array(format_string: &str, args: Vec<Rc<str>>) {
+fn printf_with_array(format_string: &str, args: Vec<String>) {
     let mut arg_iter = args.iter();
     let mut formatted = String::new();
     let mut segments = format_string.split("{}").peekable();
@@ -55,7 +60,7 @@ fn printf_with_array(format_string: &str, args: Vec<Rc<str>>) {
     print!("{}", formatted);
 }
 
-fn format_with_array(format_string: &str, args: Vec<Rc<str>>) -> String {
+fn format_with_array(format_string: &str, args: Vec<String>) -> String {
     let mut arg_iter = args.iter();
     let mut formatted = String::new();
     let mut segments = format_string.split("{}").peekable();
@@ -71,45 +76,62 @@ fn format_with_array(format_string: &str, args: Vec<Rc<str>>) -> String {
         }
     }
 
-    formatted.to_string()
+    formatted
 }
 
-// printf function for the VM that takes an array of strings // and the format string as arguments
-pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
-    let mut strings = vec![];
-    let args = state.stack.pop();
-    let str_index = state.stack.pop();
-
-    if let (Some(VmData::List(args)), Some(VmData::String(str_index))) = (args, str_index) {
-        if let Heap::String(format_string) = state.get_ref(str_index) {
-            if let Heap::List(args) = state.get_ref(args) {
-                // gather string arguments
-                for arg in args.iter() {
-                    if let Heap::StringAddress(string) = state.get_ref(*arg) {
-                        if let Heap::String(string) = state.get_ref(*string) {
-                            strings.push(string);
-                        } else {
-                            return Err(NovaError::Runtime {
-                                msg: "Invalid arguments for printf".into(),
-                            });
-                        }
-                    } else {
+/// Helper to extract an array of strings from a list-of-strings Object.
+/// In the refvm model, a list of strings is Object(List) whose data contains VmData::Object pointers
+/// each pointing to an Object(String).
+fn extract_string_list(state: &state::State, list_index: usize) -> Result<Vec<String>, NovaError> {
+    let list_obj = state.memory.ref_from_heap(list_index).ok_or(NovaError::Runtime {
+        msg: "Invalid heap reference for list".into(),
+    })?;
+    match &list_obj.object_type {
+        ObjectType::List => {
+            let mut strings = vec![];
+            for item in &list_obj.data {
+                match item {
+                    VmData::Object(str_idx) => {
+                        let str_obj = state.memory.ref_from_heap(*str_idx).ok_or(NovaError::Runtime {
+                            msg: "Invalid arguments for printf".into(),
+                        })?;
+                        let s = str_obj.as_string().ok_or(NovaError::Runtime {
+                            msg: "Invalid arguments for printf".into(),
+                        })?;
+                        strings.push(s);
+                    }
+                    _ => {
                         return Err(NovaError::Runtime {
                             msg: "Invalid arguments for printf".into(),
-                        });
+                        })
                     }
                 }
-                printf_with_array(format_string, strings.into_iter().cloned().collect());
-            } else {
-                return Err(NovaError::Runtime {
-                    msg: "Invalid arguments for printf".into(),
-                });
             }
-        } else {
-            return Err(NovaError::Runtime {
-                msg: "Invalid arguments for printf".into(),
-            });
+            Ok(strings)
         }
+        _ => Err(NovaError::Runtime {
+            msg: "Invalid arguments for printf".into(),
+        }),
+    }
+}
+
+pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
+    let args = state.memory.stack.pop();
+    let str_val = state.memory.stack.pop();
+
+    if let (Some(VmData::Object(args_idx)), Some(VmData::Object(str_idx))) = (args, str_val) {
+        let format_string = {
+            let obj = state.memory.ref_from_heap(str_idx).ok_or(NovaError::Runtime {
+                msg: "Invalid arguments for printf".into(),
+            })?;
+            obj.as_string().ok_or(NovaError::Runtime {
+                msg: "Invalid arguments for printf".into(),
+            })?
+        };
+        let strings = extract_string_list(state, args_idx)?;
+        printf_with_array(&format_string, strings);
+        state.memory.dec(args_idx);
+        state.memory.dec(str_idx);
     } else {
         return Err(NovaError::Runtime {
             msg: "Invalid arguments for printf".into(),
@@ -118,48 +140,27 @@ pub fn printf(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-// format function for the VM that takes an array of strings and returns string
 pub fn format(state: &mut state::State) -> Result<(), NovaError> {
-    let mut strings = vec![];
-    let args = state.stack.pop();
-    let str_index = state.stack.pop();
+    let args = state.memory.stack.pop();
+    let str_val = state.memory.stack.pop();
 
-    if let (Some(VmData::List(args)), Some(VmData::String(str_index))) = (args, str_index) {
-        if let Heap::String(format_string) = state.get_ref(str_index) {
-            if let Heap::List(args) = state.get_ref(args) {
-                // gather string arguments
-                for arg in args.iter() {
-                    if let Heap::StringAddress(string) = state.get_ref(*arg) {
-                        if let Heap::String(string) = state.get_ref(*string) {
-                            strings.push(string);
-                        } else {
-                            return Err(NovaError::Runtime {
-                                msg: "Invalid arguments for printf".into(),
-                            });
-                        }
-                    } else {
-                        return Err(NovaError::Runtime {
-                            msg: "Invalid arguments for printf".into(),
-                        });
-                    }
-                }
-                let index = state.allocate_string(
-                    format_with_array(format_string, strings.into_iter().cloned().collect()).into(),
-                );
-                state.stack.push(VmData::String(index));
-            } else {
-                return Err(NovaError::Runtime {
-                    msg: "Invalid arguments for printf".into(),
-                });
-            }
-        } else {
-            return Err(NovaError::Runtime {
-                msg: "Invalid arguments for printf".into(),
-            });
-        }
+    if let (Some(VmData::Object(args_idx)), Some(VmData::Object(str_idx))) = (args, str_val) {
+        let format_string = {
+            let obj = state.memory.ref_from_heap(str_idx).ok_or(NovaError::Runtime {
+                msg: "Invalid arguments for format".into(),
+            })?;
+            obj.as_string().ok_or(NovaError::Runtime {
+                msg: "Invalid arguments for format".into(),
+            })?
+        };
+        let strings = extract_string_list(state, args_idx)?;
+        let result = format_with_array(&format_string, strings);
+        state.memory.dec(args_idx);
+        state.memory.dec(str_idx);
+        state.memory.push_string(result);
     } else {
         return Err(NovaError::Runtime {
-            msg: "Invalid arguments for printf".into(),
+            msg: "Invalid arguments for format".into(),
         });
     }
     Ok(())

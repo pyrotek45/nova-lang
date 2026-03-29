@@ -267,6 +267,20 @@ impl Assembler {
                     self.runtime_error_table
                         .insert(self.output.len(), file_position);
                 }
+                Asm::NEWSTRUCT(size) => {
+                    self.output.push(Code::NEWSTRUCT);
+                    self.output.extend_from_slice(&(size).to_le_bytes());
+                }
+                Asm::GETF(file_position) => {
+                    self.output.push(Code::GETF);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
+                }
+                Asm::PINF(file_position) => {
+                    self.output.push(Code::PINF);
+                    self.runtime_error_table
+                        .insert(self.output.len(), file_position);
+                }
             }
         }
 

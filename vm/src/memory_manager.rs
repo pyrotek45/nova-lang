@@ -447,6 +447,13 @@ impl MemoryManager {
                         }
                     }
 
+                    // After recursive dec of children, the heap may have shrunk.
+                    // Re-check whether this index is still within bounds.
+                    if index >= self.heap.len() {
+                        // Already removed by shrink_heap during child processing
+                        return;
+                    }
+
                     if index == self.heap.len() - 1 {
                         self.heap.pop();
                         self.shrink_heap();

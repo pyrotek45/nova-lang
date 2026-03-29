@@ -79,6 +79,9 @@ impl Disassembler {
                 Asm::CONCAT => println!("    concat"),
                 Asm::Char(v) => println!("    char: {v}"),
                 Asm::ERROR(_) => println!("    error"),
+                Asm::NEWSTRUCT(v) => println!("    newstruct: {v}"),
+                Asm::GETF(_) => println!("    getf"),
+                Asm::PINF(_) => println!("    pinf"),
             }
         }
         println!();
@@ -290,6 +293,12 @@ impl Disassembler {
                 }
                 Code::STOREBIND => self.out("Store New Binding"),
                 Code::LOOP => self.out("Loop"),
+                Code::NEWSTRUCT => {
+                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
+                    self.out(&format!("Create struct: {} fields", size))
+                }
+                Code::GETF => self.out("Get Field"),
+                Code::PINF => self.out("Put In Field"),
                 _ => {}
             }
         }

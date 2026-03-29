@@ -1,60 +1,91 @@
 use common::error::NovaError;
-use vm::state::{self, Heap, VmData};
+use vm::memory_manager::{ObjectType, VmData};
+use vm::state;
 
 pub fn len(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::List(index)) = state.stack.pop() {
-        if let Heap::List(array) = state.get_ref(index) {
-            state.stack.push(VmData::Int(array.len() as i64))
+    if let Some(VmData::Object(index)) = state.memory.stack.pop() {
+        if let Some(obj) = state.memory.ref_from_heap(index) {
+            if let ObjectType::List = obj.object_type {
+                let len = obj.data.len() as i64;
+                state.memory.dec(index);
+                state.memory.stack.push(VmData::Int(len));
+            }
         }
     }
     Ok(())
 }
 
 pub fn push(state: &mut state::State) -> Result<(), NovaError> {
-    if let (Some(data), Some(VmData::List(index))) = (state.stack.pop(), state.stack.pop()) {
-        if let Heap::List(mut array) = state.get_ref(index).clone() {
-            array.push(state.allocate_vmdata_to_heap(data));
-            state.heap[index] = Heap::List(array);
-        } else {
-            panic!()
+    if let (Some(data), Some(VmData::Object(index))) =
+        (state.memory.stack.pop(), state.memory.stack.pop())
+    {
+        // inc data if it's an Object since we're adding a new reference
+        state.memory.inc_value(data);
+        if let Some(obj) = state.memory.ref_from_heap_mut(index) {
+            if let ObjectType::List = obj.object_type {
+                obj.data.push(data);
+            }
         }
+        // dec the popped data and list ref
+        state.memory.dec_value(data);
+        state.memory.dec(index);
     } else {
-        panic!()
+        panic!("List::push: expected data and list on stack")
     }
     Ok(())
 }
 
 pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::List(index)) = state.stack.pop() {
-        if let Heap::List(mut array) = state.get_ref(index).clone() {
-            if let Some(item) = array.pop() {
-                state.stack.push(state.to_vmdata(item));
+    if let Some(VmData::Object(index)) = state.memory.stack.pop() {
+        let popped = {
+            if let Some(obj) = state.memory.ref_from_heap_mut(index) {
+                if let ObjectType::List = obj.object_type {
+                    obj.data.pop()
+                } else {
+                    None
+                }
             } else {
-                state.stack.push(VmData::None);
+                None
             }
-            state.heap[index] = Heap::List(array);
-        } else {
-            panic!()
+        };
+        state.memory.dec(index);
+        match popped {
+            Some(value) => {
+                // The value was owned by the list, now transfer ownership to the stack
+                state.memory.stack.push(value);
+            }
+            None => {
+                state.memory.stack.push(VmData::None);
+            }
         }
     } else {
-        panic!()
+        panic!("List::pop: expected list on stack")
     }
     Ok(())
 }
 
-// remove at index
 pub fn remove(state: &mut state::State) -> Result<(), NovaError> {
-    if let (Some(VmData::Int(index)), Some(VmData::List(list_index))) =
-        (state.stack.pop(), state.stack.pop())
+    if let (Some(VmData::Int(idx)), Some(VmData::Object(list_index))) =
+        (state.memory.stack.pop(), state.memory.stack.pop())
     {
-        if let Heap::List(mut array) = state.get_ref(list_index).clone() {
-            array.remove(index as usize);
-            state.heap[list_index] = Heap::List(array.clone());
-        } else {
-            panic!()
+        let removed = {
+            if let Some(obj) = state.memory.ref_from_heap_mut(list_index) {
+                if let ObjectType::List = obj.object_type {
+                    Some(obj.data.remove(idx as usize))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        // dec the removed element if it was an Object
+        if let Some(removed_val) = removed {
+            state.memory.dec_value(removed_val);
         }
+        state.memory.dec(list_index);
     } else {
-        panic!()
+        panic!("List::remove: expected int and list on stack")
     }
     Ok(())
 }

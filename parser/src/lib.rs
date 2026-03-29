@@ -219,8 +219,14 @@ impl Parser {
                             position: pos.clone(),
                         });
                     }
-                    if let Some(mapped_type) = type_map.get(name1) {
-                        if mapped_type != t2 {
+                    let typemap_clone: HashMap<Rc<str>, TType> = type_map.clone();
+                    if let Some(mapped_type) = typemap_clone.get(name1) {
+                        if let (TType::Dyn { own, contract }, Some(name)) =
+                            (mapped_type, t2.custom_to_string())
+                        {
+                            let name_rc = Rc::from(name);
+                            self.check_contracts(type_map, &pos, t1, t2, own, contract, &name_rc)?;
+                        } else if mapped_type != t2 {
                             return Err(NovaError::TypeMismatch {
                                 expected: mapped_type.clone(),
                                 found: t2.clone(),
@@ -294,6 +300,20 @@ impl Parser {
                         });
                     }
                 }
+                (TType::Dyn { own, contract: c1 }, TType::Custom { name, .. }) => {
+                    self.check_contracts(type_map, &pos, t1, t2, own, c1, name)?;
+                }
+                (TType::Dyn { own, .. }, TType::Generic { name }) => {
+                    if name == own {
+                        continue;
+                    } else {
+                        return Err(NovaError::TypeMismatch {
+                            expected: TType::Generic { name: own.clone() },
+                            found: TType::Generic { name: name.clone() },
+                            position: pos.clone(),
+                        });
+                    }
+                }
                 _ if t1 == t2 => continue,
                 _ => {
                     return Err(NovaError::TypeMismatch {
@@ -304,6 +324,104 @@ impl Parser {
                 }
             }
         }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn check_contracts(
+        &self,
+        type_map: &mut HashMap<Rc<str>, TType>,
+        pos: &FilePosition,
+        t1: &TType,
+        t2: &TType,
+        own: &Rc<str>,
+        c1: &[(Rc<str>, TType)],
+        name: &Rc<str>,
+    ) -> Result<(), NovaError> {
+        let contract_names = c1.iter().map(|(n, _)| n).collect::<Vec<_>>();
+        if let Some(fields) = self.environment.custom_types.get(name.as_ref()) {
+            if let Some(mapped_type) = type_map.get(own) {
+                if mapped_type != t2 {
+                    return Err(NovaError::TypeMismatch {
+                        expected: mapped_type.clone(),
+                        found: t2.clone(),
+                        position: pos.clone(),
+                    });
+                }
+            } else {
+                type_map.insert(own.clone(), t2.clone());
+            }
+
+            if contract_names.len() > fields.len() {
+                return Err(NovaError::TypeMismatch {
+                    expected: t1.clone(),
+                    found: t2.clone(),
+                    position: pos.clone(),
+                });
+            }
+
+            let new_fields = if let Some(generic_params) = self
+                .environment
+                .generic_type_struct
+                .get(t2.custom_to_string().unwrap())
+            {
+                let TType::Custom { type_params, .. } = t2 else {
+                    return Err(self.generate_error_with_pos(
+                        "Expected custom type",
+                        format!("got {}", t2),
+                        pos.clone(),
+                    ));
+                };
+                fields
+                    .iter()
+                    .map(|(name, ttype)| {
+                        let new_ttype =
+                            Self::replace_generic_types(ttype, generic_params, type_params);
+                        (name.clone(), new_ttype)
+                    })
+                    .collect()
+            } else {
+                fields.clone()
+            };
+
+            for contract_name in contract_names.iter() {
+                if !new_fields
+                    .iter()
+                    .any(|(field_name, _)| field_name == *contract_name)
+                {
+                    return Err(NovaError::TypeMismatch {
+                        expected: t1.clone(),
+                        found: t2.clone(),
+                        position: pos.clone(),
+                    });
+                }
+
+                let field_type = c1
+                    .iter()
+                    .find(|(n, _)| n == *contract_name)
+                    .map(|(_, t)| t)
+                    .unwrap();
+
+                let new_field = new_fields
+                    .iter()
+                    .find(|(n, _)| n == *contract_name)
+                    .map(|(_, t)| t)
+                    .unwrap();
+
+                self.check_and_map_types(
+                    &[field_type.clone()],
+                    &[new_field.clone()],
+                    type_map,
+                    pos.clone(),
+                )?;
+            }
+        } else {
+            return Err(NovaError::TypeMismatch {
+                expected: t1.clone(),
+                found: t2.clone(),
+                position: pos.clone(),
+            });
+        };
         Ok(())
     }
 
@@ -754,13 +872,11 @@ impl Parser {
                 TType::Option { .. } => {
                      format!("Option::{}", identifier)
                 }
-                TType::Function { parameters, .. } => {
-                    let repeated_elements: String = "(_)".repeat(parameters.len());
-                     format!("Function{}::{}",repeated_elements, identifier)
+                TType::Function {  .. } => {
+                     format!("Function::{}", identifier)
                 }
-                TType::Tuple { elements } => {
-                    let repeated_elements: String = "(_)".repeat(elements.len());
-                     format!("Tuple{}::{}",repeated_elements, identifier)
+                TType::Tuple { ..} => {
+                     format!("Tuple::{}", identifier)
                 }
                 TType::Bool => {
                      format!("Bool::{}", identifier)
@@ -1244,6 +1360,14 @@ impl Parser {
                     elements: new_elements,
                 }
             }
+            TType::Dyn { own, .. } => {
+                // rc is generic name
+                if let Some(index) = x.iter().position(|x| x.as_ref() == own.deref()) {
+                    type_params[index].clone()
+                } else {
+                    ttype.clone()
+                }
+            }
         }
     }
 
@@ -1285,11 +1409,28 @@ impl Parser {
                 return self.generate_field_not_found_error(&identifier, type_name, pos);
             }
         } else {
-            return Err(self.generate_error_with_pos(
-                format!("E1 Not a valid field access: {}", identifier),
-                format!("{} is not a custom type", lhs.get_type()),
-                pos,
-            ));
+            // check if dynamic type with fields in contract
+            if let TType::Dyn { contract, .. } = lhs.get_type() {
+                if let Some((name, field_type)) = contract
+                    .iter()
+                    .find(|(name, _)| name.as_ref() == identifier.as_ref())
+                {
+                    lhs = Expr::DynField {
+                        ttype: field_type.clone(),
+                        name: name.clone(),
+                        expr: Box::new(lhs),
+                        position: pos.clone(),
+                    };
+                } else {
+                    return self.generate_field_not_found_error(&identifier, "Dyn", pos);
+                }
+            } else {
+                return Err(self.generate_error_with_pos(
+                    format!("E1 Not a valid field access: {}", identifier),
+                    format!("{} is not a custom type", lhs.get_type()),
+                    pos,
+                ));
+            }
         }
         Ok(lhs)
     }
@@ -2332,14 +2473,23 @@ impl Parser {
                         self.consume_symbol(At)?;
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
-                        let ta = self.ttype()?;
-                        type_annotation.push(ta);
-                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        // if ) then push none and return
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_symbol(RightParen))
+                        {
                             self.advance();
+                            type_annotation.push(TType::None);
+                        } else {
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
+                            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                                self.advance();
+                                let ta = self.ttype()?;
+                                type_annotation.push(ta);
+                            }
+                            self.consume_symbol(RightParen)?;
                         }
-                        self.consume_symbol(RightParen)?;
                         generate_unique_string(&identifier, &type_annotation).into()
                     }
                     _ => identifier,
@@ -2373,14 +2523,23 @@ impl Parser {
                         self.consume_symbol(At)?;
                         self.consume_symbol(LeftParen)?;
                         let mut type_annotation = vec![];
-                        let ta = self.ttype()?;
-                        type_annotation.push(ta);
-                        while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                        // if ) then push none and return
+                        if self
+                            .current_token()
+                            .is_some_and(|t| t.is_symbol(RightParen))
+                        {
                             self.advance();
+                            type_annotation.push(TType::None);
+                        } else {
                             let ta = self.ttype()?;
                             type_annotation.push(ta);
+                            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                                self.advance();
+                                let ta = self.ttype()?;
+                                type_annotation.push(ta);
+                            }
+                            self.consume_symbol(RightParen)?;
                         }
-                        self.consume_symbol(RightParen)?;
                         let t = generate_unique_string(&identifier, &type_annotation).into();
                         dbg!(&t);
                         t
@@ -3324,12 +3483,13 @@ impl Parser {
                                         },
                                     };
                                 } else {
-                                    left_expr = self.create_binop_expr(
-                                        left_expr,
-                                        right_expr,
+                                    // return error
+                                    return Err(self.create_type_error(
+                                        left_expr.clone(),
+                                        right_expr.clone(),
                                         operation,
-                                        TType::Bool,
-                                    );
+                                        current_pos.clone(),
+                                    ));
                                 }
                             }
                         }
@@ -3981,6 +4141,31 @@ impl Parser {
                 self.consume_symbol(RightSquareBracket)?;
                 Ok(TType::List {
                     inner: Box::new(inner),
+                })
+            }
+            Some(Identifier(id)) if "Dyn" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
+                let (owned, _) = self.get_identifier()?;
+                let mut fields = vec![];
+                self.consume_operator(Operator::Assignment)?;
+                loop {
+                    let (field, _) = self.get_identifier()?;
+                    self.consume_operator(Operator::Colon)?;
+                    let field_type = self.ttype()?;
+                    fields.push((field, field_type));
+                    if !self
+                        .current_token()
+                        .is_some_and(|t| t.is_op(Operator::Addition))
+                    {
+                        break;
+                    }
+                    self.advance();
+                }
+                self.consume_symbol(RightParen)?;
+                Ok(TType::Dyn {
+                    own: owned,
+                    contract: fields,
                 })
             }
             Some(Identifier(_)) => {
@@ -5166,6 +5351,9 @@ impl Parser {
                         return true;
                     }
                 }
+                TType::Dyn { .. } => {
+                    return true;
+                }
                 _ => {}
             }
         }
@@ -5314,13 +5502,11 @@ impl Parser {
                     TType::Option { .. } => {
                         format!("Option::{}", identifier)
                     }
-                    TType::Function { parameters, .. } => {
-                        let repeated_elements: String = "(_)".repeat(parameters.len());
-                        format!("Function{}::{}", repeated_elements, identifier)
+                    TType::Function { .. } => {
+                        format!("Function::{}", identifier)
                     }
-                    TType::Tuple { elements } => {
-                        let repeated_elements: String = "(_)".repeat(elements.len());
-                        format!("Tuple{}::{}", repeated_elements, identifier)
+                    TType::Tuple { .. } => {
+                        format!("Tuple::{}", identifier)
                     }
                     TType::Bool => {
                         format!("Bool::{}", identifier)

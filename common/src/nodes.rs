@@ -260,6 +260,12 @@ pub enum Expr {
         ttype: TType,
         body: Vec<Statement>,
     },
+    DynField {
+        ttype: TType,
+        name: Rc<str>,
+        expr: Box<Expr>,
+        position: FilePosition,
+    },
     None,
     Void,
 }
@@ -283,6 +289,7 @@ impl Expr {
             Expr::IfExpr { ttype, .. } => ttype.clone(),
             Expr::Block { ttype, .. } => ttype.clone(),
             Expr::Let { ttype, .. } => ttype.clone(),
+            Expr::DynField { ttype, .. } => ttype.clone(),
             Expr::Void => TType::Void,
         }
     }

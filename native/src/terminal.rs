@@ -6,10 +6,11 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
     execute, terminal,
 };
-use vm::state::{self, VmData};
+use vm::memory_manager::VmData;
+use vm::state;
 
 pub fn rawmode(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::Bool(bool)) = state.stack.pop() {
+    if let Some(VmData::Bool(bool)) = state.memory.stack.pop() {
         if bool {
             terminal::enable_raw_mode().expect("could not enable raw mode");
         } else {
@@ -28,15 +29,15 @@ pub fn getch(state: &mut state::State) -> Result<(), NovaError> {
         state: _,
     }) = event::read().expect("Failed to read line")
     {
-        state.stack.push(VmData::Char(character))
+        state.memory.stack.push(VmData::Char(character))
     } else {
-        state.stack.push(VmData::None);
+        state.memory.stack.push(VmData::None);
     }
     Ok(())
 }
 
 pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
-    if let Some(VmData::Int(time)) = state.stack.pop() {
+    if let Some(VmData::Int(time)) = state.memory.stack.pop() {
         if event::poll(Duration::from_millis(time as u64)).expect("Error") {
             if let Event::Key(KeyEvent {
                 code: KeyCode::Char(character),
@@ -45,12 +46,12 @@ pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
                 state: _,
             }) = event::read().expect("Failed to read line")
             {
-                state.stack.push(VmData::Char(character));
+                state.memory.stack.push(VmData::Char(character));
             } else {
-                state.stack.push(VmData::None);
+                state.memory.stack.push(VmData::None);
             }
         } else {
-            state.stack.push(VmData::None);
+            state.memory.stack.push(VmData::None);
         }
     }
     Ok(())
@@ -73,20 +74,17 @@ pub fn show_cursor(_state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaError> {
-    let args = std::env::args().skip(3);
-    let mut myarray = vec![];
-    state.gclock = true;
-    let len = args.len();
-    for arg in args {
-        let string_pos = state.allocate_string(arg.into());
-        myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
-    }
-    if len == 0 {
-        state.stack.push(VmData::None);
+    let args: Vec<String> = std::env::args().skip(3).collect();
+    if args.is_empty() {
+        state.memory.stack.push(VmData::None);
     } else {
-        let index = state.allocate_array(myarray);
-        state.stack.push(VmData::List(index));
+        // Build a list of string objects
+        let mut list_data = vec![];
+        for arg in args {
+            let str_idx = state.memory.allocate(vm::memory_manager::Object::string(arg));
+            list_data.push(VmData::Object(str_idx));
+        }
+        state.memory.push_list(list_data);
     }
-    state.gclock = false;
     Ok(())
 }
