@@ -1,0 +1,35 @@
+module test_format
+
+// Basic format
+let s = format("{} world", ["hello"])
+assert(s == "hello world", "basic format")
+
+// Multiple placeholders
+let s2 = format("{} + {} = {}", [Cast::string(1), Cast::string(2), Cast::string(3)])
+assert(s2 == "1 + 2 = 3", "multi format")
+
+// No placeholders
+let s3 = format("no placeholders", []: String)
+assert(s3 == "no placeholders", "no placeholder format")
+
+// Format with Cast::string
+let name = "Nova"
+let ver = 1
+let s4 = format("{} version {}", [name, Cast::string(ver)])
+assert(s4 == "Nova version 1", "format with mixed")
+
+// Empty string args
+let s5 = format("{}{}{}", ["a", "b", "c"])
+assert(s5 == "abc", "format concatenation")
+
+// Format with longer text
+let s6 = format("The {} {} fox {} over the {} dog", ["quick", "brown", "jumps", "lazy"])
+assert(s6 == "The quick brown fox jumps over the lazy dog", "format sentence")
+
+// Cast::string on various types
+assert(Cast::string(42) == "42", "cast int")
+assert(Cast::string(true) == "true", "cast true")
+assert(Cast::string(false) == "false", "cast false")
+assert(Cast::string('x') == "x", "cast char")
+
+println("PASS: test_format")

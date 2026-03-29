@@ -1,0 +1,93 @@
+module test_imports
+
+import super.std.core
+import super.std.list
+import super.std.math
+import super.std.string
+
+// Core - Box
+let b = Box(42)
+assert(b.value == 42, "core Box")
+
+// Core - Gen
+let gen = Gen(0)
+assert(gen() == 0, "core Gen 0")
+assert(gen() == 1, "core Gen 1")
+
+// Core - Option extensions
+let opt = Some(10)
+let val = opt.orDefault(0)
+assert(val == 10, "orDefault with Some")
+
+let none_opt : Option(Int) = None(Int)
+let def = none_opt.orDefault(99)
+assert(def == 99, "orDefault with None")
+
+assert(!opt.isNone(), "isNone false for Some")
+assert(none_opt.isNone(), "isNone true for None")
+
+// Core - orDoFn
+let lazy = none_opt.orDoFn(|| 777)
+assert(lazy == 777, "orDoFn with None")
+
+// Core - range function
+let r = range(5)
+assert(r.len() == 5, "range function")
+
+let r2 = range(2, 5)
+assert(r2.len() == 3, "range start end")
+assert(r2[0] == 2, "range start")
+
+// Core - iota
+let iota = 4.iota()
+assert(iota.len() == 4, "iota length")
+
+// Math - min/max
+assert(3.min(5) == 3, "math min")
+assert(3.max(5) == 5, "math max")
+
+// Math - abs
+assert((-5).abs() == 5, "math abs negative")
+assert(5.abs() == 5, "math abs positive")
+
+// Math - pow
+assert(2.pow(10) == 1024, "math pow")
+assert(3.pow(0) == 1, "math pow 0")
+
+// Math - clamp
+assert(1.clamp(2, 5) == 2, "clamp below")
+assert(3.clamp(2, 5) == 3, "clamp within")
+assert(7.clamp(2, 5) == 5, "clamp above")
+
+// Math - factorial
+assert(5.factorial() == 120, "factorial")
+assert(0.factorial() == 1, "factorial 0")
+
+// Math - gcd
+assert(12.gcd(8) == 4, "gcd")
+assert(7.gcd(13) == 1, "gcd coprime")
+
+// Math - lcm
+assert(4.lcm(6) == 12, "lcm")
+
+// Math - sqrt
+let sq = 4.sqrt()
+assert(sq > 1.99, "sqrt lower")
+assert(sq < 2.01, "sqrt upper")
+
+// List - various operations already tested in test_lists
+// Just verify import works
+let l = [3, 1, 2]
+let sorted = l.bubblesort()
+assert(sorted[0] == 1, "list sort 0")
+assert(sorted[1] == 2, "list sort 1")
+assert(sorted[2] == 3, "list sort 2")
+
+// String - split
+let parts = "a,b,c".split(',')
+assert(parts.len() == 3, "string split length")
+assert(parts[0] == "a", "string split 0")
+assert(parts[1] == "b", "string split 1")
+assert(parts[2] == "c", "string split 2")
+
+println("PASS: test_imports")

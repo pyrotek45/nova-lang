@@ -1,0 +1,80 @@
+module test_ranges
+
+import super.std.list
+
+// Exclusive range in for-in
+let sum = 0
+for i in 1..5 {
+    sum += i
+}
+assert(sum == 10, "exclusive range 1..5 sums to 10")
+
+// Inclusive range in for-in
+let isum = 0
+for i in 1..=5 {
+    isum += i
+}
+assert(isum == 15, "inclusive range 1..=5 sums to 15")
+
+// Range starting from 0
+let zsum = 0
+for i in 0..3 {
+    zsum += i
+}
+assert(zsum == 3, "range 0..3 sums to 3")
+
+// Single element range
+let count = 0
+for i in 5..6 {
+    count += 1
+}
+assert(count == 1, "single element range")
+
+// Empty range
+let empty_count = 0
+for i in 5..5 {
+    empty_count += 1
+}
+assert(empty_count == 0, "empty range 5..5")
+
+// Range with .to()
+let to_result = 0.to(5)
+assert(to_result.len() == 5, ".to() length")
+assert(to_result[0] == 0, ".to() first")
+assert(to_result[4] == 4, ".to() last")
+
+// range() function
+let r = range(5)
+assert(r.len() == 5, "range(5) length")
+assert(r[0] == 0, "range(5) first")
+assert(r[4] == 4, "range(5) last")
+
+// range(start, end) function
+let r2 = range(3, 7)
+assert(r2.len() == 4, "range(3,7) length")
+assert(r2[0] == 3, "range(3,7) first")
+assert(r2[3] == 6, "range(3,7) last")
+
+// toStep
+let stepped = 0.toStep(10, 2)
+assert(stepped.len() == 5, "toStep length")
+assert(stepped[0] == 0, "toStep first")
+assert(stepped[1] == 2, "toStep second")
+assert(stepped[4] == 8, "toStep last")
+
+// iota
+let iota_result = 5.iota()
+assert(iota_result.len() == 5, "iota length")
+assert(iota_result[0] == 0, "iota first")
+assert(iota_result[4] == 4, "iota last")
+
+// Range in nested loop
+let grid_sum = 0
+for i in 0..3 {
+    for j in 0..3 {
+        grid_sum += 1
+    }
+}
+assert(grid_sum == 9, "nested range loops")
+
+println("PASS: test_ranges")

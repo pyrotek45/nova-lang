@@ -1,0 +1,52 @@
+module test_int_arithmetic
+
+// Basic integer arithmetic
+assert(1 + 1 == 2, "1 + 1 should be 2")
+assert(10 - 3 == 7, "10 - 3 should be 7")
+assert(4 * 5 == 20, "4 * 5 should be 20")
+assert(10 / 2 == 5, "10 / 2 should be 5")
+assert(10 % 3 == 1, "10 % 3 should be 1")
+
+// Zero
+assert(0 + 0 == 0, "0 + 0 should be 0")
+assert(0 * 100 == 0, "0 * 100 should be 0")
+assert(0 - 0 == 0, "0 - 0 should be 0")
+
+// Negative numbers
+assert(-5 + 3 == -2, "-5 + 3 should be -2")
+assert(-5 * -3 == 15, "-5 * -3 should be 15")
+assert(-10 / 2 == -5, "-10 / 2 should be -5")
+assert(-10 % 3 == 2, "-10 % 3 should be 2 (euclidean modulo)")
+
+// Large numbers
+assert(1000000 * 1000 == 1000000000, "large multiplication")
+assert(999999999 + 1 == 1000000000, "large addition")
+
+// Operator precedence
+assert(2 + 3 * 4 == 14, "precedence: 2 + 3 * 4 = 14")
+assert((2 + 3) * 4 == 20, "parentheses: (2 + 3) * 4 = 20")
+assert(10 - 2 * 3 == 4, "precedence: 10 - 2 * 3 = 4")
+assert(10 / 2 + 3 == 8, "precedence: 10 / 2 + 3 = 8")
+assert(10 % 3 + 1 == 2, "precedence: 10 % 3 + 1 = 2")
+
+// Compound expressions
+assert((1 + 2) * (3 + 4) == 21, "(1+2) * (3+4) = 21")
+assert(((2 + 3) * 4) / 5 == 4, "nested parens")
+
+// Assignment operators
+let x = 10
+x = x + 5
+assert(x == 15, "+= works")
+x = x - 3
+assert(x == 12, "-= works")
+x = x * 2
+assert(x == 24, "*= works")
+x = x / 6
+assert(x == 4, "/= works")
+
+// Negation
+let y = 5
+assert(-y == -5, "unary negation")
+assert(-(-y) == 5, "double negation")
+
+println("PASS: test_int_arithmetic")

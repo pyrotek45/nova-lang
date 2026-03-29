@@ -1,0 +1,122 @@
+module test_functions
+
+// Basic function
+fn add(x: Int, y: Int) -> Int {
+    return x + y
+}
+assert(add(3, 4) == 7, "basic function call")
+
+// Function with no return
+fn noop() {
+    let x = 1
+}
+noop()
+
+// Function returning value
+fn square(x: Int) -> Int {
+    return x * x
+}
+assert(square(5) == 25, "square function")
+
+// Recursive function
+fn factorial(n: Int) -> Int {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+assert(factorial(5) == 120, "factorial 5")
+assert(factorial(0) == 1, "factorial 0")
+assert(factorial(1) == 1, "factorial 1")
+
+// Fibonacci
+fn fib(n: Int) -> Int {
+    if n <= 1 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+assert(fib(0) == 0, "fib 0")
+assert(fib(1) == 1, "fib 1")
+assert(fib(10) == 55, "fib 10")
+
+// Universal function call syntax (UFCS)
+fn extends double(x: Int) -> Int {
+    return x * 2
+}
+assert(5.double() == 10, "UFCS call")
+assert(5.double() == 10, "regular call same result")
+
+// Chaining with UFCS
+fn extends inc(x: Int) -> Int {
+    return x + 1
+}
+assert(5.inc().double() == 12, "UFCS chaining")
+
+// Function overloading
+fn overloaded(x: Int) -> String {
+    return "int"
+}
+fn overloaded(x: String) -> String {
+    return "string"
+}
+assert(overloaded(1) == "int", "overload int")
+assert(overloaded("hi") == "string", "overload string")
+
+// Function pointers
+let fp = fn(x: Int) -> Int { return x * x }
+assert(fp(4) == 16, "function pointer")
+
+// Lambda / closure
+let multiplier = fn(x: Int, y: Int) -> Int { return x * y }
+assert(multiplier(3, 7) == 21, "lambda call")
+
+// Short lambda syntax
+let sq = |x: Int| x * x
+assert(sq(6) == 36, "short lambda")
+
+// Pipe operator
+let piped = 5 |> square()
+assert(piped == 25, "pipe operator")
+
+// Generic function (only works with concrete type wrappers, not raw $A extends)
+fn identity_int(x: Int) -> Int {
+    return x
+}
+fn identity_str(x: String) -> String {
+    return x
+}
+assert(identity_int(42) == 42, "generic identity int")
+assert(identity_str("hello") == "hello", "generic identity string")
+
+// Function returning function (currying)
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int { return x + n }
+}
+let add5 = make_adder(5)
+assert(add5(3) == 8, "curried function")
+assert(add5(10) == 15, "curried function 2")
+
+// Higher-order function
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+assert(apply(square@(Int), 4) == 16, "higher-order function")
+assert(apply(|x: Int| x + 1, 9) == 10, "higher-order with lambda")
+
+// Function with multiple returns via tuple
+fn divmod(a: Int, b: Int) -> (Int, Int) {
+    return (a / b, a % b)
+}
+let dm = divmod(17, 5)
+assert(dm[0] == 3, "divmod quotient")
+assert(dm[1] == 2, "divmod remainder")
+
+// UFCS-only extends function
+fn extends show_value(x: Int) -> String {
+    return Cast::string(x)
+}
+// Extends functions use UFCS syntax only
+assert(42.show_value() == "42", "extends function UFCS")
+
+println("PASS: test_functions")

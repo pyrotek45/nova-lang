@@ -1,0 +1,129 @@
+module test_control_flow
+
+// Basic if
+let x = 10
+if x > 5 {
+    assert(true, "if body executes")
+}
+
+// If-else
+let result = 0
+if false {
+    result = 1
+} else {
+    result = 2
+}
+assert(result == 2, "else branch")
+
+// If-elif-else
+let v = 5
+let label = ""
+if v > 10 {
+    label = "big"
+} elif v > 3 {
+    label = "medium"
+} else {
+    label = "small"
+}
+assert(label == "medium", "elif branch")
+
+// If as expression
+let r = if true { 42 } else { 0 }
+assert(r == 42, "if expression true branch")
+
+let r2 = if false { 42 } else { 99 }
+assert(r2 == 99, "if expression false branch")
+
+// Nested if
+let n = 15
+let cat = ""
+if n > 10 {
+    if n > 20 {
+        cat = "very big"
+    } else {
+        cat = "big"
+    }
+} else {
+    cat = "small"
+}
+assert(cat == "big", "nested if")
+
+// While loop
+let sum = 0
+let i = 1
+while i <= 10 {
+    sum += i
+    i += 1
+}
+assert(sum == 55, "while loop sum 1..10")
+
+// While with break
+let count = 0
+while true {
+    count += 1
+    if count == 5 {
+        break
+    }
+}
+assert(count == 5, "while break at 5")
+
+// While with continue
+let skip_sum = 0
+let j = 0
+while j < 10 {
+    j += 1
+    if j == 5 {
+        continue
+    }
+    skip_sum += j
+}
+assert(skip_sum == 50, "while continue skips 5")
+
+// For loop (c-style)
+let for_sum = 0
+for let k = 0; k < 5; k += 1 {
+    for_sum += k
+}
+assert(for_sum == 10, "for loop sum 0..4")
+
+// For-in loop with range
+let range_sum = 0
+for val in 1..5 {
+    range_sum += val
+}
+assert(range_sum == 10, "for-in range 1..5")
+
+// For-in inclusive range
+let irange_sum = 0
+for val in 1..=5 {
+    irange_sum += val
+}
+assert(irange_sum == 15, "for-in inclusive range 1..=5")
+
+// For-in over list
+let list_sum = 0
+for val in [10, 20, 30] {
+    list_sum += val
+}
+assert(list_sum == 60, "for-in over list")
+
+// Nested for loops
+let pairs = 0
+for let a = 0; a < 3; a += 1 {
+    for let b = 0; b < 3; b += 1 {
+        pairs += 1
+    }
+}
+assert(pairs == 9, "nested for loops 3x3")
+
+// Break in for loop
+let broke_at = 0
+for let m = 0; m < 100; m += 1 {
+    if m == 7 {
+        broke_at = m
+        break
+    }
+}
+assert(broke_at == 7, "break in for loop")
+
+println("PASS: test_control_flow")

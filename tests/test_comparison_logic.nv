@@ -1,0 +1,62 @@
+module test_comparison_logic
+
+// Integer equality
+assert(1 == 1, "int equality")
+assert(!(1 == 2), "int inequality via ==")
+assert(1 != 2, "int !=")
+assert(!(1 != 1), "int not !=")
+
+// Integer ordering
+assert(1 < 2, "1 < 2")
+assert(2 > 1, "2 > 1")
+assert(1 <= 1, "1 <= 1")
+assert(1 <= 2, "1 <= 2")
+assert(2 >= 2, "2 >= 2")
+assert(3 >= 2, "3 >= 2")
+assert(!(2 < 2), "not 2 < 2")
+assert(!(1 > 2), "not 1 > 2")
+
+// Float equality
+assert(1.0 == 1.0, "float equality")
+assert(1.0 != 2.0, "float inequality")
+
+// Float ordering
+assert(1.0 < 2.0, "float 1.0 < 2.0")
+assert(2.0 > 1.0, "float 2.0 > 1.0")
+
+// Boolean operations
+assert(true, "true is true")
+assert(!false, "!false is true")
+assert(!!true, "double negation")
+
+// AND
+assert(true && true, "true && true")
+assert(!(true && false), "not true && false")
+assert(!(false && true), "not false && true")
+assert(!(false && false), "not false && false")
+
+// OR
+assert(true || true, "true || true")
+assert(true || false, "true || false")
+assert(false || true, "false || true")
+assert(!(false || false), "not false || false")
+
+// Complex boolean expressions
+assert((1 < 2) && (3 > 2), "compound boolean")
+assert((1 > 2) || (3 > 2), "compound boolean with or")
+assert(!((1 > 2) && (3 > 2)), "negated compound")
+
+// String equality
+assert("hello" == "hello", "string equality")
+assert("hello" != "world", "string inequality")
+
+// Char equality
+assert('a' == 'a', "char equality")
+assert('a' != 'b', "char inequality")
+
+// Bool equality
+assert(true == true, "bool equality true")
+assert(false == false, "bool equality false")
+assert(true != false, "bool inequality")
+
+println("PASS: test_comparison_logic")

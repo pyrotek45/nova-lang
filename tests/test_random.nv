@@ -1,0 +1,28 @@
+module test_random
+
+// random(min, max) generates int in inclusive range [min, max]
+let r1 = random(0, 10)
+assert(r1 >= 0, "random >= min")
+assert(r1 <= 10, "random <= max")
+
+// Multiple random calls - random(5, 15) is inclusive so 5..=15
+let all_in_range = true
+for let i = 0; i < 100; i += 1 {
+    let r = random(5, 15)
+    if r < 5 || r > 15 {
+        all_in_range = false
+    }
+}
+assert(all_in_range, "100 random calls all in range")
+
+// random with same min/max
+let same = random(7, 7)
+assert(same == 7, "random with same min and max")
+
+// Random used for selection
+let choices = ["a", "b", "c", "d"]
+let idx = random(0, choices.len() - 1)
+assert(idx >= 0, "random index >= 0")
+assert(idx < choices.len(), "random index < len")
+
+println("PASS: test_random")

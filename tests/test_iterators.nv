@@ -1,0 +1,80 @@
+module test_iterators
+
+import super.std.iter
+import super.std.core
+import super.std.list
+
+// Iter from vector
+let it = Iter::fromVec([1, 2, 3])
+let collected = it.collect()
+assert(collected.len() == 3, "iter collect length")
+assert(collected[0] == 1, "iter collect 0")
+assert(collected[1] == 2, "iter collect 1")
+assert(collected[2] == 3, "iter collect 2")
+
+// Iter map
+let mapped = Iter::fromVec([1, 2, 3])
+    .map(|x: Int| x * 10)
+    .collect()
+assert(mapped[0] == 10, "iter map 0")
+assert(mapped[1] == 20, "iter map 1")
+assert(mapped[2] == 30, "iter map 2")
+
+// Iter filter
+let filtered = Iter::fromVec([1, 2, 3, 4, 5, 6])
+    .filter(|x: Int| x % 2 == 0)
+    .collect()
+assert(filtered.len() == 3, "iter filter length")
+assert(filtered[0] == 2, "iter filter 0")
+assert(filtered[1] == 4, "iter filter 1")
+assert(filtered[2] == 6, "iter filter 2")
+
+// Iter chained map + filter
+let result = Iter::fromVec([1, 2, 3, 4, 5])
+    .map(|x: Int| x * x)
+    .filter(|x: Int| x > 5)
+    .collect()
+assert(result.len() == 3, "chained iter length")
+assert(result[0] == 9, "chained iter 0")
+assert(result[1] == 16, "chained iter 1")
+assert(result[2] == 25, "chained iter 2")
+
+// Iter from range
+let range_iter = Iter::fromRange(0, 5).collect()
+assert(range_iter.len() == 5, "range iter length")
+assert(range_iter[0] == 0, "range iter 0")
+assert(range_iter[4] == 4, "range iter 4")
+
+// Iter fromFn
+let state = Box(0)
+let custom = Iter::fromFn(fn() -> Option(Int) {
+    if state.value >= 3 {
+        return None(Int)
+    }
+    let v = state.value
+    state.value += 1
+    return Some(v)
+}).collect()
+assert(custom.len() == 3, "fromFn iter length")
+assert(custom[0] == 0, "fromFn 0")
+assert(custom[2] == 2, "fromFn 2")
+
+// Double map
+let double_mapped = Iter::fromVec([2, 3, 4])
+    .map(|x: Int| x + 1)
+    .map(|x: Int| x * 2)
+    .collect()
+assert(double_mapped[0] == 6, "double map 0: (2+1)*2")
+assert(double_mapped[1] == 8, "double map 1: (3+1)*2")
+assert(double_mapped[2] == 10, "double map 2: (4+1)*2")
+
+// Enumerate
+let enumerated = Iter::fromVec(["a", "b", "c"])
+    .enumerate()
+    .collect()
+assert(enumerated.len() == 3, "enumerate length")
+assert(enumerated[0][0] == 0, "enumerate index 0")
+assert(enumerated[1][0] == 1, "enumerate index 1")
+assert(enumerated[2][0] == 2, "enumerate index 2")
+
+println("PASS: test_iterators")

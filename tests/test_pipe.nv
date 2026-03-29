@@ -1,0 +1,49 @@
+module test_pipe
+
+// Basic pipe operator - pipe feeds value as first arg
+// Pipe requires () syntax on target: expr |> fn()
+fn square(x: Int) -> Int {
+    return x * x
+}
+
+fn double(x: Int) -> Int {
+    return x * 2
+}
+
+fn inc(x: Int) -> Int {
+    return x + 1
+}
+
+// Simple pipe
+let a = 5 |> square()
+assert(a == 25, "pipe to square")
+
+// Chained pipe
+let b = 3 |> square() |> double()
+assert(b == 18, "pipe chain square then double")
+
+let c = 4 |> inc() |> square() |> double()
+assert(c == 50, "pipe chain inc, square, double: (4+1)^2*2 = 50")
+
+// Pipe to println-like (just testing pipe works with various functions)
+fn to_str(x: Int) -> String {
+    return Cast::string(x)
+}
+let s = 42 |> to_str()
+assert(s == "42", "pipe to string conversion")
+
+// Pipe result used in expression
+let result = (10 |> square()) + (5 |> square())
+assert(result == 125, "pipe results in expression")
+
+// UFCS chaining (similar to pipe but method style)
+fn extends ufcs_square(x: Int) -> Int {
+    return x * x
+}
+fn extends ufcs_double(x: Int) -> Int {
+    return x * 2
+}
+assert(3.ufcs_square().ufcs_double() == 18, "UFCS chain")
+assert(3 |> square() |> double() == 3.ufcs_square().ufcs_double(), "pipe equals UFCS")
+
+println("PASS: test_pipe")

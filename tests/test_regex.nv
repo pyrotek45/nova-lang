@@ -1,0 +1,30 @@
+module test_regex
+
+// Regex::matches(pattern, text) - pattern is first arg, text is second
+assert(Regex::matches("hello", "hello world"), "regex basic match")
+assert(Regex::matches("[0-9]+", "hello123"), "regex digit match")
+assert(!Regex::matches("[0-9]+", "hello"), "regex no match")
+
+// Regex with special patterns
+assert(Regex::matches("^abc$", "abc"), "regex exact match")
+assert(Regex::matches(".+@.+\\..+", "test@email.com"), "regex email-like")
+assert(Regex::matches("\\d{4}-\\d{2}-\\d{2}", "2024-01-15"), "regex date")
+
+// Regex captures - Regex::captures(pattern, text)
+let caps = Regex::captures("(\\d+)", "hello 42 world")
+assert(caps.len() > 0, "regex captures found")
+assert(caps[0] == "42", "regex capture value")
+
+// Multiple captures
+let multi_caps = Regex::captures("(\\d+)", "abc 123 def 456")
+assert(multi_caps.len() >= 1, "regex multi captures")
+
+// Regex first - Regex::first(pattern, text)
+let first = Regex::first("(\\d+)", "test 42 hello")
+assert(first.isSome(), "regex first found")
+
+// No match
+let no_match = Regex::first("(\\d+)", "hello world")
+assert(!no_match.isSome(), "regex first no match")
+
+println("PASS: test_regex")

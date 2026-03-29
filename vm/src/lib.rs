@@ -531,15 +531,8 @@ impl Vm {
                         .into(),
                     });
                 };
-                match (v1, v2) {
-                    (a, b) => {
-                        if a == b {
-                            self.state.memory.stack.push(VmData::Bool(true))
-                        } else {
-                            self.state.memory.stack.push(VmData::Bool(false))
-                        }
-                    }
-                }
+                let equal = self.deep_equal(&v1, &v2);
+                self.state.memory.stack.push(VmData::Bool(equal));
             }
 
             Code::NOT => match self.state.memory.stack.pop() {
@@ -839,6 +832,13 @@ impl Vm {
                     table.insert(name.clone(), i);
                 }
 
+                // Add the "type" field: allocate a string object with the struct name
+                let type_str_obj = Object::string(struct_name.clone());
+                let type_str_idx = self.state.memory.allocate(type_str_obj);
+                let type_field_index = field_values.len();
+                field_values.push(VmData::Object(type_str_idx));
+                table.insert("type".to_string(), type_field_index);
+
                 // Create the struct object
                 let obj = Object {
                     object_type: memory_manager::ObjectType::Struct(struct_name),
@@ -986,5 +986,45 @@ impl Vm {
     #[inline(always)]
     pub fn run_debug(&mut self) -> Result<(), NovaError> {
         Ok(())
+    }
+
+    /// Deep value equality for VmData, following heap references for objects.
+    fn deep_equal(&self, a: &VmData, b: &VmData) -> bool {
+        match (a, b) {
+            (VmData::Int(x), VmData::Int(y)) => x == y,
+            (VmData::Float(x), VmData::Float(y)) => x == y,
+            (VmData::Bool(x), VmData::Bool(y)) => x == y,
+            (VmData::Char(x), VmData::Char(y)) => x == y,
+            (VmData::None, VmData::None) => true,
+            (VmData::Function(x), VmData::Function(y)) => x == y,
+            (VmData::StackAddress(x), VmData::StackAddress(y)) => x == y,
+            (VmData::Object(idx_a), VmData::Object(idx_b)) => {
+                if idx_a == idx_b {
+                    return true; // same heap slot
+                }
+                let (obj_a, obj_b) = match (
+                    self.state.memory.ref_from_heap(*idx_a),
+                    self.state.memory.ref_from_heap(*idx_b),
+                ) {
+                    (Some(a), Some(b)) => (a, b),
+                    _ => return false,
+                };
+                if obj_a.get_type() != obj_b.get_type() {
+                    return false;
+                }
+                let data_a = obj_a.get_data();
+                let data_b = obj_b.get_data();
+                if data_a.len() != data_b.len() {
+                    return false;
+                }
+                for (va, vb) in data_a.iter().zip(data_b.iter()) {
+                    if !self.deep_equal(va, vb) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
     }
 }

@@ -1,0 +1,175 @@
+module test_gc_cycles
+
+import super.std.core
+import super.std.list
+
+// This file stress-tests the garbage collector with patterns
+// that create lots of objects and references
+
+// Test 1: Rapid create-destroy cycles
+fn rapid_cycles() {
+    for let cycle = 0; cycle < 100; cycle += 1 {
+        let a = [1, 2, 3, 4, 5]
+        let b = ["hello", "world"]
+        let c = Box(cycle)
+    }
+}
+rapid_cycles()
+assert(true, "rapid cycles survived")
+
+// Test 2: List of lists of lists
+fn deep_nesting() {
+    let outer = []: [[Int]]
+    for let i = 0; i < 20; i += 1 {
+        let middle = []: [Int]
+        for let j = 0; j < 10; j += 1 {
+            middle.push([j, j+1, j+2])
+        }
+        outer.push(middle)
+    }
+    assert(outer.len() == 20, "deep nesting outer length")
+    assert(outer[0].len() == 10, "deep nesting inner length")
+    assert(outer[0][0][0] == 0, "deep nesting value")
+}
+deep_nesting()
+
+// Test 3: Many string allocations
+fn string_alloc_pressure() {
+    let strings = []: String
+    for let i = 0; i < 500; i += 1 {
+        strings.push("string_number_" + Cast::string(i) + "_padding_text")
+    }
+    assert(strings.len() == 500, "string alloc count")
+    assert(strings[0] == "string_number_0_padding_text", "string alloc first")
+    assert(strings[499] == "string_number_499_padding_text", "string alloc last")
+}
+string_alloc_pressure()
+
+// Test 4: Struct with list field, repeatedly replaced
+struct Data {
+    values: [Int],
+}
+
+fn struct_replace_stress() {
+    let d = Data { values: []: Int }
+    for let i = 0; i < 100; i += 1 {
+        // Create a new list each time, old one should be GC'd
+        d.values = []: Int
+        for let j = 0; j < 50; j += 1 {
+            d.values.push(j)
+        }
+    }
+    assert(d.values.len() == 50, "struct replace final length")
+}
+struct_replace_stress()
+
+// Test 5: Closures capturing increasingly large environments
+fn closure_env_stress() {
+    let closures = []: fn() -> Int
+    for let i = 0; i < 50; i += 1 {
+        let a = i
+        let b = i * 2
+        let c = i * 3
+        closures.push(|| a + b + c)
+    }
+    assert(closures[0]() == 0, "closure env 0")
+    assert(closures[10]() == 60, "closure env 10: 10+20+30")
+    assert(closures[49]() == 294, "closure env 49: 49+98+147")
+}
+closure_env_stress()
+
+// Test 6: Object ping-pong (create, pass around, discard)
+struct Packet {
+    id: Int,
+    data: String,
+}
+
+fn process_packet(p: Packet) -> String {
+    return Cast::string(p.id) + ":" + p.data
+}
+
+fn packet_storm() {
+    for let i = 0; i < 200; i += 1 {
+        let p = Packet { id: i, data: "payload_" + Cast::string(i) }
+        let result = process_packet(p)
+        // result and p go out of scope
+    }
+}
+packet_storm()
+assert(true, "packet storm survived")
+
+// Test 7: Interleaved allocation of different types
+fn interleaved_types() {
+    let ints = []: Int
+    let strs = []: String
+    let lists = []: [Int]
+    
+    for let i = 0; i < 100; i += 1 {
+        ints.push(i)
+        strs.push("s" + Cast::string(i))
+        lists.push([i, i+1])
+    }
+    
+    assert(ints.len() == 100, "interleaved ints")
+    assert(strs.len() == 100, "interleaved strs")
+    assert(lists.len() == 100, "interleaved lists")
+}
+interleaved_types()
+
+// Test 8: Recursive struct building
+struct TreeNode {
+    value: Int,
+    children: [TreeNode],
+}
+
+fn build_tree(depth: Int, value: Int) -> TreeNode {
+    if depth == 0 {
+        return TreeNode { value: value, children: []: TreeNode }
+    }
+    let node = TreeNode { 
+        value: value, 
+        children: []: TreeNode 
+    }
+    node.children.push(build_tree(depth - 1, value * 2))
+    node.children.push(build_tree(depth - 1, value * 2 + 1))
+    return node
+}
+
+let tree = build_tree(5, 1)
+assert(tree.value == 1, "tree root value")
+assert(tree.children.len() == 2, "tree root children")
+assert(tree.children[0].value == 2, "tree left child")
+assert(tree.children[1].value == 3, "tree right child")
+
+// Test 9: Lots of temporary structs
+struct TempData {
+    x: Int,
+    y: Int,
+    label: String,
+}
+
+fn temp_struct_stress() {
+    let sum = 0
+    for let i = 0; i < 500; i += 1 {
+        let t = TempData { x: i, y: i * 2, label: Cast::string(i) }
+        sum += t.x + t.y
+    }
+    // sum = sum(i + 2i) for i in 0..499 = sum(3i) = 3 * (499*500/2) = 374250
+    assert(sum == 374250, "temp struct sum")
+}
+temp_struct_stress()
+
+// Test 10: Reuse of freed slots
+fn slot_reuse() {
+    for let round = 0; round < 10; round += 1 {
+        let batch = []: String
+        for let i = 0; i < 100; i += 1 {
+            batch.push("item_" + Cast::string(round) + "_" + Cast::string(i))
+        }
+        // batch goes out of scope, should free slots for next round
+    }
+}
+slot_reuse()
+assert(true, "slot reuse survived")
+
+println("PASS: test_gc_cycles")

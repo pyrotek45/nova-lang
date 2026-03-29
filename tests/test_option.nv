@@ -1,0 +1,80 @@
+module test_option
+
+// Option construction
+let some_val : Option(Int) = Some(42)
+let none_val : Option(Int) = None(Int)
+
+// isSome
+assert(some_val.isSome(), "Some isSome")
+assert(!none_val.isSome(), "None not isSome")
+
+// unwrap
+assert(some_val.unwrap() == 42, "unwrap Some")
+
+// Option with different types
+let str_opt : Option(String) = Some("hello")
+assert(str_opt.isSome(), "string option Some")
+assert(str_opt.unwrap() == "hello", "string option unwrap")
+
+let none_str : Option(String) = None(String)
+assert(!none_str.isSome(), "string option None")
+
+// Option with bool
+let bool_opt = Some(true)
+assert(bool_opt.isSome(), "bool option Some")
+assert(bool_opt.unwrap(), "bool option unwrap")
+
+// Conditional unwrap pattern
+let opt = Some(99)
+if opt.isSome() {
+    assert(opt.unwrap() == 99, "conditional unwrap")
+}
+
+// None in conditional
+let nopt : Option(Int) = None(Int)
+let entered = false
+if nopt.isSome() {
+    // Should not enter
+    assert(false, "should not enter None branch")
+}
+
+// if-let pattern
+let maybe = Some(7)
+if let val = maybe {
+    assert(val == 7, "if-let unwraps Some")
+}
+
+// if-let with None
+let nothing : Option(Int) = None(Int)
+let iflet_entered = false
+if let val = nothing {
+    iflet_entered = true
+}
+assert(!iflet_entered, "if-let does not enter for None")
+
+// Nested option
+let nested = Some(Some(42))
+assert(nested.isSome(), "nested option outer Some")
+let inner = nested.unwrap()
+assert(inner.isSome(), "nested option inner Some")
+assert(inner.unwrap() == 42, "nested option value")
+
+// Option in list
+let opts = [Some(1), None(Int), Some(3)]
+assert(opts[0].isSome(), "option in list 0")
+assert(!opts[1].isSome(), "option in list 1")
+assert(opts[2].isSome(), "option in list 2")
+
+// Cast::int returns Option
+let parsed = Cast::int("42")
+assert(parsed.isSome(), "Cast::int valid")
+assert(parsed.unwrap() == 42, "Cast::int value")
+
+let bad_parse = Cast::int("abc")
+assert(!bad_parse.isSome(), "Cast::int invalid")
+
+// Cast::float returns Option
+let parsed_f = Cast::float(42)
+assert(parsed_f.isSome(), "Cast::float valid")
+
+println("PASS: test_option")

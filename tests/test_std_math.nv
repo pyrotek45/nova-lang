@@ -1,0 +1,94 @@
+module test_std_math
+
+import super.std.math
+
+// min
+assert(3.min(5) == 3, "min smaller first")
+assert(5.min(3) == 3, "min smaller second")
+assert(4.min(4) == 4, "min equal")
+
+// max
+assert(3.max(5) == 5, "max larger second")
+assert(5.max(3) == 5, "max larger first")
+assert(4.max(4) == 4, "max equal")
+
+// abs
+assert(5.abs() == 5, "abs positive")
+assert((-5).abs() == 5, "abs negative")
+assert(0.abs() == 0, "abs zero")
+
+// pow
+assert(2.pow(0) == 1, "pow zero exp")
+assert(2.pow(1) == 2, "pow one exp")
+assert(2.pow(10) == 1024, "pow 2^10")
+assert(3.pow(4) == 81, "pow 3^4")
+assert(10.pow(3) == 1000, "pow 10^3")
+
+// sqrt (float)
+let s4 = 4.0.sqrt()
+assert(s4 > 1.99, "sqrt 4 lower bound")
+assert(s4 < 2.01, "sqrt 4 upper bound")
+
+let s9 = 9.sqrt()
+assert(s9 > 2.99, "sqrt 9 lower bound")
+assert(s9 < 3.01, "sqrt 9 upper bound")
+
+// clamp
+assert(1.clamp(2, 5) == 2, "clamp below min")
+assert(3.clamp(2, 5) == 3, "clamp in range")
+assert(7.clamp(2, 5) == 5, "clamp above max")
+assert(2.clamp(2, 5) == 2, "clamp at min")
+assert(5.clamp(2, 5) == 5, "clamp at max")
+
+// factorial
+assert(0.factorial() == 1, "factorial 0")
+assert(1.factorial() == 1, "factorial 1")
+assert(5.factorial() == 120, "factorial 5")
+assert(10.factorial() == 3628800, "factorial 10")
+
+// gcd
+assert(12.gcd(8) == 4, "gcd 12,8")
+assert(15.gcd(10) == 5, "gcd 15,10")
+assert(7.gcd(13) == 1, "gcd coprime")
+assert(100.gcd(75) == 25, "gcd 100,75")
+assert(0.gcd(5) == 5, "gcd 0,5")
+
+// lcm
+assert(4.lcm(6) == 12, "lcm 4,6")
+assert(3.lcm(5) == 15, "lcm 3,5")
+assert(12.lcm(18) == 36, "lcm 12,18")
+
+// exp (approximation)
+let e1 = 1.0.exp()
+assert(e1 > 2.71, "exp(1) lower")
+assert(e1 < 2.72, "exp(1) upper")
+
+let e0 = 0.0.exp()
+assert(e0 > 0.99, "exp(0) lower")
+assert(e0 < 1.01, "exp(0) upper")
+
+// bin
+let b = bin(10)
+assert(b == "1010", "bin 10")
+
+let b8 = bin(8)
+assert(b8 == "1000", "bin 8")
+
+let b255 = bin(255)
+assert(b255 == "11111111", "bin 255")
+
+// divmod
+let dm = divmod(17, 5)
+assert(dm[0] == 3, "divmod quotient")
+assert(dm[1] == 2, "divmod remainder")
+
+let dm2 = divmod(10, 3)
+assert(dm2[0] == 3, "divmod2 quotient")
+assert(dm2[1] == 1, "divmod2 remainder")
+
+// round
+assert(round(2.7) == 3, "round up")
+assert(round(2.3) == 2, "round down")
+assert(round(2.5) == 3, "round half up")
+
+println("PASS: test_std_math")

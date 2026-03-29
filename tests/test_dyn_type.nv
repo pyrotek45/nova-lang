@@ -1,0 +1,101 @@
+module test_dyn_type
+
+// Struct definitions for Dyn testing
+struct Dog {
+    name: String,
+    age: Int
+}
+
+struct Cat {
+    name: String,
+    lives: Int
+}
+
+struct Robot {
+    name: String,
+    model: Int
+}
+
+// Dyn type definition
+type named = Dyn(T = name: String)
+
+// Function accepting Dyn type
+fn get_name(thing: Dyn(T = name: String)) -> String {
+    return thing.name
+}
+
+let dog = Dog { name: "Rex", age: 5 }
+let cat = Cat { name: "Whiskers", lives: 9 }
+let robot = Robot { name: "R2D2", model: 2 }
+
+// Dyn field access
+assert(get_name(dog) == "Rex", "dyn get name dog")
+assert(get_name(cat) == "Whiskers", "dyn get name cat")
+assert(get_name(robot) == "R2D2", "dyn get name robot")
+
+// Multi-field Dyn
+fn get_name_and_age(x: Dyn(T = name: String + age: Int)) -> String {
+    return x.name + " " + Cast::string(x.age)
+}
+assert(get_name_and_age(dog) == "Rex 5", "dyn multi-field")
+
+// Dyn with function field (vtable pattern)
+struct Button {
+    label: String,
+    render: fn(Button) -> String
+}
+
+struct Link {
+    label: String,
+    url: String,
+    render: fn(Link) -> String
+}
+
+let btn = Button {
+    label: "Click",
+    render: fn(self: Button) -> String {
+        return "Button: " + self.label
+    }
+}
+
+let link = Link {
+    label: "Visit",
+    url: "http://example.com",
+    render: fn(self: Link) -> String {
+        return "Link: " + self.label
+    }
+}
+
+// Dyn with -> dispatch (calls the field function)
+type renderable = Dyn(T = render: fn($T) -> String + label: String)
+
+fn render_thing(item: renderable) -> String {
+    return item->render()
+}
+
+assert(render_thing(btn) == "Button: Click", "dyn -> dispatch button")
+assert(render_thing(link) == "Link: Visit", "dyn -> dispatch link")
+
+// Dyn field assignment
+fn change_name(x: Dyn(T = name: String)) {
+    x.name = "changed"
+}
+
+let d = Dog { name: "Fido", age: 3 }
+change_name(d)
+assert(d.name == "changed", "dyn field assignment")
+
+// Dyn in list
+let items = []: named
+items.push(dog)
+items.push(cat)
+items.push(robot)
+assert(items.len() == 3, "dyn list length")
+
+// Generic Dyn
+fn get_generic_name(x: Dyn(T = name: $S)) -> $S {
+    return x.name
+}
+assert(get_generic_name(dog) == "Rex", "generic dyn")
+
+println("PASS: test_dyn_type")

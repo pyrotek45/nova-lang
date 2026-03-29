@@ -1,0 +1,61 @@
+module test_hashmap
+
+import super.std.hashmap
+import super.std.list
+
+// HashMap creation
+let map = HashMap::default() @[K: String, V: Int]
+
+// Insert
+map.insert("one", 1)
+map.insert("two", 2)
+map.insert("three", 3)
+
+// Get
+let val = map.get("one")
+assert(val.isSome(), "hashmap get existing")
+assert(val.unwrap() == 1, "hashmap get value")
+
+let val2 = map.get("two")
+assert(val2.unwrap() == 2, "hashmap get two")
+
+// Get missing
+let missing = map.get("four")
+assert(!missing.isSome(), "hashmap get missing is None")
+
+// Has
+assert(map.has("one"), "hashmap has existing")
+assert(!map.has("four"), "hashmap has missing")
+
+// Update existing key
+map.insert("one", 100)
+assert(map.get("one").unwrap() == 100, "hashmap update")
+
+// Delete
+map.delete("two")
+assert(!map.has("two"), "hashmap delete removes key")
+assert(map.has("one"), "hashmap delete keeps other keys")
+
+// Int keys
+let int_map = HashMap::default() @[K: Int, V: String]
+int_map.insert(1, "one")
+int_map.insert(2, "two")
+int_map.insert(3, "three")
+assert(int_map.get(1).unwrap() == "one", "int key hashmap")
+assert(int_map.get(2).unwrap() == "two", "int key hashmap 2")
+assert(!int_map.get(99).isSome(), "int key hashmap missing")
+
+// toString
+let display = Cast::string(map)
+assert(display.len() > 0, "hashmap toString not empty")
+
+// Multiple operations
+let m2 = HashMap::default() @[K: String, V: Int]
+for let i = 0; i < 10; i += 1 {
+    m2.insert(Cast::string(i), i * i)
+}
+assert(m2.get("0").unwrap() == 0, "batch insert 0")
+assert(m2.get("5").unwrap() == 25, "batch insert 5")
+assert(m2.get("9").unwrap() == 81, "batch insert 9")
+
+println("PASS: test_hashmap")

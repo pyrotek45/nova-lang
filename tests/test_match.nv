@@ -1,0 +1,89 @@
+module test_match
+
+import super.std.core
+
+// Match on enum
+enum Animal {
+    Dog: String,
+    Cat: String,
+    Fish
+}
+
+fn animal_sound(a: Animal) -> String {
+    match a {
+        Dog(name) => { return name + " says woof" }
+        Cat(name) => { return name + " says meow" }
+        Fish() => { return "..." }
+    }
+    return "unknown"
+}
+
+assert(animal_sound(Animal::Dog("Rex")) == "Rex says woof", "match dog")
+assert(animal_sound(Animal::Cat("Whiskers")) == "Whiskers says meow", "match cat")
+assert(animal_sound(Animal::Fish()) == "...", "match fish")
+
+// Match with Option
+fn describe_opt(o: Option(Int)) -> String {
+    if o.isSome() {
+        return "has: " + Cast::string(o.unwrap())
+    }
+    return "empty"
+}
+assert(describe_opt(Some(42)) == "has: 42", "match option some")
+assert(describe_opt(None(Int)) == "empty", "match option none")
+
+// Match extracting values
+enum Expr {
+    Num: Int,
+    Add: (Int, Int),
+    Neg: Int
+}
+
+fn eval(e: Expr) -> Int {
+    match e {
+        Num(n) => { return n }
+        Add(pair) => { return pair[0] + pair[1] }
+        Neg(n) => { return -n }
+    }
+    return 0
+}
+
+assert(eval(Expr::Num(42)) == 42, "match Num")
+assert(eval(Expr::Add((3, 4))) == 7, "match Add")
+assert(eval(Expr::Neg(5)) == -5, "match Neg")
+
+// Nested match
+enum Tree {
+    Leaf: Int,
+    Branch: (Int, Int)
+}
+
+fn tree_sum(t: Tree) -> Int {
+    match t {
+        Leaf(v) => { return v }
+        Branch(pair) => { return pair[0] + pair[1] }
+    }
+    return 0
+}
+
+assert(tree_sum(Tree::Leaf(10)) == 10, "tree leaf")
+assert(tree_sum(Tree::Branch((3, 7))) == 10, "tree branch")
+
+// Multiple matches in sequence
+fn classify(x: Int) -> String {
+    if x < 0 {
+        return "negative"
+    } elif x == 0 {
+        return "zero"
+    } elif x < 10 {
+        return "small"
+    } else {
+        return "big"
+    }
+}
+assert(classify(-5) == "negative", "classify negative")
+assert(classify(0) == "zero", "classify zero")
+assert(classify(5) == "small", "classify small")
+assert(classify(100) == "big", "classify big")
+
+println("PASS: test_match")

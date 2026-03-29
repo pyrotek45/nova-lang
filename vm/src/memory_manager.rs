@@ -771,6 +771,14 @@ impl MemoryManager {
             }
         }
         self.shrink_heap();
+
+        // show debug info about heap after collection
+        println!(
+            "GC: live objects = {}, heap size = {}, free list size = {}",
+            self.live_count(),
+            self.heap.len(),
+            self.free_list.len()
+        );  
     }
 
     pub fn store(&mut self, index: usize, value: VmData) {

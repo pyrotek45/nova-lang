@@ -1,0 +1,57 @@
+module test_strings
+
+// String literals
+let s = "hello"
+assert(s == "hello", "string literal")
+
+// String concatenation
+let a = "hello" + " " + "world"
+assert(a == "hello world", "string concatenation")
+
+// String length
+assert("hello".len() == 5, "string length")
+assert("".len() == 0, "empty string length")
+assert("abc".len() == 3, "string length 3")
+
+// String chars
+let chars = "abc".chars()
+assert(chars.len() == 3, "chars length")
+assert(chars[0] == 'a', "first char")
+assert(chars[1] == 'b', "second char")
+assert(chars[2] == 'c', "third char")
+
+// Chars back to string
+let rebuilt = "hello".chars().string()
+assert(rebuilt == "hello", "chars roundtrip")
+
+// Escape sequences
+let newline = "a\nb"
+assert(newline.len() == 3, "newline in string")
+
+let tab = "a\tb"
+assert(tab.len() == 3, "tab in string")
+
+// String comparison
+assert("abc" == "abc", "string eq")
+assert("abc" != "def", "string ne")
+
+// String from Cast
+let num_str = Cast::string(42)
+assert(num_str == "42", "Cast::string int")
+
+let float_str = Cast::string(3.14)
+assert(float_str.len() > 0, "Cast::string float not empty")
+
+let bool_str = Cast::string(true)
+assert(bool_str == "true", "Cast::string bool")
+
+// format function
+let formatted = format("{} + {} = {}", [Cast::string(1), Cast::string(2), Cast::string(3)])
+assert(formatted == "1 + 2 = 3", "format function")
+
+// String concatenation with +=
+let greeting = "hello"
+greeting = greeting + "!"
+assert(greeting == "hello!", "string concat with reassignment")
+
+println("PASS: test_strings")

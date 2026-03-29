@@ -1,0 +1,124 @@
+module test_struct_methods
+
+// Struct with extends methods
+struct Counter {
+    value: Int,
+}
+
+fn extends inc(self: Counter) {
+    self.value += 1
+}
+
+fn extends dec(self: Counter) {
+    self.value -= 1
+}
+
+fn extends get(self: Counter) -> Int {
+    return self.value
+}
+
+fn extends reset(self: Counter) {
+    self.value = 0
+}
+
+fn extends add_n(self: Counter, n: Int) {
+    self.value += n
+}
+
+// Test basic methods
+let c = Counter { value: 0 }
+c.inc()
+assert(c.get() == 1, "counter inc")
+c.inc()
+c.inc()
+assert(c.get() == 3, "counter triple inc")
+c.dec()
+assert(c.get() == 2, "counter dec")
+c.reset()
+assert(c.get() == 0, "counter reset")
+c.add_n(10)
+assert(c.get() == 10, "counter add_n")
+
+// Static call syntax
+Counter::inc(c)
+assert(c.get() == 11, "static call inc")
+
+// Struct with function field and -> dispatch
+struct Entity {
+    hp: Int,
+    name: String,
+    damage: fn(Entity, Int),
+    describe: fn(Entity) -> String,
+}
+
+fn make_entity(n: String, h: Int) -> Entity {
+    return Entity {
+        hp: h,
+        name: n,
+        damage: fn(self: Entity, amount: Int) {
+            self.hp -= amount
+        },
+        describe: fn(self: Entity) -> String {
+            return self.name + " HP:" + Cast::string(self.hp)
+        }
+    }
+}
+
+let hero = make_entity("Hero", 100)
+assert(hero->describe() == "Hero HP:100", "entity describe")
+hero->damage(25)
+assert(hero.hp == 75, "entity damage")
+assert(hero->describe() == "Hero HP:75", "entity after damage")
+
+// Struct containing another struct
+struct Inventory {
+    owner: Entity,
+    items: [String],
+}
+
+fn extends add_item(self: Inventory, item: String) {
+    self.items.push(item)
+}
+
+fn extends item_count(self: Inventory) -> Int {
+    return self.items.len()
+}
+
+let inv = Inventory {
+    owner: hero,
+    items: []: String,
+}
+inv.add_item("Sword")
+inv.add_item("Shield")
+assert(inv.item_count() == 2, "inventory item count")
+assert(inv.items[0] == "Sword", "inventory first item")
+
+// Method chaining pattern via return self
+struct Builder {
+    parts: [String],
+}
+
+fn extends add(self: Builder, part: String) -> Builder {
+    self.parts.push(part)
+    return self
+}
+
+fn extends build(self: Builder) -> String {
+    let result = ""
+    for let i = 0; i < self.parts.len(); i += 1 {
+        result = result + self.parts[i]
+        if i < self.parts.len() - 1 {
+            result = result + "-"
+        }
+    }
+    return result
+}
+
+let built = Builder { parts: []: String }
+    .add("A")
+    .add("B")
+    .add("C")
+    .build()
+assert(built == "A-B-C", "builder pattern")
+
+println("PASS: test_struct_methods")

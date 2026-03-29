@@ -1,0 +1,51 @@
+module test_clone
+
+import super.std.list
+
+// Clone a list
+let original = [1, 2, 3]
+let cloned = clone(original)
+assert(cloned.len() == 3, "cloned list length")
+assert(cloned[0] == 1, "cloned list value")
+
+// Mutating clone doesn't affect original
+cloned[0] = 99
+assert(original[0] == 1, "original unchanged after clone mutation")
+assert(cloned[0] == 99, "clone changed")
+
+// Clone a nested list
+let nested = [[1, 2], [3, 4]]
+let nested_clone = clone(nested)
+nested_clone[0][0] = 99
+// Deep clone should make the inner lists independent too
+// (or not, depending on implementation — testing behavior)
+assert(nested_clone[0][0] == 99, "nested clone modified")
+
+// Clone string
+let s = "hello"
+let s2 = clone(s)
+assert(s2 == "hello", "clone string")
+
+// Clone in loop
+let lists = []: [Int]
+let base = [0]
+for let i = 0; i < 5; i += 1 {
+    base[0] = i
+    lists.push(clone(base))
+}
+assert(lists.len() == 5, "cloned in loop length")
+assert(lists[0][0] == 0, "cloned in loop 0")
+assert(lists[4][0] == 4, "cloned in loop 4")
+
+// Clone struct
+struct Point {
+    x: Int,
+    y: Int,
+}
+let p1 = Point(1, 2)
+let p2 = clone(p1)
+p2.x = 99
+assert(p1.x == 1, "struct clone original unchanged")
+assert(p2.x == 99, "struct clone modified")
+
+println("PASS: test_clone")
