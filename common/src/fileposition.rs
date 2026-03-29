@@ -1,6 +1,6 @@
 use std::{path::Path, rc::Rc};
 
-use crate::error::NovaError;
+use crate::error::{NovaError, NovaResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FilePosition {
@@ -19,13 +19,13 @@ impl Default for FilePosition {
     }
 }
 
-pub fn load_file_content(path: &Path) -> Result<String, NovaError> {
+pub fn load_file_content(path: &Path) -> NovaResult<String> {
     let source = match std::fs::read_to_string(path) {
         Ok(content) => content,
         Err(_) => {
-            return Err(NovaError::File {
+            return Err(Box::new(NovaError::File {
                 msg: format!(" '{}' is not a valid filepath", path.display()).into(),
-            })
+            }))
         }
     };
     Ok(source)

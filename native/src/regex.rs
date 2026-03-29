@@ -1,41 +1,41 @@
-use common::error::NovaError;
+use common::error::{NovaError, NovaResult};
 use vm::memory_manager::{Object, VmData};
 use vm::state;
 
 /// Helper to pop a string Object from the stack and return the String value.
 /// Decrements the reference count of the Object.
-fn pop_string(state: &mut state::State) -> Result<String, NovaError> {
+fn pop_string(state: &mut state::State) -> NovaResult<String> {
     match state.memory.stack.pop() {
         Some(VmData::Object(index)) => {
             let s = state
                 .memory
                 .ref_from_heap(index)
                 .and_then(|obj| obj.as_string())
-                .ok_or(NovaError::Runtime {
+                .ok_or(Box::new(NovaError::Runtime {
                     msg: "Expected a string in the heap".into(),
-                })?;
+                }))?;
             state.memory.dec(index);
             Ok(s)
         }
-        Some(_) => Err(NovaError::Runtime {
+        Some(_) => Err(Box::new(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
-        }),
-        None => Err(NovaError::Runtime {
+        })),
+        None => Err(Box::new(NovaError::Runtime {
             msg: "Stack is empty".into(),
-        }),
+        })),
     }
 }
 
-pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
+pub fn regex_match(state: &mut state::State) -> NovaResult<()> {
     let text = pop_string(state)?;
     let pattern = pop_string(state)?;
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: format!("Invalid regex pattern: {e}").into(),
-            })
+            }))
         }
     };
 
@@ -44,16 +44,16 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
+pub fn regex_captures(state: &mut state::State) -> NovaResult<()> {
     let text = pop_string(state)?;
     let pattern = pop_string(state)?;
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: format!("Invalid regex pattern: {e}").into(),
-            })
+            }))
         }
     };
 
@@ -72,16 +72,16 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
+pub fn regex_first(state: &mut state::State) -> NovaResult<()> {
     let text = pop_string(state)?;
     let pattern = pop_string(state)?;
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: format!("Invalid regex pattern: {}", e).into(),
-            })
+            }))
         }
     };
 

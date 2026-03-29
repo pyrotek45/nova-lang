@@ -7,6 +7,12 @@ use std::{
     path::Path,
 };
 
+/// A boxed result alias used throughout the compiler pipeline.
+/// `NovaError` is a large enum (>128 bytes due to `TType` fields),
+/// so we box it in `Result` to keep return values pointer-sized on the
+/// error path and satisfy clippy::result_large_err.
+pub type NovaResult<T> = Result<T, Box<NovaError>>;
+
 // ───────────────────────────────────────────────────────────────────
 // Source-reading helper
 // ───────────────────────────────────────────────────────────────────
@@ -21,7 +27,11 @@ where
 
 /// Read a window of source lines around `center` (1-indexed).
 /// Returns `Vec<(line_number, line_text)>`.
-fn read_source_window(filepath: Option<&Path>, center: usize, radius: usize) -> Vec<(usize, String)> {
+fn read_source_window(
+    filepath: Option<&Path>,
+    center: usize,
+    radius: usize,
+) -> Vec<(usize, String)> {
     let path = filepath.unwrap_or(Path::new(""));
     let Ok(lines) = read_lines(path) else {
         return Vec::new();
@@ -95,7 +105,11 @@ fn render_snippet(position: &FilePosition, label: &str) {
                 .map(|c| if c == '\t' { '\t' } else { ' ' })
                 .collect();
             // Determine underline length: at least 1 char, up to next whitespace or end
-            let rest = &text[text.char_indices().nth(col).map(|(i, _)| i).unwrap_or(text.len())..];
+            let rest = &text[text
+                .char_indices()
+                .nth(col)
+                .map(|(i, _)| i)
+                .unwrap_or(text.len())..];
             let underline_len = rest
                 .chars()
                 .take_while(|c| !c.is_whitespace())
@@ -147,11 +161,7 @@ fn render_location_header(kind: &str, position: &FilePosition) {
 /// Render a help/note line.
 fn render_note(note: &str) {
     if !note.is_empty() {
-        println!(
-            "  {} {}",
-            "help:".bright_cyan().bold(),
-            note.bright_cyan()
-        );
+        println!("  {} {}", "help:".bright_cyan().bold(), note.bright_cyan());
     }
 }
 
@@ -174,9 +184,7 @@ fn render_footer() {
 #[derive(Debug, Clone)]
 pub enum NovaError {
     /// Error opening / reading a source file.
-    File {
-        msg: Cow<'static, str>,
-    },
+    File { msg: Cow<'static, str> },
 
     /// Lexer encountered an invalid token or unterminated literal.
     Lexing {
@@ -200,9 +208,7 @@ pub enum NovaError {
     },
 
     /// VM runtime error (no source location available).
-    Runtime {
-        msg: Cow<'static, str>,
-    },
+    Runtime { msg: Cow<'static, str> },
 
     /// VM runtime error with source location.
     RuntimeWithPos {
@@ -266,29 +272,19 @@ impl NovaError {
     pub fn show_without_position(&self) {
         match self {
             NovaError::File { msg } => {
-                println!(
-                    "\n  {} {}\n",
-                    "error:".bright_red().bold(),
-                    msg.bold()
-                );
+                println!("\n  {} {}\n", "error:".bright_red().bold(), msg.bold());
             }
 
             NovaError::Lexing { msg, note, .. } => {
-                println!(
-                    "\n  {} {}",
-                    "error[Lexer]:".bright_red().bold(),
-                    msg.bold()
-                );
+                println!("\n  {} {}", "error[Lexer]:".bright_red().bold(), msg.bold());
                 render_note(note);
                 render_footer();
             }
 
-            NovaError::Parsing { msg, note, extra, .. } => {
-                println!(
-                    "\n  {} {}",
-                    "error:".bright_red().bold(),
-                    msg.bold()
-                );
+            NovaError::Parsing {
+                msg, note, extra, ..
+            } => {
+                println!("\n  {} {}", "error:".bright_red().bold(), msg.bold());
                 if let Some(extras) = extra {
                     for (extra_msg, _) in extras {
                         println!(
@@ -334,11 +330,7 @@ impl NovaError {
                 found,
                 ..
             } => {
-                println!(
-                    "\n  {} {}",
-                    "error[Type]:".bright_red().bold(),
-                    msg.bold()
-                );
+                println!("\n  {} {}", "error[Type]:".bright_red().bold(), msg.bold());
                 println!(
                     "  {} {}    {} {}",
                     "expected:".bright_green().bold(),

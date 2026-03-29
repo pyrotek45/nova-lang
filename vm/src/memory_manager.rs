@@ -22,16 +22,17 @@ pub enum VmData {
     None,
 }
 
-impl VmData {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for VmData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VmData::Int(i) => i.to_string(),
-            VmData::Float(f) => f.to_string(),
-            VmData::Bool(b) => b.to_string(),
-            VmData::Char(c) => c.to_string(),
-            VmData::Function(idx) => format!("Function({})", idx),
-            VmData::Object(idx) => format!("Object({})", idx),
-            _ => "None".to_string(),
+            VmData::Int(i) => write!(f, "{}", i),
+            VmData::Float(v) => write!(f, "{}", v),
+            VmData::Bool(b) => write!(f, "{}", b),
+            VmData::Char(c) => write!(f, "{}", c),
+            VmData::Function(idx) => write!(f, "Function({})", idx),
+            VmData::Object(idx) => write!(f, "Object({})", idx),
+            VmData::StackAddress(addr) => write!(f, "StackAddress({})", addr),
+            VmData::None => write!(f, "None"),
         }
     }
 }
@@ -120,7 +121,7 @@ impl Object {
     pub fn get(&self, key: &str) -> Option<VmData> {
         if let Some(&index) = self.table.get(key) {
             if index < self.data.len() {
-                return Some(self.data[index].clone());
+                return Some(self.data[index]);
             }
         }
         None
@@ -136,6 +137,10 @@ impl Object {
 
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 
     pub fn get_type(&self) -> &ObjectType {
@@ -182,7 +187,7 @@ impl Object {
             let mut result = HashMap::new();
             for (key, &index) in &self.table {
                 if index < self.data.len() {
-                    result.insert(key.clone(), self.data[index].clone());
+                    result.insert(key.clone(), self.data[index]);
                 }
             }
             return Some(result);
@@ -310,7 +315,7 @@ impl MemoryManager {
                                     }
                                 })
                                 .collect();
-                            format!("{}", chars)
+                            chars.to_string()
                         }
                         ObjectType::Closure(func_ptr) => {
                             format!(
@@ -430,36 +435,30 @@ impl MemoryManager {
 
     #[inline]
     pub fn dec(&mut self, index: usize) {
-        if let Some(slot) = self.heap.get_mut(index) {
-            if let Some(entry) = slot {
-                if entry.ref_count > 0 {
-                    entry.ref_count -= 1;
+        if let Some(Some(entry)) = self.heap.get_mut(index) {
+            if entry.ref_count > 0 {
+                entry.ref_count -= 1;
+            }
+            if entry.ref_count == 0 {
+                let entry = self.heap[index].take().unwrap();
+
+                for child in &entry.object.data {
+                    if let Some(child_idx) = get_heap_index(child) {
+                        self.dec(child_idx);
+                    }
                 }
-                if entry.ref_count == 0 {
-                    let entry = self.heap[index].take().unwrap();
-                    // print out freed debug info
-                    //println!("Freed: {:?}", entry.object);
-                    // free the entry and its children
 
-                    for child in &entry.object.data {
-                        if let Some(child_idx) = get_heap_index(child) {
-                            self.dec(child_idx);
-                        }
-                    }
+                // After recursive dec of children, the heap may have shrunk.
+                // Re-check whether this index is still within bounds.
+                if index >= self.heap.len() {
+                    return;
+                }
 
-                    // After recursive dec of children, the heap may have shrunk.
-                    // Re-check whether this index is still within bounds.
-                    if index >= self.heap.len() {
-                        // Already removed by shrink_heap during child processing
-                        return;
-                    }
-
-                    if index == self.heap.len() - 1 {
-                        self.heap.pop();
-                        self.shrink_heap();
-                    } else {
-                        self.free_list.push(index);
-                    }
+                if index == self.heap.len() - 1 {
+                    self.heap.pop();
+                    self.shrink_heap();
+                } else {
+                    self.free_list.push(index);
                 }
             }
         }
@@ -689,7 +688,7 @@ impl MemoryManager {
                 self.allocate(Object {
                     object_type: ObjectType::Enum {
                         name: name.clone(),
-                        tag: tag,
+                        tag,
                     },
                     table: HashMap::new(),
                     data: new_data,
@@ -729,7 +728,7 @@ impl MemoryManager {
                         }
                     }
                     ObjectType::Struct(_) => {
-                        for (_key, &item) in &entry.object.table {
+                        for &item in entry.object.table.values() {
                             if let Some(child_idx) = get_heap_index(&entry.object.data[item]) {
                                 if child_idx < len && !marked[child_idx] {
                                     marked[child_idx] = true;
@@ -778,15 +777,13 @@ impl MemoryManager {
             self.live_count(),
             self.heap.len(),
             self.free_list.len()
-        );  
+        );
     }
 
     pub fn store(&mut self, index: usize, value: VmData) {
         // Decrement the reference count of the old value
-        if let Some(old_value) = self.stack.get(index).cloned() {
-            if let VmData::Object(idx) = old_value {
-                self.dec(idx);
-            }
+        if let Some(VmData::Object(idx)) = self.stack.get(index).cloned() {
+            self.dec(idx);
         }
         if let Some(slot) = self.stack.get_mut(index) {
             *slot = value;
@@ -796,10 +793,8 @@ impl MemoryManager {
     pub fn pop_store_index(&mut self, index: usize) {
         if let Some(value) = self.stack.pop() {
             // Decrement the reference count of the old value
-            if let Some(old_value) = self.stack.get(index) {
-                if let VmData::Object(idx) = old_value {
-                    self.dec(*idx);
-                }
+            if let Some(VmData::Object(idx)) = self.stack.get(index) {
+                self.dec(*idx);
             }
             // Increment the reference count of the new value
             self.stack[index] = value;

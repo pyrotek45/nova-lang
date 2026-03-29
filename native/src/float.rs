@@ -1,14 +1,14 @@
-use common::error::NovaError;
+use common::error::{NovaError, NovaResult};
 use vm::memory_manager::VmData;
 use vm::state;
 
-pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
+pub fn int_to_float(state: &mut state::State) -> NovaResult<()> {
     let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: "Stack is empty".into(),
-            })
+            }))
         }
     };
     let float = match data {

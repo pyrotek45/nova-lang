@@ -12,7 +12,7 @@ impl Code {
     pub const DIRECTCALL: u8 = 3;
     pub const NATIVE: u8 = 4;
 
-    // Function and Closure Construction 
+    // Function and Closure Construction
     pub const FUNCTION: u8 = 5;
     pub const CLOSURE: u8 = 6;
 
@@ -38,7 +38,7 @@ impl Code {
     // Number Operations
     pub const NEG: u8 = 21;
     pub const EQUALS: u8 = 22;
-    
+
     // True/False and Logic Operations
     pub const TRUE: u8 = 24;
     pub const FALSE: u8 = 25;
@@ -59,7 +59,7 @@ impl Code {
     pub const ALLOCATEGLOBAL: u8 = 34;
     pub const ALLOCLOCALS: u8 = 35;
 
-    // Local Memory 
+    // Local Memory
     pub const STORE: u8 = 36;
     pub const GET: u8 = 37;
     pub const ASSIGN: u8 = 38;
@@ -69,11 +69,11 @@ impl Code {
     pub const GETGLOBAL: u8 = 40;
 
     // List Construction and Operations
-    pub const NEWLIST: u8 = 41;   
+    pub const NEWLIST: u8 = 41;
     pub const LINDEX: u8 = 42;
     pub const PINDEX: u8 = 43;
-    
-    // String Construction and Operations 
+
+    // String Construction and Operations
     pub const STRING: u8 = 44;
     pub const CONCAT: u8 = 45;
 
@@ -81,7 +81,7 @@ impl Code {
     pub const NONE: u8 = 46;
     pub const ISSOME: u8 = 47;
     pub const UNWRAP: u8 = 48;
-    
+
     // Char
     pub const CHAR: u8 = 49;
 

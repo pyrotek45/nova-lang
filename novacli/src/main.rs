@@ -1,4 +1,4 @@
-use common::error::NovaError;
+use common::error::NovaResult;
 use novacore::NovaCore;
 use rand::Rng;
 use reedline::{
@@ -23,14 +23,14 @@ fn entry_command() -> Option<()> {
     args.next(); // Skip the file path
     let command = args.next()?;
 
-    let handle_error = |result: Result<(), NovaError>| {
+    let handle_error = |result: NovaResult<()>| {
         if let Err(e) = result {
             e.show();
             exit(1);
         }
     };
 
-    let execute_command = |filepath: &Path, action: fn(NovaCore) -> Result<(), NovaError>| {
+    let execute_command = |filepath: &Path, action: fn(NovaCore) -> NovaResult<()>| {
         let novacore = compile_file_or_exit(filepath);
         handle_error(action(novacore));
     };

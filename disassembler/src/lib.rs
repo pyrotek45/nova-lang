@@ -116,10 +116,7 @@ impl Disassembler {
         Some(out)
     }
 
-    pub fn dis(
-        &mut self,
-        mut input: std::vec::IntoIter<u8>,
-    ) -> Result<(), common::error::NovaError> {
+    pub fn dis(&mut self, mut input: std::vec::IntoIter<u8>) -> common::error::NovaResult<()> {
         while let Some(code) = self.next(&mut input) {
             print!("{} : ", self.ip);
             match code {
