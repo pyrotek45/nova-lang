@@ -1,0 +1,4 @@
+module syntax_double_assign
+// SHOULD FAIL: double assignment in one expression
+let x: Int = 5
+let x: Int = 10

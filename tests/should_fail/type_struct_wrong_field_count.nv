@@ -1,0 +1,9 @@
+module type_struct_wrong_field_count
+// SHOULD FAIL: positional constructor with wrong number of fields
+struct Triple {
+    x: Int,
+    y: Int,
+    z: Int,
+}
+
+let t = Triple(1, 2)

@@ -1,0 +1,84 @@
+module test_nested_structs
+
+import super.std.core
+
+// Test deeply nested struct access and modification
+
+struct Address {
+    street: String,
+    city: String,
+    zip: Int,
+}
+
+struct Company {
+    name: String,
+    address: Address,
+}
+
+struct Employee {
+    name: String,
+    company: Company,
+    age: Int,
+}
+
+let addr = Address { street: "123 Main St", city: "Springfield", zip: 62701 }
+let co = Company { name: "Acme", address: addr }
+let emp = Employee { name: "Alice", company: co, age: 30 }
+
+// Deeply nested field access
+assert(emp.company.address.city == "Springfield", "deep nested read")
+assert(emp.company.address.zip == 62701, "deep nested int read")
+assert(emp.company.name == "Acme", "nested read")
+
+// Nested field assignment
+emp.company.address.city = "Shelbyville"
+assert(emp.company.address.city == "Shelbyville", "deep nested write")
+
+emp.age = 31
+assert(emp.age == 31, "top-level field write")
+
+// Struct with list field
+struct Team {
+    name: String,
+    scores: [Int],
+}
+
+let team = Team { name: "Hawks", scores: [10, 20, 30] }
+assert(team.scores[0] == 10, "struct list field index 0")
+assert(team.scores[2] == 30, "struct list field index 2")
+
+team.scores[1] = 99
+assert(team.scores[1] == 99, "struct list field assignment")
+
+// Struct with Option field
+struct Profile {
+    name: String,
+    email: Option(String),
+}
+
+let p1 = Profile { name: "Bob", email: Some("bob@test.com") }
+let p2 = Profile { name: "Eve", email: None(String) }
+
+assert(p1.email.isSome(), "option field isSome")
+assert(p1.email.unwrap() == "bob@test.com", "option field unwrap")
+assert(!p2.email.isSome(), "option field none")
+
+// Struct with tuple field
+struct Bounds {
+    min: (Int, Int),
+    max: (Int, Int),
+}
+
+let bounds = Bounds { min: (0, 0), max: (100, 200) }
+assert(bounds.min[0] == 0, "tuple field access 0")
+assert(bounds.max[1] == 200, "tuple field access 1")
+
+// Struct in a list
+let addresses: [Address] = [
+    Address("1st Ave", "NY", 10001),
+    Address("2nd Ave", "LA", 90001),
+]
+assert(addresses[0].city == "NY", "struct list element field")
+assert(addresses[1].zip == 90001, "struct list element int field")
+
+println("PASS: test_nested_structs")

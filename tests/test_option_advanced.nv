@@ -1,0 +1,73 @@
+module test_option_advanced
+
+import super.std.core
+
+// Option basic operations
+let some_val: Option(Int) = Some(42)
+let none_val: Option(Int) = None(Int)
+
+assert(some_val.isSome(), "some isSome")
+assert(!none_val.isSome(), "none not isSome")
+assert(some_val.unwrap() == 42, "some unwrap")
+
+// Option in struct field
+struct Config {
+    name: String,
+    port: Option(Int),
+}
+
+let c1 = Config { name: "dev", port: Some(8080) }
+let c2 = Config { name: "prod", port: None(Int) }
+
+assert(c1.port.isSome(), "struct option some")
+assert(!c2.port.isSome(), "struct option none")
+assert(c1.port.unwrap() == 8080, "struct option unwrap")
+
+// Option with if-let
+if let val = some_val {
+    assert(val == 42, "if-let unwraps some")
+}
+
+let was_none = Box(true)
+if let val = none_val {
+    was_none.value = false
+}
+assert(was_none.value, "if-let skips none")
+
+// While-let
+let counter = Box(0)
+let opt_stream = Box(Some(1))
+while let v = opt_stream.value {
+    counter.value = counter.value + v
+    if counter.value >= 3 {
+        opt_stream.value = None(Int)
+    }
+}
+assert(counter.value == 3, "while-let loop")
+
+// Option in list
+let opts: [Option(Int)] = [Some(1), None(Int), Some(3)]
+assert(opts[0].isSome(), "list option 0 some")
+assert(!opts[1].isSome(), "list option 1 none")
+assert(opts[2].unwrap() == 3, "list option 2 unwrap")
+
+// Nested option usage
+fn find_positive(n: Int) -> Option(Int) {
+    if n > 0 {
+        return Some(n)
+    }
+    return None(Int)
+}
+
+assert(find_positive(5).isSome(), "find positive found")
+assert(find_positive(5).unwrap() == 5, "find positive value")
+assert(!find_positive(-1).isSome(), "find positive not found")
+
+// Option string type
+let greeting: Option(String) = Some("hello")
+assert(greeting.unwrap() == "hello", "option string unwrap")
+
+let empty_greeting: Option(String) = None(String)
+assert(!empty_greeting.isSome(), "option string none")
+
+println("PASS: test_option_advanced")

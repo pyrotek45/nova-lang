@@ -1,0 +1,5 @@
+module type_list_concat_mismatch
+// SHOULD FAIL: cannot concatenate lists of different types
+let a = [1, 2, 3]
+let b = ["x", "y"]
+let c = a + b

@@ -1,0 +1,3 @@
+module type_negate_non_numeric
+// SHOULD FAIL: cannot negate a string
+let x = -"hello"

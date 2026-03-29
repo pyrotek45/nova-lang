@@ -1,0 +1,58 @@
+module test_string_operations
+
+import super.std.core
+import super.std.string
+import super.std.list
+
+// String comparison
+assert("abc" == "abc", "string eq")
+assert("abc" != "xyz", "string ne")
+
+// String concatenation
+assert("hello" + " " + "world" == "hello world", "string concat")
+assert("" + "x" == "x", "concat with empty")
+
+// String length
+assert("hello".len() == 5, "string length 5")
+assert("".len() == 0, "empty string length 0")
+
+// String chars and iteration
+let chars = "abc".chars()
+assert(chars.len() == 3, "chars length")
+
+// String split (from std.string, splits on Char)
+let parts = "a,b,c".split(',')
+assert(parts.len() == 3, "split length")
+assert(parts[0] == "a", "split first")
+assert(parts[2] == "c", "split last")
+
+// String indexing with chars
+let greeting = "hello"
+let char_list = greeting.chars()
+assert(char_list[0] == 'h', "char at 0")
+assert(char_list[4] == 'o', "char at 4")
+
+// String from char list
+let clist = ['h', 'i'].string()
+assert(clist == "hi", "string from char list")
+
+// Multi-line string (escape sequences)
+let escaped = "line1\nline2"
+assert(escaped.len() == 11, "string with newline length")
+
+// Format
+let formatted = format("x={}", Cast::string(42))
+assert(formatted == "x=42", "format with int")
+
+// Char list manipulation
+let letters = "hello".chars()
+let filtered = letters.filter(fn(c: Char) -> Bool { return c != 'l' })
+let result = filtered.string()
+assert(result == "heo", "filter chars and back to string")
+
+// Map over char list
+let upper_h = "Hello".chars()
+assert(upper_h[0] == 'H', "uppercase char")
+assert(upper_h[1] == 'e', "lowercase char")
+
+println("PASS: test_string_operations")
