@@ -1,0 +1,40 @@
+module test_std_color
+
+import super.std.color
+
+// --- Core colors ---
+assert(white() == (255, 255, 255), "white")
+assert(black() == (0, 0, 0), "black")
+assert(red() == (230, 41, 55), "red")
+assert(green() == (0, 228, 48), "green")
+assert(blue() == (0, 121, 241), "blue")
+
+// --- Palette colors ---
+assert(lightGray() == (200, 200, 200), "lightGray")
+assert(gold() == (255, 203, 0), "gold")
+
+// --- rgb helper ---
+let c = rgb(100, 150, 200)
+assert(c == (100, 150, 200), "rgb helper")
+
+// --- invert ---
+let inv = invert(white())
+assert(inv == (0, 0, 0), "invert white = black")
+
+let inv2 = invert(black())
+assert(inv2 == (255, 255, 255), "invert black = white")
+
+// --- lerpColor ---
+let mid = lerpColor(black(), white(), 0.5)
+assert(mid[0] >= 126 && mid[0] <= 128, "lerp midpoint r")
+assert(mid[1] >= 126 && mid[1] <= 128, "lerp midpoint g")
+assert(mid[2] >= 126 && mid[2] <= 128, "lerp midpoint b")
+
+// --- darken/lighten ---
+let dark = darken(white(), 1.0)
+assert(dark == (0, 0, 0), "darken white fully = black")
+
+let light = lighten(black(), 1.0)
+assert(light == (255, 255, 255), "lighten black fully = white")
+
+println("PASS: test_std_color")

@@ -26,7 +26,8 @@ fn pop_int(state: &mut state::State) -> NovaResult<i64> {
 /// sleep(ms: Int)
 pub fn sleep(state: &mut state::State) -> NovaResult<()> {
     let ms = pop_int(state)?;
-    let delay = time::Duration::from_millis(ms as u64);
+    let safe_ms = if ms < 0 { 0u64 } else { ms as u64 };
+    let delay = time::Duration::from_millis(safe_ms);
     thread::sleep(delay);
     Ok(())
 }

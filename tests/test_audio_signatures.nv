@@ -1,0 +1,40 @@
+module test_audio_signatures
+
+// Test that audio function signatures are recognized by the typechecker.
+// We cannot actually call initAudio in a headless test environment,
+// so we wrap each call in a never-executed branch to verify signatures
+// compile without error.
+
+// Helper: wrapping calls inside `if false {}` ensures the typechecker
+// validates the signature without executing at runtime.
+
+if false {
+    raylib::initAudio()
+    raylib::closeAudio()
+    raylib::setMasterVolume(0.5)
+    let sid = raylib::loadSound("test.wav")
+    raylib::playSound(sid)
+    raylib::stopSound(sid)
+    raylib::pauseSound(sid)
+    raylib::resumeSound(sid)
+    let sp = raylib::isSoundPlaying(sid)
+    raylib::setSoundVolume(sid, 0.5)
+    raylib::setSoundPitch(sid, 1.0)
+    let mid = raylib::loadMusic("test.ogg")
+    raylib::playMusic(mid)
+    raylib::updateMusic(mid)
+    raylib::stopMusic(mid)
+    raylib::pauseMusic(mid)
+    raylib::resumeMusic(mid)
+    let mp = raylib::isMusicPlaying(mid)
+    raylib::setMusicVolume(mid, 0.5)
+    raylib::setMusicPitch(mid, 1.0)
+    let ml = raylib::getMusicLength(mid)
+    let mt = raylib::getMusicTimePlayed(mid)
+    raylib::seekMusic(mid, 0.0)
+    raylib::setMusicLooping(mid, true)
+}
+
+assert(true, "All 24 audio function signatures recognized")
+
+println("PASS: test_audio_signatures")

@@ -39,6 +39,9 @@ pub struct State {
     pub draw_queue: Vec<Draw>,
     pub sprites: Vec<Rc<Texture2D>>,
     pub current_dir: PathBuf,
+    pub audio_initialized: bool,
+    pub sounds: Vec<raylib::ffi::Sound>,
+    pub music: Vec<raylib::ffi::Music>,
 }
 
 impl std::fmt::Debug for State {
@@ -66,6 +69,9 @@ impl Clone for State {
             draw_queue: self.draw_queue.clone(),
             sprites: self.sprites.clone(),
             current_dir: self.current_dir.clone(),
+            audio_initialized: self.audio_initialized,
+            sounds: vec![],
+            music: vec![],
         }
     }
 }
@@ -90,6 +96,9 @@ impl State {
             draw_queue: vec![],
             sprites: vec![],
             current_dir: PathBuf::new(),
+            audio_initialized: false,
+            sounds: vec![],
+            music: vec![],
         }
     }
 

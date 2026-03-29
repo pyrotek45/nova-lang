@@ -56,25 +56,29 @@ fn pop_string(state: &mut state::State) -> NovaResult<String> {
 
 /// terminal::rawmode(Bool) -> Void
 pub fn rawmode(state: &mut state::State) -> NovaResult<()> {
-    if let Some(VmData::Bool(bool)) = state.memory.stack.pop() {
-        if bool {
-            terminal::enable_raw_mode().expect("could not enable raw mode");
+    if let Some(VmData::Bool(b)) = state.memory.stack.pop() {
+        if b {
+            terminal::enable_raw_mode()
+                .map_err(|e| runtime_err(format!("rawmode enable failed: {e}")))?;
         } else {
-            terminal::disable_raw_mode().expect("Could not disable raw mode")
+            terminal::disable_raw_mode()
+                .map_err(|e| runtime_err(format!("rawmode disable failed: {e}")))?;
         }
     }
-    execute!(stdout(), MoveToNextLine(0)).unwrap();
+    execute!(stdout(), MoveToNextLine(0))
+        .map_err(|e| runtime_err(format!("rawmode cursor move failed: {e}")))?;
     Ok(())
 }
 
 /// terminal::getch() -> Option(Char)
 pub fn getch(state: &mut state::State) -> NovaResult<()> {
+    let event = event::read().map_err(|e| runtime_err(format!("getch read failed: {e}")))?;
     if let Event::Key(KeyEvent {
         code: KeyCode::Char(character),
         modifiers: event::KeyModifiers::NONE,
         kind: _,
         state: _,
-    }) = event::read().expect("Failed to read line")
+    }) = event
     {
         state.memory.stack.push(VmData::Char(character))
     } else {
@@ -86,13 +90,18 @@ pub fn getch(state: &mut state::State) -> NovaResult<()> {
 /// terminal::rawread(Int) -> Option(Char)
 pub fn rawread(state: &mut state::State) -> NovaResult<()> {
     if let Some(VmData::Int(time)) = state.memory.stack.pop() {
-        if event::poll(Duration::from_millis(time as u64)).expect("Error") {
+        let ms = if time < 0 { 0u64 } else { time as u64 };
+        let ready = event::poll(Duration::from_millis(ms))
+            .map_err(|e| runtime_err(format!("rawread poll failed: {e}")))?;
+        if ready {
+            let ev = event::read()
+                .map_err(|e| runtime_err(format!("rawread read failed: {e}")))?;
             if let Event::Key(KeyEvent {
                 code: KeyCode::Char(character),
                 modifiers: event::KeyModifiers::NONE,
                 kind: _,
                 state: _,
-            }) = event::read().expect("Failed to read line")
+            }) = ev
             {
                 state.memory.stack.push(VmData::Char(character));
             } else {
@@ -107,20 +116,24 @@ pub fn rawread(state: &mut state::State) -> NovaResult<()> {
 
 /// terminal::clearScreen() -> Void
 pub fn clear_screen(_state: &mut state::State) -> NovaResult<()> {
-    execute!(stdout(), terminal::Clear(terminal::ClearType::All)).unwrap();
-    execute!(stdout(), MoveTo(0, 0)).unwrap();
+    execute!(stdout(), terminal::Clear(terminal::ClearType::All))
+        .map_err(|e| runtime_err(format!("clearScreen failed: {e}")))?;
+    execute!(stdout(), MoveTo(0, 0))
+        .map_err(|e| runtime_err(format!("clearScreen cursor move failed: {e}")))?;
     Ok(())
 }
 
 /// terminal::hideCursor() -> Void
 pub fn hide_cursor(_state: &mut state::State) -> NovaResult<()> {
-    execute!(stdout(), crossterm::cursor::Hide).unwrap();
+    execute!(stdout(), crossterm::cursor::Hide)
+        .map_err(|e| runtime_err(format!("hideCursor failed: {e}")))?;
     Ok(())
 }
 
 /// terminal::showCursor() -> Void
 pub fn show_cursor(_state: &mut state::State) -> NovaResult<()> {
-    execute!(stdout(), crossterm::cursor::Show).unwrap();
+    execute!(stdout(), crossterm::cursor::Show)
+        .map_err(|e| runtime_err(format!("showCursor failed: {e}")))?;
     Ok(())
 }
 

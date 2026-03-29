@@ -837,3 +837,351 @@ fn string_to_mouse_button(s: &str) -> Option<MouseButton> {
         _ => None,
     }
 }
+
+// ---------------------------------------------------------------
+// Audio functions
+// ---------------------------------------------------------------
+
+/// raylib::initAudio() -> Void
+/// Initialize the audio device. Must be called before loading sounds/music.
+pub fn raylib_init_audio(state: &mut state::State) -> NovaResult<()> {
+    if state.audio_initialized {
+        return Ok(()); // already initialized
+    }
+    unsafe {
+        raylib::ffi::InitAudioDevice();
+    }
+    if unsafe { raylib::ffi::IsAudioDeviceReady() } {
+        state.audio_initialized = true;
+        Ok(())
+    } else {
+        Err(Box::new(NovaError::Runtime {
+            msg: "Failed to initialize audio device".into(),
+        }))
+    }
+}
+
+/// raylib::closeAudio() -> Void
+/// Close the audio device.
+pub fn raylib_close_audio(state: &mut state::State) -> NovaResult<()> {
+    if !state.audio_initialized {
+        return Ok(());
+    }
+    // Unload all sounds and music first
+    for s in state.sounds.drain(..) {
+        unsafe { raylib::ffi::UnloadSound(s) };
+    }
+    for m in state.music.drain(..) {
+        unsafe { raylib::ffi::UnloadMusicStream(m) };
+    }
+    unsafe {
+        raylib::ffi::CloseAudioDevice();
+    }
+    state.audio_initialized = false;
+    Ok(())
+}
+
+/// raylib::setMasterVolume(volume: Float) -> Void
+pub fn raylib_set_master_volume(state: &mut state::State) -> NovaResult<()> {
+    let vol = pop_float(state)? as f32;
+    unsafe { raylib::ffi::SetMasterVolume(vol) };
+    Ok(())
+}
+
+/// raylib::loadSound(path: String) -> Int  (returns a sound index)
+pub fn raylib_load_sound(state: &mut state::State) -> NovaResult<()> {
+    let path = pop_string(state)?;
+    if !state.audio_initialized {
+        return Err(Box::new(NovaError::Runtime {
+            msg: "Audio device not initialized. Call raylib::initAudio() first.".into(),
+        }));
+    }
+    let full_path = state.current_dir.join(&path);
+    let c_path = std::ffi::CString::new(full_path.to_string_lossy().as_ref()).map_err(|_| {
+        Box::new(NovaError::Runtime {
+            msg: "Invalid file path for loadSound".into(),
+        })
+    })?;
+    let sound = unsafe { raylib::ffi::LoadSound(c_path.as_ptr()) };
+    if unsafe { !raylib::ffi::IsSoundValid(sound) } {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Failed to load sound: {}", path).into(),
+        }));
+    }
+    let idx = state.sounds.len();
+    state.sounds.push(sound);
+    state.memory.stack.push(VmData::Int(idx as i64));
+    Ok(())
+}
+
+/// raylib::playSound(id: Int) -> Void
+pub fn raylib_play_sound(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::PlaySound(state.sounds[id]) };
+    Ok(())
+}
+
+/// raylib::stopSound(id: Int) -> Void
+pub fn raylib_stop_sound(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::StopSound(state.sounds[id]) };
+    Ok(())
+}
+
+/// raylib::pauseSound(id: Int) -> Void
+pub fn raylib_pause_sound(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::PauseSound(state.sounds[id]) };
+    Ok(())
+}
+
+/// raylib::resumeSound(id: Int) -> Void
+pub fn raylib_resume_sound(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::ResumeSound(state.sounds[id]) };
+    Ok(())
+}
+
+/// raylib::isSoundPlaying(id: Int) -> Bool
+pub fn raylib_is_sound_playing(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    let playing = unsafe { raylib::ffi::IsSoundPlaying(state.sounds[id]) };
+    state.memory.stack.push(VmData::Bool(playing));
+    Ok(())
+}
+
+/// raylib::setSoundVolume(id: Int, volume: Float) -> Void
+pub fn raylib_set_sound_volume(state: &mut state::State) -> NovaResult<()> {
+    let vol = pop_float(state)? as f32;
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::SetSoundVolume(state.sounds[id], vol) };
+    Ok(())
+}
+
+/// raylib::setSoundPitch(id: Int, pitch: Float) -> Void
+pub fn raylib_set_sound_pitch(state: &mut state::State) -> NovaResult<()> {
+    let pitch = pop_float(state)? as f32;
+    let id = pop_int(state)? as usize;
+    if id >= state.sounds.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid sound id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::SetSoundPitch(state.sounds[id], pitch) };
+    Ok(())
+}
+
+/// raylib::loadMusic(path: String) -> Int  (returns a music index)
+pub fn raylib_load_music(state: &mut state::State) -> NovaResult<()> {
+    let path = pop_string(state)?;
+    if !state.audio_initialized {
+        return Err(Box::new(NovaError::Runtime {
+            msg: "Audio device not initialized. Call raylib::initAudio() first.".into(),
+        }));
+    }
+    let full_path = state.current_dir.join(&path);
+    let c_path = std::ffi::CString::new(full_path.to_string_lossy().as_ref()).map_err(|_| {
+        Box::new(NovaError::Runtime {
+            msg: "Invalid file path for loadMusic".into(),
+        })
+    })?;
+    let music = unsafe { raylib::ffi::LoadMusicStream(c_path.as_ptr()) };
+    if unsafe { !raylib::ffi::IsMusicValid(music) } {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Failed to load music: {}", path).into(),
+        }));
+    }
+    let idx = state.music.len();
+    state.music.push(music);
+    state.memory.stack.push(VmData::Int(idx as i64));
+    Ok(())
+}
+
+/// raylib::playMusic(id: Int) -> Void
+pub fn raylib_play_music(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::PlayMusicStream(state.music[id]) };
+    Ok(())
+}
+
+/// raylib::updateMusic(id: Int) -> Void
+/// Must be called every frame for music to keep playing.
+pub fn raylib_update_music(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::UpdateMusicStream(state.music[id]) };
+    Ok(())
+}
+
+/// raylib::stopMusic(id: Int) -> Void
+pub fn raylib_stop_music(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::StopMusicStream(state.music[id]) };
+    Ok(())
+}
+
+/// raylib::pauseMusic(id: Int) -> Void
+pub fn raylib_pause_music(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::PauseMusicStream(state.music[id]) };
+    Ok(())
+}
+
+/// raylib::resumeMusic(id: Int) -> Void
+pub fn raylib_resume_music(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::ResumeMusicStream(state.music[id]) };
+    Ok(())
+}
+
+/// raylib::isMusicPlaying(id: Int) -> Bool
+pub fn raylib_is_music_playing(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    let playing = unsafe { raylib::ffi::IsMusicStreamPlaying(state.music[id]) };
+    state.memory.stack.push(VmData::Bool(playing));
+    Ok(())
+}
+
+/// raylib::setMusicVolume(id: Int, volume: Float) -> Void
+pub fn raylib_set_music_volume(state: &mut state::State) -> NovaResult<()> {
+    let vol = pop_float(state)? as f32;
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::SetMusicVolume(state.music[id], vol) };
+    Ok(())
+}
+
+/// raylib::setMusicPitch(id: Int, pitch: Float) -> Void
+pub fn raylib_set_music_pitch(state: &mut state::State) -> NovaResult<()> {
+    let pitch = pop_float(state)? as f32;
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::SetMusicPitch(state.music[id], pitch) };
+    Ok(())
+}
+
+/// raylib::getMusicLength(id: Int) -> Float
+pub fn raylib_get_music_length(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    let len = unsafe { raylib::ffi::GetMusicTimeLength(state.music[id]) };
+    state.memory.stack.push(VmData::Float(len as f64));
+    Ok(())
+}
+
+/// raylib::getMusicTimePlayed(id: Int) -> Float
+pub fn raylib_get_music_time_played(state: &mut state::State) -> NovaResult<()> {
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    let time = unsafe { raylib::ffi::GetMusicTimePlayed(state.music[id]) };
+    state.memory.stack.push(VmData::Float(time as f64));
+    Ok(())
+}
+
+/// raylib::seekMusic(id: Int, position: Float) -> Void
+pub fn raylib_seek_music(state: &mut state::State) -> NovaResult<()> {
+    let pos = pop_float(state)? as f32;
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    unsafe { raylib::ffi::SeekMusicStream(state.music[id], pos) };
+    Ok(())
+}
+
+/// raylib::setMusicLooping(id: Int, looping: Bool) -> Void
+pub fn raylib_set_music_looping(state: &mut state::State) -> NovaResult<()> {
+    let looping = match pop_or_err(state)? {
+        VmData::Bool(b) => b,
+        _ => {
+            return Err(Box::new(NovaError::Runtime {
+                msg: "Expected Bool for looping parameter".into(),
+            }))
+        }
+    };
+    let id = pop_int(state)? as usize;
+    if id >= state.music.len() {
+        return Err(Box::new(NovaError::Runtime {
+            msg: format!("Invalid music id: {}", id).into(),
+        }));
+    }
+    state.music[id].looping = looping;
+    Ok(())
+}

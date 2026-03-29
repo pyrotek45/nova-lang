@@ -1,0 +1,191 @@
+module widget
+
+import color
+
+// ---------------------------------------------------------------------------
+// Simple raylib GUI widgets for game UIs.
+// All draw functions push to the raylib draw queue via raylib:: functions.
+// ---------------------------------------------------------------------------
+
+// --- Rect helper ---
+
+struct Rect {
+    x: Int,
+    y: Int,
+    w: Int,
+    h: Int
+}
+
+fn extends contains(r: Rect, px: Int, py: Int) -> Bool {
+    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h
+}
+
+// --- Button ---
+
+struct Button {
+    rect: Rect,
+    label: String,
+    bg: (Int, Int, Int),
+    fg: (Int, Int, Int),
+    fontSize: Int
+}
+
+fn extends(Button) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Button {
+    return Button {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        label: label,
+        bg: color::darkGray(),
+        fg: color::white(),
+        fontSize: 20
+    }
+}
+
+fn extends draw(btn: Button) {
+    raylib::drawRectangle(btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, btn.bg)
+    let tw = raylib::measureText(btn.label, btn.fontSize)
+    let tx = btn.rect.x + (btn.rect.w - tw) / 2
+    let ty = btn.rect.y + (btn.rect.h - btn.fontSize) / 2
+    raylib::drawText(btn.label, tx, ty, btn.fontSize, btn.fg)
+}
+
+fn extends isClicked(btn: Button) -> Bool {
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        return btn.rect.contains(pos[0], pos[1])
+    }
+    return false
+}
+
+fn extends isHovered(btn: Button) -> Bool {
+    let pos = raylib::mousePosition()
+    return btn.rect.contains(pos[0], pos[1])
+}
+
+fn extends drawWithHover(btn: Button, hoverBg: (Int, Int, Int)) {
+    if btn.isHovered() {
+        raylib::drawRectangle(btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, hoverBg)
+    } else {
+        raylib::drawRectangle(btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, btn.bg)
+    }
+    let tw = raylib::measureText(btn.label, btn.fontSize)
+    let tx = btn.rect.x + (btn.rect.w - tw) / 2
+    let ty = btn.rect.y + (btn.rect.h - btn.fontSize) / 2
+    raylib::drawText(btn.label, tx, ty, btn.fontSize, btn.fg)
+}
+
+// --- Label ---
+
+struct Label {
+    x: Int,
+    y: Int,
+    text: String,
+    color: (Int, Int, Int),
+    fontSize: Int
+}
+
+fn extends(Label) new(x: Int, y: Int, text: String) -> Label {
+    return Label {
+        x: x,
+        y: y,
+        text: text,
+        color: color::white(),
+        fontSize: 20
+    }
+}
+
+fn extends draw(lbl: Label) {
+    raylib::drawText(lbl.text, lbl.x, lbl.y, lbl.fontSize, lbl.color)
+}
+
+// --- Panel ---
+
+struct Panel {
+    rect: Rect,
+    bg: (Int, Int, Int),
+    borderColor: (Int, Int, Int)
+}
+
+fn extends(Panel) new(x: Int, y: Int, w: Int, h: Int) -> Panel {
+    return Panel {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        bg: (40, 40, 40),
+        borderColor: color::gray()
+    }
+}
+
+fn extends draw(panel: Panel) {
+    raylib::drawRectangle(panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h, panel.bg)
+    raylib::drawRectangleLines(panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h, panel.borderColor)
+}
+
+// --- ProgressBar ---
+
+struct ProgressBar {
+    rect: Rect,
+    value: Float,
+    maxValue: Float,
+    bg: (Int, Int, Int),
+    fg: (Int, Int, Int)
+}
+
+fn extends(ProgressBar) new(x: Int, y: Int, w: Int, h: Int) -> ProgressBar {
+    return ProgressBar {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        value: 0.0,
+        maxValue: 100.0,
+        bg: color::darkGray(),
+        fg: color::green()
+    }
+}
+
+fn extends draw(bar: ProgressBar) {
+    raylib::drawRectangle(bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h, bar.bg)
+    let ratio = bar.value / bar.maxValue
+    let fillW = Cast::int(Cast::float(bar.rect.w).unwrap() * ratio).unwrap()
+    raylib::drawRectangle(bar.rect.x, bar.rect.y, fillW, bar.rect.h, bar.fg)
+    raylib::drawRectangleLines(bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h, color::gray())
+}
+
+// --- Toggle ---
+
+struct Toggle {
+    rect: Rect,
+    label: String,
+    on: Bool,
+    onColor: (Int, Int, Int),
+    offColor: (Int, Int, Int),
+    fg: (Int, Int, Int),
+    fontSize: Int
+}
+
+fn extends(Toggle) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Toggle {
+    return Toggle {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        label: label,
+        on: false,
+        onColor: color::green(),
+        offColor: color::darkGray(),
+        fg: color::white(),
+        fontSize: 20
+    }
+}
+
+fn extends draw(tog: Toggle) {
+    if tog.on {
+        raylib::drawRectangle(tog.rect.x, tog.rect.y, tog.rect.w, tog.rect.h, tog.onColor)
+    } else {
+        raylib::drawRectangle(tog.rect.x, tog.rect.y, tog.rect.w, tog.rect.h, tog.offColor)
+    }
+    let tw = raylib::measureText(tog.label, tog.fontSize)
+    let tx = tog.rect.x + (tog.rect.w - tw) / 2
+    let ty = tog.rect.y + (tog.rect.h - tog.fontSize) / 2
+    raylib::drawText(tog.label, tx, ty, tog.fontSize, tog.fg)
+}
+
+fn extends isClicked(tog: Toggle) -> Bool {
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        return tog.rect.contains(pos[0], pos[1])
+    }
+    return false
+}

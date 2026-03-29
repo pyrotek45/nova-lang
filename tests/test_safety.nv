@@ -1,0 +1,101 @@
+module test_safety
+
+// Tests that native functions handle edge cases gracefully
+// instead of crashing (panicking). These all verify runtime
+// error handling or safe clamping behaviour.
+
+import super.std.list
+import super.std.string
+import super.std.math
+
+// --- String::repeat with negative count should return empty ---
+let r = "abc".repeat(-5)
+assert(r == "", "repeat with negative count returns empty")
+
+// --- String::repeat with zero ---
+let r2 = "abc".repeat(0)
+assert(r2 == "", "repeat with zero returns empty")
+
+// --- sleep with negative is clamped to 0 (should not hang) ---
+sleep(-100)
+assert(true, "sleep(-100) did not hang or crash")
+
+// --- chr() with valid ASCII ---
+let c = chr(65)
+assert(c == 'A', "chr(65) == 'A'")
+
+// --- chr() with valid Unicode ---
+let c2 = chr(9829)
+assert(true, "chr(9829) did not crash")
+
+// --- String::substring edge cases ---
+let s = "hello"
+let sub1 = s.substring(0, 0)
+assert(sub1 == "", "substring(0,0) is empty")
+
+let sub2 = s.substring(0, 100)
+assert(sub2.len() <= s.len(), "substring clamps end")
+
+// --- String::charAt edge cases ---
+let ch = s.charAt(-1)
+assert(ch.isNone(), "charAt(-1) returns None")
+
+let ch2 = s.charAt(100)
+assert(ch2.isNone(), "charAt(100) returns None")
+
+let ch3 = s.charAt(0)
+assert(ch3.isSome(), "charAt(0) returns Some")
+
+// --- String::indexOf not found returns -1 ---
+let idx = "hello".indexOf("xyz")
+assert(idx == -1, "indexOf not found returns -1")
+
+// --- String::split empty delimiter ---
+let parts = "hello".split("")
+assert(true, "split with empty delimiter did not crash")
+
+// --- List operations on empty lists ---
+let empty = []: Int
+assert(empty.len() == 0, "empty list len is 0")
+let popped = empty.pop()
+assert(popped.isNone(), "pop on empty list returns None")
+
+// --- List remove/insert/swap bounds ---
+// These should not crash - proper bounds checking
+let nums = [1, 2, 3]
+nums.insert(100, 99)
+assert(true, "insert at large index did not crash")
+
+// --- Int math edge cases ---
+let z = 0.abs()
+assert(z == 0, "abs(0) == 0")
+let neg = (-42).abs()
+assert(neg == 42, "abs(-42) == 42")
+
+// --- Float edge cases ---
+let inf = 1.0 / 0.0
+assert(inf.isInfinite(), "1.0/0.0 is infinite")
+
+let nan = 0.0 / 0.0
+assert(nan.isNan(), "0.0/0.0 is NaN")
+
+// --- String::repeat with count 1 ---
+let r3 = "hi".repeat(1)
+assert(r3 == "hi", "repeat(1) returns original")
+
+// --- Char functions with edge cases ---
+let space = ' '
+assert(space.isWhitespace(), "space is whitespace")
+assert(!space.isAlpha(), "space is not alpha")
+assert(!space.isDigit(), "space is not digit")
+
+// --- Hash consistency ---
+let h1 = hash("test")
+let h2 = hash("test")
+assert(h1 == h2, "hash is deterministic")
+
+let h3 = hash(42)
+let h4 = hash(42)
+assert(h3 == h4, "int hash is deterministic")
+
+println("PASS: test_safety")

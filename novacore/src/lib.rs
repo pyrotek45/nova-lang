@@ -1530,6 +1530,225 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::io::append_file,
         );
+        // ---------------------------------------------------------------
+        // Raylib audio functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "raylib::initAudio",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_init_audio,
+        );
+        self.add_function(
+            "raylib::closeAudio",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_close_audio,
+        );
+        self.add_function(
+            "raylib::setMasterVolume",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_master_volume,
+        );
+        self.add_function(
+            "raylib::loadSound",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_load_sound,
+        );
+        self.add_function(
+            "raylib::playSound",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_play_sound,
+        );
+        self.add_function(
+            "raylib::stopSound",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_stop_sound,
+        );
+        self.add_function(
+            "raylib::pauseSound",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_pause_sound,
+        );
+        self.add_function(
+            "raylib::resumeSound",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_resume_sound,
+        );
+        self.add_function(
+            "raylib::isSoundPlaying",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_sound_playing,
+        );
+        self.add_function(
+            "raylib::setSoundVolume",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_sound_volume,
+        );
+        self.add_function(
+            "raylib::setSoundPitch",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_sound_pitch,
+        );
+        self.add_function(
+            "raylib::loadMusic",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_load_music,
+        );
+        self.add_function(
+            "raylib::playMusic",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_play_music,
+        );
+        self.add_function(
+            "raylib::updateMusic",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_update_music,
+        );
+        self.add_function(
+            "raylib::stopMusic",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_stop_music,
+        );
+        self.add_function(
+            "raylib::pauseMusic",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_pause_music,
+        );
+        self.add_function(
+            "raylib::resumeMusic",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_resume_music,
+        );
+        self.add_function(
+            "raylib::isMusicPlaying",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_music_playing,
+        );
+        self.add_function(
+            "raylib::setMusicVolume",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_music_volume,
+        );
+        self.add_function(
+            "raylib::setMusicPitch",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_music_pitch,
+        );
+        self.add_function(
+            "raylib::getMusicLength",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_music_length,
+        );
+        self.add_function(
+            "raylib::getMusicTimePlayed",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_music_time_played,
+        );
+        self.add_function(
+            "raylib::seekMusic",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Float],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_seek_music,
+        );
+        self.add_function(
+            "raylib::setMusicLooping",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Bool],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_music_looping,
+        );
     }
 
     fn process(&mut self) -> NovaResult<()> {
