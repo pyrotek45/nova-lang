@@ -211,7 +211,7 @@ nova repl              Interactive REPL
 | `std/hashmap` | O(1) `HashMap` |
 | `std/maybe` | `Maybe(T)` — `Just`/`Nothing` with pattern matching |
 | `std/result` | `Result(A,B)` — `Ok`/`Err` for error propagation |
-| `std/tui` | Terminal UI — colors, cursor, raw input, mouse |
+| `std/tui` | `run`, `clear`, `printAt`, `printColor`, `drawBox`, colour presets, input polling |
 
 ---
 

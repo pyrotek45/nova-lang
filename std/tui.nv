@@ -1,69 +1,179 @@
 module tui
 
-struct Item(T) {
-    name: String,
-    kind: String,
-    trigger: fn($T) -> String
+// ── std/tui.nv ────────────────────────────────────────────────────────────────
+//
+// Terminal UI helpers built on top of the native terminal:: functions.
+//
+// Native functions available (no import needed):
+//   terminal::rawmode(Bool)                 enable / disable raw input mode
+//   terminal::getch() -> Option(Char)       blocking read of one keypress
+//   terminal::rawread(Int) -> Option(Char)  non-blocking read with timeout (ms)
+//   terminal::clearScreen()                 clear and move cursor to (0,0)
+//   terminal::hideCursor()                  hide the text cursor
+//   terminal::showCursor()                  show the text cursor
+//   terminal::moveTo(col: Int, row: Int)    move cursor to position
+//   terminal::getSize() -> (Int, Int)       returns (width, height)
+//   terminal::setForeground(r,g,b)          set text colour (RGB)
+//   terminal::setBackground(r,g,b)          set background colour (RGB)
+//   terminal::resetColor()                  reset to terminal default colours
+//   terminal::print(String)                 print without newline or flush
+//   terminal::flush()                       flush stdout
+//   terminal::enableMouse()                 enable mouse event capture
+//   terminal::disableMouse()                disable mouse event capture
+//   terminal::args() -> Option([String])    command-line args after the filename
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Application lifecycle ─────────────────────────────────────────────────────
+
+// Run a closure in raw-mode with the cursor hidden.
+// Cleans up properly even if the body exits early.
+//
+//   tui::run(): || { ... }
+fn run(body: fn()) {
+    terminal::rawmode(true)
+    terminal::hideCursor()
+    body()
+    terminal::rawmode(false)
+    terminal::showCursor()
+    terminal::resetColor()
+    terminal::clearScreen()
 }
 
-struct Menu(T) {
-    name: String,
-    screen: fn($T) -> String,
-    Items: [Item($T)]
+// ── Cursor and screen ─────────────────────────────────────────────────────────
+
+// Move the cursor to (col, row) and print a string there.
+//
+//   tui::printAt(5, 3, "hello")
+fn printAt(col: Int, row: Int, text: String) {
+    terminal::moveTo(col, row)
+    terminal::print(text)
 }
 
-struct SceneManager(T) {
-    currentScene: String,
-    state: $T,
-    scenes: [Menu($T)]
+// Clear the screen and move cursor to top-left.
+fn clear() {
+    terminal::clearScreen()
 }
 
-fn extends show(self: SceneManager($T)) {
-    let check = true
-    let index = 0
+// Flush all pending terminal output.
+fn flush() {
+    terminal::flush()
+}
 
-    let showError = || {
-        println("not a valid Item")
-        readln()
+// Return the current terminal size as (width, height).
+//
+//   let size = tui::size()
+//   let w = size[0]
+//   let h = size[1]
+fn size() -> (Int, Int) {
+    return terminal::getSize()
+}
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+
+// Set the foreground (text) colour by RGB.
+fn fg(r: Int, g: Int, b: Int) {
+    terminal::setForeground(r, g, b)
+}
+
+// Set the background colour by RGB.
+fn bg(r: Int, g: Int, b: Int) {
+    terminal::setBackground(r, g, b)
+}
+
+// Reset both foreground and background to terminal defaults.
+fn resetColor() {
+    terminal::resetColor()
+}
+
+// Print a string in a specific foreground colour, then reset.
+//
+//   tui::printColor(0, 10, "hello", 255, 100, 0)
+fn printColor(col: Int, row: Int, text: String, r: Int, g: Int, b: Int) {
+    terminal::setForeground(r, g, b)
+    terminal::moveTo(col, row)
+    terminal::print(text)
+    terminal::resetColor()
+}
+
+// ── Common colour presets ─────────────────────────────────────────────────────
+
+fn red()     { terminal::setForeground(220, 50,  50)  }
+fn green()   { terminal::setForeground(50,  200, 50)  }
+fn blue()    { terminal::setForeground(80,  130, 255) }
+fn yellow()  { terminal::setForeground(240, 200, 50)  }
+fn white()   { terminal::setForeground(255, 255, 255) }
+fn gray()    { terminal::setForeground(140, 140, 140) }
+fn cyan()    { terminal::setForeground(50,  220, 220) }
+fn magenta() { terminal::setForeground(200, 50,  200) }
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+
+// Blocking: wait until the user presses a key, return the Char.
+// Returns None(Char) for non-character keys (arrows, function keys, etc.).
+//
+//   if let c = tui::getch() { ... }
+fn getch() -> Option(Char) {
+    return terminal::getch()
+}
+
+// Non-blocking: poll for a keypress for up to `ms` milliseconds.
+// Returns None if no key was pressed in time.
+//
+//   if let c = tui::poll(100) { ... }
+fn poll(ms: Int) -> Option(Char) {
+    return terminal::rawread(ms)
+}
+
+// ── Box-drawing characters ────────────────────────────────────────────────────
+
+// Draw a rectangle border using box-drawing characters.
+// (col, row) is the top-left corner; w and h are the outer dimensions.
+//
+//   tui::drawBox(2, 1, 30, 10)
+fn drawBox(col: Int, row: Int, w: Int, h: Int) {
+    // top edge
+    terminal::moveTo(col, row)
+    terminal::print("┌")
+    for _i in 0..w - 2 {
+        terminal::print("─")
+    }
+    terminal::print("┐")
+
+    // sides
+    for i in 1..h - 1 {
+        terminal::moveTo(col, row + i)
+        terminal::print("│")
+        terminal::moveTo(col + w - 1, row + i)
+        terminal::print("│")
     }
 
-    let showErrorMsg = |msg: String| {
-        println(msg)
-        exit()
+    // bottom edge
+    terminal::moveTo(col, row + h - 1)
+    terminal::print("└")
+    for _i in 0..w - 2 {
+        terminal::print("─")
     }
+    terminal::print("┘")
+}
 
-    while check {
-        index = 0
-        let op = []: Item($T)
-        terminal::clearScreen()
+// ── Text layout ───────────────────────────────────────────────────────────────
 
-        for scene in self.scenes {
-            if self.currentScene == scene.name {
-                println(scene::screen(self.state))
-                for item in scene.Items {
-                    println(Cast::string(index) + " :" + item.name)
-                    op.push(item)
-                    index += 1
-                }
-                break
-            }
-        }
+// Print text centred within a field of `width` characters at (col, row).
+//
+//   tui::printCentered(0, 5, 40, "Nova TUI")
+fn printCentered(col: Int, row: Int, width: Int, text: String) {
+    let pad = (width - text.len()) / 2
+    terminal::moveTo(col + pad, row)
+    terminal::print(text)
+}
 
-        print("\n>> ")
-        let input = readln()
-        if let u = Cast::int(input) {
-            if u >= op.len() {
-                showError()
-            } else {
-                if op[u].kind == "goto" {
-                    self.currentScene = op[u]::trigger(self.state)
-                } else {
-                    showErrorMsg("Error: " + op[u].kind + " is not a valid Item kind")
-                }
-            }
-        } else {
-            showError()
-        }
-
+// Fill a row from col to col+width with a character.
+//
+//   tui::fillRow(0, 10, 40, ' ')
+fn fillRow(col: Int, row: Int, width: Int, ch: Char) {
+    terminal::moveTo(col, row)
+    for _i in 0..width {
+        terminal::print(Cast::string(ch))
     }
 }
