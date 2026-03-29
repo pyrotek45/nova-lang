@@ -1,6 +1,6 @@
 pub mod memory_manager;
 pub mod state;
-pub type CallBack = fn(state: &mut state::State) -> Result<(), NovaError>;
+pub type CallBack = fn(state: &mut state::State) -> NovaResult<()>;
 
 use std::{
     collections::HashMap,
@@ -8,7 +8,11 @@ use std::{
     process::exit,
 };
 
-use common::{code::Code, error::NovaError, fileposition::FilePosition};
+use common::{
+    code::Code,
+    error::{NovaError, NovaResult},
+    fileposition::FilePosition,
+};
 
 use memory_manager::{Object, VmData};
 use modulo::Mod;
@@ -35,7 +39,7 @@ pub struct VmTask {
 
 impl Vm {
     #[inline(always)]
-    pub fn run(&mut self) -> Result<(), NovaError> {
+    pub fn run(&mut self) -> NovaResult<()> {
         loop {
             match self.state.next_instruction() {
                 Code::RET => {
@@ -60,11 +64,11 @@ impl Vm {
                     }
                 }
                 Code::ERROR => {
-                    return Err(NovaError::RuntimeWithPos {
+                    return Err(Box::new(NovaError::RuntimeWithPos {
                         msg: "Error".into(),
                         position: self.runtime_errors_table[&self.state.current_instruction]
                             .clone(),
-                    });
+                    }));
                 }
                 Code::EXIT => exit(0),
                 instruction => self.dispatch(instruction)?,
@@ -73,7 +77,7 @@ impl Vm {
         Ok(())
     }
 
-    fn dispatch(&mut self, instruction: u8) -> Result<(), NovaError> {
+    fn dispatch(&mut self, instruction: u8) -> NovaResult<()> {
         match instruction {
             Code::ISSOME => match self.state.memory.stack.pop() {
                 Some(VmData::None) => self.state.memory.stack.push(VmData::Bool(false)),
@@ -88,14 +92,14 @@ impl Vm {
                         .runtime_errors_table
                         .get(&self.state.current_instruction)
                     {
-                        return Err(NovaError::RuntimeWithPos {
+                        return Err(Box::new(NovaError::RuntimeWithPos {
                             msg: "Tried to Unwrap a None value".into(),
                             position: pos.clone(),
-                        });
+                        }));
                     } else {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "Tried to Unwrap a None value".into(),
-                        });
+                        }));
                     }
                 }
             }
@@ -190,13 +194,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v1 + v2;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -206,13 +210,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2 - v1;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -222,13 +226,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v1 * v2;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -238,13 +242,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2 / v1;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -254,13 +258,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
                     msg: "Integer overflow".into(),
@@ -272,13 +276,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
                     msg: "Integer overflow".into(),
@@ -290,13 +294,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 // safely multi
 
@@ -310,13 +314,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
                     msg: "Integer division by zero".into(),
@@ -381,7 +385,7 @@ impl Vm {
                         self.state.goto(target);
                     }
                     VmData::Object(index) => {
-                        if let Some(object) = self.state.memory.ref_from_heap(index as usize) {
+                        if let Some(object) = self.state.memory.ref_from_heap(index) {
                             if let Some((target, env)) = object.as_closure() {
                                 for captured in env {
                                     self.state.memory.push(captured);
@@ -403,7 +407,7 @@ impl Vm {
                 };
                 match callee {
                     VmData::Object(index) => {
-                        if let Some(object) = self.state.memory.ref_from_heap(index as usize) {
+                        if let Some(object) = self.state.memory.ref_from_heap(index) {
                             if let Some((target, env)) = object.as_closure() {
                                 for captured in env {
                                     self.state.memory.push(captured);
@@ -433,13 +437,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2 < v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -452,13 +456,13 @@ impl Vm {
                 }
                 (a, b) => {
                     dbg!(a, b);
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "IGTR Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 }
             },
 
@@ -466,13 +470,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2 < v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -482,13 +486,13 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2 > v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -523,13 +527,13 @@ impl Vm {
                 let (Some(v1), Some(v2)) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let equal = self.deep_equal(&v1, &v2);
                 self.state.memory.stack.push(VmData::Bool(equal));
@@ -540,13 +544,13 @@ impl Vm {
                     self.state.memory.stack.push(VmData::Bool(!b));
                 }
                 _ => {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error on Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 }
             },
 
@@ -572,13 +576,13 @@ impl Vm {
                         VmData::Int(v) => self.state.memory.stack.push(VmData::Int(-v)),
                         VmData::Float(v) => self.state.memory.stack.push(VmData::Float(-v)),
                         _ => {
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: format!(
                                     "Error on Opcode : {}",
                                     self.state.program[self.state.current_instruction]
                                 )
                                 .into(),
-                            });
+                            }));
                         }
                     }
                 }
@@ -588,13 +592,13 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
                 let result = v2.modulo(v1);
                 self.state.memory.stack.push(VmData::Int(result))
@@ -605,18 +609,18 @@ impl Vm {
                     match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                         (Some(dest), Some(val)) => (dest, val),
                         _ => {
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: "Not enough operands for assignment".into(),
-                            })
+                            }))
                         }
                     };
                 if let VmData::Int(index) = destination {
                     let target_index = self.state.offset + index as usize;
                     self.state.memory.store(target_index, value);
                 } else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!("Invalid assignment destination: {:?}", destination).into(),
-                    });
+                    }));
                 }
             }
 
@@ -673,8 +677,8 @@ impl Vm {
 
             Code::CONCAT => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                 (Some(VmData::Object(index1)), Some(VmData::Object(index2))) => {
-                    let object2 = self.state.memory.ref_from_heap(index1 as usize).unwrap();
-                    let object1 = self.state.memory.ref_from_heap(index2 as usize).unwrap();
+                    let object2 = self.state.memory.ref_from_heap(index1).unwrap();
+                    let object1 = self.state.memory.ref_from_heap(index2).unwrap();
                     let new_data = object1
                         .data
                         .iter()
@@ -688,9 +692,9 @@ impl Vm {
                     self.state.memory.stack.push(VmData::Object(result));
                 }
                 _ => {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: "Error on Concat".into(),
-                    })
+                    }))
                 }
             },
 
@@ -702,9 +706,9 @@ impl Vm {
                 };
                 match (array, index) {
                     (VmData::Object(object), VmData::Int(index)) => {
-                        let heap_object = self.state.memory.ref_from_heap(object as usize).unwrap();
+                        let heap_object = self.state.memory.ref_from_heap(object).unwrap();
                         if let Some(item) = heap_object.data.get(index as usize) {
-                            self.state.memory.push(item.clone());
+                            self.state.memory.push(*item);
                         }
                         self.state.memory.dec(object);
                     }
@@ -721,24 +725,24 @@ impl Vm {
                     self.state.memory.stack.pop(),
                     self.state.memory.stack.pop(),
                 ) else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: format!(
                             "Error Not enough arguments Opcode : {}",
                             self.state.program[self.state.current_instruction]
                         )
                         .into(),
-                    });
+                    }));
                 };
 
                 match (array, index, value) {
                     (VmData::Object(object), VmData::Int(index), value) => {
                         let old_value = {
-                            let heap_object = self.state.memory.ref_from_heap_mut(object as usize).unwrap();
+                            let heap_object = self.state.memory.ref_from_heap_mut(object).unwrap();
                             heap_object.data.get(index as usize).cloned()
                         };
                         if let Some(old) = old_value {
                             self.state.memory.dec_value(old);
-                            let heap_object = self.state.memory.ref_from_heap_mut(object as usize).unwrap();
+                            let heap_object = self.state.memory.ref_from_heap_mut(object).unwrap();
                             if let Some(item) = heap_object.data.get_mut(index as usize) {
                                 *item = value;
                             }
@@ -854,9 +858,9 @@ impl Vm {
                 let (Some(field_name_val), Some(object_val)) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: "GETF: not enough arguments".into(),
-                    });
+                    }));
                 };
 
                 // Get field name string
@@ -868,9 +872,9 @@ impl Vm {
                         name
                     }
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "GETF: field name must be a string".into(),
-                        });
+                        }));
                     }
                 };
 
@@ -884,21 +888,21 @@ impl Vm {
                                 .runtime_errors_table
                                 .get(&self.state.current_instruction)
                             {
-                                return Err(NovaError::RuntimeWithPos {
+                                return Err(Box::new(NovaError::RuntimeWithPos {
                                     msg: format!("Field '{}' not found", field_name).into(),
                                     position: pos.clone(),
-                                });
+                                }));
                             }
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: format!("Field '{}' not found", field_name).into(),
-                            });
+                            }));
                         }
                         self.state.memory.dec(obj_idx);
                     }
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "GETF: expected an object".into(),
-                        });
+                        }));
                     }
                 }
             }
@@ -910,9 +914,9 @@ impl Vm {
                     self.state.memory.stack.pop(),
                     self.state.memory.stack.pop(),
                 ) else {
-                    return Err(NovaError::Runtime {
+                    return Err(Box::new(NovaError::Runtime {
                         msg: "PINF: not enough arguments".into(),
-                    });
+                    }));
                 };
 
                 // Get field name string
@@ -924,9 +928,9 @@ impl Vm {
                         name
                     }
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "PINF: field name must be a string".into(),
-                        });
+                        }));
                     }
                 };
 
@@ -952,23 +956,23 @@ impl Vm {
                                 .runtime_errors_table
                                 .get(&self.state.current_instruction)
                             {
-                                return Err(NovaError::RuntimeWithPos {
+                                return Err(Box::new(NovaError::RuntimeWithPos {
                                     msg: format!("Field '{}' not found for assignment", field_name)
                                         .into(),
                                     position: pos.clone(),
-                                });
+                                }));
                             }
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: format!("Field '{}' not found for assignment", field_name)
                                     .into(),
-                            });
+                            }));
                         }
                         self.state.memory.dec(obj_idx);
                     }
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "PINF: expected an object".into(),
-                        });
+                        }));
                     }
                 }
             }
@@ -984,7 +988,7 @@ impl Vm {
     }
 
     #[inline(always)]
-    pub fn run_debug(&mut self) -> Result<(), NovaError> {
+    pub fn run_debug(&mut self) -> NovaResult<()> {
         Ok(())
     }
 

@@ -1,6 +1,6 @@
 use std::{io::stdout, time::Duration};
 
-use common::error::NovaError;
+use common::error::NovaResult;
 use crossterm::{
     cursor::{MoveTo, MoveToNextLine},
     event::{self, Event, KeyCode, KeyEvent},
@@ -9,7 +9,7 @@ use crossterm::{
 use vm::memory_manager::VmData;
 use vm::state;
 
-pub fn rawmode(state: &mut state::State) -> Result<(), NovaError> {
+pub fn rawmode(state: &mut state::State) -> NovaResult<()> {
     if let Some(VmData::Bool(bool)) = state.memory.stack.pop() {
         if bool {
             terminal::enable_raw_mode().expect("could not enable raw mode");
@@ -21,7 +21,7 @@ pub fn rawmode(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn getch(state: &mut state::State) -> Result<(), NovaError> {
+pub fn getch(state: &mut state::State) -> NovaResult<()> {
     if let Event::Key(KeyEvent {
         code: KeyCode::Char(character),
         modifiers: event::KeyModifiers::NONE,
@@ -36,7 +36,7 @@ pub fn getch(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
+pub fn rawread(state: &mut state::State) -> NovaResult<()> {
     if let Some(VmData::Int(time)) = state.memory.stack.pop() {
         if event::poll(Duration::from_millis(time as u64)).expect("Error") {
             if let Event::Key(KeyEvent {
@@ -57,23 +57,23 @@ pub fn rawread(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn clear_screen(_state: &mut state::State) -> Result<(), NovaError> {
+pub fn clear_screen(_state: &mut state::State) -> NovaResult<()> {
     execute!(stdout(), terminal::Clear(terminal::ClearType::All)).unwrap();
     execute!(stdout(), MoveTo(0, 0)).unwrap();
     Ok(())
 }
 
-pub fn hide_cursor(_state: &mut state::State) -> Result<(), NovaError> {
+pub fn hide_cursor(_state: &mut state::State) -> NovaResult<()> {
     execute!(stdout(), crossterm::cursor::Hide).unwrap();
     Ok(())
 }
 
-pub fn show_cursor(_state: &mut state::State) -> Result<(), NovaError> {
+pub fn show_cursor(_state: &mut state::State) -> NovaResult<()> {
     execute!(stdout(), crossterm::cursor::Show).unwrap();
     Ok(())
 }
 
-pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaError> {
+pub fn retrieve_command_line_args(state: &mut state::State) -> NovaResult<()> {
     let args: Vec<String> = std::env::args().skip(3).collect();
     if args.is_empty() {
         state.memory.stack.push(VmData::None);
@@ -81,7 +81,9 @@ pub fn retrieve_command_line_args(state: &mut state::State) -> Result<(), NovaEr
         // Build a list of string objects
         let mut list_data = vec![];
         for arg in args {
-            let str_idx = state.memory.allocate(vm::memory_manager::Object::string(arg));
+            let str_idx = state
+                .memory
+                .allocate(vm::memory_manager::Object::string(arg));
             list_data.push(VmData::Object(str_idx));
         }
         state.memory.push_list(list_data);

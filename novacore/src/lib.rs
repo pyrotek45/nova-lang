@@ -5,7 +5,7 @@ use std::{
 
 use assembler::Assembler;
 use common::{
-    error::NovaError,
+    error::NovaResult,
     nodes::SymbolKind,
     ttype::{generate_unique_string, TType},
 };
@@ -41,7 +41,7 @@ impl NovaCore {
         }
     }
 
-    pub fn new(path: &Path) -> Result<NovaCore, NovaError> {
+    pub fn new(path: &Path) -> NovaResult<NovaCore> {
         Ok(NovaCore {
             filepath: Some(path.into()),
             lexer: Lexer::read_file(path)?,
@@ -59,7 +59,7 @@ impl NovaCore {
         function_id: &str,
         function_type: TType,
         function_kind: SymbolKind,
-        function_pointer: fn(&mut State) -> Result<(), NovaError>,
+        function_pointer: fn(&mut State) -> NovaResult<()>,
     ) {
         match function_kind {
             SymbolKind::Function => {
@@ -113,7 +113,8 @@ impl NovaCore {
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
         self.parser
-            .typechecker.environment
+            .typechecker
+            .environment
             .custom_types
             .insert("Sprite".into(), vec![]);
         // assert functions
@@ -710,7 +711,7 @@ impl NovaCore {
         );
     }
 
-    fn process(&mut self) -> Result<(), NovaError> {
+    fn process(&mut self) -> NovaResult<()> {
         self.initnova();
         let tokenlist = self.lexer.tokenize()?;
         self.parser.input = tokenlist;
@@ -738,7 +739,7 @@ impl NovaCore {
         Ok(())
     }
 
-    pub fn run_line(&mut self, line: &str, store: bool) -> Result<(), NovaError> {
+    pub fn run_line(&mut self, line: &str, store: bool) -> NovaResult<()> {
         let oldrepl = self.current_repl.clone();
 
         self.current_repl.push_str(line);
@@ -779,13 +780,13 @@ impl NovaCore {
         Ok(())
     }
 
-    pub fn run(mut self) -> Result<(), NovaError> {
+    pub fn run(mut self) -> NovaResult<()> {
         self.process()?;
         self.vm.run()?;
         Ok(())
     }
 
-    pub fn check(mut self) -> Result<(), NovaError> {
+    pub fn check(mut self) -> NovaResult<()> {
         let start = std::time::Instant::now();
         self.initnova();
         println!("OK | Initialize time: {}ms", start.elapsed().as_millis());
@@ -816,13 +817,13 @@ impl NovaCore {
         Ok(())
     }
 
-    pub fn run_debug(mut self) -> Result<(), NovaError> {
+    pub fn run_debug(mut self) -> NovaResult<()> {
         self.process()?;
         self.vm.run_debug()?;
         Ok(())
     }
 
-    pub fn dis_file(mut self) -> Result<(), NovaError> {
+    pub fn dis_file(mut self) -> NovaResult<()> {
         self.initnova();
         let tokenlist = self.lexer.tokenize()?;
         self.parser.input = tokenlist;

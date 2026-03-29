@@ -65,6 +65,12 @@ impl Clone for State {
     }
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl State {
     pub fn new() -> State {
         State {

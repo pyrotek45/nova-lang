@@ -1,131 +1,134 @@
 use std::{cell::RefCell, rc::Rc};
 
-use common::error::NovaError;
+use common::error::{NovaError, NovaResult};
 use raylib::prelude::*;
 use vm::{
     memory_manager::{Object, ObjectType, VmData},
     state::{self, Draw},
 };
 
-fn pop_or_err(state: &mut state::State) -> Result<VmData, NovaError> {
-    state.memory.stack.pop().ok_or(NovaError::Runtime {
+fn pop_or_err(state: &mut state::State) -> NovaResult<VmData> {
+    state.memory.stack.pop().ok_or(Box::new(NovaError::Runtime {
         msg: "Stack is empty".into(),
-    })
+    }))
 }
 
-fn pop_int(state: &mut state::State) -> Result<i64, NovaError> {
+fn pop_int(state: &mut state::State) -> NovaResult<i64> {
     match pop_or_err(state)? {
         VmData::Int(v) => Ok(v),
-        other => Err(NovaError::Runtime {
+        other => Err(Box::new(NovaError::Runtime {
             msg: format!("Expected Int, got {:?}", other).into(),
-        }),
+        })),
     }
 }
 
-fn pop_float(state: &mut state::State) -> Result<f64, NovaError> {
+#[allow(dead_code)]
+fn pop_float(state: &mut state::State) -> NovaResult<f64> {
     match pop_or_err(state)? {
         VmData::Float(v) => Ok(v),
-        other => Err(NovaError::Runtime {
+        other => Err(Box::new(NovaError::Runtime {
             msg: format!("Expected Float, got {:?}", other).into(),
-        }),
+        })),
     }
 }
 
-fn pop_string(state: &mut state::State) -> Result<String, NovaError> {
+fn pop_string(state: &mut state::State) -> NovaResult<String> {
     match pop_or_err(state)? {
         VmData::Object(index) => {
             let s = state
                 .memory
                 .ref_from_heap(index)
                 .and_then(|obj| obj.as_string().map(|s| s.to_string()))
-                .ok_or(NovaError::Runtime {
+                .ok_or(Box::new(NovaError::Runtime {
                     msg: "Expected a string object".into(),
-                })?;
+                }))?;
             state.memory.dec(index);
             Ok(s)
         }
-        _ => Err(NovaError::Runtime {
+        _ => Err(Box::new(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
-        }),
+        })),
     }
 }
 
-fn pop_bool(state: &mut state::State) -> Result<bool, NovaError> {
+#[allow(dead_code)]
+fn pop_bool(state: &mut state::State) -> NovaResult<bool> {
     match pop_or_err(state)? {
         VmData::Bool(v) => Ok(v),
-        other => Err(NovaError::Runtime {
+        other => Err(Box::new(NovaError::Runtime {
             msg: format!("Expected Bool, got {:?}", other).into(),
-        }),
+        })),
     }
 }
 
 /// Extract a Color from a Tuple/List object (Int, Int, Int) on the stack
-fn pop_color(state: &mut state::State) -> Result<Color, NovaError> {
+fn pop_color(state: &mut state::State) -> NovaResult<Color> {
     match pop_or_err(state)? {
         VmData::Object(index) => {
             let (r, g, b) = {
-                let obj = state.memory.ref_from_heap(index).ok_or(NovaError::Runtime {
-                    msg: "Invalid heap reference for color".into(),
-                })?;
+                let obj =
+                    state
+                        .memory
+                        .ref_from_heap(index)
+                        .ok_or(Box::new(NovaError::Runtime {
+                            msg: "Invalid heap reference for color".into(),
+                        }))?;
                 match &obj.object_type {
                     ObjectType::Tuple | ObjectType::List => {
                         if obj.data.len() < 3 {
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: "Color tuple needs 3 elements".into(),
-                            });
+                            }));
                         }
                         let r = match obj.data[0] {
                             VmData::Int(v) => v as u8,
                             _ => {
-                                return Err(NovaError::Runtime {
+                                return Err(Box::new(NovaError::Runtime {
                                     msg: "Color component must be Int".into(),
-                                })
+                                }))
                             }
                         };
                         let g = match obj.data[1] {
                             VmData::Int(v) => v as u8,
                             _ => {
-                                return Err(NovaError::Runtime {
+                                return Err(Box::new(NovaError::Runtime {
                                     msg: "Color component must be Int".into(),
-                                })
+                                }))
                             }
                         };
                         let b = match obj.data[2] {
                             VmData::Int(v) => v as u8,
                             _ => {
-                                return Err(NovaError::Runtime {
+                                return Err(Box::new(NovaError::Runtime {
                                     msg: "Color component must be Int".into(),
-                                })
+                                }))
                             }
                         };
                         (r, g, b)
                     }
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "Expected a Tuple for color".into(),
-                        })
+                        }))
                     }
                 }
             };
             state.memory.dec(index);
             Ok(Color::new(r, g, b, 255))
         }
-        _ => Err(NovaError::Runtime {
+        _ => Err(Box::new(NovaError::Runtime {
             msg: "Expected a color tuple object".into(),
-        }),
+        })),
     }
 }
 
-pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_init(state: &mut state::State) -> NovaResult<()> {
     let fps = pop_int(state)? as u32;
     let height = pop_int(state)? as i32;
     let width = pop_int(state)? as i32;
     let title = pop_string(state)?;
 
-    let (mut rl, thread) = raylib::init()
-        .size(width, height)
-        .title(&title)
-        .build();
+    let (mut rl, thread) = raylib::init().size(width, height).title(&title).build();
 
     rl.set_target_fps(fps);
 
@@ -135,13 +138,16 @@ pub fn raylib_init(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+pub fn raylib_rendering(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
-    let thread = state.raylib_thread.as_ref().ok_or(NovaError::Runtime {
-        msg: "Raylib thread not initialized".into(),
-    })?;
+    }))?;
+    let thread = state
+        .raylib_thread
+        .as_ref()
+        .ok_or(Box::new(NovaError::Runtime {
+            msg: "Raylib thread not initialized".into(),
+        }))?;
 
     let should_close = {
         let rl = rl_rc.borrow();
@@ -191,7 +197,7 @@ pub fn raylib_rendering(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_draw_text(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_text(state: &mut state::State) -> NovaResult<()> {
     let color = pop_color(state)?;
     let size = pop_int(state)? as i32;
     let y = pop_int(state)? as i32;
@@ -202,23 +208,23 @@ pub fn raylib_draw_text(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_clear(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_clear(state: &mut state::State) -> NovaResult<()> {
     let color = pop_color(state)?;
     state.draw_queue.push(Draw::ClearBackground(color));
     Ok(())
 }
 
-pub fn raylib_draw_fps(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_fps(state: &mut state::State) -> NovaResult<()> {
     let y = pop_int(state)? as i32;
     let x = pop_int(state)? as i32;
     state.draw_queue.push(Draw::FPS(x, y));
     Ok(())
 }
 
-pub fn raylib_get_mouse_position(state: &mut state::State) -> Result<(), NovaError> {
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+pub fn raylib_get_mouse_position(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let (x, y) = {
         let rl = rl_rc.borrow();
@@ -236,23 +242,21 @@ pub fn raylib_get_mouse_position(state: &mut state::State) -> Result<(), NovaErr
     Ok(())
 }
 
-pub fn raylib_draw_rectangle(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_rectangle(state: &mut state::State) -> NovaResult<()> {
     let color = pop_color(state)?;
     let h = pop_int(state)? as i32;
     let w = pop_int(state)? as i32;
     let y = pop_int(state)? as i32;
     let x = pop_int(state)? as i32;
 
-    state
-        .draw_queue
-        .push(Draw::Rectangle(x, y, w, h, color));
+    state.draw_queue.push(Draw::Rectangle(x, y, w, h, color));
     Ok(())
 }
 
-pub fn raylib_get_key_as_string(state: &mut state::State) -> Result<(), NovaError> {
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+pub fn raylib_get_key_as_string(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let key = {
         let mut rl = rl_rc.borrow_mut();
@@ -271,12 +275,12 @@ pub fn raylib_get_key_as_string(state: &mut state::State) -> Result<(), NovaErro
     Ok(())
 }
 
-pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_is_key_down(state: &mut state::State) -> NovaResult<()> {
     let key_name = pop_string(state)?;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let pressed = {
         let rl = rl_rc.borrow();
@@ -291,12 +295,12 @@ pub fn raylib_is_key_down(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_is_key_released(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_is_key_released(state: &mut state::State) -> NovaResult<()> {
     let key_name = pop_string(state)?;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let released = {
         let rl = rl_rc.borrow();
@@ -311,10 +315,10 @@ pub fn raylib_is_key_released(state: &mut state::State) -> Result<(), NovaError>
     Ok(())
 }
 
-pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> {
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+pub fn raylib_get_frame_time(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let dt = {
         let rl = rl_rc.borrow();
@@ -325,17 +329,20 @@ pub fn raylib_get_frame_time(state: &mut state::State) -> Result<(), NovaError> 
     Ok(())
 }
 
-pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_load_texture(state: &mut state::State) -> NovaResult<()> {
     let frame_count = pop_int(state)?;
     let height = pop_int(state)?;
     let path = pop_string(state)?;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
-    let thread = state.raylib_thread.as_ref().ok_or(NovaError::Runtime {
-        msg: "Raylib thread not initialized".into(),
-    })?;
+    }))?;
+    let thread = state
+        .raylib_thread
+        .as_ref()
+        .ok_or(Box::new(NovaError::Runtime {
+            msg: "Raylib thread not initialized".into(),
+        }))?;
 
     // Resolve path relative to current_dir
     let full_path = state.current_dir.join(&path);
@@ -343,10 +350,11 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
 
     let texture = {
         let mut rl = rl_rc.borrow_mut();
-        rl.load_texture(thread, &full_path_str)
-            .map_err(|e| NovaError::Runtime {
+        rl.load_texture(thread, &full_path_str).map_err(|e| {
+            Box::new(NovaError::Runtime {
                 msg: format!("Failed to load texture: {}", e).into(),
-            })?
+            })
+        })?
     };
 
     let sprite_index = state.sprites.len();
@@ -366,9 +374,7 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
         },
         data: vec![
             VmData::Int(sprite_index as i64),
-            VmData::Int(
-                state.sprites[sprite_index].width() as i64,
-            ),
+            VmData::Int(state.sprites[sprite_index].width() as i64),
             VmData::Int(height),
             VmData::Int(frame_count),
         ],
@@ -377,7 +383,7 @@ pub fn raylib_load_texture(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_draw_texture(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_texture(state: &mut state::State) -> NovaResult<()> {
     let y = pop_int(state)? as i32;
     let x = pop_int(state)? as i32;
 
@@ -385,15 +391,19 @@ pub fn raylib_draw_texture(state: &mut state::State) -> Result<(), NovaError> {
     match pop_or_err(state)? {
         VmData::Object(index) => {
             let sprite_index = {
-                let obj = state.memory.ref_from_heap(index).ok_or(NovaError::Runtime {
-                    msg: "Invalid sprite object".into(),
-                })?;
+                let obj =
+                    state
+                        .memory
+                        .ref_from_heap(index)
+                        .ok_or(Box::new(NovaError::Runtime {
+                            msg: "Invalid sprite object".into(),
+                        }))?;
                 match obj.data.first() {
                     Some(VmData::Int(idx)) => *idx as usize,
                     _ => {
-                        return Err(NovaError::Runtime {
+                        return Err(Box::new(NovaError::Runtime {
                             msg: "Sprite object missing index".into(),
-                        })
+                        }))
                     }
                 }
             };
@@ -401,13 +411,13 @@ pub fn raylib_draw_texture(state: &mut state::State) -> Result<(), NovaError> {
             state.draw_queue.push(Draw::Sprite(sprite_index, x, y));
             Ok(())
         }
-        _ => Err(NovaError::Runtime {
+        _ => Err(Box::new(NovaError::Runtime {
             msg: "Expected a Sprite object".into(),
-        }),
+        })),
     }
 }
 
-pub fn raylib_draw_circle(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_circle(state: &mut state::State) -> NovaResult<()> {
     let color = pop_color(state)?;
     let radius = pop_int(state)? as i32;
     let y = pop_int(state)? as i32;
@@ -419,7 +429,7 @@ pub fn raylib_draw_circle(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_draw_line(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_draw_line(state: &mut state::State) -> NovaResult<()> {
     let color = pop_color(state)?;
     let y2 = pop_int(state)? as i32;
     let x2 = pop_int(state)? as i32;
@@ -430,10 +440,10 @@ pub fn raylib_draw_line(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_get_time(state: &mut state::State) -> Result<(), NovaError> {
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+pub fn raylib_get_time(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let time = {
         let rl = rl_rc.borrow();
@@ -444,12 +454,12 @@ pub fn raylib_get_time(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn raylib_is_mouse_button_down(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_is_mouse_button_down(state: &mut state::State) -> NovaResult<()> {
     let button_name = pop_string(state)?;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let pressed = {
         let rl = rl_rc.borrow();
@@ -464,12 +474,12 @@ pub fn raylib_is_mouse_button_down(state: &mut state::State) -> Result<(), NovaE
     Ok(())
 }
 
-pub fn raylib_get_mouse_button_released(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_get_mouse_button_released(state: &mut state::State) -> NovaResult<()> {
     let button_name = pop_string(state)?;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
+    }))?;
 
     let released = {
         let rl = rl_rc.borrow();
@@ -484,46 +494,47 @@ pub fn raylib_get_mouse_button_released(state: &mut state::State) -> Result<(), 
     Ok(())
 }
 
-pub fn raylib_sleep(state: &mut state::State) -> Result<(), NovaError> {
+pub fn raylib_sleep(state: &mut state::State) -> NovaResult<()> {
     let ms = pop_int(state)?;
     std::thread::sleep(std::time::Duration::from_millis(ms as u64));
     Ok(())
 }
 
-pub fn create_sprite_from_array(state: &mut state::State) -> Result<(), NovaError> {
+pub fn create_sprite_from_array(state: &mut state::State) -> NovaResult<()> {
     // Pop: pixel_list, frame_count, height, width
     let pixel_list_data = pop_or_err(state)?;
     let frame_count = pop_int(state)?;
     let height = pop_int(state)? as u32;
     let width = pop_int(state)? as u32;
 
-    let rl_rc = state.raylib.clone().ok_or(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
-    })?;
-    let thread = state.raylib_thread.as_ref().ok_or(NovaError::Runtime {
-        msg: "Raylib thread not initialized".into(),
-    })?;
+    }))?;
+    let thread = state
+        .raylib_thread
+        .as_ref()
+        .ok_or(Box::new(NovaError::Runtime {
+            msg: "Raylib thread not initialized".into(),
+        }))?;
 
     // Extract pixel data from the list of tuples
-    let pixels: Vec<u8> = match pixel_list_data {
-        VmData::Object(list_index) => {
-            let mut pixel_bytes = Vec::new();
-            {
-                let obj = state
-                    .memory
-                    .ref_from_heap(list_index)
-                    .ok_or(NovaError::Runtime {
-                        msg: "Invalid pixel list".into(),
-                    })?;
-                for item in &obj.data {
-                    match item {
-                        VmData::Object(tuple_index) => {
-                            let tuple_obj = state
-                                .memory
-                                .ref_from_heap(*tuple_index)
-                                .ok_or(NovaError::Runtime {
+    let pixels: Vec<u8> =
+        match pixel_list_data {
+            VmData::Object(list_index) => {
+                let mut pixel_bytes = Vec::new();
+                {
+                    let obj = state.memory.ref_from_heap(list_index).ok_or(Box::new(
+                        NovaError::Runtime {
+                            msg: "Invalid pixel list".into(),
+                        },
+                    ))?;
+                    for item in &obj.data {
+                        if let VmData::Object(tuple_index) = item {
+                            let tuple_obj = state.memory.ref_from_heap(*tuple_index).ok_or(
+                                Box::new(NovaError::Runtime {
                                     msg: "Invalid pixel tuple".into(),
-                                })?;
+                                }),
+                            )?;
                             if tuple_obj.data.len() >= 3 {
                                 if let (VmData::Int(r), VmData::Int(g), VmData::Int(b)) =
                                     (&tuple_obj.data[0], &tuple_obj.data[1], &tuple_obj.data[2])
@@ -535,19 +546,17 @@ pub fn create_sprite_from_array(state: &mut state::State) -> Result<(), NovaErro
                                 }
                             }
                         }
-                        _ => {}
                     }
                 }
+                state.memory.dec(list_index);
+                pixel_bytes
             }
-            state.memory.dec(list_index);
-            pixel_bytes
-        }
-        _ => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a list of color tuples".into(),
-            })
-        }
-    };
+            _ => {
+                return Err(Box::new(NovaError::Runtime {
+                    msg: "Expected a list of color tuples".into(),
+                }))
+            }
+        };
 
     // Create Image from raw pixel data
     let image = unsafe {
@@ -564,10 +573,11 @@ pub fn create_sprite_from_array(state: &mut state::State) -> Result<(), NovaErro
 
     let texture = {
         let mut rl = rl_rc.borrow_mut();
-        rl.load_texture_from_image(thread, &image)
-            .map_err(|e| NovaError::Runtime {
+        rl.load_texture_from_image(thread, &image).map_err(|e| {
+            Box::new(NovaError::Runtime {
                 msg: format!("Failed to create texture from image: {}", e).into(),
-            })?
+            })
+        })?
     };
 
     let sprite_index = state.sprites.len();

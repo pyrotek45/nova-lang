@@ -16,7 +16,7 @@ mod keywords {
 pub use keywords::KEYWORDS;
 
 use common::{
-    error::NovaError,
+    error::{NovaError, NovaResult},
     fileposition::FilePosition,
     tokens::{Operator, StructuralSymbol, Token, TokenValue},
 };
@@ -29,13 +29,13 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn read_file(path: impl AsRef<Path>) -> Result<Self, NovaError> {
+    pub fn read_file(path: impl AsRef<Path>) -> NovaResult<Self> {
         match std::fs::read_to_string(path.as_ref()) {
             Ok(source) => Ok(Self::new(source, Some(path.as_ref()))),
             // a very detailed error message
-            Err(_) => Err(NovaError::File {
+            Err(_) => Err(Box::new(NovaError::File {
                 msg: format!(" '{}' is not a valid filepath", path.as_ref().display()).into(),
-            }),
+            })),
         }
     }
     pub fn new(source: impl Into<Rc<str>>, path: Option<&Path>) -> Self {
@@ -120,7 +120,7 @@ impl Lexer {
             _ => return None,
         })
     }
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, NovaError> {
+    pub fn tokenize(&mut self) -> NovaResult<Vec<Token>> {
         self.collect()
     }
 }
@@ -131,7 +131,7 @@ pub struct Span {
 }
 
 impl Iterator for Lexer {
-    type Item = Result<Token, NovaError>;
+    type Item = NovaResult<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {
         use crate::Operator::*;
@@ -151,14 +151,14 @@ impl Iterator for Lexer {
             body: &str,
             radix: u32,
             kind: &str,
-        ) -> Result<TokenValue, NovaError> {
+        ) -> NovaResult<TokenValue> {
             match i64::from_str_radix(body, radix) {
                 Ok(n) => Ok(Integer(n)),
-                Err(err) => Err(NovaError::Lexing {
+                Err(err) => Err(Box::new(NovaError::Lexing {
                     msg: format!("Invalid integer literal {body}").into(),
                     note: format!("Error while attempting to parse {kind} integer: {err}",).into(),
                     position: scanner.current_position(),
-                }),
+                })),
             }
         }
         let (span, value) = loop {
@@ -178,7 +178,7 @@ impl Iterator for Lexer {
                         }
                         None => {
                             self.remaining.start = self.remaining.end;
-                            return Some(Err(NovaError::Lexing {
+                            return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated Block comment(/* ... */)".into(),
                                 note: format!(
                                     "no terminating */ in {:?}",
@@ -186,18 +186,18 @@ impl Iterator for Lexer {
                                 )
                                 .into(),
                                 position: self.current_position(),
-                            }));
+                            })));
                         }
                     }
                     continue;
                 }
                 '\'' => {
                     let unterminated_err = |s: &Lexer| {
-                        Some(Err(NovaError::Lexing {
+                        Some(Err(Box::new(NovaError::Lexing {
                             msg: "Unterminated char literal".into(),
                             note: "".into(),
                             position: s.current_position(),
-                        }))
+                        })))
                     };
                     let Some(c) = self.advance() else {
                         return unterminated_err(self);
@@ -208,11 +208,11 @@ impl Iterator for Lexer {
                                 return unterminated_err(self);
                             };
                             let Some(escaped) = Self::escape(c) else {
-                                return Some(Err(NovaError::Lexing {
+                                return Some(Err(Box::new(NovaError::Lexing {
                                     msg: "Invalid escape sequence in char literal.".into(),
                                     note: format!("Attempted to use escape sequence \\{c}").into(),
                                     position: self.current_position(),
-                                }));
+                                })));
                             };
                             escaped
                         }
@@ -229,7 +229,7 @@ impl Iterator for Lexer {
                         std::iter::from_fn(|| self.consume_if(|c| c == '#').then_some(())).count();
                     // TODO: raw literals that aren't strings
                     let Some('"') = self.advance() else {
-                        return Some(Err(NovaError::Lexing {
+                        return Some(Err(Box::new(NovaError::Lexing {
                             msg: "Invalid raw literal".into(),
                             note: format!(
                                 "no literal following raw specifier {}",
@@ -237,12 +237,12 @@ impl Iterator for Lexer {
                             )
                             .into(),
                             position: self.current_position(),
-                        }));
+                        })));
                     };
                     let body = self.span();
                     loop {
                         let Some(c) = self.advance() else {
-                            return Some(Err(NovaError::Lexing {
+                            return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated raw string literal".into(),
                                 note: format!(
                                     "no terminating \" in {:?}",
@@ -250,7 +250,7 @@ impl Iterator for Lexer {
                                 )
                                 .into(),
                                 position: self.current_position(),
-                            }));
+                            })));
                         };
                         if c == '"'
                             && self
@@ -278,7 +278,7 @@ impl Iterator for Lexer {
                     let mut body = String::new();
                     loop {
                         let Some(c) = self.advance() else {
-                            return Some(Err(NovaError::Lexing {
+                            return Some(Err(Box::new(NovaError::Lexing {
                                 msg: "Unterminated string literal".into(),
                                 note: format!(
                                     "no terminating \" in {:?}",
@@ -286,7 +286,7 @@ impl Iterator for Lexer {
                                 )
                                 .into(),
                                 position: self.current_position(),
-                            }));
+                            })));
                         };
                         match c {
                             '"' => break,
@@ -298,12 +298,12 @@ impl Iterator for Lexer {
                                 };
                                 // TODO: Hex ASCII/BYTE escapes using \x41 syntax?
                                 let Some(escaped) = Self::escape(c) else {
-                                    return Some(Err(NovaError::Lexing {
+                                    return Some(Err(Box::new(NovaError::Lexing {
                                         msg: "Invalid escape sequence in string literal.".into(),
                                         note: format!("Attempted to use escape sequence \\{c}")
                                             .into(),
                                         position: self.current_position(),
-                                    }));
+                                    })));
                                 };
                                 body.push(escaped);
                             }
@@ -363,12 +363,12 @@ impl Iterator for Lexer {
                         match float.parse() {
                             Ok(f) => Float(f),
                             Err(err) => {
-                                return Some(Err(NovaError::Lexing {
+                                return Some(Err(Box::new(NovaError::Lexing {
                                     msg: format!("Invalid float literal {float}").into(),
                                     note: format!("Error while attempting to parse float: {err}",)
                                         .into(),
                                     position: self.current_position(),
-                                }))
+                                })))
                             }
                         }
                     } else {
@@ -435,11 +435,11 @@ impl Iterator for Lexer {
                 '&' => StructuralSymbol(Ampersand),
                 '~' => StructuralSymbol(Tilde),
                 c => {
-                    return Some(Err(NovaError::Lexing {
+                    return Some(Err(Box::new(NovaError::Lexing {
                         msg: format!("Unexpected character {c:?}").into(),
                         note: "".into(),
                         position: self.current_position(),
-                    }));
+                    })));
                 }
             };
             break (span, value);

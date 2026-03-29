@@ -1,13 +1,8 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    ops::Deref,
-    rc::Rc,
-};
+use std::{borrow::Cow, collections::HashMap, ops::Deref, rc::Rc};
 
 use common::{
     environment::Environment,
-    error::NovaError,
+    error::{NovaError, NovaResult},
     fileposition::FilePosition,
     nodes::{Expr, Statement},
     table::Table,
@@ -42,13 +37,13 @@ impl TypeChecker {
         msg: impl Into<Cow<'static, str>>,
         note: impl Into<Cow<'static, str>>,
         pos: FilePosition,
-    ) -> NovaError {
-        NovaError::Parsing {
+    ) -> Box<NovaError> {
+        Box::new(NovaError::Parsing {
             msg: msg.into(),
             note: note.into(),
             position: pos,
             extra: None,
-        }
+        })
     }
 
     // ---------------------------------------------------------------
@@ -61,7 +56,7 @@ impl TypeChecker {
         type_list2: &[TType],
         type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
-    ) -> Result<(), NovaError> {
+    ) -> NovaResult<()> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error_with_pos(
                 "E2 Incorrect amount of arguments".to_owned(),
@@ -93,18 +88,18 @@ impl TypeChecker {
                 }
                 (TType::Generic { name: name1 }, _) => {
                     if t2 == &TType::None {
-                        return Err(NovaError::TypeMismatch {
+                        return Err(Box::new(NovaError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
                             position: pos.clone(),
-                        });
+                        }));
                     }
                     if t2 == &TType::Void {
-                        return Err(NovaError::TypeMismatch {
+                        return Err(Box::new(NovaError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
                             position: pos.clone(),
-                        });
+                        }));
                     }
                     let typemap_clone: HashMap<Rc<str>, TType> = type_map.clone();
                     if let Some(mapped_type) = typemap_clone.get(name1) {
@@ -114,11 +109,11 @@ impl TypeChecker {
                             let name_rc = Rc::from(name);
                             self.check_contracts(type_map, &pos, t1, t2, own, contract, &name_rc)?;
                         } else if mapped_type != t2 {
-                            return Err(NovaError::TypeMismatch {
+                            return Err(Box::new(NovaError::TypeMismatch {
                                 expected: mapped_type.clone(),
                                 found: t2.clone(),
                                 position: pos.clone(),
-                            });
+                            }));
                         }
                     } else {
                         type_map.insert(name1.clone(), t2.clone());
@@ -152,11 +147,11 @@ impl TypeChecker {
                     },
                 ) => {
                     if params1.len() != params2.len() {
-                        return Err(NovaError::TypeMismatch {
+                        return Err(Box::new(NovaError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
                             position: pos.clone(),
-                        });
+                        }));
                     }
 
                     self.check_and_map_types(params1, params2, type_map, pos.clone())?;
@@ -180,11 +175,11 @@ impl TypeChecker {
                     if custom1 == custom2 {
                         self.check_and_map_types(gen1, gen2, type_map, pos.clone())?;
                     } else {
-                        return Err(NovaError::TypeMismatch {
+                        return Err(Box::new(NovaError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
                             position: pos.clone(),
-                        });
+                        }));
                     }
                 }
                 (TType::Dyn { own, contract: c1 }, TType::Custom { name, .. }) => {
@@ -194,20 +189,20 @@ impl TypeChecker {
                     if name == own {
                         continue;
                     } else {
-                        return Err(NovaError::TypeMismatch {
+                        return Err(Box::new(NovaError::TypeMismatch {
                             expected: TType::Generic { name: own.clone() },
                             found: TType::Generic { name: name.clone() },
                             position: pos.clone(),
-                        });
+                        }));
                     }
                 }
                 _ if t1 == t2 => continue,
                 _ => {
-                    return Err(NovaError::TypeMismatch {
+                    return Err(Box::new(NovaError::TypeMismatch {
                         expected: t1.clone(),
                         found: t2.clone(),
                         position: pos.clone(),
-                    });
+                    }));
                 }
             }
         }
@@ -228,27 +223,27 @@ impl TypeChecker {
         own: &Rc<str>,
         c1: &[(Rc<str>, TType)],
         name: &Rc<str>,
-    ) -> Result<(), NovaError> {
+    ) -> NovaResult<()> {
         let contract_names = c1.iter().map(|(n, _)| n).collect::<Vec<_>>();
         if let Some(fields) = self.environment.custom_types.get(name.as_ref()) {
             if let Some(mapped_type) = type_map.get(own) {
                 if mapped_type != t2 {
-                    return Err(NovaError::TypeMismatch {
+                    return Err(Box::new(NovaError::TypeMismatch {
                         expected: mapped_type.clone(),
                         found: t2.clone(),
                         position: pos.clone(),
-                    });
+                    }));
                 }
             } else {
                 type_map.insert(own.clone(), t2.clone());
             }
 
             if contract_names.len() > fields.len() {
-                return Err(NovaError::TypeMismatch {
+                return Err(Box::new(NovaError::TypeMismatch {
                     expected: t1.clone(),
                     found: t2.clone(),
                     position: pos.clone(),
-                });
+                }));
             }
 
             let new_fields = if let Some(generic_params) = self
@@ -280,11 +275,11 @@ impl TypeChecker {
                     .iter()
                     .any(|(field_name, _)| field_name == *contract_name)
                 {
-                    return Err(NovaError::TypeMismatch {
+                    return Err(Box::new(NovaError::TypeMismatch {
                         expected: t1.clone(),
                         found: t2.clone(),
                         position: pos.clone(),
-                    });
+                    }));
                 }
 
                 let field_type = c1
@@ -300,18 +295,18 @@ impl TypeChecker {
                     .unwrap();
 
                 self.check_and_map_types(
-                    &[field_type.clone()],
-                    &[new_field.clone()],
+                    std::slice::from_ref(field_type),
+                    std::slice::from_ref(new_field),
                     type_map,
                     pos.clone(),
                 )?;
             }
         } else {
-            return Err(NovaError::TypeMismatch {
+            return Err(Box::new(NovaError::TypeMismatch {
                 expected: t1.clone(),
                 found: t2.clone(),
                 position: pos.clone(),
-            });
+            }));
         };
         Ok(())
     }
@@ -325,7 +320,7 @@ impl TypeChecker {
         output: TType,
         type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
-    ) -> Result<TType, NovaError> {
+    ) -> NovaResult<TType> {
         match output.clone() {
             TType::Tuple { elements } => {
                 let mut mapped_elements = Vec::new();
@@ -340,15 +335,13 @@ impl TypeChecker {
             TType::Generic { name } => {
                 if let Some(mapped_type) = type_map.get(&name) {
                     Ok(mapped_type.clone())
+                } else if self.environment.live_generics.last().unwrap().has(&name) {
+                    Ok(TType::Generic { name })
                 } else {
-                    if self.environment.live_generics.last().unwrap().has(&name) {
-                        Ok(TType::Generic { name })
-                    } else {
-                        Err(NovaError::SimpleTypeError {
-                            msg: format!("Generic type {} could not be inferred", name).into(),
-                            position: pos,
-                        })
-                    }
+                    Err(Box::new(NovaError::SimpleTypeError {
+                        msg: format!("Generic type {} could not be inferred", name).into(),
+                        position: pos,
+                    }))
                 }
             }
             TType::List { inner } => {
@@ -400,7 +393,11 @@ impl TypeChecker {
     // Generic type utilities (static)
     // ---------------------------------------------------------------
 
-    pub fn replace_generic_types(ttype: &TType, x: &[impl AsRef<str>], type_params: &[TType]) -> TType {
+    pub fn replace_generic_types(
+        ttype: &TType,
+        x: &[impl AsRef<str>],
+        type_params: &[TType],
+    ) -> TType {
         match ttype {
             TType::Generic { name: n } => {
                 if let Some(index) = x.iter().position(|x| x.as_ref() == n.deref()) {
@@ -550,7 +547,7 @@ impl TypeChecker {
         argument_types: &[TType],
         type_map: &mut HashMap<Rc<str>, TType>,
         pos: FilePosition,
-    ) -> Result<(), NovaError> {
+    ) -> NovaResult<()> {
         for (param_type, arg_type) in parameters.iter().zip(argument_types.iter()) {
             if let (
                 TType::Custom {
@@ -658,13 +655,13 @@ impl TypeChecker {
         statements: &[Statement],
         return_type: TType,
         pos: FilePosition,
-    ) -> Result<bool, NovaError> {
+    ) -> NovaResult<bool> {
         for statement in statements.iter() {
             match statement {
                 Statement::Return { ttype, .. } => {
                     match self.check_and_map_types(
-                        &[ttype.clone()],
-                        &[return_type.clone()],
+                        std::slice::from_ref(ttype),
+                        std::slice::from_ref(&return_type),
                         &mut HashMap::default(),
                         pos.clone(),
                     ) {
@@ -694,7 +691,7 @@ impl TypeChecker {
                     if let Expr::Return { expr, ttype: _ } = expr {
                         match self.check_and_map_types(
                             &[expr.get_type()],
-                            &[return_type.clone()],
+                            std::slice::from_ref(&return_type),
                             &mut HashMap::default(),
                             pos.clone(),
                         ) {
@@ -845,7 +842,7 @@ impl TypeChecker {
                     for arm in arms.iter() {
                         for statement in arm.2.iter() {
                             arms_return.push(self.will_return(
-                                &[statement.clone()],
+                                std::slice::from_ref(statement),
                                 return_type.clone(),
                                 pos.clone(),
                             )?);
@@ -855,7 +852,7 @@ impl TypeChecker {
                     if let Some(default) = default {
                         for statement in default.iter() {
                             arms_return.push(self.will_return(
-                                &[statement.clone()],
+                                std::slice::from_ref(statement),
                                 return_type.clone(),
                                 pos.clone(),
                             )?);
@@ -900,8 +897,8 @@ impl TypeChecker {
         right_expr: Expr,
         operation: common::tokens::Operator,
         pos: FilePosition,
-    ) -> NovaError {
-        NovaError::TypeError {
+    ) -> Box<NovaError> {
+        Box::new(NovaError::TypeError {
             expected: left_expr.get_type().to_string().into(),
             found: right_expr.get_type().to_string().into(),
             position: pos,
@@ -911,6 +908,6 @@ impl TypeChecker {
                 left_expr.get_type(),
             )
             .into(),
-        }
+        })
     }
 }

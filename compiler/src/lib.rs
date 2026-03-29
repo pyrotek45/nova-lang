@@ -4,7 +4,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 use common::code::Asm;
-use common::error::NovaError;
+use common::error::{NovaError, NovaResult};
 use common::fileposition::FilePosition;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
@@ -147,7 +147,7 @@ impl Compiler {
         global: bool,
         function: bool,
         keep: bool,
-    ) -> Result<Vec<Asm>, NovaError> {
+    ) -> NovaResult<Vec<Asm>> {
         self.filepath = filepath.into();
         // create wrapper functions for builtin functions
         //dbg!(&self.native_functions);
@@ -364,8 +364,7 @@ impl Compiler {
                     // fields includes the auto-added "type" field at the end
                     // real user fields = fields.len() - 1
                     let num_real_fields = fields.len() - 1;
-                    self.asm
-                        .push(Asm::OFFSET(num_real_fields as u32, 0_u32));
+                    self.asm.push(Asm::OFFSET(num_real_fields as u32, 0_u32));
                     // Push field name strings (in order) for each real field
                     for field in fields.iter().take(num_real_fields) {
                         self.compile_string_literal(&field.identifier);
@@ -954,7 +953,7 @@ impl Compiler {
         Ok(self.asm.to_owned())
     }
 
-    pub fn getref_expr(&mut self, expr: &Expr) -> Result<(), NovaError> {
+    pub fn getref_expr(&mut self, expr: &Expr) -> NovaResult<()> {
         match expr {
             Expr::None => {
                 // self.output.push(Code::NONE)
@@ -1008,7 +1007,12 @@ impl Compiler {
             Expr::IfExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
-            Expr::DynField { name, expr, position, .. } => {
+            Expr::DynField {
+                name,
+                expr,
+                position,
+                ..
+            } => {
                 self.compile_string_literal(name);
                 self.compile_expr(expr)?;
                 self.asm.push(Asm::PINF(position.clone()));
@@ -1018,7 +1022,7 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn getref_atom(&mut self, atom: &Atom) -> Result<(), NovaError> {
+    pub fn getref_atom(&mut self, atom: &Atom) -> NovaResult<()> {
         match atom {
             Atom::Bool { value } => {
                 self.asm.push(Asm::BOOL(*value));
@@ -1071,7 +1075,7 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile_expr(&mut self, expr: &Expr) -> Result<(), NovaError> {
+    pub fn compile_expr(&mut self, expr: &Expr) -> NovaResult<()> {
         match expr {
             Expr::None => {
                 //    Ok(self.output.push(Code::NONE))
@@ -1095,7 +1099,12 @@ impl Compiler {
                 self.asm.push(Asm::LIN(position.clone()));
                 Ok(())
             }
-            Expr::DynField { name, expr, position, .. } => {
+            Expr::DynField {
+                name,
+                expr,
+                position,
+                ..
+            } => {
                 self.compile_expr(expr)?;
                 self.compile_string_literal(name);
                 self.asm.push(Asm::GETF(position.clone()));
@@ -1824,7 +1833,7 @@ impl Compiler {
         list_index: usize,
         mut loops: Vec<(Rc<str>, Expr)>,
         position: FilePosition,
-    ) -> Result<(), NovaError> {
+    ) -> NovaResult<()> {
         // compile list and create counter
         self.variables
             .insert(format!("__tempcounter__{}", self.gen.generate()).into());
@@ -1926,7 +1935,7 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile_atom(&mut self, atom: &Atom) -> Result<(), NovaError> {
+    pub fn compile_atom(&mut self, atom: &Atom) -> NovaResult<()> {
         match atom {
             Atom::Bool { value: bool } => {
                 self.asm.push(Asm::BOOL(*bool));
@@ -1939,10 +1948,10 @@ impl Compiler {
                 } else if let Some(value) = self.unrolled_index.get(identifier) {
                     self.asm.push(Asm::INTEGER(*value as i64));
                 } else {
-                    return Err(NovaError::Compiler {
+                    return Err(Box::new(NovaError::Compiler {
                         msg: format!("Function \"{}\" not found", identifier).into(),
                         note: "Function could not be loaded".into(),
-                    });
+                    }));
                 }
             }
             Atom::Float { value: float } => {
@@ -2020,10 +2029,10 @@ impl Compiler {
                         } else if let Some(value) = self.unrolled_index.get(identifier) {
                             self.asm.push(Asm::INTEGER(*value as i64));
                         } else {
-                            return Err(NovaError::Compiler {
+                            return Err(Box::new(NovaError::Compiler {
                                 msg: format!("Function \"{}\" not found", identifier).into(),
                                 note: "Function could not be loaded".into(),
-                            });
+                            }));
                         }
                     }
                 }

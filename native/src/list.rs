@@ -1,8 +1,8 @@
-use common::error::NovaError;
+use common::error::NovaResult;
 use vm::memory_manager::{ObjectType, VmData};
 use vm::state;
 
-pub fn len(state: &mut state::State) -> Result<(), NovaError> {
+pub fn len(state: &mut state::State) -> NovaResult<()> {
     if let Some(VmData::Object(index)) = state.memory.stack.pop() {
         if let Some(obj) = state.memory.ref_from_heap(index) {
             if let ObjectType::List = obj.object_type {
@@ -15,7 +15,7 @@ pub fn len(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn push(state: &mut state::State) -> Result<(), NovaError> {
+pub fn push(state: &mut state::State) -> NovaResult<()> {
     if let (Some(data), Some(VmData::Object(index))) =
         (state.memory.stack.pop(), state.memory.stack.pop())
     {
@@ -35,7 +35,7 @@ pub fn push(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
+pub fn pop(state: &mut state::State) -> NovaResult<()> {
     if let Some(VmData::Object(index)) = state.memory.stack.pop() {
         let popped = {
             if let Some(obj) = state.memory.ref_from_heap_mut(index) {
@@ -64,7 +64,7 @@ pub fn pop(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn remove(state: &mut state::State) -> Result<(), NovaError> {
+pub fn remove(state: &mut state::State) -> NovaResult<()> {
     if let (Some(VmData::Int(idx)), Some(VmData::Object(list_index))) =
         (state.memory.stack.pop(), state.memory.stack.pop())
     {

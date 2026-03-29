@@ -1,8 +1,8 @@
-use common::error::NovaError;
+use common::error::{NovaError, NovaResult};
 use vm::memory_manager::{ObjectType, VmData};
 use vm::state;
 
-pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
+pub fn strlen(state: &mut state::State) -> NovaResult<()> {
     match state.memory.stack.pop() {
         Some(VmData::Object(index)) => {
             if let Some(obj) = state.memory.ref_from_heap(index) {
@@ -13,26 +13,26 @@ pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
                     Ok(())
                 } else {
                     state.memory.dec(index);
-                    Err(NovaError::Runtime {
+                    Err(Box::new(NovaError::Runtime {
                         msg: "Expected a string object".into(),
-                    })
+                    }))
                 }
             } else {
-                Err(NovaError::Runtime {
+                Err(Box::new(NovaError::Runtime {
                     msg: "Invalid heap reference".into(),
-                })
+                }))
             }
         }
-        Some(_) => Err(NovaError::Runtime {
+        Some(_) => Err(Box::new(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
-        }),
-        None => Err(NovaError::Runtime {
+        })),
+        None => Err(Box::new(NovaError::Runtime {
             msg: "Stack is empty".into(),
-        }),
+        })),
     }
 }
 
-pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
+pub fn str_to_chars(state: &mut state::State) -> NovaResult<()> {
     match state.memory.stack.pop() {
         Some(VmData::Object(index)) => {
             if let Some(obj) = state.memory.ref_from_heap(index) {
@@ -43,48 +43,51 @@ pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
                     Ok(())
                 } else {
                     state.memory.dec(index);
-                    Err(NovaError::Runtime {
+                    Err(Box::new(NovaError::Runtime {
                         msg: "Expected a string object".into(),
-                    })
+                    }))
                 }
             } else {
-                Err(NovaError::Runtime {
+                Err(Box::new(NovaError::Runtime {
                     msg: "Invalid heap reference".into(),
-                })
+                }))
             }
         }
-        Some(_) => Err(NovaError::Runtime {
+        Some(_) => Err(Box::new(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
-        }),
-        None => Err(NovaError::Runtime {
+        })),
+        None => Err(Box::new(NovaError::Runtime {
             msg: "Stack is empty".into(),
-        }),
+        })),
     }
 }
 
-pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
+pub fn chars_to_str(state: &mut state::State) -> NovaResult<()> {
     let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: "Stack is empty".into(),
-            })
+            }))
         }
     };
 
     let index = match data {
         VmData::Object(index) => index,
         _ => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: "Expected a list on the stack".into(),
-            })
+            }))
         }
     };
 
     let chars_string = {
-        let obj = state.memory.ref_from_heap(index).ok_or(NovaError::Runtime {
-            msg: "Invalid heap reference".into(),
-        })?;
+        let obj = state
+            .memory
+            .ref_from_heap(index)
+            .ok_or(Box::new(NovaError::Runtime {
+                msg: "Invalid heap reference".into(),
+            }))?;
         match &obj.object_type {
             ObjectType::List => {
                 let mut s = String::new();
@@ -92,18 +95,18 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
                     match item {
                         VmData::Char(c) => s.push(*c),
                         _ => {
-                            return Err(NovaError::Runtime {
+                            return Err(Box::new(NovaError::Runtime {
                                 msg: "Expected a char in the list".into(),
-                            })
+                            }))
                         }
                     }
                 }
                 s
             }
             _ => {
-                return Err(NovaError::Runtime {
+                return Err(Box::new(NovaError::Runtime {
                     msg: "Expected a list object".into(),
-                })
+                }))
             }
         }
     };
@@ -113,13 +116,13 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
+pub fn to_string(state: &mut state::State) -> NovaResult<()> {
     let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: "Stack is empty".into(),
-            })
+            }))
         }
     };
 
@@ -142,13 +145,13 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
     Ok(())
 }
 
-pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
+pub fn to_int(state: &mut state::State) -> NovaResult<()> {
     let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
-            return Err(NovaError::Runtime {
+            return Err(Box::new(NovaError::Runtime {
                 msg: "Stack is empty".into(),
-            })
+            }))
         }
     };
 
