@@ -34,6 +34,28 @@ from your first window to a complete game architecture. For the full API referen
     - [16.8 Putting It All Together](#168-putting-it-all-together)
     - [16.9 Layered Draw Order](#169-layered-draw-order)
     - [16.10 Quick Reference](#1610-quick-reference)
+17. [Structuring a Large Game](#17-structuring-a-large-game)
+    - [17.1 File and Module Layout](#171-file-and-module-layout)
+    - [17.2 The Central Game State Struct](#172-the-central-game-state-struct)
+    - [17.3 Passing State Down vs. Using Module-level Globals](#173-passing-state-down-vs-using-module-level-globals)
+18. [Input Abstraction](#18-input-abstraction)
+    - [18.1 The Action Map Pattern](#181-the-action-map-pattern)
+    - [18.2 Checking Actions by Name](#182-checking-actions-by-name)
+    - [18.3 Rebinding at Runtime](#183-rebinding-at-runtime)
+19. [Menu Systems](#19-menu-systems)
+    - [19.1 Screen Stack with an Enum](#191-screen-stack-with-an-enum)
+    - [19.2 Drawing Each Screen](#192-drawing-each-screen)
+    - [19.3 Pause-over-Play](#193-pause-over-play)
+20. [Camera and World Space](#20-camera-and-world-space)
+    - [20.1 The Camera Struct](#201-the-camera-struct)
+    - [20.2 Scrolling and Clamping](#202-scrolling-and-clamping)
+    - [20.3 Screen-to-World for Mouse Clicks](#203-screen-to-world-for-mouse-clicks)
+21. [Optimization and Performance](#21-optimization-and-performance)
+    - [21.1 Object Pooling](#211-object-pooling)
+    - [21.2 Cooldown Timers](#212-cooldown-timers)
+    - [21.3 Spatial Grid for Broad-Phase Collision](#213-spatial-grid-for-broad-phase-collision)
+    - [21.4 Avoid Allocations in the Hot Loop](#214-avoid-allocations-in-the-hot-loop)
+    - [21.5 Quick Reference](#215-quick-reference)
 
 ---
 
@@ -1312,3 +1334,757 @@ for e in layer_ui     { e->draw() }
 | Collision response | `match a.tag { ... }` |
 | Kill dead entities | `list.filter(): \|e\| e.active` |
 | Layered draw order | Separate lists per layer, drawn in sequence |
+
+---
+
+## 17. Structuring a Large Game
+
+Small games fit in one file. Once you have enemies, menus, UI, audio cues, and
+several screens the single-file approach stops scaling. This section shows a proven
+layout for medium-to-large Nova projects.
+
+### 17.1 File and Module Layout
+
+Split your project into one Nova module per concern.
+A typical layout for a 2-D action game:
+
+```
+my_game/
+  main.nv          ← entry point: calls init, runs the loop
+  state.nv         ← global game state struct + type aliases
+  input.nv         ← action map, key bindings
+  entities.nv      ← Entity struct, update/draw logic
+  collision.nv     ← overlap tests, response helpers
+  ui.nv            ← HUD, menus, score display
+  camera.nv        ← Camera struct + worldToScreen helpers
+  std/             ← any local library modules
+```
+
+Each file starts with `module <name>` and imports what it needs:
+
+```nova
+// entities.nv
+module entities
+import super.state
+import super.camera
+```
+
+Keep cross-cutting imports to a minimum. If module A and module B both need a type,
+define that type in a third module (e.g., `state.nv`) and import it from there.
+
+---
+
+### 17.2 The Central Game State Struct
+
+One root struct owns everything. Passing it around (or keeping it at module level in
+`state.nv`) means every subsystem reads from and writes to a single source of truth.
+
+```nova
+// state.nv
+module state
+import super.camera
+import super.entities
+
+struct GameState {
+    player:    Entity,
+    enemies:   [Entity],
+    bullets:   [Entity],
+    camera:    Camera,
+    score:     Int,
+    lives:     Int,
+    level:     Int,
+    frameTime: Int,
+}
+
+fn mkGameState() -> GameState {
+    return GameState {
+        player:    mkPlayer(400, 300),
+        enemies:   []: Entity,
+        bullets:   []: Entity,
+        camera:    mkCamera(0, 0),
+        score:     0,
+        lives:     3,
+        level:     1,
+        frameTime: 0,
+    }
+}
+```
+
+Your main loop then looks like:
+
+```nova
+// main.nv
+module main
+import super.state
+import super.entities
+import super.input
+import super.ui
+
+raylib::init("My Game", 800, 600, 60)
+
+let gs = mkGameState()
+
+while raylib::rendering() {
+    gs.frameTime = raylib::getFrameTime()
+
+    updateInput(gs)
+    updateEntities(gs)
+    updateCamera(gs)
+
+    raylib::clear((10, 10, 20))
+    drawEntities(gs)
+    drawHUD(gs)
+}
+```
+
+Everything flows through `gs`. No hidden global state scattered across modules.
+
+---
+
+### 17.3 Passing State Down vs. Using Module-level Globals
+
+Nova supports module-level `let` bindings (globals). Use them for things that are
+logically program-wide singletons — the action map, a shared RNG seed:
+
+```nova
+// input.nv
+module input
+
+// Module-level: exists once for the lifetime of the program
+let actions = buildActionMap()
+```
+
+For game-world data — entities, score, lives — prefer passing `GameState` explicitly.
+That makes functions testable and keeps side-effects visible at the call site.
+
+**Rule of thumb:**
+- Singletons that never reset → module-level `let`
+- Everything that changes during a play session → inside `GameState`
+
+---
+
+## 18. Input Abstraction
+
+Hard-coding `raylib::isKeyPressed("KEY_SPACE")` everywhere makes rebinding painful
+and testing impossible. An action map fixes both.
+
+### 18.1 The Action Map Pattern
+
+Store each action's predicate as a `fn(Action) -> Bool` field. Call it with `->` dispatch.
+
+```nova
+module input
+import super.std.core
+
+struct Action {
+    name:  String,
+    check: fn(Action) -> Bool,
+}
+```
+
+Build default bindings once at startup:
+
+```nova
+let actions = [
+    Action {
+        name:  "move_left",
+        check: fn(self: Action) -> Bool {
+            return raylib::isKeyPressed("KEY_LEFT") ||
+                   raylib::isKeyPressed("KEY_A")
+        }
+    },
+    Action {
+        name:  "move_right",
+        check: fn(self: Action) -> Bool {
+            return raylib::isKeyPressed("KEY_RIGHT") ||
+                   raylib::isKeyPressed("KEY_D")
+        }
+    },
+    Action {
+        name:  "jump",
+        check: fn(self: Action) -> Bool {
+            return raylib::isKeyPressed("KEY_SPACE") ||
+                   raylib::isKeyPressed("KEY_W")
+        }
+    },
+    Action {
+        name:  "fire",
+        check: fn(self: Action) -> Bool {
+            return raylib::isKeyPressed("KEY_Z") ||
+                   raylib::isKeyPressed("KEY_ENTER")
+        }
+    },
+]: Action
+```
+
+---
+
+### 18.2 Checking Actions by Name
+
+```nova
+fn isPressed(name: String) -> Bool {
+    for a in actions {
+        if a.name == name {
+            return a->check()
+        }
+    }
+    return false
+}
+```
+
+Update code never mentions key names again:
+
+```nova
+fn updatePlayer(gs: GameState) {
+    let dt = gs.frameTime
+
+    if isPressed("move_left")  { gs.player.x -= 5 * dt / 16 }
+    if isPressed("move_right") { gs.player.x += 5 * dt / 16 }
+    if isPressed("jump")       { gs.player.vy = -12 }
+    if isPressed("fire")       { spawnBullet(gs) }
+}
+```
+
+---
+
+### 18.3 Rebinding at Runtime
+
+Replace a binding at runtime by iterating the list and swapping the closure:
+
+```nova
+fn rebind(name: String, newCheck: fn(Action) -> Bool) {
+    for a in actions {
+        if a.name == name {
+            a.check = newCheck
+            return
+        }
+    }
+}
+
+// Remap "fire" to a different key
+rebind("fire", fn(self: Action) -> Bool {
+    return raylib::isKeyPressed("KEY_SPACE")
+})
+```
+
+Because `check` is a regular struct field, assigning to it is instant and affects
+every future call to `isPressed("fire")`.
+
+---
+
+## 19. Menu Systems
+
+### 19.1 Screen Stack with an Enum
+
+Model every screen as a variant of an enum. Associate data when a variant needs it
+(e.g., `GameOver` carries the final score):
+
+```nova
+enum Screen {
+    MainMenu,
+    Playing,
+    Paused,
+    GameOver: Int,   // carries final score
+    Options,
+}
+
+let stack = []: Screen
+```
+
+Helper functions mirror a real stack:
+
+```nova
+fn pushScreen(s: Screen) { stack.push(s) }
+
+fn popScreen() {
+    if stack.len() > 0 { stack.pop() }
+}
+
+fn currentScreen() -> Option(Screen) {
+    if stack.len() == 0 { return None(Screen) }
+    return Some(stack[stack.len() - 1])
+}
+```
+
+On startup:
+
+```nova
+pushScreen(Screen::MainMenu())
+```
+
+---
+
+### 19.2 Drawing Each Screen
+
+Match on the current screen each frame:
+
+```nova
+fn drawFrame(gs: GameState) {
+    if let s = currentScreen() {
+        match s {
+            Screen::MainMenu()      => { drawMainMenu(gs)               }
+            Screen::Playing()       => { drawWorld(gs)                  }
+            Screen::Paused()        => { drawWorld(gs)
+                                         drawPauseOverlay(gs)            }
+            Screen::GameOver(score) => { drawGameOver(score)            }
+            Screen::Options()       => { drawOptions(gs)                }
+        }
+    }
+}
+```
+
+Update logic follows the same shape:
+
+```nova
+fn updateFrame(gs: GameState) {
+    if let s = currentScreen() {
+        match s {
+            Screen::Playing() => {
+                updatePlayer(gs)
+                updateEnemies(gs)
+                updateBullets(gs)
+                if livesZero(gs) {
+                    pushScreen(Screen::GameOver(gs.score))
+                }
+            }
+            Screen::MainMenu() => {
+                if isPressed("fire") { pushScreen(Screen::Playing()) }
+            }
+            Screen::Paused() => {
+                if isPressed("pause") { popScreen() }
+            }
+            Screen::GameOver(score) => {
+                if isPressed("fire") {
+                    popScreen()   // remove GameOver
+                    popScreen()   // remove Playing
+                    pushScreen(Screen::MainMenu())
+                }
+            }
+            _ => {}
+        }
+    }
+}
+```
+
+The stack keeps full context. Popping `GameOver` reveals the game world underneath;
+popping `Paused` resumes `Playing` without re-creating anything.
+
+---
+
+### 19.3 Pause-over-Play
+
+Because `Paused` sits *on top of* `Playing`, you can render the world underneath
+and then draw the pause menu on top — no state duplication:
+
+```nova
+fn drawPauseOverlay(gs: GameState) {
+    raylib::drawRect(0, 0, 800, 600, (0, 0, 0))   // dark overlay
+    raylib::drawText("PAUSED",    300, 250, 50, (255, 255, 255))
+    raylib::drawText("Resume: P", 320, 320, 24, (200, 200, 200))
+    raylib::drawText("Quit:   Q", 320, 350, 24, (200, 200, 200))
+}
+```
+
+The `Playing` branch in `drawFrame` already drew the world; the overlay goes on top.
+
+---
+
+## 20. Camera and World Space
+
+Once your game world is larger than the screen, you need a camera to translate
+between *world coordinates* and *screen coordinates*.
+
+### 20.1 The Camera Struct
+
+```nova
+struct Camera {
+    x:    Int,   // top-left of the visible region in world units
+    y:    Int,
+    zoom: Int,   // 100 = 1x, 200 = 2x, 50 = 0.5x
+}
+
+fn mkCamera(x: Int, y: Int) -> Camera {
+    return Camera { x: x, y: y, zoom: 100 }
+}
+
+fn extends worldToScreen(cam: Camera, wx: Int, wy: Int) -> (Int, Int) {
+    let sx = (wx - cam.x) * cam.zoom / 100
+    let sy = (wy - cam.y) * cam.zoom / 100
+    return (sx, sy)
+}
+
+fn extends screenToWorld(cam: Camera, sx: Int, sy: Int) -> (Int, Int) {
+    let wx = sx * 100 / cam.zoom + cam.x
+    let wy = sy * 100 / cam.zoom + cam.y
+    return (wx, wy)
+}
+```
+
+Every draw call goes through `worldToScreen`:
+
+```nova
+fn drawEntity(cam: Camera, e: Entity) {
+    let pos = cam.worldToScreen(e.x, e.y)
+    e->draw(pos[0], pos[1])
+}
+```
+
+---
+
+### 20.2 Scrolling and Clamping
+
+Keep the player centered, clamped to the map boundary:
+
+```nova
+fn extends follow(cam: Camera, targetX: Int, targetY: Int,
+                  screenW: Int, screenH: Int,
+                  mapW: Int, mapH: Int) {
+    cam.x = targetX - screenW / 2
+    cam.y = targetY - screenH / 2
+
+    if cam.x < 0 { cam.x = 0 }
+    if cam.y < 0 { cam.y = 0 }
+    let maxX = mapW - screenW * 100 / cam.zoom
+    let maxY = mapH - screenH * 100 / cam.zoom
+    if cam.x > maxX { cam.x = maxX }
+    if cam.y > maxY { cam.y = maxY }
+}
+```
+
+Call once per frame after updating the player:
+
+```nova
+gs.camera.follow(gs.player.x, gs.player.y, 800, 600, mapWidth, mapHeight)
+```
+
+---
+
+### 20.3 Screen-to-World for Mouse Clicks
+
+Point-and-click, bullet targeting, and RTS controls all need to know where in the
+*world* the mouse is:
+
+```nova
+fn mouseWorldPos(cam: Camera) -> (Int, Int) {
+    let mx = raylib::getMouseX()
+    let my = raylib::getMouseY()
+    return cam.screenToWorld(mx, my)
+}
+```
+
+Hit-test entities against the world-space mouse position:
+
+```nova
+fn pickEntity(cam: Camera, entities: [Entity]) -> Option(Entity) {
+    let mw = mouseWorldPos(cam)
+    let mx = mw[0]
+    let my = mw[1]
+    for e in entities {
+        if mx >= e.x && mx <= e.x + e.w &&
+           my >= e.y && my <= e.y + e.h {
+            return Some(e)
+        }
+    }
+    return None(Entity)
+}
+```
+
+---
+
+## 21. Optimization and Performance
+
+Nova's value semantics and GC are fast enough for most games, but a few patterns
+make the difference between 60 fps and 30 fps once entity counts grow.
+
+### 21.1 Object Pooling
+
+Creating and destroying entities each frame generates GC pressure. Pre-allocate a
+fixed-size pool and reuse slots with an `active` flag instead.
+
+```nova
+struct Bullet {
+    x:      Int,
+    y:      Int,
+    vx:     Int,
+    vy:     Int,
+    active: Int,   // 1 = alive, 0 = free
+}
+
+let bulletPool = []: Bullet
+
+fn initPool(size: Int) {
+    let i = Box(0)
+    while i.value < size {
+        bulletPool.push(Bullet { x: 0, y: 0, vx: 0, vy: -8, active: 0 })
+        i.value = i.value + 1
+    }
+}
+```
+
+Spawn by finding the first free slot — no allocation:
+
+```nova
+fn spawnBullet(px: Int, py: Int, vx: Int, vy: Int) {
+    for b in bulletPool {
+        if b.active == 0 {
+            b.x = px
+            b.y = py
+            b.vx = vx
+            b.vy = vy
+            b.active = 1
+            return
+        }
+    }
+    // pool exhausted — drop or grow pool here
+}
+```
+
+Update and draw only active bullets:
+
+```nova
+fn updateBullets(dt: Int) {
+    for b in bulletPool {
+        if b.active == 1 {
+            b.x = b.x + b.vx * dt / 16
+            b.y = b.y + b.vy * dt / 16
+            if b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600 {
+                b.active = 0
+            }
+        }
+    }
+}
+
+fn drawBullets(cam: Camera) {
+    for b in bulletPool {
+        if b.active == 1 {
+            let sp = cam.worldToScreen(b.x, b.y)
+            raylib::drawCircle(sp[0], sp[1], 4, (255, 220, 0))
+        }
+    }
+}
+```
+
+**No allocations. No GC spikes. Fixed memory cost.**
+
+---
+
+### 21.2 Cooldown Timers
+
+Prevent actions from firing every frame. Store remaining time alongside duration:
+
+```nova
+struct Cooldown {
+    remaining: Int,   // ms left
+    duration:  Int,   // total cooldown in ms
+}
+
+fn mkCooldown(durationMs: Int) -> Cooldown {
+    return Cooldown { remaining: 0, duration: durationMs }
+}
+
+fn extends ready(c: Cooldown) -> Bool { return c.remaining <= 0 }
+
+fn extends use(c: Cooldown) {
+    if c.remaining <= 0 { c.remaining = c.duration }
+}
+
+fn extends tick(c: Cooldown, dt: Int) {
+    if c.remaining > 0 { c.remaining = c.remaining - dt }
+}
+```
+
+Embed in the player struct:
+
+```nova
+struct Player {
+    x:      Int,
+    y:      Int,
+    gunCD:  Cooldown,   // 200 ms between shots
+    dashCD: Cooldown,   // 800 ms between dashes
+}
+
+fn mkPlayer(x: Int, y: Int) -> Player {
+    return Player {
+        x: x, y: y,
+        gunCD:  mkCooldown(200),
+        dashCD: mkCooldown(800),
+    }
+}
+```
+
+Each frame:
+
+```nova
+fn updatePlayer(gs: GameState) {
+    let dt = gs.frameTime
+    let p  = gs.player
+
+    p.gunCD.tick(dt)
+    p.dashCD.tick(dt)
+
+    if isPressed("fire") && p.gunCD.ready() {
+        spawnBullet(p.x, p.y, 0, -10)
+        p.gunCD.use()
+    }
+
+    if isPressed("dash") && p.dashCD.ready() {
+        p.x = p.x + 80
+        p.dashCD.use()
+    }
+}
+```
+
+No booleans, no timestamps scattered across the codebase.
+
+---
+
+### 21.3 Spatial Grid for Broad-Phase Collision
+
+Testing every bullet against every enemy is O(n²). A spatial hash grid reduces
+this to roughly O(n) for moderate entity counts.
+
+Divide the world into fixed-size cells. Each cell holds a list of entity indices:
+
+```nova
+struct Grid {
+    cells:    [[Int]],
+    cellSize: Int,
+    cols:     Int,
+    rows:     Int,
+}
+
+fn mkGrid(worldW: Int, worldH: Int, cellSize: Int) -> Grid {
+    let cols  = worldW / cellSize + 1
+    let rows  = worldH / cellSize + 1
+    let cells = []: [Int]
+    let i = Box(0)
+    while i.value < cols * rows {
+        cells.push([]: Int)
+        i.value = i.value + 1
+    }
+    return Grid { cells: cells, cellSize: cellSize, cols: cols, rows: rows }
+}
+
+fn extends cellIndex(g: Grid, wx: Int, wy: Int) -> Int {
+    return (wy / g.cellSize) * g.cols + (wx / g.cellSize)
+}
+
+fn extends insert(g: Grid, idx: Int, wx: Int, wy: Int) {
+    let ci = g.cellIndex(wx, wy)
+    if ci >= 0 && ci < g.cells.len() {
+        g.cells[ci].push(idx)
+    }
+}
+
+fn extends clearGrid(g: Grid) {
+    for cell in g.cells { cell.clear() }
+}
+
+fn extends nearby(g: Grid, wx: Int, wy: Int) -> [Int] {
+    let result = []: Int
+    let col = wx / g.cellSize
+    let row = wy / g.cellSize
+    let dr = Box(-1)
+    while dr.value <= 1 {
+        let dc = Box(-1)
+        while dc.value <= 1 {
+            let r = row + dr.value
+            let c = col + dc.value
+            if r >= 0 && r < g.rows && c >= 0 && c < g.cols {
+                for idx in g.cells[r * g.cols + c] { result.push(idx) }
+            }
+            dc.value = dc.value + 1
+        }
+        dr.value = dr.value + 1
+    }
+    return result
+}
+```
+
+Each frame: clear, insert enemies, then query per bullet:
+
+```nova
+fn checkBulletEnemyCollisions(gs: GameState, grid: Grid) {
+    grid.clearGrid()
+    let i = Box(0)
+    while i.value < gs.enemies.len() {
+        let e = gs.enemies[i.value]
+        if e.active == 1 { grid.insert(i.value, e.x, e.y) }
+        i.value = i.value + 1
+    }
+
+    for b in bulletPool {
+        if b.active == 0 { continue }
+        let candidates = grid.nearby(b.x, b.y)
+        for ei in candidates {
+            let e = gs.enemies[ei]
+            if e.active == 1 && overlaps(b, e) {
+                b.active  = 0
+                e.active  = 0
+                gs.score  = gs.score + 10
+            }
+        }
+    }
+}
+```
+
+Grid rebuild is O(n); each bullet query touches only a handful of cells.
+
+---
+
+### 21.4 Avoid Allocations in the Hot Loop
+
+Every `[]` literal and every `push` can trigger a GC cycle. In the critical path:
+
+**Don't** build temporary lists inside the loop:
+
+```nova
+// BAD: allocates a new list every frame
+while raylib::rendering() {
+    let visible = []: Entity     // new allocation each frame
+    for e in entities {
+        if inView(cam, e) { visible.push(e) }
+    }
+    for e in visible { e->draw() }
+}
+```
+
+**Do** pre-allocate outside the loop, then `clear()`:
+
+```nova
+let visible = []: Entity   // allocated once
+
+while raylib::rendering() {
+    visible.clear()          // resets length, no allocation
+    for e in entities {
+        if inView(cam, e) { visible.push(e) }
+    }
+    for e in visible { e->draw() }
+}
+```
+
+Other tips:
+
+- Avoid `Cast::string(n)` inside loops — convert numbers to strings in the draw
+  phase only, and cache the result if the value rarely changes.
+- Use integer arithmetic where possible — integer division and multiply are cheaper
+  than float on most targets.
+- Run `list.filter()` on dead entities outside the hot path (e.g., every N frames)
+  rather than every frame.
+
+---
+
+### 21.5 Quick Reference
+
+| Problem | Solution |
+|---|---|
+| GC spikes from spawning | Object pool with `active` flag |
+| Action fires every frame | `Cooldown` struct with `tick` / `use` / `ready` |
+| O(n²) bullet-enemy collision | Spatial grid — insert enemies, query per bullet |
+| Temporary lists each frame | Pre-allocate + `clear()` outside the loop |
+| Hard-coded key names everywhere | `Action` struct + `isPressed(name)` |
+| Multiple screens sharing world | `Screen` enum stack — push/pop, `match` on top |
+| World position on screen | `Camera` with `worldToScreen` / `screenToWorld` |
+| Mouse click in world space | `cam.screenToWorld(mouseX, mouseY)` |
+| Camera tracking player | `cam.follow(px, py, screenW, screenH, mapW, mapH)` |
+| Modular project layout | One module per concern, `GameState` threaded through |
