@@ -480,6 +480,7 @@ dependencies = [
  "native",
  "optimizer",
  "parser",
+ "typechecker",
  "vm",
 ]
 
@@ -543,6 +544,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "lexer",
+ "typechecker",
 ]
 
 [[package]]
@@ -921,6 +923,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "typechecker"
+version = "0.1.0"
+dependencies = [
+ "common",
 ]
 
 [[package]]

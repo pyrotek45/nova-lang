@@ -71,7 +71,7 @@ impl NovaCore {
                     generate_unique_string(function_id, &types)
                 };
 
-                self.parser.environment.insert_symbol(
+                self.parser.typechecker.environment.insert_symbol(
                     function_id,
                     function_type.clone(),
                     None,
@@ -87,7 +87,7 @@ impl NovaCore {
                     .insert(self.vm.native_functions.len(), function_pointer);
             }
             _ => {
-                self.parser.environment.insert_symbol(
+                self.parser.typechecker.environment.insert_symbol(
                     function_id,
                     function_type.clone(),
                     None,
@@ -113,7 +113,7 @@ impl NovaCore {
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
         self.parser
-            .environment
+            .typechecker.environment
             .custom_types
             .insert("Sprite".into(), vec![]);
         // assert functions

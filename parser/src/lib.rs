@@ -8,7 +8,6 @@ use std::{
 };
 
 use common::{
-    environment::Environment,
     error::NovaError,
     fileposition::FilePosition,
     nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
@@ -24,6 +23,7 @@ use common::{
 };
 
 use lexer::Lexer;
+use typechecker::TypeChecker;
 
 #[derive(Debug, Clone)]
 pub struct Parser {
@@ -31,37 +31,37 @@ pub struct Parser {
     pub input: TokenList,
     index: usize,
     pub ast: Ast,
-    pub environment: Environment,
+    pub typechecker: TypeChecker,
     pub modules: table::Table<Rc<str>>,
 }
 
 pub fn default() -> Parser {
-    let env = create_environment();
+    let tc = create_typechecker();
     Parser {
         filepath: None,
         ast: Ast { program: vec![] },
         input: vec![],
         index: 0,
-        environment: env,
+        typechecker: tc,
         modules: Table::new(),
     }
 }
 
 pub fn new(filepath: impl AsRef<Path>) -> Parser {
-    let env = create_environment();
+    let tc = create_typechecker();
     Parser {
         filepath: Some(filepath.as_ref().into()),
         ast: Ast { program: vec![] },
         input: vec![],
         index: 0,
-        environment: env,
+        typechecker: tc,
         modules: Table::new(),
     }
 }
 
-fn create_environment() -> Environment {
-    let mut env = Environment::new();
-    env.insert_symbol(
+fn create_typechecker() -> TypeChecker {
+    let mut tc = typechecker::new();
+    tc.environment.insert_symbol(
         "error",
         TType::Function {
             parameters: vec![TType::None],
@@ -70,7 +70,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "todo",
         TType::Function {
             parameters: vec![TType::None],
@@ -79,7 +79,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "unreachable",
         TType::Function {
             parameters: vec![TType::None],
@@ -88,7 +88,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "exit",
         TType::Function {
             parameters: vec![TType::None],
@@ -97,7 +97,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "typeof",
         TType::Function {
             parameters: vec![TType::Any],
@@ -106,7 +106,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "Option::isSome",
         TType::Function {
             parameters: vec![TType::Any],
@@ -115,7 +115,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "Option::unwrap",
         TType::Function {
             parameters: vec![TType::Option {
@@ -126,7 +126,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "Some",
         TType::Function {
             parameters: vec![TType::Generic { name: "a".into() }],
@@ -137,7 +137,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "print",
         TType::Function {
             parameters: vec![TType::Any],
@@ -146,7 +146,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "println",
         TType::Function {
             parameters: vec![TType::Any],
@@ -155,7 +155,7 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env.insert_symbol(
+    tc.environment.insert_symbol(
         "clone",
         TType::Function {
             parameters: vec![TType::Generic { name: "a".into() }],
@@ -164,350 +164,16 @@ fn create_environment() -> Environment {
         None,
         SymbolKind::GenericFunction,
     );
-    env
+    tc
 }
 
 impl Parser {
-    fn check_and_map_types(
-        &self,
-        type_list1: &[TType],
-        type_list2: &[TType],
-        type_map: &mut HashMap<Rc<str>, TType>,
-        pos: FilePosition,
-    ) -> Result<(), NovaError> {
-        if type_list1.len() != type_list2.len() {
-            return Err(self.generate_error_with_pos(
-                "E2 Incorrect amount of arguments".to_owned(),
-                format!(
-                    "Found {} arguments, but expecting {} arguments",
-                    type_list2.len(),
-                    type_list1.len()
-                ),
-                pos,
-            ));
-        }
-        for (t1, t2) in type_list1.iter().zip(type_list2.iter()) {
-            match (t1, t2) {
-                (TType::Any, b) if b != &TType::None => {
-                    continue;
-                }
-                (a, TType::Any) if a != &TType::None => {
-                    continue;
-                }
-                (
-                    TType::Tuple {
-                        elements: elements1,
-                    },
-                    TType::Tuple {
-                        elements: elements2,
-                    },
-                ) => {
-                    self.check_and_map_types(elements1, elements2, type_map, pos.clone())?;
-                }
-                (TType::Generic { name: name1 }, _) => {
-                    if t2 == &TType::None {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
-                    }
-                    if t2 == &TType::Void {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
-                    }
-                    let typemap_clone: HashMap<Rc<str>, TType> = type_map.clone();
-                    if let Some(mapped_type) = typemap_clone.get(name1) {
-                        if let (TType::Dyn { own, contract }, Some(name)) =
-                            (mapped_type, t2.custom_to_string())
-                        {
-                            let name_rc = Rc::from(name);
-                            self.check_contracts(type_map, &pos, t1, t2, own, contract, &name_rc)?;
-                        } else if mapped_type != t2 {
-                            return Err(NovaError::TypeMismatch {
-                                expected: mapped_type.clone(),
-                                found: t2.clone(),
-                                position: pos.clone(),
-                            });
-                        }
-                    } else {
-                        type_map.insert(name1.clone(), t2.clone());
-                    }
-                }
-
-                (TType::List { inner: inner1 }, TType::List { inner: inner2 }) => {
-                    self.check_and_map_types(
-                        &[*inner1.clone()],
-                        &[*inner2.clone()],
-                        type_map,
-                        pos.clone(),
-                    )?;
-                }
-                (TType::Option { inner: inner1 }, TType::Option { inner: inner2 }) => {
-                    self.check_and_map_types(
-                        &[*inner1.clone()],
-                        &[*inner2.clone()],
-                        type_map,
-                        pos.clone(),
-                    )?;
-                }
-                (
-                    TType::Function {
-                        parameters: params1,
-                        return_type: ret1,
-                    },
-                    TType::Function {
-                        parameters: params2,
-                        return_type: ret2,
-                    },
-                ) => {
-                    if params1.len() != params2.len() {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
-                    }
-
-                    self.check_and_map_types(params1, params2, type_map, pos.clone())?;
-                    self.check_and_map_types(
-                        &[*ret1.clone()],
-                        &[*ret2.clone()],
-                        type_map,
-                        pos.clone(),
-                    )?;
-                }
-                (
-                    TType::Custom {
-                        name: custom1,
-                        type_params: gen1,
-                    },
-                    TType::Custom {
-                        name: custom2,
-                        type_params: gen2,
-                    },
-                ) => {
-                    if custom1 == custom2 {
-                        self.check_and_map_types(gen1, gen2, type_map, pos.clone())?;
-                    } else {
-                        return Err(NovaError::TypeMismatch {
-                            expected: t1.clone(),
-                            found: t2.clone(),
-                            position: pos.clone(),
-                        });
-                    }
-                }
-                (TType::Dyn { own, contract: c1 }, TType::Custom { name, .. }) => {
-                    self.check_contracts(type_map, &pos, t1, t2, own, c1, name)?;
-                }
-                (TType::Dyn { own, .. }, TType::Generic { name }) => {
-                    if name == own {
-                        continue;
-                    } else {
-                        return Err(NovaError::TypeMismatch {
-                            expected: TType::Generic { name: own.clone() },
-                            found: TType::Generic { name: name.clone() },
-                            position: pos.clone(),
-                        });
-                    }
-                }
-                _ if t1 == t2 => continue,
-                _ => {
-                    return Err(NovaError::TypeMismatch {
-                        expected: t1.clone(),
-                        found: t2.clone(),
-                        position: pos.clone(),
-                    });
-                }
-            }
-        }
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn check_contracts(
-        &self,
-        type_map: &mut HashMap<Rc<str>, TType>,
-        pos: &FilePosition,
-        t1: &TType,
-        t2: &TType,
-        own: &Rc<str>,
-        c1: &[(Rc<str>, TType)],
-        name: &Rc<str>,
-    ) -> Result<(), NovaError> {
-        let contract_names = c1.iter().map(|(n, _)| n).collect::<Vec<_>>();
-        if let Some(fields) = self.environment.custom_types.get(name.as_ref()) {
-            if let Some(mapped_type) = type_map.get(own) {
-                if mapped_type != t2 {
-                    return Err(NovaError::TypeMismatch {
-                        expected: mapped_type.clone(),
-                        found: t2.clone(),
-                        position: pos.clone(),
-                    });
-                }
-            } else {
-                type_map.insert(own.clone(), t2.clone());
-            }
-
-            if contract_names.len() > fields.len() {
-                return Err(NovaError::TypeMismatch {
-                    expected: t1.clone(),
-                    found: t2.clone(),
-                    position: pos.clone(),
-                });
-            }
-
-            let new_fields = if let Some(generic_params) = self
-                .environment
-                .generic_type_struct
-                .get(t2.custom_to_string().unwrap())
-            {
-                let TType::Custom { type_params, .. } = t2 else {
-                    return Err(self.generate_error_with_pos(
-                        "Expected custom type",
-                        format!("got {}", t2),
-                        pos.clone(),
-                    ));
-                };
-                fields
-                    .iter()
-                    .map(|(name, ttype)| {
-                        let new_ttype =
-                            Self::replace_generic_types(ttype, generic_params, type_params);
-                        (name.clone(), new_ttype)
-                    })
-                    .collect()
-            } else {
-                fields.clone()
-            };
-
-            for contract_name in contract_names.iter() {
-                if !new_fields
-                    .iter()
-                    .any(|(field_name, _)| field_name == *contract_name)
-                {
-                    return Err(NovaError::TypeMismatch {
-                        expected: t1.clone(),
-                        found: t2.clone(),
-                        position: pos.clone(),
-                    });
-                }
-
-                let field_type = c1
-                    .iter()
-                    .find(|(n, _)| n == *contract_name)
-                    .map(|(_, t)| t)
-                    .unwrap();
-
-                let new_field = new_fields
-                    .iter()
-                    .find(|(n, _)| n == *contract_name)
-                    .map(|(_, t)| t)
-                    .unwrap();
-
-                self.check_and_map_types(
-                    &[field_type.clone()],
-                    &[new_field.clone()],
-                    type_map,
-                    pos.clone(),
-                )?;
-            }
-        } else {
-            return Err(NovaError::TypeMismatch {
-                expected: t1.clone(),
-                found: t2.clone(),
-                position: pos.clone(),
-            });
-        };
-        Ok(())
-    }
-
-    pub fn get_output(
-        &self,
-        output: TType,
-        type_map: &mut HashMap<Rc<str>, TType>,
-        pos: FilePosition,
-    ) -> Result<TType, NovaError> {
-        match output.clone() {
-            TType::Tuple { elements } => {
-                let mut mapped_elements = Vec::new();
-                for element in elements {
-                    let mapped_element = self.get_output(element, type_map, pos.clone())?;
-                    mapped_elements.push(mapped_element);
-                }
-                Ok(TType::Tuple {
-                    elements: mapped_elements,
-                })
-            }
-            TType::Generic { name } => {
-                if let Some(mapped_type) = type_map.get(&name) {
-                    Ok(mapped_type.clone())
-                } else {
-                    // return type error novaerror::typeError
-                    if self.environment.live_generics.last().unwrap().has(&name) {
-                        Ok(TType::Generic { name })
-                    } else {
-                        Err(NovaError::SimpleTypeError {
-                            msg: format!("Generic type {} could not be inferred", name).into(),
-                            position: pos,
-                        })
-                    }
-                }
-            }
-            TType::List { inner } => {
-                let mapped_inner = self.get_output(*inner.clone(), type_map, pos)?;
-                Ok(TType::List {
-                    inner: Box::new(mapped_inner),
-                })
-            }
-            TType::Option { inner } => {
-                let mapped_inner = self.get_output(*inner.clone(), type_map, pos)?;
-                Ok(TType::Option {
-                    inner: Box::new(mapped_inner),
-                })
-            }
-            TType::Function {
-                parameters: args,
-                return_type,
-            } => {
-                let mut mapped_args = Vec::new();
-                for arg in args {
-                    let mapped_arg = self.get_output(arg, type_map, pos.clone())?;
-                    mapped_args.push(mapped_arg);
-                }
-
-                let mapped_return_type = self.get_output(*return_type.clone(), type_map, pos)?;
-
-                Ok(TType::Function {
-                    parameters: mapped_args,
-                    return_type: Box::new(mapped_return_type),
-                })
-            }
-            TType::Custom { name, type_params } => {
-                let mut mapped_type_params = Vec::new();
-                for param in type_params {
-                    let mapped_param = self.get_output(param, type_map, pos.clone())?;
-                    mapped_type_params.push(mapped_param);
-                }
-
-                Ok(TType::Custom {
-                    name,
-                    type_params: mapped_type_params,
-                })
-            }
-            _ => Ok(output.clone()),
-        }
-    }
-
     fn eof(&mut self) -> Result<(), NovaError> {
         if self.current_token().is_none() {
             // check if forward declarations are empty
-            if !self.environment.forward_declarations.is_empty() {
+            if !self.typechecker.environment.forward_declarations.is_empty() {
                 let mut forward_decl = vec![];
-                for (id, (_, ret, pos)) in self.environment.forward_declarations.iter() {
+                for (id, (_, ret, pos)) in self.typechecker.environment.forward_declarations.iter() {
                     forward_decl.push((
                         format!("{} -> {} forward declarations not resolved", id, ret),
                         pos.clone(),
@@ -777,7 +443,7 @@ impl Parser {
                 continue;
             }
             if let Some(expr) = field_exprs.get(field_name.as_ref()) {
-                self.check_and_map_types(
+                self.typechecker.check_and_map_types(
                     &[field_type.clone()],
                     &[expr.get_type()],
                     &mut HashMap::default(),
@@ -859,7 +525,7 @@ impl Parser {
         // used last time for stuff like random.println() but removed for now
         // let old_identifier = identifier.clone();
         identifier = if let Some(TType::Custom { name, .. }) = argument_types.first() {
-            if self.environment.custom_types.contains_key(name.as_ref()) {
+            if self.typechecker.environment.custom_types.contains_key(name.as_ref()) {
                 format!("{}::{}", name, identifier).into()
             } else {
                 identifier
@@ -914,10 +580,10 @@ impl Parser {
             identifier
         };
 
-        self.varargs(&identifier, &mut argument_types, &mut arguments);
+        self.typechecker.varargs(&identifier, &mut argument_types, &mut arguments);
 
         if let Some((function_type, function_id, function_kind)) = self
-            .environment
+            .typechecker.environment
             .get_function_type(&identifier, &argument_types)
         {
             self.handle_function_call(
@@ -929,11 +595,11 @@ impl Parser {
                 pos,
             )
         } else if let Some((function_type, function_id, function_kind)) =
-            self.environment.get_type_capture(&identifier)
+            self.typechecker.environment.get_type_capture(&identifier)
         {
             //println!("captured id {}", identifier);
             let pos = self.get_current_token_position();
-            self.environment.captured.last_mut().unwrap().insert(
+            self.typechecker.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
@@ -990,19 +656,19 @@ impl Parser {
             }
         };
 
-        let mut generic_list = Self::collect_generics(&[*return_type.clone()]);
-        generic_list.extend(Self::collect_generics(&parameters));
+        let mut generic_list = TypeChecker::collect_generics(&[*return_type.clone()]);
+        generic_list.extend(TypeChecker::collect_generics(&parameters));
         let mut type_map = HashMap::new();
-        self.check_and_map_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
+        self.typechecker.check_and_map_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
 
         if let SymbolKind::GenericFunction | SymbolKind::Constructor = function_kind {
-            self.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
+            self.typechecker.map_generic_types(&parameters, &argument_types, &mut type_map, pos.clone())?;
         }
         // if current token is @ then parse [T: Type] and replace the generic type and inset that into the type_map
         self.modify_type_map(&mut type_map, pos.clone(), generic_list)?;
-        return_type = Box::new(self.get_output(*return_type, &mut type_map, pos.clone())?);
+        return_type = Box::new(self.typechecker.get_output(*return_type, &mut type_map, pos.clone())?);
 
-        if let Some(subtype) = self.environment.generic_type_map.get(&function_id) {
+        if let Some(subtype) = self.typechecker.environment.generic_type_map.get(&function_id) {
             function_id = subtype.clone();
         }
 
@@ -1037,9 +703,9 @@ impl Parser {
         self.consume_operator(Operator::Colon)?;
         let ttype = self.ttype()?;
         // check to see if type is generic and then checkt to see if it is live and if it is not live, throw an error
-        let generic_list = Self::collect_generics(&[ttype.clone()]);
+        let generic_list = TypeChecker::collect_generics(&[ttype.clone()]);
         for generic in generic_list.items {
-            if !self.environment.live_generics.last().unwrap().has(&generic) {
+            if !self.typechecker.environment.live_generics.last().unwrap().has(&generic) {
                 return Err(NovaError::SimpleTypeError {
                     msg: format!("E1 Generic Type '{generic}' is not live").into(),
                     position: pos,
@@ -1069,9 +735,9 @@ impl Parser {
             }
             self.consume_operator(Operator::Colon)?;
             let ttype = self.ttype()?;
-            let generic_list = Self::collect_generics(&[ttype.clone()]);
+            let generic_list = TypeChecker::collect_generics(&[ttype.clone()]);
             for generic in generic_list.items {
-                if !self.environment.live_generics.last().unwrap().has(&generic) {
+                if !self.typechecker.environment.live_generics.last().unwrap().has(&generic) {
                     return Err(NovaError::SimpleTypeError {
                         msg: format!("E1 Generic Type '{}' is not live", generic).into(),
                         position: pos,
@@ -1092,108 +758,6 @@ impl Parser {
         }
         self.consume_symbol(RightSquareBracket)?;
         Ok(())
-    }
-
-    fn map_generic_types(
-        &mut self,
-        parameters: &[TType],
-        argument_types: &[TType],
-        type_map: &mut HashMap<Rc<str>, TType>,
-        pos: FilePosition,
-    ) -> Result<(), NovaError> {
-        for (param_type, arg_type) in parameters.iter().zip(argument_types.iter()) {
-            if let (
-                TType::Custom {
-                    name: param_name, ..
-                },
-                TType::Custom { name: arg_name, .. },
-            ) = (param_type, arg_type)
-            {
-                if let Some(internal_type) =
-                    self.environment.generic_type_map.get(arg_name.as_ref())
-                {
-                    if internal_type == param_name {
-                        if let Some(param_list) = self.environment.get_type(param_name) {
-                            let mut s = self.clone();
-                            if let Some(arg_list) = s.environment.get_type(arg_name) {
-                                self.check_and_map_types(
-                                    &[param_list],
-                                    &[arg_list],
-                                    type_map,
-                                    pos.clone(),
-                                )?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn varargs(
-        &mut self,
-        identifier: &str,
-        argument_types: &mut Vec<TType>,
-        arguments: &mut Vec<Expr>,
-    ) {
-        let mut type_flag: TType = TType::Any;
-        let mut has_varargs = false;
-        let mut element = 0;
-
-        if self
-            .environment
-            .get_function_type(identifier, &*argument_types)
-            .is_none()
-        {
-            for i in 0..=argument_types.len() {
-                // Split the list at the current index from the end
-                let (left, right) = argument_types.split_at(argument_types.len() - i);
-                // Check if all elements in 'right' are the same
-                if let Some(first) = right.first() {
-                    type_flag = first.clone();
-                    let mut check = true;
-                    for ttype in right.iter() {
-                        if ttype != first {
-                            check = false;
-                            break;
-                        }
-                    }
-                    // If all elements in 'right' are the same, create a TType::List
-                    if check {
-                        let mut new_right = left.to_vec();
-                        new_right.push(TType::List {
-                            inner: Box::new(first.clone()),
-                        });
-                        if self
-                            .environment
-                            .get(&generate_unique_string(identifier, &new_right))
-                            .is_some()
-                        {
-                            *argument_types = new_right;
-                            element = i;
-                            has_varargs = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if has_varargs {
-            arguments.reverse();
-            let (leftexpr, rightexpr) = arguments.split_at(element);
-            let mut leftexpr = leftexpr.to_vec();
-            let mut rightexpr = rightexpr.to_vec();
-            *arguments = vec![];
-            rightexpr.reverse();
-            arguments.append(&mut rightexpr);
-            leftexpr.reverse();
-            arguments.push(Expr::ListConstructor {
-                ttype: type_flag.clone(),
-                elements: leftexpr.clone(),
-            });
-        }
     }
 
     fn call(
@@ -1232,10 +796,10 @@ impl Parser {
             argument_types.push(TType::None)
         }
 
-        self.varargs(&identifier, &mut argument_types, &mut arguments);
+        self.typechecker.varargs(&identifier, &mut argument_types, &mut arguments);
 
         if let Some((function_type, function_id, function_kind)) = self
-            .environment
+            .typechecker.environment
             .get_function_type(&identifier, &argument_types)
         {
             self.handle_function_call(
@@ -1247,11 +811,11 @@ impl Parser {
                 pos,
             )
         } else if let Some((function_type, function_id, function_kind)) =
-            self.environment.get_type_capture(&identifier)
+            self.typechecker.environment.get_type_capture(&identifier)
         {
             //println!("captured id: call {}", identifier);
             let pos = self.get_current_token_position();
-            self.environment.captured.last_mut().unwrap().insert(
+            self.typechecker.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
@@ -1290,7 +854,7 @@ impl Parser {
         identifier: &str,
         pos: FilePosition,
     ) -> Result<Vec<Expr>, NovaError> {
-        if let Some(fields) = self.environment.custom_types.get(identifier) {
+        if let Some(fields) = self.typechecker.environment.custom_types.get(identifier) {
             if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
                 self.field_list(identifier, fields.to_vec(), pos)
             } else {
@@ -1301,76 +865,6 @@ impl Parser {
         }
     }
 
-    fn replace_generic_types(ttype: &TType, x: &[impl AsRef<str>], type_params: &[TType]) -> TType {
-        match ttype {
-            TType::Generic { name: n } => {
-                if let Some(index) = x.iter().position(|x| x.as_ref() == n.deref()) {
-                    type_params[index].clone()
-                } else {
-                    ttype.clone()
-                }
-            }
-            TType::None
-            | TType::Any
-            | TType::Int
-            | TType::Float
-            | TType::Bool
-            | TType::String
-            | TType::Char
-            | TType::Void
-            | TType::Auto => ttype.clone(),
-            TType::Custom {
-                name,
-                type_params: inner_params,
-            } => {
-                let new_params = inner_params
-                    .iter()
-                    .map(|param| Self::replace_generic_types(param, x, type_params))
-                    .collect();
-                TType::Custom {
-                    name: name.clone(),
-                    type_params: new_params,
-                }
-            }
-            TType::List { inner } => TType::List {
-                inner: Box::new(Self::replace_generic_types(inner, x, type_params)),
-            },
-            TType::Function {
-                parameters,
-                return_type,
-            } => {
-                let new_params = parameters
-                    .iter()
-                    .map(|param| Self::replace_generic_types(param, x, type_params))
-                    .collect();
-                TType::Function {
-                    parameters: new_params,
-                    return_type: Box::new(Self::replace_generic_types(return_type, x, type_params)),
-                }
-            }
-            TType::Option { inner } => TType::Option {
-                inner: Box::new(Self::replace_generic_types(inner, x, type_params)),
-            },
-            TType::Tuple { elements } => {
-                let new_elements = elements
-                    .iter()
-                    .map(|element| Self::replace_generic_types(element, x, type_params))
-                    .collect();
-                TType::Tuple {
-                    elements: new_elements,
-                }
-            }
-            TType::Dyn { own, .. } => {
-                // rc is generic name
-                if let Some(index) = x.iter().position(|x| x.as_ref() == own.deref()) {
-                    type_params[index].clone()
-                } else {
-                    ttype.clone()
-                }
-            }
-        }
-    }
-
     fn field(
         &mut self,
         identifier: Rc<str>,
@@ -1378,16 +872,16 @@ impl Parser {
         pos: FilePosition,
     ) -> Result<Expr, NovaError> {
         if let Some(type_name) = lhs.get_type().custom_to_string() {
-            if let Some(fields) = self.environment.custom_types.get(type_name) {
+            if let Some(fields) = self.typechecker.environment.custom_types.get(type_name) {
                 let new_fields =
-                    if let Some(x) = self.environment.generic_type_struct.get(type_name) {
+                    if let Some(x) = self.typechecker.environment.generic_type_struct.get(type_name) {
                         let TType::Custom { type_params, .. } = lhs.get_type() else {
                             panic!("not a custom type")
                         };
                         fields
                             .iter()
                             .map(|(name, ttype)| {
-                                let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
+                                let new_ttype = TypeChecker::replace_generic_types(ttype, x, &type_params);
                                 (name.clone(), new_ttype)
                             })
                             .collect()
@@ -1480,7 +974,7 @@ impl Parser {
                 {
                     self.consume_operator(Operator::DoubleColon)?;
                     let (field, pos) = self.get_identifier()?;
-                    if let Some(custom_type) = self.environment.get_type(&identifier) {
+                    if let Some(custom_type) = self.typechecker.environment.get_type(&identifier) {
                         rhs = self.field(
                             field.clone(),
                             Expr::Literal {
@@ -1512,14 +1006,14 @@ impl Parser {
                     }
                     let input_types: Vec<_> = arguments.iter().map(|arg| arg.get_type()).collect();
                     let mut type_map = HashMap::default();
-                    self.check_and_map_types(
+                    self.typechecker.check_and_map_types(
                         &parameters,
                         &input_types,
                         &mut type_map,
                         pos.clone(),
                     )?;
                     return_type =
-                        Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
+                        Box::new(self.typechecker.get_output(*return_type.clone(), &mut type_map, pos)?);
                     lhs = Expr::Call {
                         ttype: *return_type,
                         name: "anon".into(),
@@ -1775,7 +1269,7 @@ impl Parser {
             Some(Operator(Operator::RightArrow)) => {
                 self.consume_operator(Operator::RightArrow)?;
                 let (field, field_position) = self.get_identifier()?;
-                if let Some(identifier_type) = self.environment.get_type(&identifier) {
+                if let Some(identifier_type) = self.typechecker.environment.get_type(&identifier) {
                     let mut arguments =
                         vec![self.create_literal_expr(identifier.clone(), identifier_type.clone())];
                     let left_expr = self.field(
@@ -1800,14 +1294,14 @@ impl Parser {
                         let input_types: Vec<TType> =
                             arguments.iter().map(|arg| arg.get_type()).collect();
                         let mut type_map = HashMap::default();
-                        self.check_and_map_types(
+                        self.typechecker.check_and_map_types(
                             &input_types,
                             &parameters,
                             &mut type_map,
                             field_position.clone(),
                         )?;
                         return_type =
-                            Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
+                            Box::new(self.typechecker.get_output(*return_type.clone(), &mut type_map, pos)?);
                         // dbg!(arguments.clone(), return_type.clone(), left_expr.clone());
 
                         Expr::Call {
@@ -1837,7 +1331,7 @@ impl Parser {
             Some(StructuralSymbol(LeftParen)) => self.call(identifier.clone(), pos, None)?,
             _ => {
                 if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace))
-                    && self.environment.custom_types.contains_key(&identifier)
+                    && self.typechecker.environment.custom_types.contains_key(&identifier)
                 {
                     self.call(identifier.clone(), pos.clone(), None)?
                 } else {
@@ -1861,14 +1355,14 @@ impl Parser {
         identifier: Rc<str>,
         position: FilePosition,
     ) -> Result<Expr, NovaError> {
-        if let Some(ttype) = self.environment.get_type(&identifier) {
+        if let Some(ttype) = self.typechecker.environment.get_type(&identifier) {
             self.index(
                 identifier.clone(),
                 self.create_literal_expr(identifier.clone(), ttype.clone()),
                 ttype.clone(),
             )
-        } else if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
-            self.environment.captured.last_mut().unwrap().insert(
+        } else if let Some((ttype, _, kind)) = self.typechecker.environment.get_type_capture(&identifier) {
+            self.typechecker.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
@@ -1877,7 +1371,7 @@ impl Parser {
                     kind: SymbolKind::Captured,
                 },
             );
-            self.environment.insert_symbol(
+            self.typechecker.environment.insert_symbol(
                 &identifier,
                 ttype.clone(),
                 Some(position.clone()),
@@ -1902,16 +1396,16 @@ impl Parser {
         identifier: Rc<str>,
         position: FilePosition,
     ) -> Result<Expr, NovaError> {
-        if let Some(ttype) = self.environment.get_type(&identifier) {
+        if let Some(ttype) = self.typechecker.environment.get_type(&identifier) {
             //println!("identifier hloc-not-capture {}", identifier);
             Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
-        } else if let Some((ttype, _, kind)) = self.environment.get_type_capture(&identifier) {
+        } else if let Some((ttype, _, kind)) = self.typechecker.environment.get_type_capture(&identifier) {
             // println!("identifier hloc-capture {}", identifier);
             // println!(
             //     "environment {:?}",
-            //     self.environment.captured.last().unwrap()
+            //     self.typechecker.environment.captured.last().unwrap()
             // );
-            self.environment.captured.last_mut().unwrap().insert(
+            self.typechecker.environment.captured.last_mut().unwrap().insert(
                 identifier.clone(),
                 Symbol {
                     id: identifier.clone(),
@@ -1920,7 +1414,7 @@ impl Parser {
                     kind: SymbolKind::Captured,
                 },
             );
-            self.environment.insert_symbol(
+            self.typechecker.environment.insert_symbol(
                 &identifier,
                 ttype.clone(),
                 Some(position.clone()),
@@ -2055,7 +1549,7 @@ impl Parser {
                 for (ttype, identifier) in parameters.iter().cloned() {
                     if let TType::Function { .. } = ttype.clone() {
                         // check if generic function exist
-                        if self.environment.has(&identifier) {
+                        if self.typechecker.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
                                 format!("Generic Function {} already defined", &identifier),
                                 "Cannot redefine a generic function",
@@ -2063,7 +1557,7 @@ impl Parser {
                             ));
                         }
                         // check if normal function exist
-                        if self.environment.has(&identifier) {
+                        if self.typechecker.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
                                 format!("Function {} already defined", &identifier,),
                                 "Cannot redefine a generic function",
@@ -2086,9 +1580,9 @@ impl Parser {
                 if typeinput.is_empty() {
                     typeinput.push(TType::None)
                 }
-                let mut generic_list = Self::collect_generics(&typeinput);
-                generic_list.extend(Self::collect_generics(&[output.clone()]));
-                if let Some(livemap) = self.environment.live_generics.last_mut() {
+                let mut generic_list = TypeChecker::collect_generics(&typeinput);
+                generic_list.extend(TypeChecker::collect_generics(&[output.clone()]));
+                if let Some(livemap) = self.typechecker.environment.live_generics.last_mut() {
                     for generic in generic_list.items.iter() {
                         // add generics to live map
                         if !livemap.has(generic) {
@@ -2096,7 +1590,7 @@ impl Parser {
                         }
                     }
                 }
-                self.environment.push_scope();
+                self.typechecker.environment.push_scope();
 
                 // insert params into scope
                 for (ttype, id) in parameters.iter() {
@@ -2105,7 +1599,7 @@ impl Parser {
                             parameters: paraminput,
                             return_type: output,
                         } => {
-                            self.environment.insert_symbol(
+                            self.typechecker.environment.insert_symbol(
                                 id,
                                 TType::Function {
                                     parameters: paraminput.clone(),
@@ -2115,7 +1609,7 @@ impl Parser {
                                 SymbolKind::Parameter,
                             );
                         }
-                        _ => self.environment.insert_symbol(
+                        _ => self.typechecker.environment.insert_symbol(
                             id,
                             ttype.clone(),
                             Some(pos.clone()),
@@ -2127,7 +1621,7 @@ impl Parser {
                 let mut statements = self.block()?;
 
                 let mut captured: Vec<_> = self
-                    .environment
+                    .typechecker.environment
                     .captured
                     .last()
                     .unwrap()
@@ -2135,12 +1629,12 @@ impl Parser {
                     .map(|v| v.0.clone())
                     .collect();
 
-                self.environment.pop_scope();
+                self.typechecker.environment.pop_scope();
 
                 for c in captured.iter() {
-                    if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+                    if let Some(mc) = self.typechecker.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_current_token_position();
-                        self.environment.captured.last_mut().unwrap().insert(
+                        self.typechecker.environment.captured.last_mut().unwrap().insert(
                             c.clone(),
                             Symbol {
                                 id: mc.1,
@@ -2153,7 +1647,7 @@ impl Parser {
                 }
 
                 captured = self
-                    .environment
+                    .typechecker.environment
                     .captured
                     .last()
                     .unwrap()
@@ -2170,10 +1664,10 @@ impl Parser {
                 }
 
                 // for dc in captured.iter() {
-                //     if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+                //     if let Some(v) = self.typechecker.environment.values.last().unwrap().get(dc) {
                 //         if let SymbolKind::Captured = v.kind {
                 //         } else {
-                //             self.environment.captured.last_mut().unwrap().remove(dc);
+                //             self.typechecker.environment.captured.last_mut().unwrap().remove(dc);
                 //         }
                 //     }
                 // }
@@ -2192,7 +1686,7 @@ impl Parser {
                 }
 
                 // if last statement isnt a return error
-                let will_return = self.will_return(&statements, output.clone(), pos.clone())?;
+                let will_return = self.typechecker.will_return(&statements, output.clone(), pos.clone())?;
                 //dbg!(will_return);
                 if !will_return {
                     return Err(self.generate_error_with_pos(
@@ -2240,7 +1734,7 @@ impl Parser {
                         let listexpr = self.expr()?;
 
                         if let TType::List { inner } = listexpr.get_type() {
-                            self.environment.insert_symbol(
+                            self.typechecker.environment.insert_symbol(
                                 &ident,
                                 *inner.clone(),
                                 Some(pos.clone()),
@@ -2263,7 +1757,7 @@ impl Parser {
                             let listexpr = self.expr()?;
                             // insert identifer into scope for typechecking
                             if let TType::List { inner } = listexpr.get_type() {
-                                self.environment.insert_symbol(
+                                self.typechecker.environment.insert_symbol(
                                     &ident,
                                     *inner.clone(),
                                     Some(pos.clone()),
@@ -2280,7 +1774,7 @@ impl Parser {
                         }
                         self.consume_symbol(Pipe)?;
 
-                        self.environment.push_block();
+                        self.typechecker.environment.push_block();
                         let mut outexpr = vec![self.expr()?];
                         // continue parsing expr if there is a comma after the outexpr
                         if self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
@@ -2314,11 +1808,11 @@ impl Parser {
                                 ));
                             }
                         }
-                        self.environment.pop_block();
+                        self.typechecker.environment.pop_block();
                         self.consume_symbol(RightSquareBracket)?;
                         // remove ident from scope
                         for (ident, _) in loops.iter() {
-                            if let Some(v) = self.environment.values.last_mut() {
+                            if let Some(v) = self.typechecker.environment.values.last_mut() {
                                 _ = v.remove(ident);
                             }
                         }
@@ -2365,9 +1859,9 @@ impl Parser {
                             }
                         }
 
-                        let generic_list = Self::collect_generics(&[ttype.clone()]);
+                        let generic_list = TypeChecker::collect_generics(&[ttype.clone()]);
                         for generic in generic_list.items {
-                            if !self.environment.live_generics.last().unwrap().has(&generic) {
+                            if !self.typechecker.environment.live_generics.last().unwrap().has(&generic) {
                                 return Err(NovaError::SimpleTypeError {
                                     msg: format!("Generic Type '{}' is not live", generic).into(),
                                     position: pos,
@@ -2457,7 +1951,7 @@ impl Parser {
                         format!("{}::{}", identifier, name).into()
                     }
                     Some(Operator(Operator::DoubleColon))
-                        if self.environment.custom_types.contains_key(&identifier) =>
+                        if self.typechecker.environment.custom_types.contains_key(&identifier) =>
                     {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
@@ -2507,7 +2001,7 @@ impl Parser {
                         format!("{}::{}", identifier, name).into()
                     }
                     Some(Operator(Operator::DoubleColon))
-                        if self.environment.custom_types.contains_key(&identifier) =>
+                        if self.typechecker.environment.custom_types.contains_key(&identifier) =>
                     {
                         self.advance();
                         let (name, _) = self.get_identifier()?;
@@ -2620,7 +2114,7 @@ impl Parser {
                             format!("{}::{}", identifier, name).into()
                         }
                         Some(Operator(Operator::DoubleColon))
-                            if self.environment.custom_types.contains_key(&identifier) =>
+                            if self.typechecker.environment.custom_types.contains_key(&identifier) =>
                         {
                             self.advance();
                             let (name, _) = self.get_identifier()?;
@@ -2683,7 +2177,7 @@ impl Parser {
         for (ttype, identifier) in parameters.clone() {
             if let TType::Function { .. } = ttype.clone() {
                 // check if generic function exist
-                if self.environment.has(&identifier) {
+                if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Generic Function {} already defined", &identifier),
                         "Cannot redefine a generic function",
@@ -2691,7 +2185,7 @@ impl Parser {
                     ));
                 }
                 // check if normal function exist
-                if self.environment.has(&identifier) {
+                if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Function {} already defined", &identifier,),
                         "Cannot redefine a generic function",
@@ -2713,16 +2207,16 @@ impl Parser {
         if typeinput.is_empty() {
             typeinput.push(TType::None)
         }
-        let generic_list = Self::collect_generics(&typeinput);
-        self.environment.live_generics.push(generic_list.clone());
-        self.environment.push_scope();
+        let generic_list = TypeChecker::collect_generics(&typeinput);
+        self.typechecker.environment.live_generics.push(generic_list.clone());
+        self.typechecker.environment.push_scope();
         for (ttype, id) in parameters.iter() {
             match ttype.clone() {
                 TType::Function {
                     parameters: paraminput,
                     return_type: output,
                 } => {
-                    self.environment.insert_symbol(
+                    self.typechecker.environment.insert_symbol(
                         id,
                         TType::Function {
                             parameters: paraminput.clone(),
@@ -2732,7 +2226,7 @@ impl Parser {
                         SymbolKind::Parameter,
                     );
                 }
-                _ => self.environment.insert_symbol(
+                _ => self.typechecker.environment.insert_symbol(
                     id,
                     ttype.clone(),
                     Some(pos.clone()),
@@ -2761,7 +2255,7 @@ impl Parser {
             statement
         };
         let mut captured: Vec<_> = self
-            .environment
+            .typechecker.environment
             .captured
             .last()
             .unwrap()
@@ -2769,13 +2263,13 @@ impl Parser {
             .map(|v| v.0.clone())
             .collect();
 
-        self.environment.pop_scope();
-        self.environment.live_generics.pop();
+        self.typechecker.environment.pop_scope();
+        self.typechecker.environment.live_generics.pop();
         for c in captured.iter() {
-            if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+            if let Some(mc) = self.typechecker.environment.get_type_capture(&c.clone()) {
                 let pos = self.get_current_token_position();
 
-                self.environment.captured.last_mut().unwrap().insert(
+                self.typechecker.environment.captured.last_mut().unwrap().insert(
                     c.clone(),
                     Symbol {
                         id: mc.1,
@@ -2787,7 +2281,7 @@ impl Parser {
             }
         }
         captured = self
-            .environment
+            .typechecker.environment
             .captured
             .last()
             .unwrap()
@@ -2806,10 +2300,10 @@ impl Parser {
         }
 
         // for dc in captured.iter() {
-        //     if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+        //     if let Some(v) = self.typechecker.environment.values.last().unwrap().get(dc) {
         //         if let SymbolKind::Captured = v.kind {
         //         } else {
-        //             self.environment.captured.last_mut().unwrap().remove(dc);
+        //             self.typechecker.environment.captured.last_mut().unwrap().remove(dc);
         //         }
         //     }
         // }
@@ -2871,8 +2365,8 @@ impl Parser {
                 input_types.push(arg.get_type())
             }
             let mut type_map = HashMap::new();
-            self.check_and_map_types(&parameters, &input_types, &mut type_map, pos.clone())?;
-            return_type = Box::new(self.get_output(*return_type.clone(), &mut type_map, pos)?);
+            self.typechecker.check_and_map_types(&parameters, &input_types, &mut type_map, pos.clone())?;
+            return_type = Box::new(self.typechecker.get_output(*return_type.clone(), &mut type_map, pos)?);
             Ok(Expr::Call {
                 ttype: *return_type,
                 name: function_name,
@@ -2902,7 +2396,7 @@ impl Parser {
                             match (left_expr.clone().get_type(), right_expr.clone().get_type()) {
                                 (TType::Int, TType::Int) => {}
                                 (_, _) => {
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -2926,7 +2420,7 @@ impl Parser {
                                     format!("{}::__mul__", custom)
                                 } else {
                                     // error if no custom method
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -2939,7 +2433,7 @@ impl Parser {
                                     format!("{}::__div__", custom)
                                 } else {
                                     // error if no custom method
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -2952,7 +2446,7 @@ impl Parser {
                                     format!("{}::__mod__", custom)
                                 } else {
                                     // error if no custom method
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -2968,7 +2462,7 @@ impl Parser {
                                 ));
                             }
                         };
-                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                        if let Some(overload) = self.typechecker.environment.get(&generate_unique_string(
                             &function_id,
                             &[left_expr.get_type(), right_expr.get_type()],
                         )) {
@@ -2981,7 +2475,7 @@ impl Parser {
                                     return_type,
                                     parameters,
                                 } => {
-                                    match self.check_and_map_types(
+                                    match self.typechecker.check_and_map_types(
                                         &parameters,
                                         &typelist,
                                         &mut HashMap::default(),
@@ -3003,7 +2497,7 @@ impl Parser {
                                                     );
                                                 }
                                                 (_, _) => {
-                                                    return Err(self.create_type_error(
+                                                    return Err(self.typechecker.create_type_error(
                                                         left_expr.clone(),
                                                         right_expr.clone(),
                                                         operation,
@@ -3035,7 +2529,7 @@ impl Parser {
                                     position: pos.clone(),
                                 },
                             };
-                        } else if let Some(overload) = self.environment.get(&function_id) {
+                        } else if let Some(overload) = self.typechecker.environment.get(&function_id) {
                             // get return type of function call
                             let pos = self.get_current_token_position();
                             let arguments = vec![left_expr.clone(), right_expr.clone()];
@@ -3046,7 +2540,7 @@ impl Parser {
                                     return_type,
                                     parameters,
                                 } => {
-                                    match self.check_and_map_types(
+                                    match self.typechecker.check_and_map_types(
                                         &parameters,
                                         &typelist,
                                         &mut HashMap::default(),
@@ -3068,7 +2562,7 @@ impl Parser {
                                                     );
                                                 }
                                                 (_, _) => {
-                                                    return Err(self.create_type_error(
+                                                    return Err(self.typechecker.create_type_error(
                                                         left_expr.clone(),
                                                         right_expr.clone(),
                                                         operation,
@@ -3107,7 +2601,7 @@ impl Parser {
                                     );
                                 }
                                 (_, _) => {
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -3151,7 +2645,7 @@ impl Parser {
                     }
                     Expr::Literal { value: v, .. } => match v {
                         Atom::Id { .. } => {
-                            self.check_and_map_types(
+                            self.typechecker.check_and_map_types(
                                 &[left_expr.get_type()],
                                 &[right_expr.get_type()],
                                 &mut HashMap::default(),
@@ -3210,22 +2704,22 @@ impl Parser {
                         ));
                     }
 
-                    if self.environment.has(&identifier) {
+                    if self.typechecker.environment.has(&identifier) {
                         return Err(self.generate_error_with_pos(
                             format!("Variable '{}' has already been created", identifier),
                             "",
                             pos.clone(),
                         ));
                     } else {
-                        self.environment.push_block();
-                        self.environment.insert_symbol(
+                        self.typechecker.environment.push_block();
+                        self.typechecker.environment.insert_symbol(
                             &identifier,
                             left_expr.get_type(),
                             Some(pos.clone()),
                             SymbolKind::Variable,
                         );
                         let expr_block = self.block()?;
-                        self.environment.pop_block();
+                        self.typechecker.environment.pop_block();
 
                         if let Some(Statement::Expression { ttype, .. }) = expr_block.last() {
                             left_expr = Expr::StoreExpr {
@@ -3303,7 +2797,7 @@ impl Parser {
                                         {
                                             format!("{}::__gt__", custom)
                                         } else {
-                                            return Err(self.create_type_error(
+                                            return Err(self.typechecker.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
                                                 operation,
@@ -3317,7 +2811,7 @@ impl Parser {
                                         {
                                             format!("{}::__ge__", custom)
                                         } else {
-                                            return Err(self.create_type_error(
+                                            return Err(self.typechecker.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
                                                 operation,
@@ -3331,7 +2825,7 @@ impl Parser {
                                         {
                                             format!("{}::__lt__", custom)
                                         } else {
-                                            return Err(self.create_type_error(
+                                            return Err(self.typechecker.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
                                                 operation,
@@ -3345,7 +2839,7 @@ impl Parser {
                                         {
                                             format!("{}::__le__", custom)
                                         } else {
-                                            return Err(self.create_type_error(
+                                            return Err(self.typechecker.create_type_error(
                                                 left_expr.clone(),
                                                 right_expr.clone(),
                                                 operation,
@@ -3362,7 +2856,7 @@ impl Parser {
                                 };
 
                                 if let Some(overload) =
-                                    self.environment.get(&generate_unique_string(
+                                    self.typechecker.environment.get(&generate_unique_string(
                                         &function_id,
                                         &[left_expr.get_type(), right_expr.get_type()],
                                     ))
@@ -3377,7 +2871,7 @@ impl Parser {
                                             return_type,
                                             parameters,
                                         } => {
-                                            match self.check_and_map_types(
+                                            match self.typechecker.check_and_map_types(
                                                 &parameters,
                                                 &typelist,
                                                 &mut HashMap::default(),
@@ -3426,7 +2920,7 @@ impl Parser {
                                             position: pos.clone(),
                                         },
                                     };
-                                } else if let Some(overload) = self.environment.get(&function_id) {
+                                } else if let Some(overload) = self.typechecker.environment.get(&function_id) {
                                     // get return type of function call
                                     let pos = self.get_current_token_position();
                                     let arguments = vec![left_expr.clone(), right_expr.clone()];
@@ -3437,7 +2931,7 @@ impl Parser {
                                             return_type,
                                             parameters,
                                         } => {
-                                            match self.check_and_map_types(
+                                            match self.typechecker.check_and_map_types(
                                                 &parameters,
                                                 &typelist,
                                                 &mut HashMap::default(),
@@ -3484,7 +2978,7 @@ impl Parser {
                                     };
                                 } else {
                                     // return error
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -3525,7 +3019,7 @@ impl Parser {
                             }
                             _ => "".into(),
                         };
-                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                        if let Some(overload) = self.typechecker.environment.get(&generate_unique_string(
                             &function_id,
                             &[left_expr.get_type(), right_expr.get_type()],
                         )) {
@@ -3538,7 +3032,7 @@ impl Parser {
                                     return_type,
                                     parameters,
                                 } => {
-                                    match self.check_and_map_types(
+                                    match self.typechecker.check_and_map_types(
                                         &parameters,
                                         &typelist,
                                         &mut HashMap::default(),
@@ -3587,7 +3081,7 @@ impl Parser {
                                     position: pos.clone(),
                                 },
                             };
-                        } else if let Some(overload) = self.environment.get(&function_id) {
+                        } else if let Some(overload) = self.typechecker.environment.get(&function_id) {
                             // get return type of function call
                             let pos = self.get_current_token_position();
                             let arguments = vec![left_expr.clone(), right_expr.clone()];
@@ -3597,7 +3091,7 @@ impl Parser {
                                     return_type,
                                     parameters,
                                 } => {
-                                    match self.check_and_map_types(
+                                    match self.typechecker.check_and_map_types(
                                         &parameters,
                                         &typelist,
                                         &mut HashMap::default(),
@@ -3684,7 +3178,7 @@ impl Parser {
                                         format!("{}::__and__", custom)
                                     } else {
                                         // error if no custom method
-                                        return Err(self.create_type_error(
+                                        return Err(self.typechecker.create_type_error(
                                             left_expr.clone(),
                                             right_expr.clone(),
                                             operation,
@@ -3697,7 +3191,7 @@ impl Parser {
                                         format!("{}::__or__", custom)
                                     } else {
                                         // error if no custom method
-                                        return Err(self.create_type_error(
+                                        return Err(self.typechecker.create_type_error(
                                             left_expr.clone(),
                                             right_expr.clone(),
                                             operation,
@@ -3713,7 +3207,7 @@ impl Parser {
                                 }
                             };
 
-                            if let Some(overload) = self.environment.get(&generate_unique_string(
+                            if let Some(overload) = self.typechecker.environment.get(&generate_unique_string(
                                 &function_id,
                                 &[left_expr.get_type(), right_expr.get_type()],
                             )) {
@@ -3726,7 +3220,7 @@ impl Parser {
                                         return_type,
                                         parameters,
                                     } => {
-                                        match self.check_and_map_types(
+                                        match self.typechecker.check_and_map_types(
                                             &parameters,
                                             &typelist,
                                             &mut HashMap::default(),
@@ -3775,7 +3269,7 @@ impl Parser {
                                         position: pos.clone(),
                                     },
                                 };
-                            } else if let Some(overload) = self.environment.get(&function_id) {
+                            } else if let Some(overload) = self.typechecker.environment.get(&function_id) {
                                 // get return type of function call
                                 let pos = self.get_current_token_position();
                                 let arguments = vec![left_expr.clone(), right_expr.clone()];
@@ -3785,7 +3279,7 @@ impl Parser {
                                         return_type,
                                         parameters,
                                     } => {
-                                        match self.check_and_map_types(
+                                        match self.typechecker.check_and_map_types(
                                             &parameters,
                                             &typelist,
                                             &mut HashMap::default(),
@@ -3882,7 +3376,7 @@ impl Parser {
                                 left_expr.get_type(),
                             );
                         } else {
-                            return Err(self.create_type_error(
+                            return Err(self.typechecker.create_type_error(
                                 left_expr.clone(),
                                 right_expr.clone(),
                                 operation,
@@ -3897,7 +3391,7 @@ impl Parser {
                                     format!("{}::__add__", custom)
                                 } else {
                                     // error if no custom method
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -3910,7 +3404,7 @@ impl Parser {
                                     format!("{}::__sub__", custom)
                                 } else {
                                     // error if no custom method
-                                    return Err(self.create_type_error(
+                                    return Err(self.typechecker.create_type_error(
                                         left_expr.clone(),
                                         right_expr.clone(),
                                         operation,
@@ -3919,7 +3413,7 @@ impl Parser {
                                 }
                             }
                             _ => {
-                                return Err(self.create_type_error(
+                                return Err(self.typechecker.create_type_error(
                                     left_expr.clone(),
                                     right_expr.clone(),
                                     operation,
@@ -3929,7 +3423,7 @@ impl Parser {
                         };
 
                         //dbg!(function_id.clone());
-                        if let Some(overload) = self.environment.get(&generate_unique_string(
+                        if let Some(overload) = self.typechecker.environment.get(&generate_unique_string(
                             &function_id,
                             &[left_expr.get_type(), right_expr.get_type()],
                         )) {
@@ -3958,7 +3452,7 @@ impl Parser {
                                     position: pos.clone(),
                                 },
                             };
-                        } else if let Some(overload) = self.environment.get(&function_id) {
+                        } else if let Some(overload) = self.typechecker.environment.get(&function_id) {
                             // get return type of function call
                             let pos = self.get_current_token_position();
                             let arguments = vec![left_expr.clone(), right_expr.clone()];
@@ -4007,26 +3501,6 @@ impl Parser {
             op: operation,
             lhs: Box::new(left_expr),
             rhs: Box::new(right_expr),
-        }
-    }
-
-    fn create_type_error(
-        &self,
-        left_expr: Expr,
-        right_expr: Expr,
-        operation: Operator,
-        pos: FilePosition,
-    ) -> NovaError {
-        NovaError::TypeError {
-            expected: left_expr.get_type().to_string().into(),
-            found: right_expr.get_type().to_string().into(),
-            position: pos,
-            msg: format!(
-                "Type error, cannot apply operation {operation:?} to {} and {}",
-                right_expr.get_type(),
-                left_expr.get_type(),
-            )
-            .into(),
         }
     }
 
@@ -4185,7 +3659,7 @@ impl Parser {
                 };
                 if let Some(builtin) = builtin {
                     Ok(builtin)
-                } else if self.environment.custom_types.contains_key(&identifier) {
+                } else if self.typechecker.environment.custom_types.contains_key(&identifier) {
                     let mut type_annotation = vec![];
                     if let Some(StructuralSymbol(LeftParen)) = self.current_token_value() {
                         self.consume_symbol(LeftParen)?;
@@ -4199,7 +3673,7 @@ impl Parser {
                         }
                         self.consume_symbol(RightParen)?;
                     }
-                    if let Some(generic_len) = self.environment.generic_type_struct.get(&identifier)
+                    if let Some(generic_len) = self.typechecker.environment.generic_type_struct.get(&identifier)
                     {
                         if generic_len.len() != type_annotation.len() {
                             return Err(self.generate_error_with_pos(
@@ -4215,7 +3689,7 @@ impl Parser {
                         type_params: type_annotation,
                     })
                 } else {
-                    let Some(alias) = self.environment.type_alias.get(&identifier) else {
+                    let Some(alias) = self.typechecker.environment.type_alias.get(&identifier) else {
                         return Err(self.generate_error_with_pos(
                             "Unknown type",
                             format!("Unknown type '{identifier}' "),
@@ -4330,18 +3804,18 @@ impl Parser {
                 pos,
             ));
         }
-        self.environment.push_block();
+        self.typechecker.environment.push_block();
         let statements = self.block()?;
-        self.environment.pop_block();
+        self.typechecker.environment.pop_block();
         let mut alternative: Option<Vec<Statement>> = None;
         if self.current_token().is_some_and(|t| t.is_id("elif")) {
             self.advance();
             alternative = Some(self.alternative()?);
         } else if self.current_token().is_some_and(|t| t.is_id("else")) {
             self.advance();
-            self.environment.push_block();
+            self.typechecker.environment.push_block();
             alternative = Some(self.block()?);
-            self.environment.pop_block();
+            self.typechecker.environment.pop_block();
         };
         Ok(vec![Statement::If {
             ttype: TType::Void,
@@ -4408,7 +3882,7 @@ impl Parser {
         parser.filepath = Some(resolved_filepath.clone());
         parser.input = tokens;
         parser.parse()?;
-        self.environment = parser.environment.clone();
+        self.typechecker.environment = parser.typechecker.environment.clone();
         self.modules = parser.modules.clone();
         Ok(Some(Statement::Block {
             body: parser.ast.program.clone(),
@@ -4474,12 +3948,12 @@ impl Parser {
             self.consume_operator(Operator::FatArrow)?;
 
             if let Some(fields) = self
-                .environment
+                .typechecker.environment
                 .custom_types
                 .get(expr.get_type().custom_to_string().unwrap())
             {
                 let new_fields = if let Some(x) = self
-                    .environment
+                    .typechecker.environment
                     .generic_type_struct
                     .get(expr.get_type().custom_to_string().unwrap())
                 {
@@ -4493,7 +3967,7 @@ impl Parser {
                     fields
                         .iter()
                         .map(|(name, ttype)| {
-                            let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
+                            let new_ttype = TypeChecker::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
                         .collect()
@@ -4530,8 +4004,8 @@ impl Parser {
                     ));
                 }
 
-                self.environment.push_block();
-                self.environment.insert_symbol(
+                self.typechecker.environment.push_block();
+                self.typechecker.environment.insert_symbol(
                     enum_id.as_deref().unwrap_or_default(),
                     vtype,
                     None,
@@ -4560,7 +4034,7 @@ impl Parser {
                     }]
                 };
 
-                self.environment.pop_block();
+                self.typechecker.environment.pop_block();
             }
         }
         self.consume_symbol(RightBrace)?;
@@ -4572,12 +4046,12 @@ impl Parser {
                 covered.push(tag);
             }
             if let Some(fields) = self
-                .environment
+                .typechecker.environment
                 .custom_types
                 .get(expr.get_type().custom_to_string().unwrap())
             {
                 let new_fields = if let Some(x) = self
-                    .environment
+                    .typechecker.environment
                     .generic_type_struct
                     .get(expr.get_type().custom_to_string().unwrap())
                 {
@@ -4591,7 +4065,7 @@ impl Parser {
                     fields
                         .iter()
                         .map(|(name, ttype)| {
-                            let new_ttype = Self::replace_generic_types(ttype, x, &type_params);
+                            let new_ttype = TypeChecker::replace_generic_types(ttype, x, &type_params);
                             (name.clone(), new_ttype)
                         })
                         .collect()
@@ -4624,7 +4098,7 @@ impl Parser {
     fn type_alias(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("type"))?;
         let (alias, _) = self.get_identifier()?;
-        if self.environment.custom_types.contains_key(&alias) {
+        if self.typechecker.environment.custom_types.contains_key(&alias) {
             return Err(self.generate_error_with_pos(
                 format!("type '{}' already defined", alias),
                 "try using another name",
@@ -4633,7 +4107,7 @@ impl Parser {
         }
         self.consume_operator(Operator::Assignment)?;
         let ttype = self.ttype()?;
-        self.environment.type_alias.insert(alias, ttype.clone());
+        self.typechecker.environment.type_alias.insert(alias, ttype.clone());
         Ok(None)
     }
 
@@ -4694,51 +4168,21 @@ impl Parser {
         Ok(idlist)
     }
 
-    fn collect_generics(input: &[TType]) -> Table<Rc<str>> {
-        let mut contracts = Table::new();
-        for t in input {
-            match t {
-                TType::Generic { name: generic } => contracts.insert(generic.clone()),
-                TType::Function {
-                    parameters: input,
-                    return_type: output,
-                } => {
-                    contracts.extend(Self::collect_generics(input));
-                    contracts.extend(Self::collect_generics(&[*output.clone()]))
-                }
-                TType::List { inner: list } => {
-                    contracts.extend(Self::collect_generics(&[*list.clone()]))
-                }
-                TType::Option { inner: option } => {
-                    contracts.extend(Self::collect_generics(&[*option.clone()]))
-                }
-                TType::Custom { type_params, .. } => {
-                    contracts.extend(Self::collect_generics(&type_params.clone()))
-                }
-                TType::Tuple { elements } => {
-                    contracts.extend(Self::collect_generics(&elements.clone()))
-                }
-                _ => {}
-            }
-        }
-        contracts
-    }
-
     fn enum_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("enum"))?;
         let (enum_name, position) = self.get_identifier()?;
 
         // Initialize the struct in the environment for recursive types
-        self.environment
+        self.typechecker.environment
             .custom_types
             .insert(enum_name.clone(), vec![]);
 
-        self.environment.enums.insert(enum_name.clone());
+        self.typechecker.environment.enums.insert(enum_name.clone());
 
         let mut generic_field_names = vec![];
         if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
             generic_field_names = self.get_id_list()?;
-            self.environment
+            self.typechecker.environment
                 .generic_type_struct
                 .insert(enum_name.clone(), generic_field_names.clone());
         }
@@ -4751,7 +4195,7 @@ impl Parser {
         let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
-            generics_table.extend(Self::collect_generics(&[field_type.clone()]));
+            generics_table.extend(TypeChecker::collect_generics(&[field_type.clone()]));
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
@@ -4780,7 +4224,7 @@ impl Parser {
 
         for variants in field_definitions.clone() {
             if generics_table.is_empty() {
-                self.environment.insert_symbol(
+                self.typechecker.environment.insert_symbol(
                     &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
                     TType::Function {
                         parameters: vec![variants.ttype.clone()],
@@ -4798,7 +4242,7 @@ impl Parser {
                     .map(|x| TType::Generic { name: x.clone() })
                     .collect::<Vec<TType>>();
 
-                self.environment.insert_symbol(
+                self.typechecker.environment.insert_symbol(
                     &format!("{}::{}", enum_name.clone(), variants.identifier.clone()),
                     TType::Function {
                         parameters: vec![variants.ttype.clone()],
@@ -4813,12 +4257,12 @@ impl Parser {
             }
         }
 
-        self.environment
+        self.typechecker.environment
             .custom_types
             .insert(enum_name.clone(), fields);
 
-        if !self.environment.has(&enum_name) {
-            self.environment.no_override.insert(enum_name.clone());
+        if !self.typechecker.environment.has(&enum_name) {
+            self.typechecker.environment.no_override.insert(enum_name.clone());
         } else {
             return Err(self.generate_error_with_pos(
                 format!("Enum '{}' is already instantiated", enum_name),
@@ -4842,14 +4286,14 @@ impl Parser {
         let (struct_name, position) = self.get_identifier()?;
 
         // Initialize the struct in the environment for recursive types
-        self.environment
+        self.typechecker.environment
             .custom_types
             .insert(struct_name.clone(), vec![]);
 
         let mut generic_field_names = vec![];
         if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
             generic_field_names = self.get_id_list()?;
-            self.environment
+            self.typechecker.environment
                 .generic_type_struct
                 .insert(struct_name.clone(), generic_field_names.clone());
         }
@@ -4863,7 +4307,7 @@ impl Parser {
         let mut generics_table = Table::new();
 
         for (field_type, field_name) in parameter_list.clone() {
-            generics_table.extend(Self::collect_generics(&[field_type.clone()]));
+            generics_table.extend(TypeChecker::collect_generics(&[field_type.clone()]));
             type_parameters.push(field_type.clone());
             fields.push((field_name, field_type));
         }
@@ -4890,10 +4334,10 @@ impl Parser {
             });
         }
 
-        if !self.environment.has(&struct_name) {
-            self.environment.no_override.insert(struct_name.clone());
+        if !self.typechecker.environment.has(&struct_name) {
+            self.typechecker.environment.no_override.insert(struct_name.clone());
             if generics_table.is_empty() {
-                self.environment.insert_symbol(
+                self.typechecker.environment.insert_symbol(
                     &struct_name,
                     TType::Function {
                         parameters: type_parameters,
@@ -4911,7 +4355,7 @@ impl Parser {
                     .map(|x| TType::Generic { name: x.clone() })
                     .collect::<Vec<TType>>();
 
-                self.environment.insert_symbol(
+                self.typechecker.environment.insert_symbol(
                     &struct_name,
                     TType::Function {
                         parameters: type_parameters,
@@ -4924,7 +4368,7 @@ impl Parser {
                     SymbolKind::Constructor,
                 );
             }
-            self.environment
+            self.typechecker.environment
                 .custom_types
                 .insert(struct_name.clone(), fields);
         } else {
@@ -4952,7 +4396,7 @@ impl Parser {
             // Handle foreach statement
 
             let (identifier, pos) = self.get_identifier()?;
-            if self.environment.has(&identifier) {
+            if self.typechecker.environment.has(&identifier) {
                 return Err(self.generate_error_with_pos(
                     "identifier already used",
                     format!("identifier '{identifier}' is already used within this scope"),
@@ -4968,15 +4412,15 @@ impl Parser {
                     let start_range = array;
                     self.consume_operator(Operator::ExclusiveRange)?;
                     let end_range = self.expr()?;
-                    self.environment.push_block();
-                    self.environment.insert_symbol(
+                    self.typechecker.environment.push_block();
+                    self.typechecker.environment.insert_symbol(
                         &identifier,
                         TType::Int,
                         Some(pos),
                         SymbolKind::Variable,
                     );
                     let body = self.block()?;
-                    self.environment.pop_block();
+                    self.typechecker.environment.pop_block();
                     Ok(Some(Statement::ForRange {
                         identifier,
                         body,
@@ -4990,15 +4434,15 @@ impl Parser {
                     let start_range = array;
                     self.consume_operator(Operator::InclusiveRange)?;
                     let end_range = self.expr()?;
-                    self.environment.push_block();
-                    self.environment.insert_symbol(
+                    self.typechecker.environment.push_block();
+                    self.typechecker.environment.insert_symbol(
                         &identifier,
                         TType::Int,
                         Some(pos),
                         SymbolKind::Variable,
                     );
                     let body = self.block()?;
-                    self.environment.pop_block();
+                    self.typechecker.environment.pop_block();
                     Ok(Some(Statement::ForRange {
                         identifier,
                         body,
@@ -5009,10 +4453,10 @@ impl Parser {
                     }))
                 }
                 _ => {
-                    self.environment.push_block();
+                    self.typechecker.environment.push_block();
                     // check if array has type array and then assign identifier to that type
                     if let TType::List { inner } = array.get_type() {
-                        self.environment.insert_symbol(
+                        self.typechecker.environment.insert_symbol(
                             &identifier,
                             *inner,
                             Some(pos),
@@ -5026,7 +4470,7 @@ impl Parser {
                         ));
                     }
                     let body = self.block()?;
-                    self.environment.pop_block();
+                    self.typechecker.environment.pop_block();
 
                     Ok(Some(Statement::Foreach {
                         identifier,
@@ -5038,7 +4482,7 @@ impl Parser {
             }
         } else {
             // Handle regular for statement
-            self.environment.push_block();
+            self.typechecker.environment.push_block();
             let init = self.expr()?;
             self.consume_symbol(Semicolon)?;
             let testpos = self.get_current_token_position();
@@ -5053,7 +4497,7 @@ impl Parser {
                 ));
             }
             let body = self.block()?;
-            self.environment.pop_block();
+            self.typechecker.environment.pop_block();
             Ok(Some(Statement::For {
                 init,
                 test,
@@ -5082,22 +4526,22 @@ impl Parser {
             };
 
             // make sure symbol doesn't already exist
-            if self.environment.has(&identifier) {
+            if self.typechecker.environment.has(&identifier) {
                 Err(self.generate_error_with_pos(
                     format!("Symbol '{}' is already instantiated", identifier),
                     "Cannot reinstantiate the same symbol in the same scope",
                     pos.clone(),
                 ))
             } else {
-                self.environment.push_block();
-                self.environment.insert_symbol(
+                self.typechecker.environment.push_block();
+                self.typechecker.environment.insert_symbol(
                     &identifier,
                     *inner.clone(),
                     Some(pos),
                     SymbolKind::Variable,
                 );
                 let statements = self.block()?;
-                self.environment.pop_block();
+                self.typechecker.environment.pop_block();
 
                 Ok(Some(Statement::WhileLet {
                     identifier,
@@ -5115,9 +4559,9 @@ impl Parser {
                     testpos,
                 ));
             }
-            self.environment.push_block();
+            self.typechecker.environment.push_block();
             let statements = self.block()?;
-            self.environment.pop_block();
+            self.typechecker.environment.pop_block();
 
             Ok(Some(Statement::While {
                 test,
@@ -5151,22 +4595,22 @@ impl Parser {
             };
 
             // make sure symbol doesn't already exist
-            if self.environment.has(&identifier) {
+            if self.typechecker.environment.has(&identifier) {
                 Err(self.generate_error_with_pos(
                     format!("Symbol '{}' is already instantiated", identifier),
                     "Cannot reinstantiate the same symbol in the same scope",
                     pos.clone(),
                 ))
             } else {
-                self.environment.push_block();
-                self.environment.insert_symbol(
+                self.typechecker.environment.push_block();
+                self.typechecker.environment.insert_symbol(
                     &identifier,
                     *inner.clone(),
                     Some(pos),
                     SymbolKind::Variable,
                 );
                 let body = self.block()?;
-                self.environment.pop_block();
+                self.typechecker.environment.pop_block();
 
                 let mut alternative: Option<Vec<Statement>> = None;
                 if self.current_token().is_some_and(|t| t.is_id("elif")) {
@@ -5174,9 +4618,9 @@ impl Parser {
                     alternative = Some(self.alternative()?);
                 } else if self.current_token().is_some_and(|t| t.is_id("else")) {
                     self.advance();
-                    self.environment.push_block();
+                    self.typechecker.environment.push_block();
                     alternative = Some(self.block()?);
-                    self.environment.pop_block();
+                    self.typechecker.environment.pop_block();
                 };
 
                 Ok(Some(Statement::IfLet {
@@ -5199,9 +4643,9 @@ impl Parser {
                     testpos.clone(),
                 ));
             }
-            self.environment.push_block();
+            self.typechecker.environment.push_block();
             let body = self.block()?;
-            self.environment.pop_block();
+            self.typechecker.environment.pop_block();
             let mut alternative: Option<Vec<Statement>> = None;
 
             if self.current_token().is_some_and(|t| t.is_id("elif")) {
@@ -5209,9 +4653,9 @@ impl Parser {
                 alternative = Some(self.alternative()?);
             } else if self.current_token().is_some_and(|t| t.is_id("else")) {
                 self.advance();
-                self.environment.push_block();
+                self.typechecker.environment.push_block();
                 alternative = Some(self.block()?);
-                self.environment.pop_block();
+                self.typechecker.environment.pop_block();
             };
 
             Ok(Some(Statement::If {
@@ -5251,13 +4695,13 @@ impl Parser {
             self.consume_operator(Operator::Assignment)?;
             expr = self.expr()?;
             match (
-                self.check_and_map_types(
+                self.typechecker.check_and_map_types(
                     &[ttype.clone()],
                     &[expr.get_type()],
                     &mut HashMap::default(),
                     pos.clone(),
                 ),
-                self.check_and_map_types(
+                self.typechecker.check_and_map_types(
                     &[expr.get_type()],
                     &[ttype.clone()],
                     &mut HashMap::default(),
@@ -5288,14 +4732,14 @@ impl Parser {
             ));
         }
         // make sure symbol doesnt already exist
-        if self.environment.has(&identifier) {
+        if self.typechecker.environment.has(&identifier) {
             Err(self.generate_error_with_pos(
                 format!("Symbol '{}' is already instantiated", identifier),
                 "Cannot reinstantiate the same symbol in the same scope",
                 pos.clone(),
             ))
         } else {
-            self.environment.insert_symbol(
+            self.typechecker.environment.insert_symbol(
                 &identifier,
                 ttype.clone(),
                 Some(pos.clone()),
@@ -5319,47 +4763,6 @@ impl Parser {
         }))
     }
 
-    fn is_generic(params: &[TType]) -> bool {
-        for param in params {
-            match param {
-                TType::Generic { .. } => return true,
-                TType::Function {
-                    parameters,
-                    return_type,
-                } => {
-                    if Self::is_generic(parameters) || Self::is_generic(&[*return_type.clone()]) {
-                        return true;
-                    }
-                }
-                TType::List { inner } => {
-                    if Self::is_generic(&[*inner.clone()]) {
-                        return true;
-                    }
-                }
-                TType::Option { inner } => {
-                    if Self::is_generic(&[*inner.clone()]) {
-                        return true;
-                    }
-                }
-                TType::Custom { type_params, .. } => {
-                    if Self::is_generic(type_params) {
-                        return true;
-                    }
-                }
-                TType::Tuple { elements } => {
-                    if Self::is_generic(elements) {
-                        return true;
-                    }
-                }
-                TType::Dyn { .. } => {
-                    return true;
-                }
-                _ => {}
-            }
-        }
-        false
-    }
-
     fn function_declaration(&mut self) -> Result<Option<Statement>, NovaError> {
         self.consume_identifier(Some("fn"))?;
         let builtin_types = [
@@ -5378,7 +4781,7 @@ impl Parser {
                 self.consume_symbol(LeftParen)?;
                 (custom_type, _) = self.get_identifier()?;
                 // check to see if its a valid custom type
-                if !self.environment.custom_types.contains_key(&custom_type)
+                if !self.typechecker.environment.custom_types.contains_key(&custom_type)
                     && !builtin_types.contains(&&*custom_type)
                 {
                     return Err(self.generate_error_with_pos(
@@ -5428,7 +4831,7 @@ impl Parser {
             typeinput.push(arg.0.clone())
         }
         // is function using generics?
-        let generic = Self::is_generic(&typeinput);
+        let generic = TypeChecker::is_generic(&typeinput);
 
         // check if dunder method
         match identifier.as_ref() {
@@ -5541,7 +4944,7 @@ impl Parser {
         for (ttype, identifier) in parameters.clone() {
             if let TType::Function { .. } = ttype.clone() {
                 // check if generic function exist
-                if self.environment.has(&identifier) {
+                if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Generic Function {} already defined", &identifier),
                         "Cannot redefine a generic function",
@@ -5549,7 +4952,7 @@ impl Parser {
                     ));
                 }
                 // check if normal function exist
-                if self.environment.has(&identifier) {
+                if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
                         format!("Function {} already defined", &identifier,),
                         "Cannot redefine a generic function",
@@ -5577,7 +4980,7 @@ impl Parser {
         if !generic {
             // check if normal function exist
             if self
-                .environment
+                .typechecker.environment
                 .has(&generate_unique_string(&identifier, &typeinput))
             {
                 return Err(self.generate_error_with_pos(
@@ -5593,7 +4996,7 @@ impl Parser {
                     pos.clone(),
                 ));
             }
-            self.environment.insert_symbol(
+            self.typechecker.environment.insert_symbol(
                 &identifier,
                 TType::Function {
                     parameters: typeinput.clone(),
@@ -5604,7 +5007,7 @@ impl Parser {
             );
             identifier = generate_unique_string(&identifier, &typeinput).into();
         } else {
-            if self.environment.no_override.has(&identifier) {
+            if self.typechecker.environment.no_override.has(&identifier) {
                 return Err(self.generate_error_with_pos(
                     format!(
                         "Cannot create generic functon since, {} is already defined",
@@ -5614,7 +5017,7 @@ impl Parser {
                     pos.clone(),
                 ));
             }
-            self.environment.insert_symbol(
+            self.typechecker.environment.insert_symbol(
                 &identifier,
                 TType::Function {
                     parameters: typeinput.clone(),
@@ -5631,7 +5034,7 @@ impl Parser {
             .is_some_and(|t| !t.is_symbol(LeftBrace))
         {
             //dbg!(&identifier);
-            self.environment.forward_declarations.insert(
+            self.typechecker.environment.forward_declarations.insert(
                 identifier.clone(),
                 (typeinput.clone(), output.clone(), pos.clone()),
             );
@@ -5639,12 +5042,12 @@ impl Parser {
         }
 
         //dbg!(identifier.clone());
-        self.environment.no_override.insert(identifier.clone());
-        let mut generic_list = Self::collect_generics(&typeinput);
-        generic_list.extend(Self::collect_generics(&[output.clone()]));
-        self.environment.live_generics.push(generic_list.clone());
+        self.typechecker.environment.no_override.insert(identifier.clone());
+        let mut generic_list = TypeChecker::collect_generics(&typeinput);
+        generic_list.extend(TypeChecker::collect_generics(&[output.clone()]));
+        self.typechecker.environment.live_generics.push(generic_list.clone());
         // parse body with scope
-        self.environment.push_scope();
+        self.typechecker.environment.push_scope();
         // insert params into scope
         for (ttype, id) in parameters.iter() {
             match ttype {
@@ -5652,7 +5055,7 @@ impl Parser {
                     parameters,
                     return_type,
                 } => {
-                    self.environment.insert_symbol(
+                    self.typechecker.environment.insert_symbol(
                         id,
                         TType::Function {
                             parameters: parameters.clone(),
@@ -5662,7 +5065,7 @@ impl Parser {
                         SymbolKind::Parameter,
                     );
                 }
-                _ => self.environment.insert_symbol(
+                _ => self.typechecker.environment.insert_symbol(
                     id,
                     ttype.clone(),
                     Some(pos.clone()),
@@ -5675,7 +5078,7 @@ impl Parser {
 
         // capture variables -----------------------------------
         let mut captured: Vec<Rc<str>> = self
-            .environment
+            .typechecker.environment
             .captured
             .last()
             .unwrap()
@@ -5683,13 +5086,13 @@ impl Parser {
             .map(|v| v.0.clone())
             .collect();
 
-        self.environment.pop_scope();
-        self.environment.live_generics.pop();
+        self.typechecker.environment.pop_scope();
+        self.typechecker.environment.live_generics.pop();
         for c in captured.iter() {
-            if let Some(mc) = self.environment.get_type_capture(&c.clone()) {
+            if let Some(mc) = self.typechecker.environment.get_type_capture(&c.clone()) {
                 let pos = self.get_current_token_position();
 
-                self.environment.captured.last_mut().unwrap().insert(
+                self.typechecker.environment.captured.last_mut().unwrap().insert(
                     c.clone(),
                     Symbol {
                         id: mc.1,
@@ -5702,7 +5105,7 @@ impl Parser {
         }
 
         captured = self
-            .environment
+            .typechecker.environment
             .captured
             .last()
             .unwrap()
@@ -5720,10 +5123,10 @@ impl Parser {
         }
 
         for dc in captured.iter() {
-            if let Some(v) = self.environment.values.last().unwrap().get(dc) {
+            if let Some(v) = self.typechecker.environment.values.last().unwrap().get(dc) {
                 if let SymbolKind::Captured = v.kind {
                 } else {
-                    self.environment.captured.last_mut().unwrap().remove(dc);
+                    self.typechecker.environment.captured.last_mut().unwrap().remove(dc);
                 }
             }
         }
@@ -5741,7 +5144,7 @@ impl Parser {
             }
         }
         // if last statement isnt a return error
-        let will_return = self.will_return(&statements, output.clone(), pos.clone())?;
+        let will_return = self.typechecker.will_return(&statements, output.clone(), pos.clone())?;
         if !will_return && output != TType::Void {
             if let Some(Statement::Pass) = statements.last() {
                 // do nothing
@@ -5762,254 +5165,6 @@ impl Parser {
             body: statements,
             captures: captured,
         }))
-    }
-
-    // function to see if all returns are valid and to see if stuff like if statements have returns, match statements have returns ect
-    fn will_return(
-        &self,
-        statements: &[Statement],
-        return_type: TType,
-        pos: FilePosition,
-    ) -> Result<bool, NovaError> {
-        for statement in statements.iter() {
-            match statement {
-                Statement::Return { ttype, .. } => {
-                    match self.check_and_map_types(
-                        &[ttype.clone()],
-                        &[return_type.clone()],
-                        &mut HashMap::default(),
-                        pos.clone(),
-                    ) {
-                        Ok(_) => {}
-                        _ => {
-                            return Err(self.generate_error_with_pos(
-                                format!("Cannot return {} from function", ttype),
-                                format!("Expected {}", return_type),
-                                pos.clone(),
-                            ));
-                        }
-                    }
-                    return Ok(true);
-                }
-                Statement::If {
-                    body, alternative, ..
-                } => {
-                    // check if all branches have a return
-                    // recurse into body and alternative
-                    let body_return = self.will_return(body, return_type.clone(), pos.clone())?;
-                    if let Some(alt) = alternative {
-                        let alt_return = self.will_return(alt, return_type.clone(), pos.clone())?;
-                        if body_return && alt_return {
-                            return Ok(true);
-                        }
-                    }
-                }
-                Statement::Expression { expr, .. } => {
-                    // check if expression is a return
-                    if let Expr::Return { expr, ttype: _ } = expr {
-                        match self.check_and_map_types(
-                            &[expr.get_type()],
-                            &[return_type.clone()],
-                            &mut HashMap::default(),
-                            pos.clone(),
-                        ) {
-                            Ok(_) => {}
-                            _ => {
-                                return Err(self.generate_error_with_pos(
-                                    format!("Cannot return {} from function", expr.get_type()),
-                                    format!("Expected {}", return_type),
-                                    pos.clone(),
-                                ));
-                            }
-                        }
-                        return Ok(true);
-                    }
-                }
-                Statement::Pass => {
-                    return Ok(true);
-                }
-                Statement::IfLet {
-                    expr,
-                    body,
-                    alternative,
-                    ..
-                } => {
-                    let body_return = self.will_return(body, return_type.clone(), pos.clone())?;
-                    if let Some(alt) = alternative {
-                        let alt_return = self.will_return(alt, return_type.clone(), pos.clone())?;
-                        if body_return && alt_return {
-                            return Ok(true);
-                        }
-                    }
-                    // check expr
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: expr.get_type(),
-                            expr: expr.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                }
-                Statement::While { test, body } => {
-                    // check if test is a return
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: test.get_type(),
-                            expr: test.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-                Statement::For {
-                    init,
-                    test,
-                    inc,
-                    body,
-                } => {
-                    // check if init, test, and inc are returns
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: init.get_type(),
-                            expr: init.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: test.get_type(),
-                            expr: test.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: inc.get_type(),
-                            expr: inc.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-                Statement::Foreach { expr, body, .. } => {
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: expr.get_type(),
-                            expr: expr.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-                Statement::ForRange {
-                    start,
-                    end,
-                    step,
-                    body,
-                    ..
-                } => {
-                    // check if start, end, and step are returns
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: start.get_type(),
-                            expr: start.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: end.get_type(),
-                            expr: end.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    if let Some(step) = step {
-                        self.will_return(
-                            &[Statement::Expression {
-                                ttype: step.get_type(),
-                                expr: step.clone(),
-                            }],
-                            return_type.clone(),
-                            pos.clone(),
-                        )?;
-                    }
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-                Statement::Block { body, .. } => {
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-                Statement::Match {
-                    expr,
-                    arms,
-                    default,
-                    ..
-                } => {
-                    // if all branches have a return, then return true
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: expr.get_type(),
-                            expr: expr.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    let mut arms_return = vec![];
-                    for arm in arms.iter() {
-                        for statement in arm.2.iter() {
-                            arms_return.push(self.will_return(
-                                &[statement.clone()],
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
-                        }
-                    }
-
-                    if let Some(default) = default {
-                        for statement in default.iter() {
-                            arms_return.push(self.will_return(
-                                &[statement.clone()],
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
-                        }
-                    }
-
-                    // if all true, then return true, else do nothing
-                    if arms_return.iter().all(|x| *x) {
-                        return Ok(true);
-                    }
-                }
-                // if all branches have a return, then return true
-                Statement::Enum { .. } => {}
-                Statement::Struct { .. } => {}
-                Statement::Function { .. } => {}
-                Statement::ForwardDec { .. } => {}
-                Statement::Continue => {}
-                Statement::Break => {}
-                Statement::Unwrap { .. } => {}
-                Statement::WhileLet { expr, body, .. } => {
-                    self.will_return(
-                        &[Statement::Expression {
-                            ttype: expr.get_type(),
-                            expr: expr.clone(),
-                        }],
-                        return_type.clone(),
-                        pos.clone(),
-                    )?;
-                    self.will_return(body, return_type.clone(), pos.clone())?;
-                }
-            }
-        }
-
-        Ok(false)
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>, NovaError> {
@@ -6038,9 +5193,9 @@ impl Parser {
 
     fn block_expr(&mut self) -> Result<Expr, NovaError> {
         self.consume_symbol(LeftBrace)?;
-        self.environment.push_block();
+        self.typechecker.environment.push_block();
         let statements = self.compound_statement()?;
-        self.environment.pop_block();
+        self.typechecker.environment.pop_block();
         self.consume_symbol(RightBrace)?;
         // check if last statement is a statement expression
         let mut ttype = match statements.last().cloned() {
