@@ -26,8 +26,8 @@ fn extends dropIndex(list: [$T], index: Int) -> [$T] {
     return result
 }
 
-fn extends fill(list: [$A], input: $A, ammount: Int) -> [$A] {
-    for let i = 0; i < ammount; i += 1 {
+fn extends fill(list: [$A], input: $A, amount: Int) -> [$A] {
+    for let i = 0; i < amount; i += 1 {
         list.push(input)
     }
     return list
@@ -621,7 +621,7 @@ fn extends get(input: [$T], index: Int) -> Option($T) {
     return Some(input[index])
 }
 
-fn extends enumurate(input: [$T]) -> [($T,Int)] {
+fn extends enumerate(input: [$T]) -> [($T,Int)] {
     let result = []: ($T,Int)
     for let i = 0; i < input.len(); i += 1 {
         result.push((input[i],i))

@@ -1,0 +1,29 @@
+module test_std_tuple
+
+import super.std.tuple
+
+// --- swap ---
+let t = (1, "hello")
+let s = t.swap()
+assert(s[0] == "hello", "swap first")
+assert(s[1] == 1, "swap second")
+
+// --- mapFirst ---
+let t2 = (5, "world")
+let m1 = t2.mapFirst(|x: Int| x * 2)
+assert(m1[0] == 10, "mapFirst doubles")
+assert(m1[1] == "world", "mapFirst preserves second")
+
+// --- mapSecond ---
+let t3 = (42, 3)
+let m2 = t3.mapSecond(|x: Int| x + 10)
+assert(m2[0] == 42, "mapSecond preserves first")
+assert(m2[1] == 13, "mapSecond adds")
+
+// --- toStrings ---
+let t4 = (123, "abc")
+let ss = t4.toStrings()
+assert(ss[0] == "123", "toStrings first")
+assert(ss[1] == "abc", "toStrings second")
+
+println("PASS: test_std_tuple")

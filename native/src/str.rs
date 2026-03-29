@@ -261,9 +261,10 @@ pub fn str_index_of(state: &mut state::State) -> NovaResult<()> {
 
 /// String::repeat(s, n) -> String
 pub fn str_repeat(state: &mut state::State) -> NovaResult<()> {
-    let n = pop_int(state)? as usize;
+    let n = pop_int(state)?;
     let s = pop_string(state)?;
-    state.memory.push_string(s.repeat(n));
+    let count = if n < 0 { 0usize } else { n as usize };
+    state.memory.push_string(s.repeat(count));
     Ok(())
 }
 

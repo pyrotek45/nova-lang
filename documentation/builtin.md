@@ -239,3 +239,31 @@ See the [Raylib Guide](raylib.md) for detailed usage, examples, and key-name ref
 | `raylib::isMousePressed(String) -> Bool` | Is the button held? |
 | `raylib::isMouseReleased(String) -> Bool` | Was the button released this frame? |
 | `raylib::getMouseWheel() -> Float` | Mouse wheel movement. |
+
+### Audio
+| Signature | Description |
+|---|---|
+| `raylib::initAudio() -> Void` | Initialize the audio device. Call once before loading sounds/music. |
+| `raylib::closeAudio() -> Void` | Close the audio device and free resources. |
+| `raylib::setMasterVolume(Float) -> Void` | Set the master volume (0.0–1.0). |
+| `raylib::loadSound(String) -> Int` | Load a sound file (.wav, .ogg, .mp3). Returns a sound ID. |
+| `raylib::playSound(Int) -> Void` | Play a sound by ID. |
+| `raylib::stopSound(Int) -> Void` | Stop a playing sound. |
+| `raylib::pauseSound(Int) -> Void` | Pause a playing sound. |
+| `raylib::resumeSound(Int) -> Void` | Resume a paused sound. |
+| `raylib::isSoundPlaying(Int) -> Bool` | Check if a sound is currently playing. |
+| `raylib::setSoundVolume(Int, Float) -> Void` | Set volume for a sound (0.0–1.0). |
+| `raylib::setSoundPitch(Int, Float) -> Void` | Set pitch for a sound (1.0 = normal). |
+| `raylib::loadMusic(String) -> Int` | Load a music stream (.ogg, .mp3, .wav). Returns a music ID. |
+| `raylib::playMusic(Int) -> Void` | Start playing a music stream. |
+| `raylib::updateMusic(Int) -> Void` | Update a music stream buffer. Call every frame. |
+| `raylib::stopMusic(Int) -> Void` | Stop a music stream. |
+| `raylib::pauseMusic(Int) -> Void` | Pause a music stream. |
+| `raylib::resumeMusic(Int) -> Void` | Resume a paused music stream. |
+| `raylib::isMusicPlaying(Int) -> Bool` | Check if a music stream is playing. |
+| `raylib::setMusicVolume(Int, Float) -> Void` | Set volume for a music stream (0.0–1.0). |
+| `raylib::setMusicPitch(Int, Float) -> Void` | Set pitch for a music stream (1.0 = normal). |
+| `raylib::getMusicLength(Int) -> Float` | Get the total duration of a music stream (seconds). |
+| `raylib::getMusicTimePlayed(Int) -> Float` | Get the elapsed play time of a music stream (seconds). |
+| `raylib::seekMusic(Int, Float) -> Void` | Seek to a position in a music stream (seconds). |
+| `raylib::setMusicLooping(Int, Bool) -> Void` | Enable or disable looping for a music stream. |

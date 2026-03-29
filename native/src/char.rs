@@ -24,7 +24,23 @@ fn pop_char(state: &mut state::State) -> NovaResult<char> {
 /// chr(n: Int) -> Char
 pub fn int_to_char(state: &mut state::State) -> NovaResult<()> {
     match pop(state)? {
-        VmData::Int(ch) => state.memory.stack.push(VmData::Char((ch as u8) as char)),
+        VmData::Int(ch) => {
+            if !(0..=0x10FFFF).contains(&ch) {
+                return Err(runtime_err(format!(
+                    "chr: value {} is out of valid Unicode range (0..=0x10FFFF)",
+                    ch
+                )));
+            }
+            match char::from_u32(ch as u32) {
+                Some(c) => state.memory.stack.push(VmData::Char(c)),
+                None => {
+                    return Err(runtime_err(format!(
+                        "chr: value {} is not a valid Unicode scalar value",
+                        ch
+                    )))
+                }
+            }
+        }
         _ => return Err(runtime_err("Expected an Int on the stack")),
     }
     Ok(())

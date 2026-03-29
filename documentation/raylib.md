@@ -268,6 +268,102 @@ while raylib::rendering() {
 
 ---
 
+## Audio
+
+Nova's raylib integration includes full audio support for sound effects and music streams.
+Call `raylib::initAudio()` once before loading any sounds or music.
+
+| Function | Description |
+|---|---|
+| `raylib::initAudio()` | Initialize the audio device. Call once at startup. |
+| `raylib::closeAudio()` | Close the audio device and free resources. |
+| `raylib::setMasterVolume(vol: Float)` | Set the master volume (0.0 = silent, 1.0 = full). |
+
+### Sound Effects
+
+Sounds are short audio clips loaded entirely into memory. Good for effects like jumps, explosions, and UI clicks.
+
+| Function | Description |
+|---|---|
+| `raylib::loadSound(path: String) -> Int` | Load a sound file (.wav, .ogg, .mp3). Returns a sound ID. |
+| `raylib::playSound(id: Int)` | Play a sound. |
+| `raylib::stopSound(id: Int)` | Stop a playing sound. |
+| `raylib::pauseSound(id: Int)` | Pause a sound. |
+| `raylib::resumeSound(id: Int)` | Resume a paused sound. |
+| `raylib::isSoundPlaying(id: Int) -> Bool` | Check if a sound is playing. |
+| `raylib::setSoundVolume(id: Int, vol: Float)` | Set per-sound volume (0.0–1.0). |
+| `raylib::setSoundPitch(id: Int, pitch: Float)` | Set pitch (1.0 = normal, 2.0 = octave up). |
+
+### Music Streams
+
+Music is streamed from disk in chunks — ideal for background tracks that are too large to keep in memory.
+You **must** call `raylib::updateMusic(id)` every frame to keep the buffer filled.
+
+| Function | Description |
+|---|---|
+| `raylib::loadMusic(path: String) -> Int` | Load a music stream (.ogg, .mp3, .wav). Returns a music ID. |
+| `raylib::playMusic(id: Int)` | Start playing a music stream. |
+| `raylib::updateMusic(id: Int)` | Refill the stream buffer. **Call every frame.** |
+| `raylib::stopMusic(id: Int)` | Stop a music stream. |
+| `raylib::pauseMusic(id: Int)` | Pause a music stream. |
+| `raylib::resumeMusic(id: Int)` | Resume a paused music stream. |
+| `raylib::isMusicPlaying(id: Int) -> Bool` | Check if a music stream is playing. |
+| `raylib::setMusicVolume(id: Int, vol: Float)` | Set volume (0.0–1.0). |
+| `raylib::setMusicPitch(id: Int, pitch: Float)` | Set pitch (1.0 = normal). |
+| `raylib::getMusicLength(id: Int) -> Float` | Total duration in seconds. |
+| `raylib::getMusicTimePlayed(id: Int) -> Float` | Elapsed play time in seconds. |
+| `raylib::seekMusic(id: Int, pos: Float)` | Seek to a position in seconds. |
+| `raylib::setMusicLooping(id: Int, loop: Bool)` | Enable or disable looping. |
+
+### Example – sound effects
+
+```nova
+module sound_demo
+
+raylib::init("Sound Demo", 800, 600, 60)
+raylib::initAudio()
+
+let jump = raylib::loadSound("jump.wav")
+
+while raylib::rendering() {
+    if raylib::isKeyPressed("KEY_SPACE") {
+        raylib::playSound(jump)
+    }
+
+    raylib::clear((30, 30, 30))
+    raylib::drawText("Press SPACE to play sound", 200, 280, 20, (255, 255, 255))
+}
+
+raylib::closeAudio()
+```
+
+### Example – background music
+
+```nova
+module music_demo
+
+raylib::init("Music Demo", 800, 600, 60)
+raylib::initAudio()
+
+let bgm = raylib::loadMusic("background.ogg")
+raylib::setMusicLooping(bgm, true)
+raylib::playMusic(bgm)
+
+while raylib::rendering() {
+    raylib::updateMusic(bgm)   // must call every frame!
+
+    let played = raylib::getMusicTimePlayed(bgm)
+    let total  = raylib::getMusicLength(bgm)
+
+    raylib::clear((20, 20, 40))
+    raylib::drawText(format("Music: {}/{} sec", [Cast::string(Cast::int(played).unwrap()), Cast::string(Cast::int(total).unwrap())]), 100, 280, 20, (200, 200, 200))
+}
+
+raylib::closeAudio()
+```
+
+---
+
 ## Complete Function Reference
 
 ### Window & Timing
@@ -321,3 +417,31 @@ while raylib::rendering() {
 | `raylib::isMousePressed(String)` | `Bool` |
 | `raylib::isMouseReleased(String)` | `Bool` |
 | `raylib::getMouseWheel()` | `Float` |
+
+### Audio
+| Function | Returns |
+|---|---|
+| `raylib::initAudio()` | `Void` |
+| `raylib::closeAudio()` | `Void` |
+| `raylib::setMasterVolume(Float)` | `Void` |
+| `raylib::loadSound(String)` | `Int` |
+| `raylib::playSound(Int)` | `Void` |
+| `raylib::stopSound(Int)` | `Void` |
+| `raylib::pauseSound(Int)` | `Void` |
+| `raylib::resumeSound(Int)` | `Void` |
+| `raylib::isSoundPlaying(Int)` | `Bool` |
+| `raylib::setSoundVolume(Int, Float)` | `Void` |
+| `raylib::setSoundPitch(Int, Float)` | `Void` |
+| `raylib::loadMusic(String)` | `Int` |
+| `raylib::playMusic(Int)` | `Void` |
+| `raylib::updateMusic(Int)` | `Void` |
+| `raylib::stopMusic(Int)` | `Void` |
+| `raylib::pauseMusic(Int)` | `Void` |
+| `raylib::resumeMusic(Int)` | `Void` |
+| `raylib::isMusicPlaying(Int)` | `Bool` |
+| `raylib::setMusicVolume(Int, Float)` | `Void` |
+| `raylib::setMusicPitch(Int, Float)` | `Void` |
+| `raylib::getMusicLength(Int)` | `Float` |
+| `raylib::getMusicTimePlayed(Int)` | `Float` |
+| `raylib::seekMusic(Int, Float)` | `Void` |
+| `raylib::setMusicLooping(Int, Bool)` | `Void` |

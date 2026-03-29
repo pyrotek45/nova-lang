@@ -33,6 +33,12 @@ fn pop_float(state: &mut state::State) -> NovaResult<f64> {
 pub fn random_int(state: &mut state::State) -> NovaResult<()> {
     let high = pop_int(state)?;
     let low = pop_int(state)?;
+    if low > high {
+        return Err(runtime_err(format!(
+            "random: low ({}) must be <= high ({})",
+            low, high
+        )));
+    }
     let mut rng = rand::thread_rng();
     state
         .memory
@@ -45,6 +51,12 @@ pub fn random_int(state: &mut state::State) -> NovaResult<()> {
 pub fn random_float(state: &mut state::State) -> NovaResult<()> {
     let high = pop_float(state)?;
     let low = pop_float(state)?;
+    if low >= high {
+        return Err(runtime_err(format!(
+            "randomFloat: low ({}) must be < high ({})",
+            low, high
+        )));
+    }
     let mut rng = rand::thread_rng();
     state
         .memory

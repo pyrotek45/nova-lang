@@ -1,5 +1,28 @@
 module tuple
 
+// Tuple utilities
+
+// Map a pair-of-lists to a list using a function
 fn extends map(input: ([$A],[$B]), f: fn(([$A],[$B])) -> $C) -> [$C] {
     return [f((input[0],input[1]))]
+}
+
+// Swap the elements of a two-element tuple
+fn extends swap(t: ($A,$B)) -> ($B,$A) {
+    return (t[1],t[0])
+}
+
+// Apply a function to the first element
+fn extends mapFirst(t: ($A,$B), f: fn($A) -> $C) -> ($C,$B) {
+    return (f(t[0]),t[1])
+}
+
+// Apply a function to the second element
+fn extends mapSecond(t: ($A,$B), f: fn($B) -> $C) -> ($A,$C) {
+    return (t[0],f(t[1]))
+}
+
+// Convert a pair to a list of strings
+fn extends toStrings(t: ($A,$B)) -> [String] {
+    return [Cast::string(t[0]),Cast::string(t[1])]
 }
