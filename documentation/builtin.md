@@ -1,88 +1,85 @@
-### Built-in Functions
+# Built-in Functions
 
-#### `fn exit() -> Void`
-Terminates the program.
+These functions are available without any imports.
 
-#### `fn typeof(a) -> String`
-Returns the type of the given value as a string.
+## Output
 
-#### `fn isSome(?a) -> Bool`
-Checks if the given option contains a value.
+| Signature | Description |
+|---|---|
+| `print(a) -> Void` | Print a value to stdout. |
+| `println(a) -> Void` | Print a value to stdout followed by a newline. |
 
-#### `fn unwrap(?a) -> a`
-Extracts the value from an option and panicking if it is `None`.
+## Type Inspection
 
-#### `fn Some(a) -> ?a`
-Wraps a value in an option
+| Signature | Description |
+|---|---|
+| `typeof(a) -> String` | Return the type of a value as a string. |
+| `clone(a) -> a` | Create a deep copy of a value. |
 
-#### `fn print(a) -> Void`
-Prints the given value to the standard output.
+## Option Handling
 
-#### `fn println(a) -> Void`
-Prints the given value to the standard output, followed by a newline.
+| Signature | Description |
+|---|---|
+| `Some(a) -> Option(a)` | Wrap a value in an Option. |
+| `None(T) -> Option(T)` | Create an empty Option of a given type. |
+| `isSome(Option(a)) -> Bool` | Check if an Option contains a value. |
+| `unwrap(Option(a)) -> a` | Extract the value from an Option. Panics if None. |
 
-#### `fn clone(a) -> a`
-Creates a deep copy of the given value.
+## Type Conversion
 
-#### `fn cliArgs() -> [String]`
-Retrieves the command line arguments.
+| Signature | Description |
+|---|---|
+| `Cast::string(a) -> String` | Convert any value to a String. |
+| `Cast::int(a) -> Option(Int)` | Convert a value to Int. Returns None on failure. |
+| `Cast::float(a) -> Option(Float)` | Convert a value to Float. Returns None on failure. |
+| `toStr(a) -> String` | Alias for `Cast::string`. |
+| `toInt(a) -> Option(Int)` | Alias for `Cast::int`. |
+| `toChar(Int) -> Char` | Convert an integer to a character. |
 
-#### `fn hidecursor() -> Void`
-Hides the cursor in the terminal.
+## String and Char
 
-#### `fn showcursor() -> Void`
-Shows the cursor in the terminal.
+| Signature | Description |
+|---|---|
+| `strlen(String) -> Int` | Return the length of a string. |
+| `strToChars(String) -> [Char]` | Convert a string to a list of characters. |
+| `charsToStr([Char]) -> String` | Convert a list of characters to a string. |
 
-#### `fn toInt(a) -> ?Int`
-Converts a generic value to an integer, if possible.
+## Lists
 
-#### `fn toStr(a) -> String`
-Converts a generic value to a string.
+| Signature | Description |
+|---|---|
+| `len([a]) -> Int` | Return the length of a list. |
+| `push([a], a) -> Void` | Append an element to a list. |
+| `pop([a]) -> Option(a)` | Remove and return the last element. |
 
-#### `fn len([a]) -> Int`
-Returns the length of a list.
+## I/O
 
-#### `fn sleep(Int) -> Void`
-Pauses the program for a specified number of milliseconds.
+| Signature | Description |
+|---|---|
+| `readln() -> String` | Read a line of input from stdin. |
+| `readFile(String) -> String` | Read the contents of a file. |
 
-#### `fn rawmode(Bool) -> Void`
-Enables or disables raw mode in the terminal.
+## Random
 
-#### `fn getch() -> ?Char`
-Reads a single character from the terminal without waiting for a newline.
+| Signature | Description |
+|---|---|
+| `randomInt(Int, Int) -> Int` | Generate a random integer in a range (inclusive). |
 
-#### `fn rawread(Int) -> ?Char`
-Reads a specified number of characters from the terminal in raw mode.
+## Terminal
 
-#### `fn readln() -> String`
-Reads a line of input from the terminal.
+| Signature | Description |
+|---|---|
+| `clearscreen() -> Void` | Clear the terminal screen. |
+| `hidecursor() -> Void` | Hide the terminal cursor. |
+| `showcursor() -> Void` | Show the terminal cursor. |
+| `rawmode(Bool) -> Void` | Enable or disable terminal raw mode. |
+| `getch() -> Option(Char)` | Read a single character without waiting for newline. |
+| `rawread(Int) -> Option(Char)` | Read a character in raw mode with a timeout (ms). |
+| `sleep(Int) -> Void` | Pause execution for a number of milliseconds. |
 
-#### `fn clearscreen() -> Void`
-Clears the terminal screen.
+## Program
 
-#### `fn push([a], a) -> Void`
-Adds an element to the end of a list.
-
-#### `fn pop([a]) -> ?a`
-Removes and returns the last element of a list.
-
-#### `fn randomInt(Int, Int) -> Int`
-Generates a random integer within a specified range.
-
-#### `fn strlen(String) -> Int`
-Returns the length of a string.
-
-#### `fn strToChars(String) -> [Char]`
-Converts a string to a list of characters.
-
-#### `fn charsToStr([Char]) -> String`
-Converts a list of characters to a string.
-
-#### `fn toStr(a) -> String`
-Converts a generic value to a string.
-
-#### `fn toChar(Int) -> Char`
-Converts an integer to a character.
-
-#### `fn readFile(String) -> String`
-Reads the contents of a file and returns it as a string.
+| Signature | Description |
+|---|---|
+| `exit() -> Void` | Terminate the program. |
+| `cliArgs() -> [String]` | Retrieve command-line arguments. |

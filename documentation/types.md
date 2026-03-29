@@ -1,51 +1,68 @@
-### Built-in Types
+# Built-in Types
 
-This is how the built-in types are represented under the hood. 
+This document describes Nova's built-in type representations.
 
+## Primitive Types
 
-#### `None`
-Represents the absence of a value. can be written like `?type`
+| Type | Description |
+|---|---|
+| `Int` | 64-bit signed integer. |
+| `Float` | 64-bit IEEE 754 floating-point number. |
+| `Bool` | Boolean value: `true` or `false`. |
+| `String` | UTF-8 encoded text. |
+| `Char` | Single Unicode character. |
+| `Void` | Absence of a return value. |
 
-#### `Int`
-Represents an integer type.
+## Composite Types
 
-#### `Float`
-Represents a floating-point number type.
+### `Option(T)`
 
-#### `Bool`
-Represents a boolean type, which can be either `true` or `false`.
+An optional value -- either `Some(value)` or `None`.
 
-#### `String`
-Represents a sequence of characters.
+- `inner: T` -- the type of the contained value.
 
-#### `Char`
-Represents a single character.
+### `List`
 
-#### `Void`
-Represents the absence of a return value.
+A dynamically-sized sequence of elements of a single type, written `[T]`.
 
-#### `Custom`
-Represents a user-defined type with a name and optional type parameters.
-- `name: String` - The name of the custom type.
-- `type_params: Vec<TType>` - The type parameters for the custom type.
+- `inner: T` -- the element type.
 
-#### `List`
-Represents a list of elements of a specific type.
-- `inner: Box<TType>` - The type of elements contained in the list.
+### `Tuple`
 
-#### `Function`
-Represents a function type with parameters and a return type.
-- `parameters: Vec<TType>` - The types of the function parameters.
-- `return_type: Box<TType>` - The return type of the function.
+A fixed-size, heterogeneous collection, written `(A, B, ...)`.
 
-#### `Generic`
-Represents a generic type with a name.
-- `name: String` - The name of the generic type.
+- `elements: [Type]` -- the type of each position.
 
-#### `Option`
-Represents an optional value that can either be `Some` containing a value or `None`.
-- `inner: Box<TType>` - The type of the value contained in the option.
+### `Function`
 
-#### `Tuple`
-Represents a tuple containing multiple elements of specific types.
-- `elements: Vec<TType>` - The types of the elements in the tuple.
+A callable value with typed parameters and a return type, written `fn(A, B) -> R`.
+
+- `parameters: [Type]` -- the parameter types.
+- `return_type: Type` -- the return type.
+
+## User-defined Types
+
+### `Custom`
+
+A user-defined struct or enum type.
+
+- `name: String` -- the type name (e.g. `Person`, `Shape`).
+- `type_params: [Type]` -- type parameters for generic types (e.g. `Pair(Int, String)`).
+
+### `Generic`
+
+A type variable used in generic definitions, written `$T`.
+
+- `name: String` -- the name of the type variable (e.g. `T`, `A`, `B`).
+
+## Special Types
+
+### `Dyn`
+
+A structural constraint type for duck-typed dispatch. Written `Dyn(T = field: Type + ...)`.
+Any struct with matching fields satisfies the constraint.
+
+### `None`
+
+The absence of a value inside an `Option`. Can be written as `None(T)` to specify the
+expected inner type.
