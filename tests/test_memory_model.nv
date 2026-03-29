@@ -1,0 +1,343 @@
+module test_memory_model
+
+import super.std.core
+import super.std.list
+
+// ============================================================================
+// Memory Model & Clone Semantics Tests
+//
+// Nova's memory model:
+//   - Primitives (Int, Float, Bool, Char) are VALUE TYPES — assignment copies.
+//   - Heap objects (List, String, Struct, Tuple, Enum, Closure) are
+//     REFERENCE COUNTED — assignment creates an alias (shared reference).
+//   - clone() performs a DEEP COPY — the clone is fully independent.
+//   - GC uses hybrid ref-counting + mark-sweep for cycle collection.
+//
+// These tests verify every aspect of this model.
+// ============================================================================
+
+// ============================
+// 1. PRIMITIVE VALUE SEMANTICS
+// ============================
+// Int, Float, Bool, Char are copied on assignment.
+
+// Int copy
+let a = 42
+let b = a
+b = 100
+assert(a == 42, "value: int copy — original unchanged")
+assert(b == 100, "value: int copy — copy changed")
+
+// Float copy
+let f1 = 3.14
+let f2 = f1
+f2 = 2.71
+assert(f1 == 3.14, "value: float copy — original unchanged")
+assert(f2 == 2.71, "value: float copy — copy changed")
+
+// Bool copy
+let flag1 = true
+let flag2 = flag1
+flag2 = false
+assert(flag1 == true, "value: bool copy — original unchanged")
+assert(flag2 == false, "value: bool copy — copy changed")
+
+// Char copy
+let c1 = 'A'
+let c2 = c1
+c2 = 'Z'
+assert(c1 == 'A', "value: char copy — original unchanged")
+assert(c2 == 'Z', "value: char copy — copy changed")
+
+// ============================
+// 2. LIST REFERENCE SEMANTICS
+// ============================
+// Lists are ref-counted — assignment shares the reference.
+
+let list1 = [1, 2, 3]
+let list2 = list1  // alias, NOT a copy
+list2.push(4)
+assert(list1.len() == 4, "ref: list alias — push visible through original")
+assert(list1[3] == 4, "ref: list alias — element visible")
+
+list1[0] = 99
+assert(list2[0] == 99, "ref: list alias — mutation visible both ways")
+
+// Nested list aliasing
+let outer = [[1, 2], [3, 4]]
+let outer2 = outer
+outer2[0].push(9)
+assert(outer[0].len() == 3, "ref: nested list alias — inner push visible")
+assert(outer[0][2] == 9, "ref: nested list alias — inner element visible")
+
+// ============================
+// 3. STRING REFERENCE SEMANTICS
+// ============================
+// Strings are heap objects — aliased on assignment.
+
+let s1 = "hello"
+let s2 = s1
+// Note: string mutations that create new strings (like +) reassign the variable,
+// they don't mutate the original object. But both s1 and s2 point to the same string.
+assert(s1 == "hello", "ref: string initial")
+assert(s2 == "hello", "ref: string alias same value")
+
+// ============================
+// 4. STRUCT REFERENCE SEMANTICS
+// ============================
+// Structs are ref-counted heap objects.
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+let p1 = Point { x: 1, y: 2 }
+let p2 = p1  // alias
+p2.x = 99
+assert(p1.x == 99, "ref: struct alias — field change visible")
+assert(p2.x == 99, "ref: struct alias — both see change")
+
+// Struct containing a list — list is also shared
+struct Container {
+    items: [Int],
+    label: String,
+}
+
+let ct1 = Container { items: [10, 20], label: "box" }
+let ct2 = ct1  // alias
+ct2.items.push(30)
+assert(ct1.items.len() == 3, "ref: struct with list — push visible")
+ct2.label = "changed"
+assert(ct1.label == "changed", "ref: struct string field alias")
+
+// ============================
+// 5. TUPLE REFERENCE SEMANTICS
+// ============================
+
+let t1 = (1, "hello", true)
+let t2 = t1
+// Tuples are immutable in element count, but the reference is shared
+assert(t1[0] == 1, "ref: tuple[0]")
+assert(t2[1] == "hello", "ref: tuple[1]")
+
+// ============================
+// 6. CLONE — DEEP COPY SEMANTICS
+// ============================
+// clone() creates a fully independent deep copy.
+
+// Clone list
+let orig_list = [1, 2, 3]
+let cloned_list = clone(orig_list)
+cloned_list.push(4)
+cloned_list[0] = 99
+assert(orig_list.len() == 3, "clone: list — original length unchanged")
+assert(orig_list[0] == 1, "clone: list — original[0] unchanged")
+assert(cloned_list.len() == 4, "clone: list — clone extended")
+assert(cloned_list[0] == 99, "clone: list — clone[0] changed")
+
+// Clone struct
+let orig_pt = Point { x: 5, y: 10 }
+let cloned_pt = clone(orig_pt)
+cloned_pt.x = 999
+assert(orig_pt.x == 5, "clone: struct — original unchanged")
+assert(cloned_pt.x == 999, "clone: struct — clone changed")
+
+// Clone struct with nested list (deep clone!)
+let orig_c = Container { items: [1, 2, 3], label: "original" }
+let cloned_c = clone(orig_c)
+cloned_c.items.push(4)
+cloned_c.label = "cloned"
+assert(orig_c.items.len() == 3, "clone: nested list — original len unchanged")
+assert(orig_c.label == "original", "clone: nested string — original unchanged")
+assert(cloned_c.items.len() == 4, "clone: nested list — clone extended")
+assert(cloned_c.label == "cloned", "clone: nested string — clone changed")
+
+// Clone nested lists
+let nested = [[1, 2], [3, 4]]
+let nested_clone = clone(nested)
+nested_clone[0].push(99)
+assert(nested[0].len() == 2, "clone: nested list — inner original unchanged")
+assert(nested_clone[0].len() == 3, "clone: nested list — inner clone changed")
+
+// Clone string
+let s_orig = "hello"
+let s_clone = clone(s_orig)
+assert(s_orig == "hello", "clone: string original")
+assert(s_clone == "hello", "clone: string clone same value")
+
+// ============================
+// 7. CLONE IN LOOPS
+// ============================
+// Common pattern: clone inside a loop to create independent copies.
+
+let snapshots = []: [Int]
+let accumulator = []: Int
+for let i = 0; i < 5; i += 1 {
+    accumulator.push(i)
+    snapshots.push(clone(accumulator))
+}
+
+assert(snapshots[0].len() == 1, "clone loop: snapshot 0 has 1 item")
+assert(snapshots[0][0] == 0, "clone loop: snapshot 0 = [0]")
+assert(snapshots[2].len() == 3, "clone loop: snapshot 2 has 3 items")
+assert(snapshots[4].len() == 5, "clone loop: snapshot 4 has 5 items")
+assert(accumulator.len() == 5, "clone loop: accumulator has 5 items")
+
+// Ensure snapshots are truly independent
+accumulator.push(999)
+assert(snapshots[4].len() == 5, "clone loop: snapshots independent of accumulator")
+
+// ============================
+// 8. FUNCTION ARGUMENTS
+// ============================
+// Primitives are passed by value copy.
+// Heap objects are passed by reference (alias).
+
+fn modify_int(x: Int) -> Int {
+    x = x + 100
+    return x
+}
+
+let orig = 5
+let result = modify_int(orig)
+assert(orig == 5, "args: int passed by value — original unchanged")
+assert(result == 105, "args: int returned correctly")
+
+fn modify_list(lst: [Int]) {
+    lst.push(99)
+}
+
+let my_list = [1, 2]
+modify_list(my_list)
+assert(my_list.len() == 3, "args: list passed by ref — push visible")
+assert(my_list[2] == 99, "args: list — new element visible")
+
+fn modify_struct(p: Point) {
+    p.x = 999
+}
+
+let my_pt = Point { x: 1, y: 2 }
+modify_struct(my_pt)
+assert(my_pt.x == 999, "args: struct passed by ref — field change visible")
+
+// ============================
+// 9. BOX PATTERN FOR MUTABLE CLOSURES
+// ============================
+// Since closures capture values, use Box to create a shared mutable cell.
+
+fn make_counter() -> (fn() -> Int, fn()) {
+    let count = Box(0)
+    let get = fn() -> Int { return count.value }
+    let inc = fn() { count.value += 1 }
+    return (get, inc)
+}
+
+let ctr = make_counter()
+let get = ctr[0]
+let inc = ctr[1]
+assert(get() == 0, "box: initial 0")
+inc()
+inc()
+inc()
+assert(get() == 3, "box: incremented to 3")
+
+// Multiple closures sharing the same Box
+fn make_shared_state() -> (fn(Int), fn() -> Int) {
+    let state = Box(0)
+    let setter = fn(v: Int) { state.value = v }
+    let getter = fn() -> Int { return state.value }
+    return (setter, getter)
+}
+
+let shared = make_shared_state()
+let set = shared[0]
+let get2 = shared[1]
+set(42)
+assert(get2() == 42, "box: shared setter/getter")
+set(100)
+assert(get2() == 100, "box: shared updated")
+
+// ============================
+// 10. LOOP VARIABLE CAPTURE PITFALL
+// ============================
+// Closures capture the VARIABLE, not the VALUE at time of creation.
+// To capture the current value, rebind with `let val = i`.
+
+let fns = []: fn() -> Int
+
+// CORRECT way: rebind loop variable
+for let i = 0; i < 5; i += 1 {
+    let captured = i  // rebind to capture current value
+    fns.push(fn() -> Int { return captured })
+}
+
+assert(fns[0]() == 0, "capture: fn[0] returns 0")
+assert(fns[1]() == 1, "capture: fn[1] returns 1")
+assert(fns[4]() == 4, "capture: fn[4] returns 4")
+
+// ============================
+// 11. CLONE WITH BOX PATTERN
+// ============================
+// Cloning a Box creates an independent Box.
+
+let b1 = Box(10)
+let b2 = clone(b1)
+b2.value = 99
+assert(b1.value == 10, "clone box: original unchanged")
+assert(b2.value == 99, "clone box: clone changed")
+
+// Without clone — Box is aliased (it's a struct!)
+let b3 = Box(42)
+let b4 = b3
+b4.value = 0
+assert(b3.value == 0, "alias box: both see change")
+
+// ============================
+// 12. ENUM CLONE
+// ============================
+
+enum Maybe2 {
+    Just: [Int],
+    Nothing
+}
+
+let m1 = Maybe2::Just([1, 2, 3])
+let m2 = clone(m1)
+match m2 {
+    Just(data) => { data.push(4) }
+    Nothing() => {}
+}
+
+// m1 should be unchanged
+match m1 {
+    Just(data) => { assert(data.len() == 3, "clone enum: original list unchanged") }
+    Nothing() => { assert(false, "clone enum: should be Just") }
+}
+
+// ============================
+// 13. STRESS: MANY CLONES
+// ============================
+// Verify GC handles many clones without issues.
+
+let big_list = []: Int
+for let i = 0; i < 100; i += 1 {
+    big_list.push(i)
+}
+
+let clones = []: [Int]
+for let i = 0; i < 50; i += 1 {
+    clones.push(clone(big_list))
+}
+
+assert(clones.len() == 50, "stress: 50 clones created")
+assert(clones[0].len() == 100, "stress: each clone has 100 items")
+assert(clones[49][99] == 99, "stress: last clone last item correct")
+
+// Modify one clone, others unaffected
+clones[25][0] = -1
+assert(clones[0][0] == 0, "stress: clones are independent")
+assert(clones[25][0] == -1, "stress: modified clone changed")
+assert(big_list[0] == 0, "stress: original unchanged")
+
+println("PASS: test_memory_model")

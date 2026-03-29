@@ -1,0 +1,628 @@
+module test_design_patterns2
+
+import super.std.core
+import super.std.list
+
+// ============================================================================
+// Design Patterns Part 2 — more patterns, more variants
+// ============================================================================
+
+// ============================
+// 1. PROTOTYPE / CLONE PATTERN
+// ============================
+// Create new objects by cloning an existing prototype.
+
+// Prototype 1a: config cloning
+struct Config {
+    host: String,
+    port: Int,
+    debug: Bool,
+}
+
+let base_config = Config { host: "localhost", port: 8080, debug: false }
+
+let dev = clone(base_config)
+dev.debug = true
+
+let staging = clone(base_config)
+staging.host = "staging.example.com"
+staging.port = 443
+
+// Clones are independent of the original
+assert(base_config.debug == false, "proto: base unchanged")
+assert(dev.debug == true, "proto: dev debug on")
+assert(dev.host == "localhost", "proto: dev host inherited")
+assert(staging.host == "staging.example.com", "proto: staging host")
+assert(staging.port == 443, "proto: staging port")
+assert(base_config.port == 8080, "proto: base port unchanged")
+
+// Prototype 1b: game entity prototype
+struct Entity {
+    kind: String,
+    hp: Int,
+    items: [String],
+}
+
+let proto_enemy = Entity { kind: "skeleton", hp: 50, items: ["bone", "shield"] }
+
+fn spawn_from(proto: Entity) -> Entity {
+    return clone(proto)
+}
+
+let e1 = spawn_from(proto_enemy)
+let e2 = spawn_from(proto_enemy)
+e1.hp = 30
+e2.items.push("sword")
+
+assert(e1.hp == 30, "proto: e1 hp modified")
+assert(e2.hp == 50, "proto: e2 hp original")
+assert(proto_enemy.items.len() == 2, "proto: original items untouched")
+assert(e2.items.len() == 3, "proto: e2 items extended")
+assert(e1.items.len() == 2, "proto: e1 items independent")
+
+// ============================
+// 2. PROXY PATTERN
+// ============================
+// Control access to an object via a wrapper.
+
+// Proxy 2a: access control proxy
+fn make_guarded_store(password: String) -> (fn(String, Int), fn(String) -> Option(Int)) {
+    let data = []: (String, Int)
+
+    let setter = fn(key: String, val: Int) {
+        // In a real proxy we would check auth here
+        data.push((key, val))
+    }
+
+    let getter = fn(key: String) -> Option(Int) {
+        for entry in data {
+            if entry[0] == key { return Some(entry[1]) }
+        }
+        return None(Int)
+    }
+
+    return (setter, getter)
+}
+
+let store = make_guarded_store("secret")
+let store_set = store[0]
+let store_get = store[1]
+
+store_set("x", 42)
+store_set("y", 99)
+assert(store_get("x").unwrap() == 42, "proxy: get x")
+assert(store_get("y").unwrap() == 99, "proxy: get y")
+assert(store_get("z").isNone(), "proxy: get missing")
+
+// Proxy 2b: lazy initialization proxy
+fn make_lazy(init: fn() -> Int) -> fn() -> Int {
+    let cached = Box(None(Int))
+    return fn() -> Int {
+        if cached.value.isNone() {
+            cached.value = Some(init())
+        }
+        return cached.value.unwrap()
+    }
+}
+
+let init_count = Box(0)
+let lazy = make_lazy(fn() -> Int {
+    init_count.value += 1
+    return 42 * 42
+})
+
+assert(init_count.value == 0, "proxy lazy: not yet init")
+let v1 = lazy()
+assert(v1 == 1764, "proxy lazy: first call")
+assert(init_count.value == 1, "proxy lazy: init once")
+let v2 = lazy()
+assert(v2 == 1764, "proxy lazy: second call same")
+assert(init_count.value == 1, "proxy lazy: still init once")
+
+// ============================
+// 3. FLYWEIGHT PATTERN
+// ============================
+// Share common data to save memory.
+
+// Flyweight 3a: shared color palette
+struct Pixel {
+    x: Int,
+    y: Int,
+    color_idx: Int,
+}
+
+let palette = ["red", "green", "blue", "white", "black"]
+
+fn extends colorName(p: Pixel) -> String {
+    return palette[p.color_idx]
+}
+
+let pixels = [
+    Pixel { x: 0, y: 0, color_idx: 0 },
+    Pixel { x: 1, y: 0, color_idx: 0 },
+    Pixel { x: 2, y: 0, color_idx: 2 },
+    Pixel { x: 3, y: 0, color_idx: 4 },
+]
+
+assert(pixels[0].colorName() == "red", "flyweight: pixel 0 red")
+assert(pixels[2].colorName() == "blue", "flyweight: pixel 2 blue")
+assert(pixels[3].colorName() == "black", "flyweight: pixel 3 black")
+// All "red" pixels share the same palette index, not duplicated strings
+
+// Flyweight 3b: interned string-like pattern
+struct Symbol {
+    id: Int,
+}
+
+let symbol_table = []: String
+
+fn intern(name: String) -> Symbol {
+    for let i = 0; i < symbol_table.len(); i += 1 {
+        if symbol_table[i] == name {
+            return Symbol { id: i }
+        }
+    }
+    symbol_table.push(name)
+    return Symbol { id: symbol_table.len() - 1 }
+}
+
+fn extends resolve(s: Symbol) -> String {
+    return symbol_table[s.id]
+}
+
+let s1 = intern("hello")
+let s2 = intern("world")
+let s3 = intern("hello")  // should reuse
+
+assert(s1.id == s3.id, "flyweight: hello interned same id")
+assert(s1.id != s2.id, "flyweight: hello != world")
+assert(s3.resolve() == "hello", "flyweight: resolve hello")
+assert(symbol_table.len() == 2, "flyweight: only 2 entries")
+
+// ============================
+// 4. VISITOR PATTERN
+// ============================
+// Separate algorithm from object structure.
+
+// Visitor 4a: visit AST nodes
+enum ASTNode {
+    Literal: Int,
+    BinOp: (String, ASTNode, ASTNode),
+    Unary: (String, ASTNode)
+}
+
+fn visit(node: ASTNode, on_lit: fn(Int) -> Int, on_binop: fn(String, Int, Int) -> Int, on_unary: fn(String, Int) -> Int) -> Int {
+    match node {
+        Literal(n) => { return on_lit(n) }
+        BinOp(data) => {
+            let left = visit(data[1], on_lit, on_binop, on_unary)
+            let right = visit(data[2], on_lit, on_binop, on_unary)
+            return on_binop(data[0], left, right)
+        }
+        Unary(data) => {
+            let inner = visit(data[1], on_lit, on_binop, on_unary)
+            return on_unary(data[0], inner)
+        }
+    }
+    return 0
+}
+
+// Evaluator visitor
+let eval_lit = |n: Int| n
+let eval_binop = fn(op: String, l: Int, r: Int) -> Int {
+    if op == "+" { return l + r }
+    if op == "*" { return l * r }
+    return 0
+}
+let eval_unary = fn(op: String, v: Int) -> Int {
+    if op == "neg" { return 0 - v }
+    return v
+}
+
+// -(3 + 4) = -7
+let ast1 = ASTNode::Unary(("neg", ASTNode::BinOp(("+", ASTNode::Literal(3), ASTNode::Literal(4)))))
+assert(visit(ast1, eval_lit, eval_binop, eval_unary) == -7, "visitor: eval -(3+4)=-7")
+
+// 2 * (5 + 1) = 12
+let ast2 = ASTNode::BinOp(("*", ASTNode::Literal(2), ASTNode::BinOp(("+", ASTNode::Literal(5), ASTNode::Literal(1)))))
+assert(visit(ast2, eval_lit, eval_binop, eval_unary) == 12, "visitor: eval 2*(5+1)=12")
+
+// Counter visitor: count nodes
+let count_lit = |n: Int| 1
+let count_binop = |op: String, l: Int, r: Int| 1 + l + r
+let count_unary = |op: String, v: Int| 1 + v
+assert(visit(ast1, count_lit, count_binop, count_unary) == 4, "visitor: count -(3+4)=4 nodes")
+
+// ============================
+// 5. PIPELINE / MIDDLEWARE PATTERN
+// ============================
+// Chain processing steps, each can modify data.
+
+// Pipeline 5a: text pipeline
+fn pipeline(input: String, steps: [fn(String) -> String]) -> String {
+    let result = input
+    for step in steps {
+        result = step(result)
+    }
+    return result
+}
+
+let text = pipeline("  Hello, World!  ", [
+    |s: String| s.trim(),
+    |s: String| s.toLower(),
+    |s: String| s.replace(",", ""),
+    |s: String| s.replace("!", "")
+])
+assert(text == "hello world", "pipeline: text processing")
+
+// Pipeline 5b: number pipeline
+fn num_pipeline(input: Int, steps: [fn(Int) -> Int]) -> Int {
+    let result = input
+    for step in steps {
+        result = step(result)
+    }
+    return result
+}
+
+let answer = num_pipeline(10, [
+    |x: Int| x * 2,
+    |x: Int| x + 5,
+    |x: Int| x * 3
+])
+// (10 * 2 = 20, + 5 = 25, * 3 = 75)
+assert(answer == 75, "pipeline: numbers (10*2+5)*3=75")
+
+// Middleware 5c: request/response middleware chain
+struct Request {
+    path: String,
+    headers: [String],
+    body: String,
+}
+
+fn apply_middlewares(req: Request, middlewares: [fn(Request) -> Request]) -> Request {
+    let r = req
+    for mw in middlewares {
+        r = mw(r)
+    }
+    return r
+}
+
+let req = Request { path: "/api/users", headers: []: String, body: "" }
+let processed = apply_middlewares(req, [
+    fn(r: Request) -> Request {
+        r.headers.push("Content-Type: json")
+        return r
+    },
+    fn(r: Request) -> Request {
+        r.headers.push("Auth: token123")
+        return r
+    },
+    fn(r: Request) -> Request {
+        r.path = "/v2" + r.path
+        return r
+    }
+])
+
+assert(processed.path == "/v2/api/users", "middleware: path prefixed")
+assert(processed.headers.len() == 2, "middleware: 2 headers added")
+assert(processed.headers[0] == "Content-Type: json", "middleware: content type")
+
+// ============================
+// 6. REGISTRY PATTERN
+// ============================
+// Central registry for looking up handlers/factories by name.
+
+struct Registry {
+    names: [String],
+    handlers: [fn(Int) -> Int],
+}
+
+fn RegistryNew() -> Registry {
+    return Registry { names: []: String, handlers: []: fn(Int) -> Int }
+}
+
+fn extends register(reg: Registry, name: String, handler: fn(Int) -> Int) {
+    reg.names.push(name)
+    reg.handlers.push(handler)
+}
+
+fn extends lookup(reg: Registry, name: String) -> Option(fn(Int) -> Int) {
+    for let i = 0; i < reg.names.len(); i += 1 {
+        if reg.names[i] == name {
+            return Some(reg.handlers[i])
+        }
+    }
+    return None(fn(Int) -> Int)
+}
+
+let reg = RegistryNew()
+reg.register("double", |x: Int| x * 2)
+reg.register("square", |x: Int| x * x)
+reg.register("negate", |x: Int| 0 - x)
+
+let double_fn = reg.lookup("double")
+assert(!double_fn.isNone(), "registry: found double")
+assert(double_fn.unwrap()(5) == 10, "registry: double(5)=10")
+
+let sq_fn = reg.lookup("square")
+assert(sq_fn.unwrap()(7) == 49, "registry: square(7)=49")
+
+let missing = reg.lookup("triple")
+assert(missing.isNone(), "registry: triple not found")
+
+// ============================
+// 7. OBJECT POOL PATTERN
+// ============================
+// Reuse objects instead of creating new ones.
+
+struct Pool {
+    available: [Int],
+    in_use: [Int],
+}
+
+fn PoolNew(size: Int) -> Pool {
+    let avail = []: Int
+    for let i = 0; i < size; i += 1 {
+        avail.push(i)
+    }
+    return Pool { available: avail, in_use: []: Int }
+}
+
+fn extends acquire(p: Pool) -> Option(Int) {
+    if p.available.len() == 0 { return None(Int) }
+    let obj = p.available[p.available.len() - 1]
+    p.available = p.available[0:p.available.len() - 1]
+    p.in_use.push(obj)
+    return Some(obj)
+}
+
+fn extends release(p: Pool, obj: Int) {
+    let new_in_use = []: Int
+    for item in p.in_use {
+        if item != obj {
+            new_in_use.push(item)
+        }
+    }
+    p.in_use = new_in_use
+    p.available.push(obj)
+}
+
+let pool = PoolNew(3)
+assert(pool.available.len() == 3, "pool: 3 available")
+
+let a = pool.acquire()
+assert(!a.isNone(), "pool: acquired a")
+assert(pool.available.len() == 2, "pool: 2 available after acquire")
+assert(pool.in_use.len() == 1, "pool: 1 in use")
+
+let b = pool.acquire()
+let c = pool.acquire()
+assert(pool.available.len() == 0, "pool: none available")
+
+let d = pool.acquire()
+assert(d.isNone(), "pool: empty pool returns None")
+
+pool.release(a.unwrap())
+assert(pool.available.len() == 1, "pool: 1 available after release")
+
+let e = pool.acquire()
+assert(!e.isNone(), "pool: re-acquired from pool")
+
+// ============================
+// 8. STRATEGY WITH ENUMS
+// ============================
+// Encode strategies as enum variants (an alternative to closures).
+
+enum SortOrder {
+    Ascending,
+    Descending,
+    AbsAscending
+}
+
+fn extends apply(order: SortOrder, a: Int, b: Int) -> Bool {
+    match order {
+        Ascending() => { return a > b }
+        Descending() => { return a < b }
+        AbsAscending() => {
+            let abs_a = if a < 0 { 0 - a } else { a }
+            let abs_b = if b < 0 { 0 - b } else { b }
+            return abs_a > abs_b
+        }
+    }
+    return false
+}
+
+fn enum_sort(data: [Int], order: SortOrder) -> [Int] {
+    let result = clone(data)
+    let n = result.len()
+    for let i = 0; i < n; i += 1 {
+        for let j = 0; j < n - 1 - i; j += 1 {
+            if order.apply(result[j], result[j + 1]) {
+                let tmp = result[j]
+                result[j] = result[j + 1]
+                result[j + 1] = tmp
+            }
+        }
+    }
+    return result
+}
+
+let data = [3, -1, 4, -5, 2]
+let asc = enum_sort(data, SortOrder::Ascending())
+assert(asc[0] == -5, "enum strategy: ascending[0]")
+assert(asc[4] == 4, "enum strategy: ascending[4]")
+
+let desc = enum_sort(data, SortOrder::Descending())
+assert(desc[0] == 4, "enum strategy: descending[0]")
+assert(desc[4] == -5, "enum strategy: descending[4]")
+
+let abs_asc = enum_sort(data, SortOrder::AbsAscending())
+assert(abs_asc[0] == -1, "enum strategy: abs ascending first is +-1")
+
+// ============================
+// 9. EVENT SOURCING PATTERN
+// ============================
+// Store all events, derive state by replaying.
+
+enum AccountEvent {
+    Deposit: Int,
+    Withdraw: Int,
+    SetName: String
+}
+
+struct Account {
+    name: String,
+    balance: Int,
+    events: [AccountEvent],
+}
+
+fn AccountNew() -> Account {
+    return Account { name: "unknown", balance: 0, events: []: AccountEvent }
+}
+
+fn extends apply_event(acc: Account, event: AccountEvent) {
+    acc.events.push(event)
+    match event {
+        Deposit(amount) => { acc.balance += amount }
+        Withdraw(amount) => { acc.balance -= amount }
+        SetName(n) => { acc.name = n }
+    }
+}
+
+fn replay(events: [AccountEvent]) -> Account {
+    let acc = AccountNew()
+    for e in events {
+        acc.apply_event(e)
+    }
+    return acc
+}
+
+let acc = AccountNew()
+acc.apply_event(AccountEvent::SetName("Alice"))
+acc.apply_event(AccountEvent::Deposit(100))
+acc.apply_event(AccountEvent::Withdraw(30))
+acc.apply_event(AccountEvent::Deposit(50))
+
+assert(acc.name == "Alice", "event sourcing: name")
+assert(acc.balance == 120, "event sourcing: balance 100-30+50=120")
+assert(acc.events.len() == 4, "event sourcing: 4 events")
+
+// Replay from scratch
+let replayed = replay(acc.events)
+assert(replayed.name == "Alice", "event sourcing: replay name")
+assert(replayed.balance == 120, "event sourcing: replay balance")
+
+// ============================
+// 10. SPECIFICATION PATTERN
+// ============================
+// Compose boolean predicates.
+
+fn and_spec(pred1: fn(Int) -> Bool, pred2: fn(Int) -> Bool) -> fn(Int) -> Bool {
+    return |x: Int| pred1(x) && pred2(x)
+}
+
+fn or_spec(pred1: fn(Int) -> Bool, pred2: fn(Int) -> Bool) -> fn(Int) -> Bool {
+    return |x: Int| pred1(x) || pred2(x)
+}
+
+fn not_spec(pred1: fn(Int) -> Bool) -> fn(Int) -> Bool {
+    return |x: Int| !pred1(x)
+}
+
+let is_positive = |x: Int| x > 0
+let is_even = |x: Int| x % 2 == 0
+let is_small = |x: Int| x < 10
+
+let pos_and_even = and_spec(is_positive, is_even)
+assert(pos_and_even(4) == true, "spec: 4 is pos and even")
+assert(pos_and_even(3) == false, "spec: 3 is not even")
+assert(pos_and_even(-2) == false, "spec: -2 is not positive")
+
+let pos_or_even = or_spec(is_positive, is_even)
+assert(pos_or_even(-2) == true, "spec: -2 is even")
+assert(pos_or_even(3) == true, "spec: 3 is positive")
+
+let big = not_spec(is_small)
+assert(big(15) == true, "spec: 15 is big")
+assert(big(5) == false, "spec: 5 is small")
+
+// Compose complex spec: positive AND even AND small
+let complex = and_spec(and_spec(is_positive, is_even), is_small)
+assert(complex(4) == true, "spec: 4 meets all")
+assert(complex(12) == false, "spec: 12 not small")
+assert(complex(-4) == false, "spec: -4 not positive")
+
+// ============================
+// 11. NULL OBJECT PATTERN
+// ============================
+// Use Option or an explicit "no-op" instead of null.
+
+// 11a: Using Option for safe operations
+fn safe_divide(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+
+assert(safe_divide(10, 2).unwrap() == 5, "null obj: 10/2=5")
+assert(safe_divide(10, 0).isNone(), "null obj: div by zero is None")
+assert(safe_divide(10, 0).orDefault(0) == 0, "null obj: default on None")
+
+// 11b: Null logger
+fn make_null_logger() -> fn(String) {
+    return |msg: String| {
+        // does nothing — null object
+    }
+}
+
+fn make_real_logger(output: Box(String)) -> fn(String) {
+    return |msg: String| {
+        output.value = output.value + msg + ";"
+    }
+}
+
+let null_log = make_null_logger()
+null_log("test")  // should do nothing
+
+let buf = Box("")
+let real_log = make_real_logger(buf)
+real_log("hello")
+real_log("world")
+assert(buf.value == "hello;world;", "null obj: real logger works")
+
+// ============================
+// 12. INTERPRETER PATTERN
+// ============================
+// Define a mini language and evaluate it.
+
+enum Token {
+    TNum: Int,
+    TPlus,
+    TMul
+}
+
+fn interpret(tokens: [Token]) -> Int {
+    // Simple left-to-right evaluation for demonstration
+    let result = 0
+    let op = "+"
+    for tok in tokens {
+        match tok {
+            TNum(n) => {
+                if op == "+" { result += n }
+                elif op == "*" { result = result * n }
+            }
+            TPlus() => { op = "+" }
+            TMul() => { op = "*" }
+        }
+    }
+    return result
+}
+
+// 3 + 4 + 5 = 12
+let prog1 = [Token::TNum(3), Token::TPlus(), Token::TNum(4), Token::TPlus(), Token::TNum(5)]
+assert(interpret(prog1) == 12, "interpreter: 3+4+5=12")
+
+// 2 + 3 * 4 = 20 (left-to-right, no precedence)
+let prog2 = [Token::TNum(2), Token::TPlus(), Token::TNum(3), Token::TMul(), Token::TNum(4)]
+assert(interpret(prog2) == 20, "interpreter: 2+3*4=20 (left-right)")
+
+println("PASS: test_design_patterns2")
