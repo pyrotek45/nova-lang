@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: assign to a literal integer on lhs
+1 = 5
+println("unreachable")

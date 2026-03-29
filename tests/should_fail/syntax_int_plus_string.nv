@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: Int + String arithmetic type error
+fn test() -> Int {
+    return 1 + "two"
+}
+println(test())

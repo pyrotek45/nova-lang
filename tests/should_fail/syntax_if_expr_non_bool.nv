@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: if-expression condition is not Bool (it's Int)
+fn test(n: Int) -> String {
+    return if n { "yes" } else { "no" }
+}
+println(test(1))

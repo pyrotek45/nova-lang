@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: while-statement condition is not Bool (it is String)
+fn test() {
+    while "forever" {
+        println("loop")
+    }
+}
+test()

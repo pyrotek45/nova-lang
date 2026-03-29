@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: higher-order function receives closure with wrong return type
+// expects fn(Int) -> Int but gets fn(Int) -> String
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+
+let result = apply(|n: Int| Cast::string(n), 5)
+println(result)

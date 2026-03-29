@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: leftover tokens after last statement - parser eof check
+// A spurious token after a complete program
+fn foo() -> Int {
+    return 1
+}
+foo()
+}

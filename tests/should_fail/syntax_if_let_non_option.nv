@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: if let on a non-Option (String)
+fn test() {
+    let s = "hello"
+    if let v = s {
+        println(v)
+    }
+}
+test()

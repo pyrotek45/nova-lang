@@ -1,0 +1,14 @@
+module main
+
+// SHOULD FAIL: Dyn contract field type mismatch
+// Dog has name: String but contract requires name: Int
+struct Dog {
+    name: String
+}
+
+fn takes_int_name(x: Dyn(T = name: Int)) {
+    println(x.name)
+}
+
+let d = Dog { name: "Rex" }
+takes_int_name(d)

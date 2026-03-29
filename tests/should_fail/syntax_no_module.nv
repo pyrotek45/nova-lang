@@ -1,0 +1,5 @@
+// SHOULD FAIL: no module declaration — parser requires module as first statement
+fn add(x: Int, y: Int) -> Int {
+    return x + y
+}
+println(add(1, 2))

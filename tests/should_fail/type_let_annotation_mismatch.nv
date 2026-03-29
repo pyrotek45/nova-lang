@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: annotated let where annotation type contradicts expression type
+let x: String = 42
+println(x)

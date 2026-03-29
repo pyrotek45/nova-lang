@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: assign mismatched type to field (struct field assignment)
+struct Counter {
+    count: Int
+}
+let c = Counter { count: 0 }
+c.count = "not an int"
+println(c.count)

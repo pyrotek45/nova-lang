@@ -1,0 +1,12 @@
+module main
+
+// SHOULD FAIL: calling an UFCS extends function with the wrong receiver type
+struct Dog { name: String }
+struct Cat { name: String }
+
+fn extends greet(d: Dog) -> String {
+    return "Woof from " + d.name
+}
+
+let c = Cat { name: "Whiskers" }
+println(c.greet())

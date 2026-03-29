@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: missing closing brace on function body
+fn broken() -> Int {
+    return 42
+
+println(broken())

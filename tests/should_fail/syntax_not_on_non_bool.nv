@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: ! (not) applied to non-Bool
+// parser: "Cannot use ! on non-boolean"
+let x = 5
+let y = !x
+println(y)

@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: dunder method declared without 'extends' — must use extends
+fn __add__(x: Int, y: Int) -> Int {
+    return x + y
+}
+println(__add__(1, 2))

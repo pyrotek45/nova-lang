@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: forward declaration never resolved
+// parser: "forward declarations not resolved" at EOF
+fn foo(x: Int) -> Int

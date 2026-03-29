@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: empty tuple — tuples must contain at least one element
+// The parser errors on ()
+let t = ()
+println(t)

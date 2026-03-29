@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: type alias using an unknown type name
+type Phantom = NonExistentType
+println("unreachable")

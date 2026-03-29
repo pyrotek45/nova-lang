@@ -305,4 +305,153 @@ let piped2 = 4 |> inc_plain() |> square_plain()
 assert(piped1 == 25, "pipe square 5")
 assert(piped2 == 25, "pipe inc then square: (4+1)^2=25")
 
+// ---- Multi-argument extends functions ----
+fn extends clampToRange(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+assert((-5).clampToRange(0, 100) == 0, "clamp below range")
+assert(50.clampToRange(0, 100) == 50, "clamp in range")
+assert(200.clampToRange(0, 100) == 100, "clamp above range")
+
+fn extends between(x: Int, lo: Int, hi: Int) -> Bool {
+    return x >= lo && x <= hi
+}
+assert(5.between(1, 10) == true, "between 5 in [1,10]")
+assert(0.between(1, 10) == false, "between 0 not in [1,10]")
+assert(10.between(1, 10) == true, "between 10 at edge")
+
+// ---- Extends on String receiver ----
+fn extends repeat(s: String, n: Int) -> String {
+    let acc = ""
+    for let i = 0; i < n; i += 1 {
+        acc = acc + s
+    }
+    return acc
+}
+fn extends startsWith(s: String, prefix: String) -> Bool {
+    if prefix.len() > s.len() { return false }
+    let sc = s.chars()
+    let pc = prefix.chars()
+    for let i = 0; i < pc.len(); i += 1 {
+        if sc[i] != pc[i] { return false }
+    }
+    return true
+}
+fn extends countChar(s: String, target: Char) -> Int {
+    let count = 0
+    for c in s.chars() {
+        if c == target {
+            count = count + 1
+        }
+    }
+    return count
+}
+
+assert("ab".repeat(3) == "ababab", "repeat ab 3")
+assert("hello".countChar('l') == 2, "countChar l in hello = 2")
+assert("".repeat(5) == "", "repeat empty string")
+assert("xyz".repeat(1) == "xyz", "repeat 1 = same")
+assert("hello".startsWith("hel") == true, "startsWith hel")
+assert("hello".startsWith("world") == false, "startsWith world")
+
+// ---- Extends on Bool receiver ----
+fn extends flip(b: Bool) -> Bool {
+    return !b
+}
+assert(true.toInt() == 1, "true toInt (reuse existing)")
+assert(false.toInt() == 0, "false toInt (reuse existing)")
+assert(true.flip() == false, "flip true")
+assert(false.flip() == true, "flip false")
+assert(true.flip().toInt() == 0, "flip then toInt")
+
+// ---- Extends chained with map/filter ----
+let nums2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let doubled_evens = nums2.filter(|x: Int| x % 2 == 0).map(|x: Int| x.double())
+assert(doubled_evens.len() == 5, "doubled_evens length 5")
+assert(doubled_evens[0] == 4, "doubled_evens[0] = 4")
+assert(doubled_evens[4] == 20, "doubled_evens[4] = 20")
+
+let squared_odds = nums2.filter(|x: Int| x % 2 != 0).map(|x: Int| x.square())
+assert(squared_odds.len() == 5, "squared_odds length 5")
+assert(squared_odds[0] == 1, "1^2=1")
+assert(squared_odds[4] == 81, "9^2=81")
+
+// ---- Extends storing the fn value and calling indirectly ----
+let double_fn: fn(Int) -> Int = |x: Int| x.double()
+assert(double_fn(7) == 14, "stored extends as fn value")
+let triple_fn: fn(Int) -> Int = |x: Int| x.triple()
+assert(triple_fn(6) == 18, "stored triple as fn value")
+
+// ---- Extends on generic struct ----
+struct Stack(T) {
+    items: [$T],
+    size: Int
+}
+
+fn extends push_item(s: Stack($T), item: $T) -> Stack($T) {
+    s.items.push(item)
+    s.size = s.size + 1
+    return s
+}
+
+fn extends peek(s: Stack($T)) -> $T {
+    return s.items[s.size - 1]
+}
+
+fn extends is_empty(s: Stack($T)) -> Bool {
+    return s.size == 0
+}
+
+let istack = Stack { items: []: Int, size: 0 }
+istack = istack.push_item(10)
+istack = istack.push_item(20)
+istack = istack.push_item(30)
+assert(istack.size == 3, "stack size 3")
+assert(istack.peek() == 30, "stack peek = 30")
+assert(istack.is_empty() == false, "stack not empty")
+
+let sstack = Stack { items: []: String, size: 0 }
+sstack = sstack.push_item("hello")
+sstack = sstack.push_item("world")
+assert(sstack.size == 2, "string stack size 2")
+assert(sstack.peek() == "world", "string stack peek")
+
+// ---- Extends on list receiver: reduce-like pattern ----
+fn extends sumWith(xs: [Int], initial: Int) -> Int {
+    let acc = initial
+    for x in xs {
+        acc = acc + x
+    }
+    return acc
+}
+fn extends countWhere(xs: [Int], pred: fn(Int) -> Bool) -> Int {
+    let count = 0
+    for x in xs {
+        if pred(x) { count = count + 1 }
+    }
+    return count
+}
+
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+assert(data.sumWith(100) == 155, "sumWith 100 + 55 = 155")
+assert(data.countWhere(|x: Int| x > 5) == 5, "countWhere > 5 = 5")
+assert(data.countWhere(|x: Int| x % 2 == 0) == 5, "countWhere even = 5")
+
+// ---- Extends that returns an Option ----
+fn extends safeDiv(x: Int, denom: Int) -> Option(Int) {
+    if denom == 0 { return None(Int) }
+    return Some(x / denom)
+}
+
+let r1 = 10.safeDiv(2)
+let r2 = 10.safeDiv(0)
+assert(r1.isSome() == true, "safeDiv 10/2 isSome")
+assert(r1.unwrap() == 5, "safeDiv 10/2 = 5")
+assert(r2.isSome() == false, "safeDiv 10/0 isNone")
+
+// ---- Deep UFCS chain of 7 ----
+assert(1.double().double().double().triple().negate().negate().square() == 576, "deep chain 1->2->4->8->24->-24->24->576")
+
 println("PASS: test_ufcs_stress")

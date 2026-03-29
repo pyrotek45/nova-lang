@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: return a void expression from an Int function via block expression
+fn make_block() -> Int {
+    return {
+        let x = 5
+        // block last expr is void (no expression), returns void
+    }
+}
+println(make_block())

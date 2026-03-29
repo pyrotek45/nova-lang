@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: let without assignment operator
+// parser expects '=' after the identifier
+let x: Int
+println(x)

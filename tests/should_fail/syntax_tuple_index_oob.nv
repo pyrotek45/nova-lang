@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: tuple index out of bounds
+// parser: "Tuple cannot index into 5"
+let t = (1, 2, 3)
+println(t[5])

@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: Float % Int — modulo only valid for Int % Int
+fn test() -> Float {
+    return 5.0 % 2
+}
+println(test())

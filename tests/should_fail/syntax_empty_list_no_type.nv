@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: empty list without type annotation
+// parser: "List must have a type, use `[]: type`"
+let xs = []
+println(xs)

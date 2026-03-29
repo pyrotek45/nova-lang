@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: if-let binding variable that already exists
+let opt: Option(Int) = Some(5)
+let inner = 0
+if let inner = opt {
+    println(inner)
+}

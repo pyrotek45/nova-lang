@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: index into a non-list non-tuple (e.g. Int)
+fn foo() -> Int { return 5 }
+let x = foo()
+println(x[0])

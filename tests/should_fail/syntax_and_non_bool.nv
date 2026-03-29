@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: || applied to non-Bool (String || String — no __or__ for String)
+fn test() -> Bool {
+    return "yes" || "no"
+}
+println(test())

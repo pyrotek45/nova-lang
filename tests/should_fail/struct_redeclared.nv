@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: struct redeclared with same name
+struct Foo {
+    x: Int
+}
+struct Foo {
+    y: String
+}

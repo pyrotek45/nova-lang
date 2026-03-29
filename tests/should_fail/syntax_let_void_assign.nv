@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: let variable assigned void expression
+fn noop() {}
+let x = noop()
+println(x)

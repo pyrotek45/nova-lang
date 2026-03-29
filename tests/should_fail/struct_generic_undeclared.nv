@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: generic struct missing generic type declaration
+// e.g. struct Box { value: $T } — $T not declared in Box(T)
+struct BadBox {
+    value: $T
+}

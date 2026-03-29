@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: if-statement condition is not Bool (it is Int)
+fn test(x: Int) {
+    if x {
+        println("yes")
+    }
+}
+test(1)

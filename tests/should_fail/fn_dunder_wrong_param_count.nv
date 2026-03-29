@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: dunder method with wrong number of parameters (not exactly 2)
+struct Vec2 {
+    x: Float,
+    y: Float
+}
+fn extends __add__(v: Vec2) -> Vec2 {
+    return Vec2 { x: v.x, y: v.y }
+}

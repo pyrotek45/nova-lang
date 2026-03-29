@@ -1,0 +1,12 @@
+module main
+
+// SHOULD FAIL: generic struct with wrong number of type parameters
+struct Pair(A, B) {
+    fst: $A,
+    snd: $B
+}
+
+// Pair expects 2 type params, giving only 1
+fn test(p: Pair(Int)) -> Int {
+    return p.fst
+}

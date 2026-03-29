@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: list comprehension over non-list
+// parser: "List comprehension must be a list"
+let xs = [x | x in 42]
+println(xs)

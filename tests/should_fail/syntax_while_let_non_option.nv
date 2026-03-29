@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: while let on a non-Option (Int)
+fn test() {
+    let x = 5
+    while let v = x {
+        println(v)
+    }
+}
+test()

@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: void expression used inside a list literal
+fn noop() {}
+let xs = [noop(), noop()]
+println(xs)

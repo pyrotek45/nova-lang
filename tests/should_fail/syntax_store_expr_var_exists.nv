@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: ~> (store expression) where bound variable already exists
+let x = 10
+let result = 5 ~> x {
+    x + 1
+}
+println(result)

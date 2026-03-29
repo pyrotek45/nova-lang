@@ -212,4 +212,150 @@ fn option_gc_stress() {
 }
 option_gc_stress()
 
+// 13. Closure over a mutable list — list survives multiple closure calls
+fn shared_list_closure() {
+    let log = Box([]: String)
+    let record = fn(s: String) {
+        log.value.push(s)
+    }
+    for let i = 0; i < 50; i += 1 {
+        record("entry_" + Cast::string(i))
+    }
+    assert(log.value.len() == 50, "shared list closure 50 entries")
+    assert(log.value[0] == "entry_0", "first entry correct")
+    assert(log.value[49] == "entry_49", "last entry correct")
+}
+shared_list_closure()
+
+// 14. Recursive struct (via list) deep nesting — tests cycle handling
+fn recursive_struct_pressure() {
+    // Build a list-of-lists (simulates tree nodes)
+    let nodes = []: [[Int]]
+    for let i = 0; i < 100; i += 1 {
+        let children = []: [Int]
+        for let j = 0; j < 10; j += 1 {
+            children.push([i, j, i * j])
+        }
+        nodes.push(children)
+    }
+    assert(nodes.len() == 100, "100 nodes")
+    assert(nodes[50].len() == 10, "50th node has 10 children")
+    assert(nodes[5][3][2] == 15, "nodes[5][3][2] = 5*3 = 15")
+    // Release all
+    nodes = []: [[Int]]
+    assert(nodes.len() == 0, "recursive nodes released")
+}
+recursive_struct_pressure()
+
+// 15. Multiple Box objects cross-referencing via fn values
+fn box_cross_ref() {
+    let a = Box(0)
+    let b = Box(0)
+    let inc_a = fn() { a.value = a.value + 1 }
+    let inc_b = fn() { b.value = b.value + 1 }
+    let sync = fn() {
+        inc_a()
+        inc_b()
+    }
+    for let i = 0; i < 100; i += 1 {
+        sync()
+    }
+    assert(a.value == 100, "box cross ref a=100")
+    assert(b.value == 100, "box cross ref b=100")
+}
+box_cross_ref()
+
+// 16. Large string allocations and concatenation churn
+fn string_churn() {
+    let result = ""
+    for let i = 0; i < 100; i += 1 {
+        result = result + "x"
+    }
+    assert(result.len() == 100, "string churn length 100")
+    // Now build from pieces
+    let pieces = []: String
+    for let i = 0; i < 50; i += 1 {
+        pieces.push(Cast::string(i) + ".")
+    }
+    let joined = ""
+    for x in pieces {
+        joined = joined + x
+    }
+    assert(joined.len() > 0, "joined string non-empty")
+}
+string_churn()
+
+// 17. Deep option chain: wrap/unwrap 50 times each
+fn option_chain_stress() {
+    let values = []: Option(Int)
+    for let i = 0; i < 50; i += 1 {
+        values.push(Some(i * 3))
+    }
+    let total = 0
+    for let i = 0; i < values.len(); i += 1 {
+        if values[i].isSome() {
+            total = total + values[i].unwrap()
+        }
+    }
+    // sum of 0*3, 1*3, ..., 49*3 = 3*(0+1+...+49) = 3*1225 = 3675
+    assert(total == 3675, "option chain sum 3675")
+}
+option_chain_stress()
+
+// 18. Struct holding a Box(String) — layered heap allocation
+struct TextBox {
+    content: Box(String),
+    id: Int
+}
+
+fn textbox_gc_stress() {
+    let boxes = []: TextBox
+    for let i = 0; i < 100; i += 1 {
+        boxes.push(TextBox {
+            content: Box("item_" + Cast::string(i)),
+            id: i
+        })
+    }
+    assert(boxes[0].content.value == "item_0", "textbox 0")
+    assert(boxes[99].content.value == "item_99", "textbox 99")
+    // Mutate a few
+    boxes[10].content.value = "mutated"
+    assert(boxes[10].content.value == "mutated", "textbox 10 mutated")
+    // Release
+    boxes = []: TextBox
+    assert(boxes.len() == 0, "textboxes released")
+}
+textbox_gc_stress()
+
+// 19. Accumulator pattern with many closures sharing the same Box
+fn accumulator_stress() {
+    let acc = Box(0)
+    let adders = []: fn(Int) -> Int
+    for let i = 0; i < 100; i += 1 {
+        let step = i
+        adders.push(fn(x: Int) -> Int {
+            acc.value = acc.value + step
+            return acc.value
+        })
+    }
+    // call each adder with 1
+    for let i = 0; i < adders.len(); i += 1 {
+        adders[i](1)
+    }
+    // acc = 0+1+2+...+99 = 4950
+    assert(acc.value == 4950, "accumulator stress sum=4950")
+}
+accumulator_stress()
+
+// 20. Rapid Box creation and immediate release (tight loop)
+fn box_rapid_release() {
+    let last = 0
+    for let i = 0; i < 10000; i += 1 {
+        let b = Box(i)
+        last = b.value
+    }
+    assert(last == 9999, "box rapid release last=9999")
+}
+box_rapid_release()
+
 println("PASS: test_gc_stress")

@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: function declared with duplicate signature (same name + arg types)
+fn add(x: Int, y: Int) -> Int {
+    return x + y
+}
+fn add(x: Int, y: Int) -> Int {
+    return x + y + 1
+}
+println(add(1, 2))

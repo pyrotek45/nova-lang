@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: tuple type annotation with zero elements
+// parser: "Tuple must contain at least two elements"
+fn foo(t: ()) -> Int {
+    return 0
+}
+println(foo(()))

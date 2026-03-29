@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: tuple indexed with a variable (must be integer literal)
+let t = (10, 20, 30)
+let i = 0
+println(t[i])

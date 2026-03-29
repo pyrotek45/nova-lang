@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: greater-than comparison on strings (no __gt__ for String)
+fn test() -> Bool {
+    return "abc" > "def"
+}
+println(test())

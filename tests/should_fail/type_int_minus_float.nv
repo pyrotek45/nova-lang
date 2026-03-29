@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: subtract Float from Int (type mismatch)
+fn test() -> Int {
+    return 10 - 3.0
+}
+println(test())
