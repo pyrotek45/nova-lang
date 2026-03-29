@@ -1,0 +1,20 @@
+module type_dyn_field_access_returns_wrong_type
+
+import super.std.core
+
+dyn HasAge {
+    age: Int,
+}
+
+struct Person {
+    age: Int,
+    name: String,
+}
+
+fn get_name(h: Dyn(HasAge)) -> String {
+    // 'age' is an Int in the contract, not a String
+    return h.age
+}
+
+let p = Person { age: 25, name: "Alice" }
+get_name(p)

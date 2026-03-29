@@ -1,0 +1,15 @@
+module syntax_while_let_wrong_body_type
+
+import super.std.core
+
+// while-let body must not type-error
+fn get_opt() -> Option(Int) {
+    return Some(42)
+}
+
+let acc = 0
+let opt = get_opt()
+while let v = opt {
+    acc = acc + "oops"
+    opt = None(Int)
+}

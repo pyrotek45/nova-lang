@@ -1,0 +1,11 @@
+module fn_generic_param_count_wrong
+
+import super.std.core
+
+struct Pair(A, B) {
+    first: $A,
+    second: $B,
+}
+
+// Pair needs 2 type params, we supply 1
+let p: Pair(Int) = Pair { first: 1, second: "x" }

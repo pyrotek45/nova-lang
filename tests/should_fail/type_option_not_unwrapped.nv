@@ -1,0 +1,11 @@
+module type_call_with_option_not_unwrapped
+
+import super.std.core
+
+// Passing Option(Int) where Int is expected — not unwrapped
+fn double(x: Int) -> Int {
+    return x * 2
+}
+
+let opt = Some(21)
+double(opt)

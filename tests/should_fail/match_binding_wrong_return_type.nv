@@ -1,0 +1,17 @@
+module match_wrong_binding_type
+
+import super.std.core
+
+enum Payload {
+    Data: Int,
+}
+
+// Try to use binding as String when it's Int
+fn extract(p: Payload) -> String {
+    match p {
+        Data(x) => { return x }
+    }
+    return ""
+}
+
+extract(Payload::Data(10))

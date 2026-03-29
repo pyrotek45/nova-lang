@@ -1,0 +1,8 @@
+module fn_void_used_as_value
+
+import super.std.core
+
+// Void return used in expression
+fn nothing() {}
+
+let x = nothing() + 1

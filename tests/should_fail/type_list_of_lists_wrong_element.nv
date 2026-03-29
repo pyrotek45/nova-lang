@@ -1,0 +1,7 @@
+module type_list_of_lists_wrong_element
+
+import super.std.core
+
+// List of Int-lists but we try to assign a String-list element
+let matrix = [[1, 2, 3], [4, 5, 6]]
+matrix[0] = ["a", "b", "c"]

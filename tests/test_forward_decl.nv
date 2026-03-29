@@ -1,0 +1,118 @@
+module test_forward_decl
+
+// ---- Forward declaration enables mutual recursion ----
+// Both functions declared first, then implemented, then called
+fn is_even(n: Int) -> Bool
+fn is_odd(n: Int) -> Bool
+
+fn is_even(n: Int) -> Bool {
+    if n == 0 { return true }
+    return is_odd(n - 1)
+}
+
+fn is_odd(n: Int) -> Bool {
+    if n == 0 { return false }
+    return is_even(n - 1)
+}
+
+assert(is_even(0) == true,  "mutual fwd: 0 is even")
+assert(is_odd(0) == false,  "mutual fwd: 0 not odd")
+assert(is_even(6) == true,  "mutual fwd: 6 is even")
+assert(is_odd(7) == true,   "mutual fwd: 7 is odd")
+assert(is_even(11) == false, "mutual fwd: 11 not even")
+assert(is_odd(4) == false,  "mutual fwd: 4 not odd")
+
+// ---- Forward decl enables using fn before its impl in another fn ----
+fn square(n: Int) -> Int
+
+fn sum_of_squares(a: Int, b: Int) -> Int {
+    return square(a) + square(b)
+}
+
+fn square(n: Int) -> Int {
+    return n * n
+}
+
+assert(sum_of_squares(3, 4) == 25, "forward decl used in fn before impl: 9+16=25")
+assert(square(7) == 49, "square direct call: 49")
+
+// ---- Three-way mutual recursion ----
+fn mod3_zero(n: Int) -> Bool
+fn mod3_one(n: Int) -> Bool
+fn mod3_two(n: Int) -> Bool
+
+fn mod3_zero(n: Int) -> Bool {
+    if n == 0 { return true }
+    return mod3_two(n - 1)
+}
+fn mod3_one(n: Int) -> Bool {
+    if n == 0 { return false }
+    return mod3_zero(n - 1)
+}
+fn mod3_two(n: Int) -> Bool {
+    if n == 0 { return false }
+    return mod3_one(n - 1)
+}
+
+assert(mod3_zero(0) == true,  "3-way mut rec: 0%3==0")
+assert(mod3_zero(3) == true,  "3-way mut rec: 3%3==0")
+assert(mod3_zero(6) == true,  "3-way mut rec: 6%3==0")
+assert(mod3_one(1)  == true,  "3-way mut rec: 1%3==1")
+assert(mod3_one(4)  == true,  "3-way mut rec: 4%3==1")
+assert(mod3_two(2)  == true,  "3-way mut rec: 2%3==2")
+assert(mod3_two(5)  == true,  "3-way mut rec: 5%3==2")
+
+// ---- Forward decl with String return ----
+fn greet(name: String) -> String
+
+fn greet_caller() -> String {
+    return greet("World")
+}
+
+fn greet(name: String) -> String {
+    return "Hello, " + name + "!"
+}
+
+assert(greet_caller() == "Hello, World!", "forward decl string fn via wrapper")
+assert(greet("Nova") == "Hello, Nova!", "greet direct call")
+
+// ---- Multiple forward decls resolved later, used in wrapper ----
+fn add_one(x: Int) -> Int
+fn sub_one(x: Int) -> Int
+
+fn ping_pong(n: Int, steps: Int) -> Int {
+    if steps == 0 { return n }
+    if steps % 2 == 0 { return add_one(ping_pong(n, steps - 1)) }
+    return sub_one(ping_pong(n, steps - 1))
+}
+
+fn add_one(x: Int) -> Int { return x + 1 }
+fn sub_one(x: Int) -> Int { return x - 1 }
+
+assert(ping_pong(10, 0) == 10, "ping_pong 0 steps")
+assert(ping_pong(10, 2) == 10, "ping_pong 2 steps (net 0)")
+assert(ping_pong(10, 4) == 10, "ping_pong 4 steps (net 0)")
+
+// ---- Collatz via mutual fwd decl ----
+fn collatz_even(n: Int) -> Int
+fn collatz_odd(n: Int) -> Int
+
+fn collatz_steps(n: Int) -> Int {
+    if n == 1 { return 0 }
+    if n % 2 == 0 { return 1 + collatz_even(n) }
+    return 1 + collatz_odd(n)
+}
+
+fn collatz_even(n: Int) -> Int {
+    return collatz_steps(n / 2)
+}
+fn collatz_odd(n: Int) -> Int {
+    return collatz_steps(n * 3 + 1)
+}
+
+assert(collatz_steps(1) == 0, "collatz(1)=0")
+assert(collatz_steps(2) == 1, "collatz(2)=1")
+assert(collatz_steps(4) == 2, "collatz(4)=2")
+assert(collatz_steps(6) == 8, "collatz(6)=8")
+
+println("PASS: test_forward_decl")

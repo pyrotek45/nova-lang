@@ -1,0 +1,12 @@
+module fn_forward_decl_wrong_signature
+
+import super.std.core
+
+// Forward declare with one signature, implement with different return type
+fn compute(x: Int) -> Int
+
+fn compute(x: Int) -> String {
+    return "wrong"
+}
+
+compute(5)

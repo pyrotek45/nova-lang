@@ -1,0 +1,10 @@
+module syntax_slice_non_int_step
+
+import super.std.core
+
+// Step of slice must be Int, not Bool
+fn bad_step_slice() {
+    let xs = [1, 2, 3, 4, 5]
+    let s = xs[0:5$true]
+}
+bad_step_slice()

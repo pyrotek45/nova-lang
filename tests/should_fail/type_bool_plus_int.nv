@@ -1,0 +1,6 @@
+module type_add_bool_to_int
+
+import super.std.core
+
+// Bool + Int is not supported
+let x = true + 1

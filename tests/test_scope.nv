@@ -84,4 +84,52 @@ mutate()
 mutate()
 assert(state.value == 2, "closure mutates captured")
 
+// ---- Shadowing in nested function ----
+let shadow = 10
+fn inner_shadow() -> Int {
+    let shadow = 99
+    return shadow
+}
+assert(inner_shadow() == 99, "function local shadows outer")
+assert(shadow == 10, "outer unaffected by fn shadow")
+
+// ---- Block scope: variable defined inside block not needed after ----
+let block_result = 0
+if true {
+    let tmp = 42
+    block_result = tmp * 2
+}
+assert(block_result == 84, "block scope: tmp used inside, result outside")
+
+// ---- Multiple loops each with their own scope ----
+let loop1_sum = 0
+for let i = 0; i < 3; i += 1 {
+    let v1 = i + 10
+    loop1_sum += v1
+}
+let loop2_sum = 0
+for let j = 0; j < 3; j += 1 {
+    let v2 = j * 100
+    loop2_sum += v2
+}
+assert(loop1_sum == 33, "loop1 scope: (10+11+12)=33")
+assert(loop2_sum == 300, "loop2 scope: (0+100+200)=300")
+
+// ---- Closure captures correct variable (not aliased) ----
+let val_a = Box(1)
+let val_b = Box(2)
+let get_a = || val_a.value
+let get_b = || val_b.value
+val_a.value = 100
+val_b.value = 200
+assert(get_a() == 100, "closure captures val_a by ref")
+assert(get_b() == 200, "closure captures val_b by ref")
+
+// ---- Global scope: function sees top-level ----
+let global_const = 42
+fn read_global() -> Int {
+    return global_const
+}
+assert(read_global() == 42, "function reads global_const")
+
 println("PASS: test_scope")

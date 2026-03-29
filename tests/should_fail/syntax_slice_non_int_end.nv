@@ -1,0 +1,11 @@
+module syntax_slice_non_int_end
+
+import super.std.core
+
+// End of slice must be Int, not Float
+fn bad_end_slice() {
+    let xs = [1, 2, 3, 4, 5]
+    let e = 3.0
+    let s = xs[1:e]
+}
+bad_end_slice()

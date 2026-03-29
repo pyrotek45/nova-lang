@@ -1,0 +1,8 @@
+module type_list_push_wrong_type
+
+import super.std.core
+import super.std.list
+
+// Push wrong type onto typed list
+let xs = [1, 2, 3]
+xs.push("hello")

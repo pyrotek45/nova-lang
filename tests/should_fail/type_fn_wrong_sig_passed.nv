@@ -1,0 +1,14 @@
+module type_fn_param_fn_wrong_sig
+
+import super.std.core
+
+// HOF expects fn(Int)->String but caller passes fn(Int)->Int
+fn transform(f: fn(Int) -> String, x: Int) -> String {
+    return f(x)
+}
+
+fn bad_fn(n: Int) -> Int {
+    return n * 2
+}
+
+transform(bad_fn, 5)

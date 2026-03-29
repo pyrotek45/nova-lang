@@ -1,0 +1,7 @@
+module type_tuple_wrong_element_type_access
+
+import super.std.core
+
+// Tuple contains (Int, String). Use [0] as String - type mismatch in usage.
+let t = (42, "hello")
+let x: String = t[0]

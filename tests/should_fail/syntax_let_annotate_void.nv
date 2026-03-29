@@ -1,0 +1,7 @@
+module syntax_let_annotation_void
+
+import super.std.core
+
+// Cannot annotate a let as Void
+fn noop() {}
+let x: Void = noop()

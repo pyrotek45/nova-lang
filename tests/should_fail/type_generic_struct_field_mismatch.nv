@@ -1,0 +1,10 @@
+module type_wrong_generic_arg
+
+import super.std.core
+
+struct Wrapper(T) {
+    value: $T,
+}
+
+// Wrapper expects one type param, but we pass wrong type to field
+let w: Wrapper(Int) = Wrapper { value: "hello" }

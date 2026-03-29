@@ -1,0 +1,8 @@
+module type_tuple_none_element
+
+import super.std.core
+
+// Tuple elements must not be None/Void
+fn make_void() {}
+
+let bad_tuple = (make_void(), 42)

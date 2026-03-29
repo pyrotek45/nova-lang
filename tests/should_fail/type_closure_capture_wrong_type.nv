@@ -1,0 +1,10 @@
+module type_closure_captures_wrong_type
+
+import super.std.core
+
+// Closure tries to use captured Int as String
+let num = 42
+let bad = || {
+    let s: String = num
+}
+bad()

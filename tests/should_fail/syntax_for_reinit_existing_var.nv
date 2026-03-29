@@ -1,0 +1,8 @@
+module syntax_for_c_style_wrong_init_type
+
+import super.std.core
+
+// C-style for loop init variable redeclared in same scope
+let i = 99
+for let i = 0; i < 10; i += 1 {
+}

@@ -117,4 +117,99 @@ let mp = make_point(11, 22)
 assert(mp.x == 11, "struct from function x")
 assert(mp.y == 22, "struct from function y")
 
+// ---- Struct with multiple extends methods ----
+struct Circle {
+    radius: Int,
+}
+fn extends area_approx(self: Circle) -> Int {
+    // approximate pi=3 for simplicity
+    return 3 * self.radius * self.radius
+}
+fn extends scale(self: Circle, factor: Int) -> Circle {
+    return Circle { radius: self.radius * factor }
+}
+fn extends diameter(self: Circle) -> Int {
+    return self.radius * 2
+}
+let c = Circle { radius: 5 }
+assert(c.area_approx() == 75, "circle area approx: 3*5*5=75")
+assert(c.diameter() == 10, "circle diameter: 2*5=10")
+let big_c = c.scale(3)
+assert(big_c.radius == 15, "circle scale 3: radius=15")
+assert(big_c.diameter() == 30, "scaled circle diameter=30")
+
+// ---- Struct with list field ----
+struct Team {
+    name: String,
+    scores: [Int],
+}
+fn extends team_total(self: Team) -> Int {
+    let total = 0
+    for s in self.scores {
+        total += s
+    }
+    return total
+}
+fn extends team_best(self: Team) -> Int {
+    let best = self.scores[0]
+    for s in self.scores {
+        if s > best { best = s }
+    }
+    return best
+}
+let t = Team { name: "Nova", scores: [10, 25, 18, 30, 5] }
+assert(t.team_total() == 88, "team total: 10+25+18+30+5=88")
+assert(t.team_best() == 30, "team best: 30")
+assert(t.name == "Nova", "team name")
+
+// ---- Deeply nested struct access ----
+struct Engine {
+    horsepower: Int,
+}
+struct Car {
+    model: String,
+    engine: Engine,
+}
+struct Fleet {
+    cars: [Car],
+}
+let fleet = Fleet {
+    cars: [
+        Car { model: "A", engine: Engine { horsepower: 100 } },
+        Car { model: "B", engine: Engine { horsepower: 200 } },
+        Car { model: "C", engine: Engine { horsepower: 150 } },
+    ]
+}
+assert(fleet.cars[0].engine.horsepower == 100, "deep nested access car 0")
+assert(fleet.cars[1].model == "B", "deep nested model B")
+assert(fleet.cars[2].engine.horsepower == 150, "deep nested access car 2")
+
+// ---- Struct field update propagates ----
+struct Counter {
+    count: Int,
+}
+fn extends inc_c(self: Counter) {
+    self.count += 1
+}
+fn extends reset_c(self: Counter) {
+    self.count = 0
+}
+let ctr = Counter { count: 0 }
+ctr.inc_c()
+ctr.inc_c()
+ctr.inc_c()
+assert(ctr.count == 3, "struct field update via extends: count=3")
+ctr.reset_c()
+assert(ctr.count == 0, "struct reset: count=0")
+
+// ---- Struct passed by reference, mutated in fn ----
+fn scale_point(p: Point, factor: Int) {
+    p.x = p.x * factor
+    p.y = p.y * factor
+}
+let sp = Point(3, 4)
+scale_point(sp, 10)
+assert(sp.x == 30, "struct mutated by fn: x=30")
+assert(sp.y == 40, "struct mutated by fn: y=40")
+
 println("PASS: test_structs")

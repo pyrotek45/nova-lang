@@ -91,4 +91,84 @@ assert(actions[0]::execute(5) == 6, "struct fn field 0")
 assert(actions[1]::execute(5) == 10, "struct fn field 1")
 assert(actions[2]::execute(5) == 25, "struct fn field 2")
 
+// ---- Pipeline: map then filter then manual fold ----
+let pipeline_input = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let pipe_mapped = pipeline_input.map(|x: Int| x * x)
+let pipe_filtered = pipe_mapped.filter(|x: Int| x > 10)
+// squares > 10: 16,25,36,49,64,81,100 => sum=371
+let pipe_sum = Box(0)
+pipe_filtered.foreach(|x: Int| { pipe_sum.value += x })
+assert(pipe_sum.value == 371, "pipeline map/filter/fold")
+
+// ---- Repeat application: apply n times ----
+fn apply_n(f: fn(Int) -> Int, x: Int, n: Int) -> Int {
+    if n == 0 { return x }
+    return apply_n(f, f(x), n - 1)
+}
+let double_fn = |x: Int| x * 2
+assert(apply_n(double_fn, 1, 0) == 1, "apply_n 0 times")
+assert(apply_n(double_fn, 1, 1) == 2, "apply_n 1 time")
+assert(apply_n(double_fn, 1, 8) == 256, "apply_n 8 times: 2^8=256")
+let inc_fn = |x: Int| x + 1
+assert(apply_n(inc_fn, 0, 100) == 100, "apply_n inc 100 times")
+
+// ---- Memoize-like: function that returns a new fn ----
+fn clamp_fn(lo: Int, hi: Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int {
+        if x < lo { return lo }
+        if x > hi { return hi }
+        return x
+    }
+}
+let clamp_0_10 = clamp_fn(0, 10)
+assert(clamp_0_10(-5) == 0,  "clamp lo")
+assert(clamp_0_10(5) == 5,   "clamp mid")
+assert(clamp_0_10(20) == 10, "clamp hi")
+
+let clamp_neg5_5 = clamp_fn(-5, 5)
+assert(clamp_neg5_5(-10) == -5, "clamp negative lo")
+assert(clamp_neg5_5(0) == 0,   "clamp zero")
+assert(clamp_neg5_5(10) == 5,  "clamp negative hi")
+
+// ---- zip_with HOF ----
+fn zip_with(xs: [Int], ys: [Int], f: fn(Int, Int) -> Int) -> [Int] {
+    let result = []: Int
+    let len = if xs.len() < ys.len() { xs.len() } else { ys.len() }
+    for let i = 0; i < len; i += 1 {
+        result.push(f(xs[i], ys[i]))
+    }
+    return result
+}
+let zipped = zip_with([1, 2, 3], [10, 20, 30], |a: Int, b: Int| a + b)
+assert(zipped[0] == 11, "zip_with[0]=11")
+assert(zipped[1] == 22, "zip_with[1]=22")
+assert(zipped[2] == 33, "zip_with[2]=33")
+
+let zipped_prod = zip_with([2, 3, 4], [5, 6, 7], |a: Int, b: Int| a * b)
+assert(zipped_prod[0] == 10, "zip_with prod[0]=10")
+assert(zipped_prod[2] == 28, "zip_with prod[2]=28")
+
+// ---- unfold: generate list from seed ----
+fn unfold(seed: Int, next: fn(Int) -> Int, stop: fn(Int) -> Bool, limit: Int) -> [Int] {
+    let result = []: Int
+    let current = seed
+    let count = 0
+    while count < limit {
+        if stop(current) { break }
+        result.push(current)
+        current = next(current)
+        count += 1
+    }
+    return result
+}
+let naturals = unfold(0, |x: Int| x + 1, |x: Int| x >= 5, 10)
+assert(naturals.len() == 5, "unfold: naturals 0..4 len=5")
+assert(naturals[0] == 0, "unfold: nat[0]=0")
+assert(naturals[4] == 4, "unfold: nat[4]=4")
+
+let powers2 = unfold(1, |x: Int| x * 2, |x: Int| x > 64, 10)
+assert(powers2.len() == 7, "unfold: powers of 2 up to 64 len=7")
+assert(powers2[0] == 1,  "unfold: pow2[0]=1")
+assert(powers2[6] == 64, "unfold: pow2[6]=64")
+
 println("PASS: test_higher_order")

@@ -88,4 +88,137 @@ fn extends show(x: String) -> String {
 assert(42.show() == "Int: 42", "overloaded show int")
 assert("hi".show() == "String: hi", "overloaded show string")
 
+// ---- Generic function with multiple type params ----
+fn swap(pair: ($A, $B)) -> ($B, $A) {
+    return (pair[1], pair[0])
+}
+let swapped_int_str = swap((1, "one"))
+assert(swapped_int_str[0] == "one", "swap first is String")
+assert(swapped_int_str[1] == 1, "swap second is Int")
+
+let swapped_bools = swap((true, false))
+assert(swapped_bools[0] == false, "swap bool first")
+assert(swapped_bools[1] == true, "swap bool second")
+
+// ---- Generic reduce ----
+fn extends gfold(xs: [$A], init: $B, func: fn($B, $A) -> $B) -> $B {
+    let acc = init
+    for x in xs {
+        acc = func(acc, x)
+    }
+    return acc
+}
+
+let sum_fold = [1, 2, 3, 4, 5].gfold(0, |acc: Int, x: Int| acc + x)
+assert(sum_fold == 15, "gfold sum 1..5=15")
+
+let product_fold = [1, 2, 3, 4, 5].gfold(1, |acc: Int, x: Int| acc * x)
+assert(product_fold == 120, "gfold product 1..5=120")
+
+let join_strs = ["a", "b", "c", "d"].gfold("", |acc: String, s: String| acc + s)
+assert(join_strs == "abcd", "gfold join strings")
+
+// ---- Generic filter ----
+fn extends gfilter(xs: [$A], pred: fn($A) -> Bool) -> [$A] {
+    let result = []: $A
+    for x in xs {
+        if pred(x) {
+            result.push(x)
+        }
+    }
+    return result
+}
+
+let big_nums = [1,2,3,4,5,6,7,8,9,10].gfilter(|x: Int| x > 5)
+assert(big_nums.len() == 5, "gfilter big nums len 5")
+assert(big_nums[0] == 6, "gfilter[0]=6")
+
+let long_strs = ["a","bb","ccc","dd","eeeee"].gfilter(|s: String| s.len() > 2)
+assert(long_strs.len() == 2, "gfilter long strings len 2")
+assert(long_strs[0] == "ccc", "gfilter long[0]=ccc")
+
+// ---- Generic nested struct ----
+struct Stack(T) {
+    items: [$T],
+}
+
+fn extends push_s(s: Stack($T), item: $T) -> Stack($T) {
+    s.items.push(item)
+    return s
+}
+
+fn extends pop_s(s: Stack($T)) -> Option($T) {
+    if s.items.len() == 0 { return None($T) }
+    let last = s.items[s.items.len() - 1]
+    s.items = s.items[0:s.items.len()-1]
+    return Some(last)
+}
+
+fn extends peek_s(s: Stack($T)) -> Option($T) {
+    if s.items.len() == 0 { return None($T) }
+    return Some(s.items[s.items.len() - 1])
+}
+
+let int_stack = Stack { items: []: Int }
+int_stack.push_s(10)
+int_stack.push_s(20)
+int_stack.push_s(30)
+assert(int_stack.peek_s().isSome(), "stack peek Some")
+assert(int_stack.peek_s().unwrap() == 30, "stack peek top=30")
+let popped = int_stack.pop_s()
+assert(popped.isSome(), "stack pop Some")
+assert(popped.unwrap() == 30, "stack pop value=30")
+assert(int_stack.peek_s().unwrap() == 20, "stack peek after pop=20")
+
+let str_stack = Stack { items: []: String }
+str_stack.push_s("hello")
+str_stack.push_s("world")
+assert(str_stack.peek_s().unwrap() == "world", "str stack peek=world")
+
+// ---- Generic HOF composition ----
+fn extends gmap(xs: [$A], func: fn($A) -> $B) -> [$B] {
+    let result = []: $B
+    for x in xs {
+        result.push(func(x))
+    }
+    return result
+}
+
+// map then fold
+let sq_sum = [1,2,3,4,5].gmap(|x: Int| x * x).gfold(0, |acc: Int, x: Int| acc + x)
+assert(sq_sum == 55, "gmap-then-gfold: 1+4+9+16+25=55")
+
+// map strings to lengths, then filter > 3
+let words = ["hi", "hello", "hey", "howdy", "ha"]
+let long_word_lens = words.gmap(|w: String| w.len()).gfilter(|n: Int| n > 3)
+assert(long_word_lens.len() == 2, "map+filter long words: 5,5 = 2")
+assert(long_word_lens[0] == 5, "long_word_lens[0]=5")
+
+// ---- Generic recursion ----
+fn extends glast(xs: [$A]) -> Option($A) {
+    if xs.len() == 0 { return None($A) }
+    return Some(xs[xs.len() - 1])
+}
+
+assert([1,2,3].glast().unwrap() == 3, "glast int 3")
+assert(["a","b","c"].glast().unwrap() == "c", "glast string c")
+assert(([]: Int).glast().isSome() == false, "glast empty None")
+
+// ---- Triple generic struct ----
+struct Triple(A, B, C) {
+    a: $A,
+    b: $B,
+    c: $C,
+}
+
+let t = Triple { a: 1, b: "two", c: true }
+assert(t.a == 1, "triple a=1")
+assert(t.b == "two", "triple b=two")
+assert(t.c == true, "triple c=true")
+
+let t2 = Triple { a: 3.14, b: 42, c: "pi" }
+assert(t2.a > 3.0, "triple2 a>3.0")
+assert(t2.b == 42, "triple2 b=42")
+assert(t2.c == "pi", "triple2 c=pi")
+
 println("PASS: test_generics")

@@ -107,4 +107,163 @@ fn is_ok(r: MyResult(Int, String)) -> Bool {
 assert(is_ok(ok), "Result is Ok")
 assert(!is_ok(err), "Result is Err")
 
+// ---- Enum in struct field ----
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+
+struct User {
+    name: String,
+    status: Status,
+}
+
+let u1 = User { name: "Alice", status: Status::Active() }
+let u2 = User { name: "Bob", status: Status::Inactive() }
+let u3 = User { name: "Charlie", status: Status::Pending() }
+
+fn status_label(u: User) -> String {
+    match u.status {
+        Active() => { return "active" }
+        Inactive() => { return "inactive" }
+        Pending() => { return "pending" }
+    }
+    return "unknown"
+}
+assert(status_label(u1) == "active", "enum in struct Active")
+assert(status_label(u2) == "inactive", "enum in struct Inactive")
+assert(status_label(u3) == "pending", "enum in struct Pending")
+
+// ---- Enum in list ----
+let colors = [Color::Red(), Color::Green(), Color::Blue(), Color::Red()]
+assert(colors.len() == 4, "enum list length")
+assert(color_name(colors[0]) == "Red", "enum list[0] Red")
+assert(color_name(colors[1]) == "Green", "enum list[1] Green")
+assert(color_name(colors[3]) == "Red", "enum list[3] Red")
+
+// Count specific variant in list
+fn count_red(cs: [Color]) -> Int {
+    let count = 0
+    for c in cs {
+        match c {
+            Red() => { count += 1 }
+            _ => {}
+        }
+    }
+    return count
+}
+assert(count_red(colors) == 2, "count_red = 2")
+assert(count_red([Color::Green(), Color::Blue()]) == 0, "count_red none = 0")
+
+// ---- Chained match with accumulator ----
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn coin_value(c: Coin) -> Int {
+    match c {
+        Penny() => { return 1 }
+        Nickel() => { return 5 }
+        Dime() => { return 10 }
+        Quarter() => { return 25 }
+    }
+    return 0
+}
+
+let coins = [Coin::Quarter(), Coin::Dime(), Coin::Nickel(), Coin::Penny(), Coin::Quarter()]
+let total_cents = 0
+for coin in coins {
+    total_cents += coin_value(coin)
+}
+assert(total_cents == 66, "coins total: 25+10+5+1+25=66")
+
+// ---- Enum with nested data (tuple payload) ----
+let circle2 = Shape::Circle(3.14)
+let rect2 = Shape::Rectangle((5.0, 2.0))
+
+fn area_approx(s: Shape) -> Float {
+    match s {
+        Circle(r) => { return r * r * 3.14 }
+        Rectangle(dims) => { return dims[0] * dims[1] }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+// circle: 3.14 * 3.14 * 3.14 ~= 30.96
+assert(area_approx(circle2) > 30.0, "circle area > 30")
+assert(area_approx(circle2) < 32.0, "circle area < 32")
+assert(area_approx(rect2) == 10.0, "rectangle area 5*2=10")
+assert(area_approx(Shape::Point()) == 0.0, "point area 0")
+
+// ---- Match with default arm catches all ----
+fn color_or_other(col: Color) -> String {
+    match col {
+        Red() => { return "red" }
+        _ => { return "other" }
+    }
+    return ""
+}
+assert(color_or_other(Color::Red()) == "red", "match default Red")
+assert(color_or_other(Color::Green()) == "other", "match default Green")
+assert(color_or_other(Color::Blue()) == "other", "match default Blue")
+
+// ---- Enum extends methods ----
+fn extends to_hex(c: Color) -> String {
+    match c {
+        Red() => { return "#FF0000" }
+        Green() => { return "#00FF00" }
+        Blue() => { return "#0000FF" }
+    }
+    return "#000000"
+}
+assert(Color::Red().to_hex() == "#FF0000", "extends on enum Red")
+assert(Color::Green().to_hex() == "#00FF00", "extends on enum Green")
+assert(Color::Blue().to_hex() == "#0000FF", "extends on enum Blue")
+
+// ---- Generic Maybe chained operations ----
+let just42 = Maybe::Just(42)
+let nothing42 = Maybe::Nothing() @[A: Int]
+
+fn maybe_double(m: Maybe(Int)) -> Maybe(Int) {
+    match m {
+        Just(x) => { return Maybe::Just(x * 2) }
+        Nothing() => { return Maybe::Nothing() @[A: Int] }
+    }
+    return Maybe::Nothing() @[A: Int]
+}
+
+let doubled = maybe_double(just42)
+assert(is_just(doubled), "maybe_double Just isSome")
+assert(get_value(doubled) == 84, "maybe_double value 84")
+
+let doubled_nothing = maybe_double(nothing42)
+assert(!is_just(doubled_nothing), "maybe_double Nothing stays Nothing")
+
+// ---- Nested enum match ----
+enum Outer {
+    Wrap: Maybe(Int),
+}
+
+fn unwrap_outer(o: Outer) -> Int {
+    match o {
+        Wrap(inner) => {
+            match inner {
+                Just(v) => { return v }
+                Nothing() => { return -1 }
+            }
+            return -1
+        }
+    }
+    return -1
+}
+
+let outer_just = Outer::Wrap(Maybe::Just(99))
+let outer_nothing = Outer::Wrap(Maybe::Nothing() @[A: Int])
+assert(unwrap_outer(outer_just) == 99, "nested enum match Just")
+assert(unwrap_outer(outer_nothing) == -1, "nested enum match Nothing")
+
 println("PASS: test_enums")

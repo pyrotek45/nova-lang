@@ -1,0 +1,7 @@
+module syntax_reassign_wrong_type
+
+import super.std.core
+
+// Reassign a variable to a different type
+let x = 42
+x = "hello"

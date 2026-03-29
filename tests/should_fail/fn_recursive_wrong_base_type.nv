@@ -1,0 +1,13 @@
+module fn_recursive_with_wrong_base_type
+
+import super.std.core
+
+// Recursive fn returns String on base but Int on recursive case
+fn bad_fib(n: Int) -> Int {
+    if n <= 1 {
+        return "base"
+    }
+    return bad_fib(n - 1) + bad_fib(n - 2)
+}
+
+bad_fib(5)
