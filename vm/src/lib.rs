@@ -70,36 +70,6 @@ impl Vm {
                 instruction => self.dispatch(instruction)?,
             }
         }
-        // self.state.memory.collect();
-        println!("");
-        let mut counts = HashMap::new();
-        println!("Stack:");
-        for (i, item) in self.state.memory.stack.iter().enumerate() {
-            if let VmData::Object(index) = item {
-                counts.insert(*index, counts.get(index).unwrap_or(&0) + 1);
-
-                let object = self.state.memory.ref_from_heap(*index as usize).unwrap();
-                for i in object.data.iter() {
-                    if let VmData::Object(index) = i {
-                        counts.insert(*index, counts.get(index).unwrap_or(&0) + 1);
-                    }
-                }
-            }
-            println!("{}: {:?}", i, item);
-        }
-        println!("\nHeap:");
-        for (i, item) in self.state.memory.heap.iter().enumerate() {
-            if item.is_none() {
-                continue;
-            }
-            println!(
-                "Count: {} -> {}; {}: {:?}",
-                counts.get(&i).unwrap_or(&0),
-                item.as_ref().unwrap().ref_count,
-                i,
-                item
-            );
-        }
         Ok(())
     }
 
@@ -822,6 +792,187 @@ impl Vm {
             //         }
             //     }
             // }
+            // NEWSTRUCT: pop N field values + N field name strings + struct name string
+            // Stack layout (top first): field_name_N, ..., field_name_1, field_val_N, ..., field_val_1
+            // The struct name is encoded as a STRING pushed right before the field names
+            Code::NEWSTRUCT => {
+                let num_fields = u64::from_le_bytes(self.state.next_arr()) as usize;
+
+                // Pop the struct name string
+                let struct_name = match self.state.memory.stack.pop() {
+                    Some(VmData::Object(idx)) => {
+                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
+                        let name = obj.as_string().unwrap_or_default();
+                        self.state.memory.dec(idx);
+                        name
+                    }
+                    _ => String::new(),
+                };
+
+                // Pop field names (they are strings on the heap)
+                let mut field_names = Vec::with_capacity(num_fields);
+                for _ in 0..num_fields {
+                    match self.state.memory.stack.pop() {
+                        Some(VmData::Object(idx)) => {
+                            let obj = self.state.memory.ref_from_heap(idx).unwrap();
+                            let name = obj.as_string().unwrap_or_default();
+                            self.state.memory.dec(idx);
+                            field_names.push(name);
+                        }
+                        _ => field_names.push(String::new()),
+                    }
+                }
+                field_names.reverse();
+
+                // Pop field values
+                let mut field_values = Vec::with_capacity(num_fields);
+                for _ in 0..num_fields {
+                    if let Some(value) = self.state.memory.stack.pop() {
+                        field_values.push(value);
+                    }
+                }
+                field_values.reverse();
+
+                // Build the table (field_name -> index in data)
+                let mut table = std::collections::HashMap::new();
+                for (i, name) in field_names.iter().enumerate() {
+                    table.insert(name.clone(), i);
+                }
+
+                // Create the struct object
+                let obj = Object {
+                    object_type: memory_manager::ObjectType::Struct(struct_name),
+                    table,
+                    data: field_values,
+                };
+                let idx = self.state.memory.allocate(obj);
+                self.state.memory.stack.push(VmData::Object(idx));
+            }
+
+            // GETF: pop field_name (string), pop object -> push object.data[table[field_name]]
+            Code::GETF => {
+                let (Some(field_name_val), Some(object_val)) =
+                    (self.state.memory.stack.pop(), self.state.memory.stack.pop())
+                else {
+                    return Err(NovaError::Runtime {
+                        msg: "GETF: not enough arguments".into(),
+                    });
+                };
+
+                // Get field name string
+                let field_name = match field_name_val {
+                    VmData::Object(idx) => {
+                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
+                        let name = obj.as_string().unwrap_or_default();
+                        self.state.memory.dec(idx);
+                        name
+                    }
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: "GETF: field name must be a string".into(),
+                        });
+                    }
+                };
+
+                match object_val {
+                    VmData::Object(obj_idx) => {
+                        let heap_obj = self.state.memory.ref_from_heap(obj_idx).unwrap();
+                        if let Some(value) = heap_obj.get(&field_name) {
+                            self.state.memory.push(value);
+                        } else {
+                            if let Some(pos) = self
+                                .runtime_errors_table
+                                .get(&self.state.current_instruction)
+                            {
+                                return Err(NovaError::RuntimeWithPos {
+                                    msg: format!("Field '{}' not found", field_name).into(),
+                                    position: pos.clone(),
+                                });
+                            }
+                            return Err(NovaError::Runtime {
+                                msg: format!("Field '{}' not found", field_name).into(),
+                            });
+                        }
+                        self.state.memory.dec(obj_idx);
+                    }
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: "GETF: expected an object".into(),
+                        });
+                    }
+                }
+            }
+
+            // PINF: pop object, pop field_name (string), pop value -> object.data[table[field_name]] = value
+            Code::PINF => {
+                let (Some(object_val), Some(field_name_val), Some(value)) = (
+                    self.state.memory.stack.pop(),
+                    self.state.memory.stack.pop(),
+                    self.state.memory.stack.pop(),
+                ) else {
+                    return Err(NovaError::Runtime {
+                        msg: "PINF: not enough arguments".into(),
+                    });
+                };
+
+                // Get field name string
+                let field_name = match field_name_val {
+                    VmData::Object(idx) => {
+                        let obj = self.state.memory.ref_from_heap(idx).unwrap();
+                        let name = obj.as_string().unwrap_or_default();
+                        self.state.memory.dec(idx);
+                        name
+                    }
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: "PINF: field name must be a string".into(),
+                        });
+                    }
+                };
+
+                match object_val {
+                    VmData::Object(obj_idx) => {
+                        // Look up the field index
+                        let field_idx = {
+                            let heap_obj = self.state.memory.ref_from_heap(obj_idx).unwrap();
+                            heap_obj.table.get(&field_name).copied()
+                        };
+                        if let Some(idx) = field_idx {
+                            // Dec old value, set new value
+                            let old_value = {
+                                let heap_obj =
+                                    self.state.memory.ref_from_heap_mut(obj_idx).unwrap();
+                                let old = heap_obj.data[idx];
+                                heap_obj.data[idx] = value;
+                                old
+                            };
+                            self.state.memory.dec_value(old_value);
+                        } else {
+                            if let Some(pos) = self
+                                .runtime_errors_table
+                                .get(&self.state.current_instruction)
+                            {
+                                return Err(NovaError::RuntimeWithPos {
+                                    msg: format!("Field '{}' not found for assignment", field_name)
+                                        .into(),
+                                    position: pos.clone(),
+                                });
+                            }
+                            return Err(NovaError::Runtime {
+                                msg: format!("Field '{}' not found for assignment", field_name)
+                                    .into(),
+                            });
+                        }
+                        self.state.memory.dec(obj_idx);
+                    }
+                    _ => {
+                        return Err(NovaError::Runtime {
+                            msg: "PINF: expected an object".into(),
+                        });
+                    }
+                }
+            }
+
             error => {
                 dbg!(error);
             }

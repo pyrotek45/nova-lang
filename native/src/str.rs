@@ -1,19 +1,28 @@
-use std::rc::Rc;
-
 use common::error::NovaError;
-use vm::state::{self, Heap, VmData};
+use vm::memory_manager::{ObjectType, VmData};
+use vm::state;
 
 pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
-    match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index) {
-            Heap::String(str) => {
-                state.stack.push(VmData::Int(str.len() as i64));
-                Ok(())
+    match state.memory.stack.pop() {
+        Some(VmData::Object(index)) => {
+            if let Some(obj) = state.memory.ref_from_heap(index) {
+                if let Some(s) = obj.as_string() {
+                    state.memory.stack.push(VmData::Int(s.len() as i64));
+                    // dec ref since we popped without going through memory.pop()
+                    state.memory.dec(index);
+                    Ok(())
+                } else {
+                    state.memory.dec(index);
+                    Err(NovaError::Runtime {
+                        msg: "Expected a string object".into(),
+                    })
+                }
+            } else {
+                Err(NovaError::Runtime {
+                    msg: "Invalid heap reference".into(),
+                })
             }
-            _ => Err(NovaError::Runtime {
-                msg: "Expected a string in the heap".into(),
-            }),
-        },
+        }
         Some(_) => Err(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
         }),
@@ -24,23 +33,26 @@ pub fn strlen(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
-    match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index).clone() {
-            Heap::String(str) => {
-                state.gclock = true;
-                let mut myarray = vec![];
-                for c in str.chars() {
-                    myarray.push(state.allocate_vmdata_to_heap(VmData::Char(c)));
+    match state.memory.stack.pop() {
+        Some(VmData::Object(index)) => {
+            if let Some(obj) = state.memory.ref_from_heap(index) {
+                if let Some(s) = obj.as_string() {
+                    let chars: Vec<VmData> = s.chars().map(VmData::Char).collect();
+                    state.memory.dec(index);
+                    state.memory.push_list(chars);
+                    Ok(())
+                } else {
+                    state.memory.dec(index);
+                    Err(NovaError::Runtime {
+                        msg: "Expected a string object".into(),
+                    })
                 }
-                let index = state.allocate_array(myarray);
-                state.stack.push(VmData::List(index));
-                state.gclock = false;
-                Ok(())
+            } else {
+                Err(NovaError::Runtime {
+                    msg: "Invalid heap reference".into(),
+                })
             }
-            _ => Err(NovaError::Runtime {
-                msg: "Expected a string in the heap".into(),
-            }),
-        },
+        }
         Some(_) => Err(NovaError::Runtime {
             msg: "Expected a string on the stack".into(),
         }),
@@ -51,7 +63,7 @@ pub fn str_to_chars(state: &mut state::State) -> Result<(), NovaError> {
 }
 
 pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
-    let data = match state.stack.pop() {
+    let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
@@ -61,7 +73,7 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let index = match data {
-        VmData::List(index) => index,
+        VmData::Object(index) => index,
         _ => {
             return Err(NovaError::Runtime {
                 msg: "Expected a list on the stack".into(),
@@ -69,38 +81,40 @@ pub fn chars_to_str(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
 
-    let array = match state.get_ref(index).clone() {
-        Heap::List(array) => array,
-        _ => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a list in the heap".into(),
-            })
+    let chars_string = {
+        let obj = state.memory.ref_from_heap(index).ok_or(NovaError::Runtime {
+            msg: "Invalid heap reference".into(),
+        })?;
+        match &obj.object_type {
+            ObjectType::List => {
+                let mut s = String::new();
+                for item in &obj.data {
+                    match item {
+                        VmData::Char(c) => s.push(*c),
+                        _ => {
+                            return Err(NovaError::Runtime {
+                                msg: "Expected a char in the list".into(),
+                            })
+                        }
+                    }
+                }
+                s
+            }
+            _ => {
+                return Err(NovaError::Runtime {
+                    msg: "Expected a list object".into(),
+                })
+            }
         }
     };
 
-    state.gclock = true;
-    let mut str = String::new();
-    for item in array.iter() {
-        let char = state.get_ref(*item);
-        match char {
-            Heap::Char(c) => str.push(*c),
-            _ => {
-                state.gclock = false;
-                return Err(NovaError::Runtime {
-                    msg: "Expected a char in the list".into(),
-                });
-            }
-        }
-    }
-    let index = state.allocate_string(str.into());
-    state.stack.push(VmData::String(index));
-    state.gclock = false;
-
+    state.memory.dec(index);
+    state.memory.push_string(chars_string);
     Ok(())
 }
 
 pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
-    let data = match state.stack.pop() {
+    let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
@@ -109,51 +123,27 @@ pub fn to_string(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
 
-    let string: Rc<str> = match data {
-        VmData::StackAddress(v) => format!("Stack pointer: {v}").into(),
-        VmData::Function(v) => format!("function pointer: {v}").into(),
-        VmData::Closure(v) => format!("closure pointer: {v}").into(),
-        VmData::Int(v) => format!("{v}").into(),
-        VmData::Float(v) => format!("{v}").into(),
-        VmData::Bool(v) => format!("{v}").into(),
-        VmData::Char(v) => format!("{v}").into(),
-        VmData::List(v) => {
-            let mut sbuild = String::new();
-            if let Heap::List(array) = state.get_ref(v) {
-                sbuild += "[";
-                for (index, item) in array.iter().enumerate() {
-                    if index > 0 {
-                        sbuild += ", ";
-                    }
-                    sbuild += &format!("{}", state.get_ref(*item));
-                }
-                sbuild += "]";
-            } else {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a list in the heap".into(),
-                });
-            }
-            sbuild.into()
+    let string: String = match data {
+        VmData::StackAddress(v) => format!("Stack pointer: {v}"),
+        VmData::Function(v) => format!("function pointer: {v}"),
+        VmData::Int(v) => format!("{v}"),
+        VmData::Float(v) => format!("{v}"),
+        VmData::Bool(v) => format!("{v}"),
+        VmData::Char(v) => format!("{v}"),
+        VmData::Object(v) => {
+            let s = state.memory.print_heap_object(v, 0);
+            state.memory.dec(v);
+            s
         }
-        VmData::Struct(v) => format!("Struct pointer: {v}").into(),
-        VmData::String(v) => {
-            let Heap::String(s) = state.get_ref(v) else {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".into(),
-                });
-            };
-            s.clone()
-        }
-        VmData::None => "None".into(),
+        VmData::None => "None".to_string(),
     };
 
-    let index = state.allocate_string(string);
-    state.stack.push(VmData::String(index));
+    state.memory.push_string(string);
     Ok(())
 }
 
 pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
-    let data = match state.stack.pop() {
+    let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
@@ -163,8 +153,8 @@ pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let int = match data {
-        VmData::Int(value) => value, // Already an integer, no conversion needed
-        VmData::Float(value) => value as i64, // Convert float to integer
+        VmData::Int(value) => value,
+        VmData::Float(value) => value as i64,
         VmData::Bool(value) => {
             if value {
                 1
@@ -176,29 +166,36 @@ pub fn to_int(state: &mut state::State) -> Result<(), NovaError> {
             if let Ok(parsed) = value.to_string().parse::<i64>() {
                 parsed
             } else {
-                state.stack.push(VmData::None);
+                state.memory.stack.push(VmData::None);
                 return Ok(());
             }
         }
-        VmData::String(v) => {
-            if let Heap::String(str) = state.get_ref(v) {
-                if let Ok(parsed) = str.parse::<i64>() {
-                    parsed
+        VmData::Object(v) => {
+            if let Some(obj) = state.memory.ref_from_heap(v) {
+                if let Some(s) = obj.as_string() {
+                    state.memory.dec(v);
+                    if let Ok(parsed) = s.parse::<i64>() {
+                        parsed
+                    } else {
+                        state.memory.stack.push(VmData::None);
+                        return Ok(());
+                    }
                 } else {
-                    state.stack.push(VmData::None);
+                    state.memory.dec(v);
+                    state.memory.stack.push(VmData::None);
                     return Ok(());
                 }
             } else {
-                state.stack.push(VmData::None);
+                state.memory.stack.push(VmData::None);
                 return Ok(());
             }
         }
         _ => {
-            state.stack.push(VmData::None);
+            state.memory.stack.push(VmData::None);
             return Ok(());
         }
     };
 
-    state.stack.push(VmData::Int(int));
+    state.memory.stack.push(VmData::Int(int));
     Ok(())
 }

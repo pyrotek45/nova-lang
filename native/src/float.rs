@@ -1,9 +1,9 @@
 use common::error::NovaError;
-use vm::state::Heap;
-use vm::state::{self, VmData};
+use vm::memory_manager::VmData;
+use vm::state;
 
 pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
-    let data = match state.stack.pop() {
+    let data = match state.memory.stack.pop() {
         Some(data) => data,
         None => {
             return Err(NovaError::Runtime {
@@ -12,8 +12,8 @@ pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
     let float = match data {
-        VmData::Int(value) => value as f64, // Convert integer to float
-        VmData::Float(value) => value,      // Already a float, no conversion needed
+        VmData::Int(value) => value as f64,
+        VmData::Float(value) => value,
         VmData::Bool(value) => {
             if value {
                 1.0
@@ -25,28 +25,33 @@ pub fn int_to_float(state: &mut state::State) -> Result<(), NovaError> {
             if let Ok(parsed) = value.to_string().parse::<f64>() {
                 parsed
             } else {
-                state.stack.push(VmData::None);
+                state.memory.stack.push(VmData::None);
                 return Ok(());
             }
         }
-        VmData::String(v) => {
-            if let Heap::String(str) = state.get_ref(v) {
-                if let Ok(parsed) = str.parse::<f64>() {
-                    parsed
+        VmData::Object(v) => {
+            if let Some(obj) = state.memory.ref_from_heap(v) {
+                if let Some(s) = obj.as_string() {
+                    if let Ok(parsed) = s.parse::<f64>() {
+                        parsed
+                    } else {
+                        state.memory.stack.push(VmData::None);
+                        return Ok(());
+                    }
                 } else {
-                    state.stack.push(VmData::None);
+                    state.memory.stack.push(VmData::None);
                     return Ok(());
                 }
             } else {
-                state.stack.push(VmData::None);
+                state.memory.stack.push(VmData::None);
                 return Ok(());
             }
         }
         _ => {
-            state.stack.push(VmData::None);
+            state.memory.stack.push(VmData::None);
             return Ok(());
         }
     };
-    state.stack.push(VmData::Float(float));
+    state.memory.stack.push(VmData::Float(float));
     Ok(())
 }

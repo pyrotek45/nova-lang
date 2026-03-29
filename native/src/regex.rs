@@ -1,50 +1,36 @@
 use common::error::NovaError;
-use vm::state::{self, Heap, VmData};
+use vm::memory_manager::{Object, VmData};
+use vm::state;
+
+/// Helper to pop a string Object from the stack and return the String value.
+/// Decrements the reference count of the Object.
+fn pop_string(state: &mut state::State) -> Result<String, NovaError> {
+    match state.memory.stack.pop() {
+        Some(VmData::Object(index)) => {
+            let s = state
+                .memory
+                .ref_from_heap(index)
+                .and_then(|obj| obj.as_string())
+                .ok_or(NovaError::Runtime {
+                    msg: "Expected a string in the heap".into(),
+                })?;
+            state.memory.dec(index);
+            Ok(s)
+        }
+        Some(_) => Err(NovaError::Runtime {
+            msg: "Expected a string on the stack".into(),
+        }),
+        None => Err(NovaError::Runtime {
+            msg: "Stack is empty".into(),
+        }),
+    }
+}
 
 pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
-    let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index).clone() {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".into(),
-            })
-        }
-    };
+    let text = pop_string(state)?;
+    let pattern = pop_string(state)?;
 
-    let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index) {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".into(),
-            })
-        }
-    };
-
-    let re = match regex::Regex::new(pattern) {
+    let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -54,56 +40,15 @@ pub fn regex_match(state: &mut state::State) -> Result<(), NovaError> {
     };
 
     let result = re.is_match(&text);
-    state.stack.push(VmData::Bool(result));
+    state.memory.stack.push(VmData::Bool(result));
     Ok(())
 }
 
-// make a function that returns captures from a regex match as a list of strings
 pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
-    let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index).clone() {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".into(),
-            })
-        }
-    };
+    let text = pop_string(state)?;
+    let pattern = pop_string(state)?;
 
-    let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index) {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".into(),
-            })
-        }
-    };
-    // need to continue to run the regex to capture all patterns in the text
-
-    let re = match regex::Regex::new(pattern) {
+    let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -112,74 +57,26 @@ pub fn regex_captures(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
 
-    state.gclock = true;
-    let mut myarray = vec![];
     let captures: Vec<String> = re
         .find_iter(&text)
         .map(|m| m.as_str().to_string())
         .collect();
-    //dbg!(&text, &pattern, &captures);
-    for i in 0..captures.len() {
-        let capture = match captures.get(i) {
-            Some(capture) => capture.as_str(),
-            None => "",
-        };
-        let string_pos = state.allocate_string(capture.into());
-        myarray.push(state.allocate_vmdata_to_heap(VmData::String(string_pos)));
+
+    let mut list_data = vec![];
+    for capture in captures {
+        let str_idx = state.memory.allocate(Object::string(capture));
+        list_data.push(VmData::Object(str_idx));
     }
 
-    let index = state.allocate_array(myarray);
-    state.stack.push(VmData::List(index));
-    state.gclock = false;
+    state.memory.push_list(list_data);
     Ok(())
 }
 
-// make a function that returns first capture from a regex match as a string and returns both index and string
 pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
-    let text = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index).clone() {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string().into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string().into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string().into(),
-            })
-        }
-    };
+    let text = pop_string(state)?;
+    let pattern = pop_string(state)?;
 
-    let pattern = match state.stack.pop() {
-        Some(VmData::String(index)) => match state.get_ref(index) {
-            Heap::String(str) => str,
-            _ => {
-                return Err(NovaError::Runtime {
-                    msg: "Expected a string in the heap".to_string().into(),
-                })
-            }
-        },
-        Some(_) => {
-            return Err(NovaError::Runtime {
-                msg: "Expected a string on the stack".to_string().into(),
-            })
-        }
-        None => {
-            return Err(NovaError::Runtime {
-                msg: "Stack is empty".to_string().into(),
-            })
-        }
-    };
-    // need to continue to run the regex to capture all patterns in the text
-
-    let re = match regex::Regex::new(pattern) {
+    let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
         Err(e) => {
             return Err(NovaError::Runtime {
@@ -188,32 +85,25 @@ pub fn regex_first(state: &mut state::State) -> Result<(), NovaError> {
         }
     };
 
-    state.gclock = true;
     let captures = re.find(&text);
 
-    // if no captures return none
     if captures.is_none() {
-        state.stack.push(VmData::None);
-        state.gclock = false;
+        state.memory.stack.push(VmData::None);
         return Ok(());
     }
-    // unwrap captures
-    let captures = captures.unwrap();
-    //dbg!(captures);
-    // create a list of (int, int , string) to return
-    let (start, end, str) = (
-        captures.start(),
-        captures.end(),
-        captures.as_str().to_string(),
-    );
 
-    let string_pos = state.allocate_string(str.into());
-    let start_pos = state.allocate_vmdata_to_heap(VmData::Int(start as i64));
-    let end_pos = state.allocate_vmdata_to_heap(VmData::Int(end as i64));
-    let string_pos = state.allocate_vmdata_to_heap(VmData::String(string_pos));
-    let myarray = vec![start_pos, end_pos, string_pos];
-    let index = state.allocate_array(myarray);
-    state.stack.push(VmData::List(index));
-    state.gclock = false;
+    let captures = captures.unwrap();
+    let start = captures.start() as i64;
+    let end = captures.end() as i64;
+    let matched_str = captures.as_str().to_string();
+
+    // Create a tuple (start, end, string) as a list [Int, Int, Object(String)]
+    let str_idx = state.memory.allocate(Object::string(matched_str));
+    let list_data = vec![
+        VmData::Int(start),
+        VmData::Int(end),
+        VmData::Object(str_idx),
+    ];
+    state.memory.push_list(list_data);
     Ok(())
 }

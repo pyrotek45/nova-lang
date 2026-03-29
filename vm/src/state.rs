@@ -1,4 +1,20 @@
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use crate::memory_manager::{MemoryManager, VmData};
+use raylib::prelude::*;
+
+#[derive(Debug, Clone)]
+pub enum Draw {
+    Text(String, i32, i32, i32, Color),
+    FPS(i32, i32),
+    Rectangle(i32, i32, i32, i32, Color),
+    Circle(i32, i32, f32, Color),
+    Line(i32, i32, i32, i32, Color),
+    ClearBackground(Color),
+    Sprite(usize, i32, i32),
+}
 
 #[derive(Debug, Clone)]
 pub enum CallType {
@@ -6,7 +22,6 @@ pub enum CallType {
     Closure { target: usize, closure: usize },
 }
 
-#[derive(Debug, Clone)]
 pub struct State {
     pub memory: MemoryManager,
     pub program: Vec<u8>,
@@ -14,6 +29,40 @@ pub struct State {
     pub current_instruction: usize,
     pub offset: usize,
     pub window: Vec<usize>,
+    pub raylib: Option<Rc<RefCell<RaylibHandle>>>,
+    pub raylib_thread: Option<RaylibThread>,
+    pub draw_queue: Vec<Draw>,
+    pub sprites: Vec<Rc<Texture2D>>,
+    pub current_dir: PathBuf,
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("State")
+            .field("program_len", &self.program.len())
+            .field("current_instruction", &self.current_instruction)
+            .field("offset", &self.offset)
+            .field("raylib", &self.raylib.is_some())
+            .finish()
+    }
+}
+
+impl Clone for State {
+    fn clone(&self) -> Self {
+        State {
+            memory: self.memory.clone(),
+            program: self.program.clone(),
+            callstack: self.callstack.clone(),
+            current_instruction: self.current_instruction,
+            offset: self.offset,
+            window: self.window.clone(),
+            raylib: self.raylib.clone(),
+            raylib_thread: None,
+            draw_queue: self.draw_queue.clone(),
+            sprites: self.sprites.clone(),
+            current_dir: self.current_dir.clone(),
+        }
+    }
 }
 
 impl State {
@@ -25,6 +74,11 @@ impl State {
             offset: 0,
             window: vec![],
             memory: MemoryManager::new(10_000),
+            raylib: None,
+            raylib_thread: None,
+            draw_queue: vec![],
+            sprites: vec![],
+            current_dir: PathBuf::new(),
         }
     }
 

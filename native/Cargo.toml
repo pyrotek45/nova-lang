@@ -11,3 +11,4 @@ common = { path = "../common" }
 vm = { path = "../vm"}
 rand = "0.8.5"
 regex = "1.11.1"
+raylib = "5.0.2"

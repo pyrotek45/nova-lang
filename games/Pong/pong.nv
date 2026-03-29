@@ -1,0 +1,159 @@
+module pong
+
+import super.super.std.math
+
+let width = 800
+let height = 600
+
+raylib::init("pong", width, height, 60)
+
+let paddle_width = 20
+let paddle_height = 100
+let paddle_speed = 6
+
+let ball_size = 20
+let ball_speed = 5
+
+let paddle1 = (10, height / 2 - paddle_height / 2)
+let paddle2 = (width - 10 - paddle_width, height / 2 - paddle_height / 2)
+
+let ball = (width / 2 - ball_size / 2, height / 2 - ball_size / 2)
+let ball_velocity = (ball_speed, ball_speed)
+
+let score = (0, 0)
+
+struct Timer {
+    lifetime: Float,
+}
+
+fn extends set(timer: Timer, time: Float) {
+    timer.lifetime = time
+}
+
+fn extends update(timer: Timer) {
+    timer.lifetime -= raylib::getFrameTime()
+}
+
+fn extends isDone(timer: Timer) -> Bool {
+    return timer.lifetime <= 0.0 
+}
+
+fn extends reset(timer: Timer) {
+    timer.lifetime = 0.0
+}
+
+let timer = Timer { lifetime: 5.0 }
+
+while raylib::rendering() {
+    raylib::clear((0, 0, 0))
+    // draw paddles , to access a tuple use []
+    raylib::drawRectangle(paddle1[0], paddle1[1], paddle_width, paddle_height, (255, 255, 255))
+    raylib::drawRectangle(paddle2[0], paddle2[1], paddle_width, paddle_height, (255, 255, 255))
+
+    // draw ball
+    raylib::drawRectangle(ball[0], ball[1], ball_size, ball_size, (255, 255, 255))
+
+    // move paddles
+    if raylib::isKeyPressed("KEY_UP") {
+        paddle1[1] -= paddle_speed
+    }
+    if raylib::isKeyPressed("KEY_DOWN") {
+        paddle1[1] += paddle_speed
+    }
+
+    // move paddle 2 is ai
+    if ball[1] < paddle2[1] {
+        paddle2[1] -= paddle_speed + 2
+    }
+    if ball[1] > paddle2[1] {
+        paddle2[1] += paddle_speed + 2
+    }
+
+    // move ball
+    ball[0] += ball_velocity[0]
+    ball[1] += ball_velocity[1]
+
+    // check for collision with paddles
+    if ball[0] < paddle1[0] + paddle_width
+    && ball[0] + ball_size > paddle1[0]
+    && ball[1] < paddle1[1] + paddle_height
+    && ball[1] + ball_size > paddle1[1] {
+        ball_velocity[0] = -ball_velocity[0]
+        ball[0] = paddle1[0] + paddle_width  // move ball outside paddle
+    }
+
+    if ball[0] < paddle2[0] + paddle_width
+    && ball[0] + ball_size > paddle2[0]
+    && ball[1] < paddle2[1] + paddle_height
+    && ball[1] + ball_size > paddle2[1] {
+        ball_velocity[0] = -ball_velocity[0]
+        ball[0] = paddle2[0] - ball_size  // move ball outside paddle
+    }
+
+    // check for collision with top and bottom
+    if ball[1] < 0 || ball[1] + ball_size > height {
+        ball_velocity[1] = -ball_velocity[1]
+    }
+
+    // check for scoring
+    if ball[0] < 0 {
+        score[1] += 1
+        ball = (width / 2 - ball_size / 2, height / 2 - ball_size / 2)
+        // reset ball speed
+        ball_velocity = (ball_speed, ball_speed)
+        // reset timer
+        timer.set(5.0)
+    }
+    if ball[0] + ball_size > width {
+        score[0] += 1
+        ball = (width / 2 - ball_size / 2, height / 2 - ball_size / 2)
+        // reset ball speed
+        ball_velocity = (ball_speed, ball_speed)
+        // reset timer 
+        timer.set(5.0)
+    }
+
+    // draw score
+    let scoreString = format("Player: {} AI: {}", Cast::string(score[0]), Cast::string(score[1]))
+    // top left
+    raylib::drawText(scoreString, 10, 10, 20, (255, 255, 255))
+
+    // clamp paddles
+    paddle1[1] = paddle1[1].clamp(0, height - paddle_height)
+    paddle2[1] = paddle2[1].clamp(0, height - paddle_height)
+
+    // clamp ball
+    ball[1] = ball[1].clamp(0, height - ball_size)
+    ball[0] = ball[0].clamp(0, width - ball_size)
+
+    // check for game over
+    if score[0] == 5 || score[1] == 5 {
+        score = (0, 0)
+    }
+
+    // draw outline with drawLine 
+    raylib::drawLine(width / 2, 0, width / 2, height, (255, 255, 255))
+
+    // update timer
+    timer.update()
+
+    // check if timer is done
+    if timer.isDone() {
+        timer.set(5.0)
+        // speed up the ball after 5 seconds
+        if ball_velocity[0] < 0 {
+            ball_velocity[0] -= 1
+        } else {
+            ball_velocity[0] += 1
+        }
+
+        if ball_velocity[1] < 0 {
+            ball_velocity[1] -= 1
+        } else {
+            ball_velocity[1] += 1
+        }
+    }
+
+    // debug print ball velocity
+    // println(ball_velocity)
+}

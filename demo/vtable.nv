@@ -1,0 +1,148 @@
+module vtable
+
+// Struct definitions
+struct Person {
+    age: Int,
+    name: String
+}
+
+struct Other {
+    name: String
+}
+
+struct H(T) {
+    name: $T,
+    thing: Int
+}
+
+struct Button {
+    text: String,
+    draw: fn(Button)
+}
+
+struct Text {
+    text: String,
+    age: Int,
+    draw: fn(Text),
+    name: String
+}
+
+struct Image {
+    content: String,
+    draw: fn(Image)
+}
+
+// Type definitions
+type drawable = Dyn(T = draw: fn($T))
+
+
+// Function definitions
+fn test(t: Dyn(T = name: String)) {
+    println(t.name)
+}
+
+fn extends render(items: [drawable]) {
+    for item in items {
+        item->draw()
+    }
+}
+
+fn multi(x: Dyn(T = age: Int + name: String)) {
+    println(x.age)
+}
+
+fn do(a: Dyn(T = name: $S)) -> $S {
+    return a.name
+}
+
+// Variable initializations
+let p = Person {
+    age: 42,
+    name: "Alice"
+}
+
+let o = Other {
+    name: "Bob"
+}
+
+let h = H {
+    name: "Charlie",
+    thing: 42
+}
+
+let b = Button {
+    text: "Click me",
+    draw: fn(self: Button) {
+        println("Button")
+    }
+}
+
+let t = Text {
+    name: "Bob",
+    age: 300,
+    text: "Hello",
+    draw: fn(self: Text) {
+        println("Text")
+    }
+}
+
+let i = Image {
+    content: "Image",
+    draw: fn(self: Image) {
+        println("Image")
+    }
+}
+
+
+// Renderables list
+let renderables = []: drawable
+
+// Adding items to renderables
+renderables.push(b)
+renderables.push(t)
+renderables.push(i)
+
+// Rendering items
+renderables.render()
+
+// Function calls
+test(p)
+test(o)
+test(h)
+
+multi(p)
+multi(t)
+
+println(do(t))
+
+
+// assignment
+
+struct A {
+    name: String
+}
+
+struct B {
+    age: Int,
+    name: String
+}
+
+fn changeName(a: Dyn(T = name: String)) {
+    a.name = "changed"
+}
+
+
+let a = A {
+    name: "A"
+}
+
+let q = B {
+    age: 42,
+    name: "B"
+}
+
+changeName(a)
+changeName(q)
+
+println(a.name)
+println(q.name)
