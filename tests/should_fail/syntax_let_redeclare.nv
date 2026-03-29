@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: let binding shadows/reinstantiates existing symbol
+let x = 10
+let x = 20
+println(x)

@@ -1,0 +1,15 @@
+module main
+
+// SHOULD FAIL: variable annotated with let as Dyn but assigned struct missing contract field
+struct Dog {
+    name: String,
+    breed: String
+}
+
+fn takes_named(x: Dyn(T = name: String, age: Int)) {
+    println(x.name)
+}
+
+let d = Dog { name: "Rex", breed: "Husky" }
+// Dog has 'name' but not 'age' — fails Dyn contract
+takes_named(d)

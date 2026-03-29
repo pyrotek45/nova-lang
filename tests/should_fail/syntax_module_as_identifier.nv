@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: use a module name as a variable identifier
+// parser: "Cannot use module as identifier"
+import super.std.core
+
+let core = 5
+println(core)

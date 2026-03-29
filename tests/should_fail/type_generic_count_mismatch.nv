@@ -1,0 +1,13 @@
+module main
+
+// SHOULD FAIL: struct generic type parameter count mismatch in annotation
+struct Triple(A, B, C) {
+    a: $A,
+    b: $B,
+    c: $C
+}
+
+// Only 2 type params given, Triple needs 3
+fn test(t: Triple(Int, String)) -> Int {
+    return t.a
+}

@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: calling a non-function value as a function
+let x = 42
+x()

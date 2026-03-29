@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: assign to a non-assignable expression (rhs of binop)
+fn foo() -> Int { return 1 }
+foo() + 1 = 5

@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: foreach over a non-list (Int)
+fn test() {
+    for x in 42 {
+        println(x)
+    }
+}
+test()

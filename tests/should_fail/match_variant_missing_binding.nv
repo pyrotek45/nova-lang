@@ -1,0 +1,11 @@
+module main
+
+// SHOULD FAIL: match variant with payload but missing identifier
+enum Wrapper { Value: Int, Empty }
+fn test(w: Wrapper) {
+    match w {
+        Value => { println("has value but no binding") }  // missing (id)
+        Empty => { println("empty") }
+    }
+}
+test(Wrapper::Value(42))

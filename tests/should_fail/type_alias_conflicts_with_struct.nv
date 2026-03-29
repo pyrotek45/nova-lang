@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: type alias redefines an existing struct name
+struct Foo {
+    x: Int
+}
+type Foo = Int
+println("unreachable")

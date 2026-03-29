@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: enum generic type not declared in name
+// e.g. enum Result { Ok: $T, Err: String } without Result(T)
+enum BadResult {
+    Ok: $T,
+    Err: String
+}

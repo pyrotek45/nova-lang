@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: list annotation type contradicts element type
+// [1, 2, 3]: String — annotated as String but elements are Int
+let xs = [1, 2, 3]: String
+println(xs)

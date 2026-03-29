@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: ~> (store expression) without a block
+fn get() -> Int { return 1 }
+let result = get() ~> x
+println(result)

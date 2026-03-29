@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: function called with too many arguments
+fn add(x: Int, y: Int) -> Int {
+    return x + y
+}
+println(add(1, 2, 3))

@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: fn extends on a module that doesn't exist
+fn mod(NonExistentModule) myFunc(x: Int) -> Int {
+    return x
+}

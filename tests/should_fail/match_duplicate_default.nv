@@ -1,0 +1,11 @@
+module main
+
+// SHOULD FAIL: match with duplicate default branch
+enum Dir { North, South }
+fn test(d: Dir) {
+    match d {
+        _ => { println("first default") }
+        _ => { println("second default") }
+    }
+}
+test(Dir::North())

@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: while-let binding variable that already exists
+let x: Option(Int) = Some(42)
+let v = 99
+while let v = x {
+    println(v)
+}

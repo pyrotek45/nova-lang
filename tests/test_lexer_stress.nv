@@ -165,4 +165,167 @@ let num_str = "12345"
 assert(num_str.len() == 5, "numeric string len")
 assert(num_str == "12345", "numeric string eq")
 
+// ---- All comparison operators ----
+assert(1 < 2, "lt")
+assert(2 > 1, "gt")
+assert(2 <= 2, "le eq")
+assert(3 <= 4, "le lt")
+assert(5 >= 5, "ge eq")
+assert(6 >= 5, "ge gt")
+assert(1 != 2, "ne")
+assert(!(1 != 1), "not ne")
+
+// ---- Integer edge cases ----
+let max_reasonable = 1000000000
+let min_reasonable = -1000000000
+assert(max_reasonable > 0, "large positive int")
+assert(min_reasonable < 0, "large negative int")
+assert(max_reasonable + min_reasonable == 0, "large ints cancel")
+
+// ---- Float edge cases ----
+let tiny = 0.000001
+let big_f = 999999.999999
+assert(tiny > 0.0, "tiny float positive")
+assert(big_f > 999999.0, "big float")
+assert(big_f - 999999.0 < 1.0, "big float fractional part")
+
+// ---- Mixed arithmetic precedence exhaustive ----
+assert(1 + 2 * 3 - 4 / 2 == 5, "prec: 1+6-2=5")
+assert(10 - 3 - 2 == 5, "left assoc subtraction")
+assert(10 / 2 / 1 == 5, "left assoc division")
+assert(2 * 3 * 4 == 24, "left assoc multiplication")
+assert(10 % 3 == 1, "modulo 10%3=1")
+assert(10 % 4 == 2, "modulo 10%4=2")
+assert(7 % 7 == 0, "modulo self = 0")
+
+// ---- Identifier with all valid chars ----
+let _private = 1
+let _123 = 2
+let abc123def = 3
+let ALLCAPS = 4
+let MixedCase = 5
+assert(_private == 1, "underscore prefix ident")
+assert(_123 == 2, "underscore+digit ident")
+assert(abc123def == 3, "alphanum ident")
+assert(ALLCAPS == 4, "all caps ident")
+assert(MixedCase == 5, "mixed case ident")
+
+// ---- Nested string operations ----
+fn str_reverse(s: String) -> String {
+    let cs = s.chars()
+    let result = []: Char
+    let len = cs.len()
+    for let i = len - 1; i >= 0; i -= 1 {
+        result.push(cs[i])
+    }
+    return result.string()
+}
+assert(str_reverse("hello") == "olleh", "str reverse hello")
+assert(str_reverse("abcde") == "edcba", "str reverse abcde")
+assert(str_reverse("") == "", "str reverse empty")
+assert(str_reverse("a") == "a", "str reverse single char")
+
+// ---- Deeply nested list operations ----
+let matrix = [[1,2,3],[4,5,6],[7,8,9]]
+assert(matrix.len() == 3, "matrix rows")
+assert(matrix[0].len() == 3, "matrix cols")
+assert(matrix[0][0] == 1, "matrix[0][0]=1")
+assert(matrix[1][1] == 5, "matrix[1][1]=5")
+assert(matrix[2][2] == 9, "matrix[2][2]=9")
+
+// Flatten by hand
+fn flatten(m: [[Int]]) -> [Int] {
+    let result = []: Int
+    for row in m {
+        for v in row {
+            result.push(v)
+        }
+    }
+    return result
+}
+let flat = flatten(matrix)
+assert(flat.len() == 9, "flatten len 9")
+assert(flat[0] == 1, "flatten[0]=1")
+assert(flat[4] == 5, "flatten[4]=5")
+assert(flat[8] == 9, "flatten[8]=9")
+
+// ---- Complex string escape roundtrips ----
+let tab_in_string = "col1\tcol2\tcol3"
+assert(tab_in_string.len() == 14, "tab-separated string len")
+
+let quotes_in_str = "He said \"hi\""
+assert(quotes_in_str.len() == 12, "embedded quotes len")
+
+let backslash_escape = "path\\to\\file"
+assert(backslash_escape.len() == 12, "backslash escape len")
+
+// ---- Number parsing edge cases ----
+let zero_int = 0
+let zero_float = 0.0
+assert(zero_int == 0, "zero int")
+assert(zero_float == 0.0, "zero float")
+// Arithmetic with zero
+assert(zero_int + 100 == 100, "zero + 100")
+assert(100 - zero_int == 100, "100 - zero")
+assert(zero_int * 9999 == 0, "zero * anything")
+assert(0.0 + 1.5 == 1.5, "float zero + 1.5")
+
+// ---- Long chains of boolean operations ----
+let b1 = true
+let b2 = false
+let b3 = true
+let b4 = false
+let b5 = true
+let chain = b1 && !b2 && b3 && !b4 && b5
+assert(chain, "long bool chain all satisfy")
+let chain2 = b1 || b2 || b3 || b4 || b5
+assert(chain2, "long bool or chain any true")
+let chain3 = b2 || b4
+assert(!chain3, "long bool or chain all false")
+
+// ---- Many local variables in one scope ----
+fn twenty_locals() -> Int {
+    let a = 1
+    let b = 2
+    let c = 3
+    let d = 4
+    let e = 5
+    let f = 6
+    let g = 7
+    let h = 8
+    let i = 9
+    let j = 10
+    let k = 11
+    let l = 12
+    let m = 13
+    let n = 14
+    let o = 15
+    let p = 16
+    let q = 17
+    let r = 18
+    let s = 19
+    let t = 20
+    return a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t
+}
+// 1+2+...+20 = 210
+assert(twenty_locals() == 210, "twenty locals sum 1-20=210")
+
+// ---- Operator tokens: all of them back to back ----
+let ops_test_a = 10
+let ops_test_b = 3
+assert(ops_test_a + ops_test_b == 13, "op +")
+assert(ops_test_a - ops_test_b == 7, "op -")
+assert(ops_test_a * ops_test_b == 30, "op *")
+assert(ops_test_a / ops_test_b == 3, "op / integer")
+assert(ops_test_a % ops_test_b == 1, "op %")
+assert(ops_test_a == ops_test_a, "op ==")
+assert(ops_test_a != ops_test_b, "op !=")
+assert(ops_test_a > ops_test_b, "op >")
+assert(ops_test_b < ops_test_a, "op <")
+assert(ops_test_a >= ops_test_a, "op >=")
+assert(ops_test_b <= ops_test_b, "op <=")
+assert(!false, "op !")
+assert(true && true, "op &&")
+assert(false || true, "op ||")
+
 println("PASS: test_lexer_stress")

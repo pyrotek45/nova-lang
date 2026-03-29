@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: parameter without type annotation (missing colon)
+fn bad(x Int) -> Int {
+    return x
+}
+println(bad(1))

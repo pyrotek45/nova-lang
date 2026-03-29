@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: list slice with non-Int start index
+let xs = [1, 2, 3, 4, 5]
+let s = "0"
+println(xs[s:3])

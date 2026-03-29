@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: function returns wrong type vs declared return type
+fn get_str() -> String {
+    return 42
+}
+println(get_str())

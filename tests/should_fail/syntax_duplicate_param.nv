@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: duplicate parameter name in function signature
+// parser: "parameter identifier already defined"
+fn bad(x: Int, x: Int) -> Int {
+    return x + x
+}
+println(bad(1, 2))

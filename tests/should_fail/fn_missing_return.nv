@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: fn missing return in non-void function
+fn always(x: Int) -> Int {
+    if x > 0 {
+        return x
+    }
+    // missing return for x <= 0 branch
+}
+println(always(5))

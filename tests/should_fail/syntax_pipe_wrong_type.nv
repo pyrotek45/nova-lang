@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: pipe operator passes wrong type to target function
+fn double_str(s: String) -> String {
+    return s + s
+}
+let result = 42 |> double_str()
+println(result)

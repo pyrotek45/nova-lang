@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: if-expr branches return different types
+// parser: "Both branches must return the same type"
+fn test(b: Bool) -> Int {
+    return if b { 1 } else { "hello" }
+}
+println(test(true))

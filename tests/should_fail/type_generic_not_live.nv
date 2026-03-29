@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: return type annotation uses an unknown custom type name
+// "Phantom" is not defined anywhere — should be a type error
+fn make() -> Phantom {
+    return 42
+}
+println(make())

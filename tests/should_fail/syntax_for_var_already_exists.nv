@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: for-loop identifier already exists in this scope
+let i = 99
+for i in 0..10 {
+    println(i)
+}

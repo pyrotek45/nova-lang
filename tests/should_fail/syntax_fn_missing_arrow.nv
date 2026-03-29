@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: function missing return arrow but has a return type token after a space
+// i.e. fn foo() Int { ... } — parser expects -> before the type
+fn foo() Int {
+    return 1
+}
+println(foo())

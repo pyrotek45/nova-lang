@@ -1,0 +1,15 @@
+module main
+
+// SHOULD FAIL: access field that is in the Dyn contract but does not exist on that path
+// The variable has type Dyn, then we try to access a field NOT in the contract
+struct Point {
+    x: Int,
+    y: Int
+}
+
+fn get_x(p: Dyn(T = x: Int)) -> Int {
+    return p.z  // z is not in the Dyn contract
+}
+
+let pt = Point { x: 3, y: 4 }
+println(get_x(pt))

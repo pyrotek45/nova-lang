@@ -1,0 +1,12 @@
+module main
+
+// SHOULD FAIL: match variant that doesn't exist in the enum
+enum Color { Red, Green, Blue }
+fn test(c: Color) {
+    match c {
+        Red => { println("red") }
+        Green => { println("green") }
+        Purple => { println("purple") }  // does not exist
+    }
+}
+test(Color::Red())

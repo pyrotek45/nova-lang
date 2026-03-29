@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: mixed types in list literal — all elements must be same type
+let xs = [1, 2, "three", 4]
+println(xs)

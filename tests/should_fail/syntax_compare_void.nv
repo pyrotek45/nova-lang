@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: compare void — relational op on void expression
+fn noop() {}
+let x = noop() > noop()
+println(x)

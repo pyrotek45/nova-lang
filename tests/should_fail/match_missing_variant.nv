@@ -1,0 +1,17 @@
+module main
+
+// SHOULD FAIL: match missing a variant (incomplete coverage, no default)
+enum Shape {
+    Circle: Float,
+    Square: Float,
+    Triangle: Float
+}
+
+fn test(s: Shape) {
+    match s {
+        Circle(r) => { println(r) }
+        Square(side) => { println(side) }
+        // Triangle is missing, no _ default
+    }
+}
+test(Shape::Circle(1.0))

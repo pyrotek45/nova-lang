@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: fn extends from a custom type that does not exist
+fn extends(MyFakeType) double(x: MyFakeType) -> MyFakeType {
+    return x
+}

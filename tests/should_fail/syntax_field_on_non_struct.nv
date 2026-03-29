@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: struct field access on a non-struct (plain Int)
+fn get(x: Int) -> Int {
+    return x.nonexistent
+}
+println(get(5))

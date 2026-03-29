@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: multiply String * Int (no __mul__ defined)
+fn test() -> String {
+    return "hello" * 3
+}
+println(test())

@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: fn closure (fn() -> T) declared without return when T is non-void
+// inner closure fn() -> Int with no return statement
+let f = fn() -> Int {
+    println("no return here")
+}
+println(f())

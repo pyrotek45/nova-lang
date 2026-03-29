@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: struct literal with extra (unknown) field
+struct Point {
+    x: Int,
+    y: Int
+}
+let p = Point { x: 1, y: 2, z: 3 }
+println(p.x)

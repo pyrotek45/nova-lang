@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: index a list with a non-Int (String used as index)
+let xs = [10, 20, 30]
+let idx = "0"
+println(xs[idx])

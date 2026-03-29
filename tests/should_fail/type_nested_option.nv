@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: nested Option type — Option(Option(Int)) not allowed
+fn bad() -> Option(Option(Int)) {
+    return None(Option(Int))
+}
+println(bad())

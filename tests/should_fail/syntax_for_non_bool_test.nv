@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: for-statement test expression is not Bool
+fn test() {
+    let i = 0
+    for let i = 0; i; i = i + 1 {
+        println(i)
+    }
+}
+test()

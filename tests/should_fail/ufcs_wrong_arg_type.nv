@@ -1,0 +1,12 @@
+module main
+
+// SHOULD FAIL: UFCS call passing wrong argument types to extends function
+struct Counter { count: Int }
+
+fn extends add_to(c: Counter, amount: Int) -> Counter {
+    return Counter { count: c.count + amount }
+}
+
+let c = Counter { count: 0 }
+// passing a String instead of Int
+println(c.add_to("five"))

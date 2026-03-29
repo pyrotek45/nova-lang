@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: list comprehension guard is not Bool
+// parser: "Guard must be a boolean"
+let xs = [1, 2, 3, 4, 5]
+let ys = [x | x in xs | x + 1]
+println(ys)

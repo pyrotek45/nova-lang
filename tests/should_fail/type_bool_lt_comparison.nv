@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: comparison less-than on Bool (no __lt__ for Bool)
+fn test() -> Bool {
+    return true < false
+}
+println(test())

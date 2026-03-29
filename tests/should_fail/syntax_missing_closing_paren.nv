@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: missing closing paren in function call argument list
+fn add(x: Int, y: Int) -> Int {
+    return x + y
+}
+println(add(1, 2)
