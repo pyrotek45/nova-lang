@@ -1,0 +1,9 @@
+module type_map_wrong_return_type
+
+import super.std.core
+import super.std.list
+
+// map closure returns wrong type — expects fn(Int)->B but closure typed wrong
+let xs = [1, 2, 3]
+// This closure takes Int but returns Void (no return value expression)
+let bad = xs.map(|x: Int| {})

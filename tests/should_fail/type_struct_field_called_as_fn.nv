@@ -1,0 +1,11 @@
+module type_struct_field_used_as_fn
+
+import super.std.core
+
+struct Counter {
+    count: Int,
+}
+
+let c = Counter { count: 0 }
+// count is an Int field, not callable
+c.count()

@@ -1,0 +1,15 @@
+module fn_extends_wrong_return_from_generic
+
+import super.std.core
+
+struct Box2(T) {
+    val: $T,
+}
+
+// Return type is wrong - returns Int instead of $T
+fn extends extract_wrong(b: Box2($T)) -> String {
+    return b.val
+}
+
+let b = Box2 { val: 42 }
+let _ = b.extract_wrong()

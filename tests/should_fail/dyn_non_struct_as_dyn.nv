@@ -1,0 +1,15 @@
+module dyn_non_struct_as_dyn
+
+import super.std.core
+
+// Cannot use Dyn contract on a non-struct (Int is not a struct)
+struct Named {
+    name: String,
+}
+
+dyn HasName {
+    name: String,
+}
+
+// Int does not implement HasName
+let val: Dyn(HasName) = 42

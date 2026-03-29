@@ -1,0 +1,8 @@
+module syntax_pipe_void_result
+
+import super.std.core
+
+// Piping into a function that returns Void, then using result
+fn consume(x: Int) {}
+
+let result = 42 |> consume |> Cast::string

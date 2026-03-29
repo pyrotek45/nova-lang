@@ -81,4 +81,113 @@ assert(gen() == 1, "generator 1")
 assert(gen() == 2, "generator 2")
 assert(gen() == 3, "generator 3")
 
+// ---- Closures stored in a list ----
+fn make_multiplier(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x * n
+}
+let multipliers = [make_multiplier(1), make_multiplier(2), make_multiplier(3)]
+assert(multipliers[0](10) == 10, "closure list [0](10)")
+assert(multipliers[1](10) == 20, "closure list [1](10)")
+assert(multipliers[2](10) == 30, "closure list [2](10)")
+
+// ---- Closure capturing struct ----
+struct Config {
+    base: Int,
+    scale: Int,
+}
+let cfg = Config { base: 100, scale: 3 }
+let apply_config = fn(x: Int) -> Int {
+    return cfg.base + x * cfg.scale
+}
+assert(apply_config(0) == 100, "closure captures struct base")
+assert(apply_config(5) == 115, "closure captures struct scaled")
+assert(apply_config(10) == 130, "closure captures struct scaled 10")
+
+// ---- Multi-level currying ----
+fn curry3(f: fn(Int, Int, Int) -> Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {
+    return fn(a: Int) -> fn(Int) -> fn(Int) -> Int {
+        return fn(b: Int) -> fn(Int) -> Int {
+            return fn(c: Int) -> Int {
+                return f(a, b, c)
+            }
+        }
+    }
+}
+fn add3(a: Int, b: Int, c: Int) -> Int { return a + b + c }
+let curried3 = curry3(add3@(Int, Int, Int))
+assert(curried3(1)(2)(3) == 6, "3-level curry 1+2+3=6")
+assert(curried3(10)(20)(30) == 60, "3-level curry 10+20+30=60")
+
+// Partially apply first arg
+let add_ten = curried3(10)
+let add_ten_twenty = add_ten(20)
+assert(add_ten_twenty(5) == 35, "partial application 3-level")
+
+// ---- Closure composition ----
+fn compose2(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return |x: Int| f(g(x))
+}
+let negate = |x: Int| -x
+let abs_fn = |x: Int| if x < 0 { -x } else { x }
+let square_fn = |x: Int| x * x
+let add_one = |x: Int| x + 1
+
+let neg_then_abs = compose2(abs_fn, negate)
+assert(neg_then_abs(5) == 5, "compose: abs(-5) = 5")
+assert(neg_then_abs(-3) == 3, "compose: abs(-(-3)) = 3")
+
+let sq_then_add1 = compose2(add_one, square_fn)
+assert(sq_then_add1(4) == 17, "compose: (4^2)+1=17")
+assert(sq_then_add1(0) == 1, "compose: (0^2)+1=1")
+
+// Chain 3 compositions
+let triple_compose = compose2(add_one, compose2(square_fn, add_one))
+// triple_compose(3) = add_one(square_fn(add_one(3))) = add_one(16) = 17
+assert(triple_compose(3) == 17, "triple compose (3+1)^2+1=17")
+
+// ---- Closures sharing Box via HOF ----
+struct CounterTriple {
+    get: fn() -> Int,
+    inc: fn() -> Int,
+    reset: fn() -> Int,
+}
+
+fn make_shared_counter() -> CounterTriple {
+    let s = Box(0)
+    let get = fn() -> Int { return s.value }
+    let inc = fn() -> Int { s.value += 1; return s.value }
+    let reset = fn() -> Int { s.value = 0; return s.value }
+    return CounterTriple { get: get, inc: inc, reset: reset }
+}
+
+let ct = make_shared_counter()
+assert(ct::get() == 0, "shared counter start 0")
+ct::inc()
+ct::inc()
+ct::inc()
+assert(ct::get() == 3, "shared counter after 3 incs")
+ct::reset()
+assert(ct::get() == 0, "shared counter after reset")
+
+// ---- Recursive closure emulated via Box ----
+// Closures can't directly recurse, but we can use Box(fn) pattern via named fn
+fn fact_helper(n: Int, acc: Int) -> Int {
+    if n <= 1 { return acc }
+    return fact_helper(n - 1, acc * n)
+}
+let factorial_c = |n: Int| fact_helper(n, 1)
+assert(factorial_c(0) == 1, "closure factorial 0")
+assert(factorial_c(5) == 120, "closure factorial 5")
+assert(factorial_c(10) == 3628800, "closure factorial 10")
+
+// ---- Closures over different loop iteration values ----
+let adders = []: fn(Int) -> Int
+for let base = 1; base <= 5; base += 1 {
+    let captured_base = base
+    adders.push(|x: Int| x + captured_base)
+}
+assert(adders[0](10) == 11, "adder[0](10)=11")
+assert(adders[2](10) == 13, "adder[2](10)=13")
+assert(adders[4](10) == 15, "adder[4](10)=15")
+
 println("PASS: test_closures")

@@ -1,0 +1,10 @@
+module syntax_use_undefined_type_in_param
+
+import super.std.core
+
+// Parameter uses a type that doesn't exist
+fn foo(x: NonExistentType) -> Int {
+    return 0
+}
+
+foo(42)

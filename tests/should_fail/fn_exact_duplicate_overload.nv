@@ -1,0 +1,14 @@
+module fn_overload_ambiguous_call
+
+import super.std.core
+
+// Two overloads with same input types - duplicate signature
+fn compute(x: Int, y: Int) -> Int {
+    return x + y
+}
+
+fn compute(x: Int, y: Int) -> Int {
+    return x * y
+}
+
+compute(3, 4)

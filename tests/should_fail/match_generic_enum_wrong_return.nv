@@ -1,0 +1,19 @@
+module match_generic_enum_wrong_type
+
+import super.std.core
+
+enum Res(A, B) {
+    Ok: $A,
+    Err: $B,
+}
+
+// Ok variant has Int, but we return it as String
+fn bad_extract(r: Res(Int, String)) -> String {
+    match r {
+        Ok(v) => { return v }
+        Err(e) => { return e }
+    }
+    return ""
+}
+
+bad_extract(Res::Ok(42) @[B: String])

@@ -1,5 +1,8 @@
 module test_option
 
+import super.std.core
+import super.std.list
+
 // Option construction
 let some_val : Option(Int) = Some(42)
 let none_val : Option(Int) = None(Int)
@@ -76,5 +79,124 @@ assert(!bad_parse.isSome(), "Cast::int invalid")
 // Cast::float returns Option
 let parsed_f = Cast::float(42)
 assert(parsed_f.isSome(), "Cast::float valid")
+
+// ---- Option in struct field ----
+struct Profile {
+    name: String,
+    nickname: Option(String),
+    age: Option(Int),
+}
+
+let p1 = Profile { name: "Alice", nickname: Some("Ally"), age: Some(30) }
+let p2 = Profile { name: "Bob", nickname: None(String), age: None(Int) }
+
+assert(p1.nickname.isSome(), "profile nickname Some")
+assert(p1.nickname.unwrap() == "Ally", "profile nickname value")
+assert(!p2.nickname.isSome(), "profile nickname None")
+assert(p2.age.isSome() == false, "profile age None")
+
+// if-let on struct field
+if let nick = p1.nickname {
+    assert(nick == "Ally", "if-let struct field")
+}
+
+// ---- while-let draining a list of Options ----
+let opt_list = [Some(1), Some(2), None(Int), Some(4)]
+let sum_of_somes = 0
+for item in opt_list {
+    if let v = item {
+        sum_of_somes += v
+    }
+}
+assert(sum_of_somes == 7, "sum of Somes: 1+2+4=7")
+
+// ---- Option with function returning Option ----
+fn safe_div(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+
+let r1 = safe_div(10, 2)
+let r2 = safe_div(10, 0)
+assert(r1.isSome(), "safe_div non-zero isSome")
+assert(r1.unwrap() == 5, "safe_div 10/2=5")
+assert(!r2.isSome(), "safe_div by zero None")
+
+// Chained safe_div
+fn chain_div(a: Int, b: Int, c: Int) -> Option(Int) {
+    if let ab = safe_div(a, b) {
+        return safe_div(ab, c)
+    }
+    return None(Int)
+}
+assert(chain_div(100, 5, 4).isSome(), "chain_div 100/5/4 Some")
+assert(chain_div(100, 5, 4).unwrap() == 5, "chain_div 100/5/4=5")
+assert(!chain_div(10, 0, 2).isSome(), "chain_div 10/0/2 None")
+
+// ---- Option in list: filter Somes ----
+fn filter_somes(opts: [Option(Int)]) -> [Int] {
+    let result = []: Int
+    for o in opts {
+        if let v = o {
+            result.push(v)
+        }
+    }
+    return result
+}
+
+let mixed = [Some(10), None(Int), Some(20), None(Int), Some(30)]
+let only_vals = filter_somes(mixed)
+assert(only_vals.len() == 3, "filter_somes len 3")
+assert(only_vals[0] == 10, "filter_somes[0]=10")
+assert(only_vals[1] == 20, "filter_somes[1]=20")
+assert(only_vals[2] == 30, "filter_somes[2]=30")
+
+// ---- Option map pattern via if-let ----
+fn option_map_int(o: Option(Int), f: fn(Int) -> Int) -> Option(Int) {
+    if let v = o {
+        return Some(f(v))
+    }
+    return None(Int)
+}
+
+let doubled_opt = option_map_int(Some(21), |x: Int| x * 2)
+assert(doubled_opt.isSome(), "option_map Some")
+assert(doubled_opt.unwrap() == 42, "option_map value 42")
+
+let mapped_none = option_map_int(None(Int), |x: Int| x * 2)
+assert(!mapped_none.isSome(), "option_map None stays None")
+
+// ---- while-let pattern ----
+fn get_next(state: Box(Int)) -> Option(Int) {
+    if state.value >= 5 { return None(Int) }
+    state.value += 1
+    return Some(state.value)
+}
+
+let state = Box(0)
+let collected = []: Int
+while let val = get_next(state) {
+    collected.push(val)
+}
+assert(collected.len() == 5, "while-let collected 5 items")
+assert(collected[0] == 1, "while-let collected[0]=1")
+assert(collected[4] == 5, "while-let collected[4]=5")
+
+// ---- Option with generic ----
+fn safe_head(xs: [$A]) -> Option($A) {
+    if xs.len() == 0 { return None($A) }
+    return Some(xs[0])
+}
+
+let h1 = safe_head([10, 20, 30])
+assert(h1.isSome(), "safe_head non-empty")
+assert(h1.unwrap() == 10, "safe_head first=10")
+
+let h2 = safe_head([]: Int)
+assert(!h2.isSome(), "safe_head empty None")
+
+let hs = safe_head(["a", "b", "c"])
+assert(hs.isSome(), "safe_head string list")
+assert(hs.unwrap() == "a", "safe_head string first")
 
 println("PASS: test_option")

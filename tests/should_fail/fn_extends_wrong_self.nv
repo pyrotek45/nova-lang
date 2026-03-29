@@ -1,0 +1,19 @@
+module type_extends_wrong_self_type
+
+import super.std.core
+
+struct Cat {
+    name: String,
+}
+
+struct Dog {
+    name: String,
+}
+
+fn extends speak(d: Dog) -> String {
+    return "Woof"
+}
+
+// Call Dog's extends fn on Cat -- wrong receiver type
+let c = Cat { name: "Whiskers" }
+c.speak()

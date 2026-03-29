@@ -1,0 +1,7 @@
+module syntax_multiple_module_decls
+
+module second_module
+
+import super.std.core
+
+let x = 1

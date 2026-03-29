@@ -1,0 +1,12 @@
+module type_assign_to_wrong_field_type
+
+import super.std.core
+
+// Cannot assign Bool to Int field
+struct Vec2 {
+    x: Int,
+    y: Int,
+}
+
+let v = Vec2 { x: 0, y: 0 }
+v.x = true

@@ -1,0 +1,10 @@
+module syntax_generic_param_in_non_generic_struct
+
+import super.std.core
+
+// Using $T in struct without declaring it as generic
+struct BadStruct {
+    value: $T,
+}
+
+let b = BadStruct { value: 42 }

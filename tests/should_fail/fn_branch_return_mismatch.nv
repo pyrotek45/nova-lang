@@ -1,0 +1,13 @@
+module fn_return_type_mismatch_in_branch
+
+import super.std.core
+
+// One branch returns Int, another returns String - both return stmts
+fn bad_branches(flag: Bool) -> Int {
+    if flag {
+        return 42
+    }
+    return "oops"
+}
+
+bad_branches(true)

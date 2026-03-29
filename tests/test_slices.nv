@@ -1,0 +1,110 @@
+module test_slices
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// List Slice Stress Tests
+// Covers all slice forms: [start:end], [start:], [:end], [:]
+// with step [$step], edge cases, and chaining.
+// ============================================================
+
+let xs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+// ---- Basic slicing ----
+let s1 = xs[0:3]
+assert(s1.len() == 3, "xs[0:3] len=3")
+assert(s1[0] == 0, "xs[0:3][0]=0")
+assert(s1[2] == 2, "xs[0:3][2]=2")
+
+let s2 = xs[3:7]
+assert(s2.len() == 4, "xs[3:7] len=4")
+assert(s2[0] == 3, "xs[3:7][0]=3")
+assert(s2[3] == 6, "xs[3:7][3]=6")
+
+// ---- Open-end slice ----
+let s3 = xs[7:]
+assert(s3.len() == 3, "xs[7:] len=3")
+assert(s3[0] == 7, "xs[7:][0]=7")
+assert(s3[2] == 9, "xs[7:][2]=9")
+
+// ---- Open-start slice ----
+let s4 = xs[:4]
+assert(s4.len() == 4, "xs[:4] len=4")
+assert(s4[0] == 0, "xs[:4][0]=0")
+assert(s4[3] == 3, "xs[:4][3]=3")
+
+// ---- Full copy slice ----
+let s5 = xs[:]
+assert(s5.len() == 10, "xs[:] len=10")
+assert(s5[0] == 0, "xs[:][0]=0")
+assert(s5[9] == 9, "xs[:][9]=9")
+
+// ---- Slice with step ----
+let every2 = xs[0:10$2]
+assert(every2.len() == 5, "step-2 len=5")
+assert(every2[0] == 0, "step-2[0]=0")
+assert(every2[1] == 2, "step-2[1]=2")
+assert(every2[4] == 8, "step-2[4]=8")
+
+let every3 = xs[0:9$3]
+assert(every3.len() == 3, "step-3 len=3")
+assert(every3[0] == 0, "step-3[0]=0")
+assert(every3[1] == 3, "step-3[1]=3")
+assert(every3[2] == 6, "step-3[2]=6")
+
+// ---- Chained slices (via intermediate variable) ----
+let mid = xs[2:8]
+// xs[2:8] = [2,3,4,5,6,7]
+let chain = mid[1:4]
+// mid[1:4] = [3,4,5]
+assert(chain.len() == 3, "chained slice len=3")
+assert(chain[0] == 3, "chained slice[0]=3")
+assert(chain[2] == 5, "chained slice[2]=5")
+
+// ---- Slice of strings ----
+let words = ["alpha", "beta", "gamma", "delta", "epsilon"]
+let middle = words[1:4]
+assert(middle.len() == 3, "words[1:4] len=3")
+assert(middle[0] == "beta", "words[1:4][0]=beta")
+assert(middle[2] == "delta", "words[1:4][2]=delta")
+
+// ---- Slice then map (via comprehension) ----
+let doubled_slice = [x in xs[2:6] | x * 2]
+// xs[2:6] = [2,3,4,5], doubled = [4,6,8,10]
+assert(doubled_slice.len() == 4, "slice-then-comp len=4")
+assert(doubled_slice[0] == 4, "slice-then-comp[0]=4")
+assert(doubled_slice[3] == 10, "slice-then-comp[3]=10")
+
+// ---- Slice as function argument ----
+fn sum_slice(s: [Int]) -> Int {
+    let total = 0
+    for v in s {
+        total += v
+    }
+    return total
+}
+assert(sum_slice(xs[0:5]) == 10, "sum xs[0:5] = 0+1+2+3+4=10")
+assert(sum_slice(xs[5:]) == 35, "sum xs[5:] = 5+6+7+8+9=35")
+assert(sum_slice(xs[:]) == 45, "sum xs[:] = 0..9=45")
+
+// ---- Empty slice (start==end) ----
+let empty_sl = xs[3:3]
+assert(empty_sl.len() == 0, "xs[3:3] empty slice")
+
+// ---- Slice modifies a copy, not original ----
+let original = [10, 20, 30, 40, 50]
+let sliced_copy = original[1:4]
+sliced_copy[0] = 999
+assert(original[1] == 20, "slice is copy, original unchanged")
+assert(sliced_copy[0] == 999, "slice copy mutated")
+
+// ---- Slice with step on strings ----
+let letters = ["a","b","c","d","e","f","g","h"]
+let every2_str = letters[0:8$2]
+assert(every2_str.len() == 4, "string step-2 len=4")
+assert(every2_str[0] == "a", "string step-2[0]=a")
+assert(every2_str[1] == "c", "string step-2[1]=c")
+assert(every2_str[3] == "g", "string step-2[3]=g")
+
+println("PASS: test_slices")

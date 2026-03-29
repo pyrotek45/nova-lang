@@ -1,0 +1,10 @@
+module type_return_none_from_int_fn
+
+import super.std.core
+
+// None cannot be returned from a Int function
+fn bad() -> Int {
+    return None(Int)
+}
+
+bad()
