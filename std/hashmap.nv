@@ -3,70 +3,120 @@ module hashmap
 import list
 import core
 
-// A simple key-value hash map built on parallel lists
+// ---------------------------------------------------------------------------
+// Hash-based HashMap using bucket chaining.
+// Provides O(1) average-case insert, get, delete, and has operations.
+// Automatically resizes when the load factor exceeds 75%.
+// ---------------------------------------------------------------------------
+
 struct HashMap(K,V) {
-    keys: [$K],
-    values: [$V],
+    buckets: [[($K,$V)]],
+    numBuckets: Int,
+    count: Int,
 }
 
-// Create a new empty HashMap
-fn extends(HashMap) default() -> HashMap($K,$V) {
-    return HashMap {
-        keys: []:$K,
-        values: []:$V,
+// Internal: create an array of n empty buckets
+fn _makeBuckets(n: Int) -> [[($K,$V)]] {
+    let b: [[($K,$V)]] = []:[($K,$V)]
+    for let i = 0; i < n; i += 1 {
+        b.push([]:($K,$V))
     }
+    return b
+}
+
+// Create a new empty HashMap with an initial capacity of 16 buckets
+fn extends(HashMap) default() -> HashMap($K,$V) {
+    let nb = 16
+    return HashMap {
+        buckets: _makeBuckets(nb) @[K: $K, V: $V],
+        numBuckets: nb,
+        count: 0,
+    }
+}
+
+// Internal: double the number of buckets and rehash all entries
+fn extends _resize(self: HashMap($K,$V)) {
+    let newSize = self.numBuckets * 2
+    let newBuckets: [[($K,$V)]] = _makeBuckets(newSize) @[K: $K, V: $V]
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            let entry = bucket[j]
+            let idx = hash(entry[0]) % newSize
+            newBuckets[idx].push(entry)
+        }
+    }
+    self.buckets = newBuckets
+    self.numBuckets = newSize
 }
 
 // Convert a HashMap to a readable string
 fn extends toString(self: HashMap($K,$V)) -> String {
     let result = "{"
-    for let i = 0; i < self.keys.len(); i += 1 {
-        result += Cast::string(self.keys[i]) + " => " + Cast::string(self.values[i])
-        if i != self.keys.len() - 1 {
-            result += ", "
+    let first = true
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            if !first {
+                result += ", "
+            }
+            result += Cast::string(bucket[j][0]) + " => " + Cast::string(bucket[j][1])
+            first = false
         }
     }
     result += "}"
     return result
 }
 
-// Insert or update a key-value pair
+// Insert or update a key-value pair (O(1) average)
 fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
-    for let i = 0; i < self.keys.len(); i += 1 {
-        if self.keys[i] == k {
-            self.values[i] = v
+    // Resize if load factor > 75%
+    if self.count * 4 > self.numBuckets * 3 {
+        self._resize()
+    }
+    let idx = hash(k) % self.numBuckets
+    let bucket = self.buckets[idx]
+    for let i = 0; i < bucket.len(); i += 1 {
+        if bucket[i][0] == k {
+            bucket.set(i, (k, v))
             return
         }
     }
-    self.keys.push(k)
-    self.values.push(v)
+    bucket.push((k, v))
+    self.count += 1
 }
 
-// Get the value for a key, or None if not found
+// Get the value for a key, or None if not found (O(1) average)
 fn extends get(self: HashMap($K,$V), k: $K) -> Option($V) {
-    for let i = 0; i < self.keys.len(); i += 1 {
-        if self.keys[i] == k {
-            return Some(self.values[i])
+    let idx = hash(k) % self.numBuckets
+    let bucket = self.buckets[idx]
+    for let i = 0; i < bucket.len(); i += 1 {
+        if bucket[i][0] == k {
+            return Some(bucket[i][1])
         }
     }
     return None($V)
 }
 
-// Delete a key-value pair by key
+// Delete a key-value pair by key (O(1) average)
 fn extends delete(self: HashMap($K,$V), k: $K) {
-    for let i = 0; i < self.keys.len(); i += 1 {
-        if self.keys[i] == k {
-            self.keys.remove(i)
-            self.values.remove(i)
+    let idx = hash(k) % self.numBuckets
+    let bucket = self.buckets[idx]
+    for let i = 0; i < bucket.len(); i += 1 {
+        if bucket[i][0] == k {
+            bucket.remove(i)
+            self.count -= 1
             return
         }
     }
 }
 
-// Check if a key exists
+// Check if a key exists (O(1) average)
 fn extends has(self: HashMap($K,$V), k: $K) -> Bool {
-    for key in self.keys {
-        if key == k {
+    let idx = hash(k) % self.numBuckets
+    let bucket = self.buckets[idx]
+    for let i = 0; i < bucket.len(); i += 1 {
+        if bucket[i][0] == k {
             return true
         }
     }
@@ -75,25 +125,29 @@ fn extends has(self: HashMap($K,$V), k: $K) -> Bool {
 
 // Return the number of entries
 fn extends size(self: HashMap($K,$V)) -> Int {
-    return self.keys.len()
+    return self.count
 }
 
 // Check if the map is empty
 fn extends isEmpty(self: HashMap($K,$V)) -> Bool {
-    return self.keys.len() == 0
+    return self.count == 0
 }
 
 // Clear all entries
 fn extends clear(self: HashMap($K,$V)) {
-    self.keys = []:$K
-    self.values = []:$V
+    let nb = 16
+    self.buckets = _makeBuckets(nb) @[K: $K, V: $V]
+    self.numBuckets = nb
+    self.count = 0
 }
 
-// Get the value for a key, or a default if not found
+// Get the value for a key, or a default if not found (O(1) average)
 fn extends getOrDefault(self: HashMap($K,$V), k: $K, default: $V) -> $V {
-    for let i = 0; i < self.keys.len(); i += 1 {
-        if self.keys[i] == k {
-            return self.values[i]
+    let idx = hash(k) % self.numBuckets
+    let bucket = self.buckets[idx]
+    for let i = 0; i < bucket.len(); i += 1 {
+        if bucket[i][0] == k {
+            return bucket[i][1]
         }
     }
     return default
@@ -102,15 +156,45 @@ fn extends getOrDefault(self: HashMap($K,$V), k: $K, default: $V) -> $V {
 // Get all entries as a list of tuples
 fn extends entries(self: HashMap($K,$V)) -> [($K,$V)] {
     let result = []:($K,$V)
-    for let i = 0; i < self.keys.len(); i += 1 {
-        result.push((self.keys[i], self.values[i]))
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            result.push(bucket[j])
+        }
+    }
+    return result
+}
+
+// Get all keys as a list
+fn extends keys(self: HashMap($K,$V)) -> [$K] {
+    let result = []:$K
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            result.push(bucket[j][0])
+        }
+    }
+    return result
+}
+
+// Get all values as a list
+fn extends values(self: HashMap($K,$V)) -> [$V] {
+    let result = []:$V
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            result.push(bucket[j][1])
+        }
     }
     return result
 }
 
 // Apply a function to each entry
 fn extends forEach(self: HashMap($K,$V), f: fn($K,$V)) {
-    for let i = 0; i < self.keys.len(); i += 1 {
-        f(self.keys[i], self.values[i])
+    for let i = 0; i < self.numBuckets; i += 1 {
+        let bucket = self.buckets[i]
+        for let j = 0; j < bucket.len(); j += 1 {
+            f(bucket[j][0], bucket[j][1])
+        }
     }
 }

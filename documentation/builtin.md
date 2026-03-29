@@ -32,9 +32,16 @@ These functions are available without any imports.
 | `Cast::string(a) -> String` | Convert any value to a String. |
 | `Cast::int(a) -> Option(Int)` | Convert a value to Int. Returns None on failure. |
 | `Cast::float(a) -> Option(Float)` | Convert a value to Float. Returns None on failure. |
+| `Cast::charToInt(Char) -> Int` | Get the Unicode codepoint of a character. |
 | `toStr(a) -> String` | Alias for `Cast::string`. |
 | `toInt(a) -> Option(Int)` | Alias for `Cast::int`. |
 | `chr(Int) -> Char` | Convert an integer (codepoint) to a character. |
+
+## Hashing
+
+| Signature | Description |
+|---|---|
+| `hash(a) -> Int` | Compute a deterministic non-negative hash for any value. Uses FNV-1a for strings, Knuth multiplicative hash for ints/chars. |
 
 ## String Functions (`String::`)
 
@@ -152,6 +159,15 @@ These functions are available without any imports.
 | `terminal::rawmode(Bool) -> Void` | Enable or disable terminal raw mode. |
 | `terminal::getch() -> Option(Char)` | Read a single character without waiting for newline. |
 | `terminal::rawread(Int) -> Option(Char)` | Read a character in raw mode with a timeout (ms). |
+| `terminal::moveTo(Int, Int) -> Void` | Move the cursor to (column, row), 0-based. |
+| `terminal::getSize() -> (Int, Int)` | Get the terminal size as (width, height). |
+| `terminal::setForeground(Int, Int, Int) -> Void` | Set text foreground colour (R, G, B). |
+| `terminal::setBackground(Int, Int, Int) -> Void` | Set text background colour (R, G, B). |
+| `terminal::resetColor() -> Void` | Reset foreground and background to defaults. |
+| `terminal::print(String) -> Void` | Write a string to stdout without a trailing newline. |
+| `terminal::flush() -> Void` | Flush stdout. |
+| `terminal::enableMouse() -> Void` | Enable mouse event capture. |
+| `terminal::disableMouse() -> Void` | Disable mouse event capture. |
 
 ## Regex
 
@@ -166,7 +182,7 @@ These functions are available without any imports.
 | Signature | Description |
 |---|---|
 | `exit() -> Void` | Terminate the program. |
-| `cliArgs() -> [String]` | Retrieve command-line arguments. |
+| `terminal::args() -> Option([String])` | Retrieve command-line arguments passed after the script name. |
 
 ## Raylib
 

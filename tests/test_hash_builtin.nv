@@ -1,0 +1,42 @@
+module test_hash_builtin
+
+// =========================================================================
+// Tests for the built-in hash() function.
+// =========================================================================
+
+// --- Deterministic for same input ---
+assert(hash("hello") == hash("hello"), "string hash deterministic")
+assert(hash("") == hash(""), "empty string hash deterministic")
+assert(hash(42) == hash(42), "int hash deterministic")
+assert(hash(0) == hash(0), "zero hash deterministic")
+assert(hash('a') == hash('a'), "char hash deterministic")
+assert(hash(true) == hash(true), "bool true hash deterministic")
+assert(hash(false) == hash(false), "bool false hash deterministic")
+
+// --- Different inputs produce different hashes (with very high probability) ---
+assert(hash("hello") != hash("world"), "different strings differ")
+assert(hash("abc") != hash("abd"), "similar strings differ")
+assert(hash(1) != hash(2), "different ints differ")
+assert(hash('a') != hash('b'), "different chars differ")
+assert(hash(true) != hash(false), "true != false hash")
+
+// --- hash always returns non-negative ---
+assert(hash("test") >= 0, "string hash non-negative")
+assert(hash(42) >= 0, "int hash non-negative")
+assert(hash(-1) >= 0, "negative int hash non-negative")
+assert(hash('z') >= 0, "char hash non-negative")
+
+// --- Modulo safety: hash % n is in [0, n) ---
+for let i = 0; i < 100; i += 1 {
+    let h = hash(Cast::string(i)) % 16
+    assert(h >= 0, "mod non-negative for " + Cast::string(i))
+    assert(h < 16, "mod in range for " + Cast::string(i))
+}
+
+for let i = -50; i < 50; i += 1 {
+    let h = hash(i) % 32
+    assert(h >= 0, "int mod non-negative for " + Cast::string(i))
+    assert(h < 32, "int mod in range for " + Cast::string(i))
+}
+
+println("PASS: test_hash_builtin")

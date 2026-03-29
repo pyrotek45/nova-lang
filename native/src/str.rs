@@ -347,3 +347,52 @@ pub fn char_to_int(state: &mut state::State) -> NovaResult<()> {
     state.memory.stack.push(VmData::Int(c as i64));
     Ok(())
 }
+
+/// hash(a) -> Int
+/// Compute a deterministic hash for any value. Uses FNV-1a for strings,
+/// Knuth multiplicative hash for ints/chars, and constant for bools/None.
+pub fn hash_value(state: &mut state::State) -> NovaResult<()> {
+    let data = pop(state)?;
+    let h: i64 = match data {
+        VmData::Int(v) => {
+            // Knuth multiplicative hash
+            v.wrapping_mul(2654435761)
+        }
+        VmData::Float(v) => {
+            let bits = v.to_bits() as i64;
+            bits.wrapping_mul(2654435761)
+        }
+        VmData::Bool(v) => {
+            if v {
+                1231
+            } else {
+                1237
+            }
+        }
+        VmData::Char(v) => (v as i64).wrapping_mul(2654435761),
+        VmData::Object(idx) => {
+            if let Some(obj) = state.memory.ref_from_heap(idx) {
+                if let Some(s) = obj.as_string() {
+                    // FNV-1a hash
+                    let mut h: u64 = 14695981039346656037;
+                    for b in s.bytes() {
+                        h ^= b as u64;
+                        h = h.wrapping_mul(1099511628211);
+                    }
+                    state.memory.dec(idx);
+                    h as i64
+                } else {
+                    state.memory.dec(idx);
+                    0
+                }
+            } else {
+                0
+            }
+        }
+        VmData::None => 0,
+        _ => 0,
+    };
+    // Ensure the hash is non-negative for modulo safety
+    state.memory.stack.push(VmData::Int(h.wrapping_abs()));
+    Ok(())
+}
