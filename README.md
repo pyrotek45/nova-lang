@@ -201,18 +201,18 @@ bash tests/run_tests.sh
 
 Two categories:
 
-- **Positive tests** (`tests/test_*.nv`) -- 55 programs that must compile, run, and print
+- **Positive tests** (`tests/test_*.nv`) -- 63 programs that must compile, run, and print
   `PASS:`. Covers arithmetic, closures, enums, generics, GC, UFCS, Dyn types, iterators,
-  higher-order functions, parser/lexer stress, and more.
+  higher-order functions, parser/lexer stress, native functions, std library, and more.
 
 - **Rejection tests** (`tests/should_fail/*.nv`) -- 157 programs that the compiler must reject
   with a type or parse error. Covers wrong argument types, wrong return types, undefined
   variables, struct mismatches, missing fields, and other ill-typed programs.
 
 ```
-  Positive tests: 55 passed, 0 failed
+  Positive tests: 63 passed, 0 failed
   Rejection tests: 157 passed, 0 failed
-  Total: 212 passed, 0 failed
+  Total: 220 passed, 0 failed
 
 All tests passed!
 ```

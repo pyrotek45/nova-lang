@@ -1,0 +1,52 @@
+module test_native_char
+
+// Tests for native Char:: functions
+
+// --- Char::isAlpha ---
+assert('a'.isAlpha(), "isAlpha lowercase")
+assert('Z'.isAlpha(), "isAlpha uppercase")
+assert(!'1'.isAlpha(), "isAlpha digit false")
+assert(!' '.isAlpha(), "isAlpha space false")
+assert(!'!'.isAlpha(), "isAlpha punctuation false")
+
+// --- Char::isDigit ---
+assert('0'.isDigit(), "isDigit zero")
+assert('9'.isDigit(), "isDigit nine")
+assert(!'a'.isDigit(), "isDigit letter false")
+assert(!' '.isDigit(), "isDigit space false")
+
+// --- Char::isWhitespace ---
+assert(' '.isWhitespace(), "isWhitespace space")
+assert(!'a'.isWhitespace(), "isWhitespace letter false")
+assert(!'1'.isWhitespace(), "isWhitespace digit false")
+
+// --- Char::isAlphanumeric ---
+assert('a'.isAlphanumeric(), "isAlphanumeric letter")
+assert('5'.isAlphanumeric(), "isAlphanumeric digit")
+assert(!'!'.isAlphanumeric(), "isAlphanumeric punct false")
+assert(!' '.isAlphanumeric(), "isAlphanumeric space false")
+
+// --- Char::toUpper / toLower ---
+assert('a'.toUpper() == 'A', "toUpper a->A")
+assert('z'.toUpper() == 'Z', "toUpper z->Z")
+assert('A'.toLower() == 'a', "toLower A->a")
+assert('Z'.toLower() == 'z', "toLower Z->z")
+assert('1'.toUpper() == '1', "toUpper digit unchanged")
+assert('1'.toLower() == '1', "toLower digit unchanged")
+
+// --- Char::isUpper / isLower ---
+assert('A'.isUpper(), "isUpper A")
+assert('Z'.isUpper(), "isUpper Z")
+assert(!'a'.isUpper(), "isUpper lowercase false")
+assert(!'1'.isUpper(), "isUpper digit false")
+assert('a'.isLower(), "isLower a")
+assert('z'.isLower(), "isLower z")
+assert(!'A'.isLower(), "isLower uppercase false")
+assert(!'1'.isLower(), "isLower digit false")
+
+// --- Existing: chr (int_to_char) ---
+assert(chr(65) == 'A', "chr 65=A")
+assert(chr(97) == 'a', "chr 97=a")
+assert(chr(48) == '0', "chr 48=0")
+
+println("PASS: test_native_char")

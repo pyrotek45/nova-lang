@@ -1,3 +1,5 @@
 target/
 Cargo.lock
 history.txt
+fuzz/corpus/
+fuzz/artifacts/

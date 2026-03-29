@@ -1,0 +1,79 @@
+module test_native_float
+
+// Tests for native Float:: functions
+
+// --- Float::floor / ceil / round ---
+assert(3.7.floor() == 3.0, "floor 3.7")
+assert(3.2.floor() == 3.0, "floor 3.2")
+assert((-1.5).floor() == -2.0, "floor -1.5")
+assert(3.2.ceil() == 4.0, "ceil 3.2")
+assert(3.0.ceil() == 3.0, "ceil 3.0 (exact)")
+assert((-1.5).ceil() == -1.0, "ceil -1.5")
+assert(3.5.round() == 4.0, "round 3.5")
+assert(3.4.round() == 3.0, "round 3.4")
+assert((-1.5).round() == -2.0, "round -1.5")
+
+// --- Float::abs ---
+assert((-5.0).abs() == 5.0, "abs negative")
+assert(5.0.abs() == 5.0, "abs positive")
+assert(0.0.abs() == 0.0, "abs zero")
+
+// --- Float::sqrt ---
+assert(4.0.sqrt() == 2.0, "sqrt 4")
+assert(9.0.sqrt() == 3.0, "sqrt 9")
+assert(1.0.sqrt() == 1.0, "sqrt 1")
+assert(0.0.sqrt() == 0.0, "sqrt 0")
+
+// --- Float::sin / cos / tan ---
+// sin(0) = 0, cos(0) = 1
+assert(0.0.sin() == 0.0, "sin 0")
+assert(0.0.cos() == 1.0, "cos 0")
+assert(0.0.tan() == 0.0, "tan 0")
+
+// --- Float::atan2 ---
+assert(0.0.atan2(1.0) == 0.0, "atan2(0,1) = 0")
+
+// --- Float::log / log10 ---
+assert(1.0.log() == 0.0, "log(1) = 0")
+assert(1.0.log10() == 0.0, "log10(1) = 0")
+assert(100.0.log10() == 2.0, "log10(100) = 2")
+
+// --- Float::pow ---
+assert(2.0.pow(3.0) == 8.0, "pow 2^3")
+assert(5.0.pow(0.0) == 1.0, "pow x^0 = 1")
+assert(3.0.pow(2.0) == 9.0, "pow 3^2")
+
+// --- Float::exp ---
+assert(0.0.exp() == 1.0, "exp(0) = 1")
+
+// --- Float::min / max ---
+assert(3.0.min(5.0) == 3.0, "min(3,5)")
+assert(5.0.min(3.0) == 3.0, "min(5,3)")
+assert(3.0.max(5.0) == 5.0, "max(3,5)")
+assert(5.0.max(3.0) == 5.0, "max(5,3)")
+assert((-1.0).min(1.0) == -1.0, "min(-1,1)")
+assert((-1.0).max(1.0) == 1.0, "max(-1,1)")
+
+// --- Float::clamp ---
+assert(5.0.clamp(0.0, 10.0) == 5.0, "clamp in range")
+assert((-5.0).clamp(0.0, 10.0) == 0.0, "clamp below min")
+assert(15.0.clamp(0.0, 10.0) == 10.0, "clamp above max")
+
+// --- Float::isNan / isInfinite ---
+assert(!1.0.isNan(), "isNan normal")
+assert(!1.0.isInfinite(), "isInfinite normal")
+
+// --- Float::pi / Float::e ---
+let pi = Float::pi()
+assert(pi > 3.14, "pi > 3.14")
+assert(pi < 3.15, "pi < 3.15")
+let e = Float::e()
+assert(e > 2.71, "e > 2.71")
+assert(e < 2.72, "e < 2.72")
+
+// --- Existing: Cast::float (int_to_float) ---
+assert(Cast::float(42).unwrap() == 42.0, "int_to_float 42")
+assert(Cast::float(-1).unwrap() == -1.0, "int_to_float -1")
+assert(Cast::float(0).unwrap() == 0.0, "int_to_float 0")
+
+println("PASS: test_native_float")

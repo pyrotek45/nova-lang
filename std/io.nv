@@ -1,6 +1,38 @@
 module io
 
-fn mod(io) prompt(input: String) -> String {
-    print(input + "\n")
+// IO utilities that complement native functions
+// Native functions available: readln, readFile, writeFile,
+// appendFile, fileExists, print, println, printf, format
+
+// Prompt the user with a message and return their input
+fn prompt(msg: String) -> String {
+    print(msg)
     return readln()
+}
+
+// Prompt and parse an integer
+fn promptInt(msg: String) -> Option(Int) {
+    print(msg)
+    return Cast::int(readln())
+}
+
+// Prompt and parse a float
+fn promptFloat(msg: String) -> Option(Float) {
+    print(msg)
+    return Cast::float(readln())
+}
+
+// Print multiple values separated by a delimiter
+fn printSep(values: [String], sep: String) {
+    println(join(values, sep))
+}
+
+// Read all lines from a file into a list
+fn readLines(path: String) -> [String] {
+    return readFile(path).split("\n")
+}
+
+// Write lines to a file
+fn writeLines(path: String, lines: [String]) -> Bool {
+    return writeFile(path, join(lines, "\n"))
 }

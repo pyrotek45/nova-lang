@@ -10,8 +10,13 @@ pub enum Draw {
     Text(String, i32, i32, i32, Color),
     FPS(i32, i32),
     Rectangle(i32, i32, i32, i32, Color),
+    RectangleLines(i32, i32, i32, i32, Color),
+    RoundedRectangle(i32, i32, i32, i32, f32, Color),
     Circle(i32, i32, f32, Color),
+    CircleLines(i32, i32, f32, Color),
+    Triangle(f32, f32, f32, f32, f32, f32, Color),
     Line(i32, i32, i32, i32, Color),
+    LineThick(i32, i32, i32, i32, f32, Color),
     ClearBackground(Color),
     Sprite(usize, i32, i32),
 }
