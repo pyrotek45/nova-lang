@@ -1,0 +1,13 @@
+module dunder_add_wrong_return
+// SHOULD FAIL: __add__ must return same type, but type mismatch occurs
+struct Widget {
+    val: Int,
+}
+
+fn extends __add__(self: Widget, other: Widget) -> String {
+    return "nope"
+}
+
+// This should fail because adding two Widgets yields String, not Widget
+let w = Widget(1) + Widget(2)
+let x: Widget = w

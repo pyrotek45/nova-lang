@@ -1,0 +1,3 @@
+module syntax_unclosed_string
+// SHOULD FAIL: unterminated string literal
+let x = "hello

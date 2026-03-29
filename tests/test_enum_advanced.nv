@@ -1,0 +1,96 @@
+module test_enum_advanced
+
+import super.std.core
+
+// Enum with various data types - use a different name since Result is in std
+enum Outcome {
+    Ok: Int,
+    Err: String
+}
+
+fn divide(a: Int, b: Int) -> Outcome {
+    if b == 0 {
+        return Outcome::Err("division by zero")
+    }
+    return Outcome::Ok(a / b)
+}
+
+fn result_to_string(r: Outcome) -> String {
+    match r {
+        Ok(v) => { return "ok:" + Cast::string(v) }
+        Err(msg) => { return "err:" + msg }
+    }
+    return "unreachable"
+}
+
+assert(result_to_string(divide(10, 2)) == "ok:5", "result ok")
+assert(result_to_string(divide(10, 0)) == "err:division by zero", "result err")
+
+// Enum with tuple data
+enum Instruction {
+    Move: (Int, Int),
+    Print: String,
+    Halt
+}
+
+fn exec(instr: Instruction) -> String {
+    match instr {
+        Move(coords) => { return "move:" + Cast::string(coords[0]) + "," + Cast::string(coords[1]) }
+        Print(msg) => { return "print:" + msg }
+        Halt() => { return "halt" }
+    }
+    return "?"
+}
+
+assert(exec(Instruction::Move((5, 10))) == "move:5,10", "enum tuple data")
+assert(exec(Instruction::Print("hello")) == "print:hello", "enum string data")
+assert(exec(Instruction::Halt()) == "halt", "enum no data")
+
+// Enum stored in list
+let instructions: [Instruction] = [
+    Instruction::Move((1, 2)),
+    Instruction::Print("world"),
+    Instruction::Halt()
+]
+assert(exec(instructions[0]) == "move:1,2", "enum in list 0")
+assert(exec(instructions[2]) == "halt", "enum in list 2")
+
+// Enum with struct data
+struct Point { x: Int, y: Int }
+
+enum DrawCmd {
+    DrawAt: Point,
+    Clear
+}
+
+fn draw_desc(cmd: DrawCmd) -> String {
+    match cmd {
+        DrawAt(p) => { return Cast::string(p.x) + "," + Cast::string(p.y) }
+        Clear() => { return "clear" }
+    }
+    return "?"
+}
+
+assert(draw_desc(DrawCmd::DrawAt(Point(3, 7))) == "3,7", "enum with struct data")
+assert(draw_desc(DrawCmd::Clear()) == "clear", "enum clear variant")
+
+// Generic enum
+enum Opt(A) {
+    Just: $A,
+    Nothing
+}
+
+fn opt_or(m: Opt($A), default: $A) -> $A {
+    match m {
+        Just(v) => { return v }
+        Nothing() => { return default }
+    }
+    return default
+}
+
+assert(opt_or(Opt::Just(42), 0) == 42, "generic enum just")
+assert(opt_or(Opt::Nothing() @[A: Int], 99) == 99, "generic enum nothing")
+assert(opt_or(Opt::Just("hi"), "bye") == "hi", "generic enum string just")
+assert(opt_or(Opt::Nothing() @[A: String], "default") == "default", "generic enum string nothing")
+
+println("PASS: test_enum_advanced")

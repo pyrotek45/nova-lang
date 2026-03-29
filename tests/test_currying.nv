@@ -1,0 +1,72 @@
+module test_currying
+
+import super.std.core
+
+// Test currying and higher-order function patterns
+
+// Simple currying: returns a closure
+fn add_maker(x: Int) -> fn(Int) -> Int {
+    return fn(y: Int) -> Int { return x + y }
+}
+
+let add5 = add_maker(5)
+assert(add5(3) == 8, "basic curry add5(3)")
+assert(add5(0) == 5, "basic curry add5(0)")
+assert(add5(-5) == 0, "basic curry add5(-5)")
+
+// Multi-level currying
+fn mul3(a: Int) -> fn(Int) -> fn(Int) -> Int {
+    return fn(b: Int) -> fn(Int) -> Int {
+        return fn(c: Int) -> Int {
+            return a * b * c
+        }
+    }
+}
+
+assert(mul3(2)(3)(4) == 24, "3-level curry")
+let step1 = mul3(10)
+let step2 = step1(5)
+assert(step2(2) == 100, "curry partial application")
+
+// Generic curry wrapper
+fn curry(f: fn($A, $A) -> $A) -> fn($A) -> fn($A) -> $A {
+    return fn(x: $A) -> fn($A) -> $A {
+        return fn(y: $A) -> $A {
+            return f(x, y)
+        }
+    }
+}
+
+fn mul(a: Int, b: Int) -> Int { return a * b }
+fn add(a: Int, b: Int) -> Int { return a + b }
+
+let curried_mul = curry(mul@(Int, Int))
+assert(curried_mul(6)(7) == 42, "generic curry mul")
+
+let curried_add = curry(add@(Int, Int))
+assert(curried_add(10)(20) == 30, "generic curry add")
+
+// Function pointer from struct
+struct MathOp {
+    func: fn(Int, Int) -> Int,
+}
+
+let adder = MathOp(fn(x: Int, y: Int) -> Int { return x + y })
+assert((adder.func)(3, 4) == 7, "struct func field call")
+
+// Closure that returns closure
+fn counter_maker(start: Int) -> fn() -> Int {
+    let state = Box(start)
+    return fn() -> Int {
+        let v = state.value
+        state.value = state.value + 1
+        return v
+    }
+}
+
+let cnt = counter_maker(10)
+assert(cnt() == 10, "counter starts at 10")
+assert(cnt() == 11, "counter increments")
+assert(cnt() == 12, "counter increments again")
+
+println("PASS: test_currying")

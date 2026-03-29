@@ -1,0 +1,78 @@
+module test_while_loops
+
+import super.std.core
+
+// Basic while loop
+let i = Box(0)
+while i.value < 5 {
+    i.value += 1
+}
+assert(i.value == 5, "basic while loop")
+
+// While loop with break
+let j = Box(0)
+while true {
+    j.value += 1
+    if j.value == 10 {
+        break
+    }
+}
+assert(j.value == 10, "while break")
+
+// While loop accumulator
+let sum = Box(0)
+let k = Box(1)
+while k.value <= 100 {
+    sum.value += k.value
+    k.value += 1
+}
+assert(sum.value == 5050, "gauss sum 1 to 100")
+
+// While loop with continue
+let evens = Box(0)
+let n = Box(0)
+while n.value < 20 {
+    n.value += 1
+    if n.value % 2 != 0 {
+        continue
+    }
+    evens.value += 1
+}
+assert(evens.value == 10, "while continue count evens")
+
+// Nested while loops
+let outer = Box(0)
+let total = Box(0)
+while outer.value < 3 {
+    let inner = Box(0)
+    while inner.value < 4 {
+        total.value += 1
+        inner.value += 1
+    }
+    outer.value += 1
+}
+assert(total.value == 12, "nested while 3x4")
+
+// For loop basic
+let acc = Box(0)
+for let x = 1; x <= 10; x += 1 {
+    acc.value += x
+}
+assert(acc.value == 55, "for loop sum 1-10")
+
+// For loop with different step
+let doubled = Box(0)
+for let x = 0; x < 10; x += 2 {
+    doubled.value += 1
+}
+assert(doubled.value == 5, "for loop step 2")
+
+// Foreach (for...in)
+let items = [10, 20, 30, 40, 50]
+let fsum = Box(0)
+for item in items {
+    fsum.value += item
+}
+assert(fsum.value == 150, "foreach sum")
+
+println("PASS: test_while_loops")

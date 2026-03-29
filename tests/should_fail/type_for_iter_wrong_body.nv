@@ -1,0 +1,6 @@
+module type_for_iter_wrong_body
+// SHOULD FAIL: for loop body tries to use iterator variable as wrong type
+let items = [1, 2, 3]
+foreach item in items {
+    let s: String = item
+}

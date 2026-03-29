@@ -1,0 +1,8 @@
+module type_enum_construct_wrong_data
+// SHOULD FAIL: constructing enum variant with wrong data type
+enum Color {
+    Rgb: (Int, Int, Int),
+    Named: String
+}
+
+let c = Color::Rgb("not a tuple")

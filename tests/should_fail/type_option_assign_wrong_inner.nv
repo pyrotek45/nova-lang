@@ -1,0 +1,3 @@
+module type_option_assign_wrong_inner
+// SHOULD FAIL: Option(Int) cannot hold a String
+let x: Option(Int) = Some("hello")

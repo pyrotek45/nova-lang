@@ -1,0 +1,18 @@
+module type_match_branch_type_mismatch
+// SHOULD FAIL: match branches return different types in a function expecting uniform return
+enum Dir {
+    North,
+    South,
+    East,
+    West
+}
+
+fn dir_val(d: Dir) -> Int {
+    match d {
+        North() => { return 0 }
+        South() => { return "south" }
+        East() => { return 2 }
+        West() => { return 3 }
+    }
+    return 0
+}

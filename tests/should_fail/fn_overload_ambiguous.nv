@@ -1,0 +1,7 @@
+module fn_overload_ambiguous
+// SHOULD FAIL: calling overloaded function with wrong types
+fn process(x: Int) -> Int { return x }
+fn process(x: String) -> String { return x }
+
+// Bool is neither Int nor String
+let result = process(true)

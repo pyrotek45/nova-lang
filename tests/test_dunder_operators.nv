@@ -1,0 +1,97 @@
+module test_dunder_operators
+
+import super.std.core
+
+// Test operator overloading via dunder methods
+
+struct Vec2 {
+    x: Int,
+    y: Int,
+}
+
+fn extends toString(self: Vec2) -> String {
+    return "(" + Cast::string(self.x) + ", " + Cast::string(self.y) + ")"
+}
+
+// __add__
+fn extends __add__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x + other.x, y: self.y + other.y }
+}
+
+let a = Vec2(1, 2)
+let b = Vec2(3, 4)
+let c = a + b
+assert(c.x == 4, "dunder add x")
+assert(c.y == 6, "dunder add y")
+
+// __sub__
+fn extends __sub__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x - other.x, y: self.y - other.y }
+}
+let d = b - a
+assert(d.x == 2, "dunder sub x")
+assert(d.y == 2, "dunder sub y")
+
+// __mul__
+fn extends __mul__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x * other.x, y: self.y * other.y }
+}
+let e = Vec2(2, 3) * Vec2(4, 5)
+assert(e.x == 8, "dunder mul x")
+assert(e.y == 15, "dunder mul y")
+
+// __eq__
+fn extends __eq__(self: Vec2, other: Vec2) -> Bool {
+    return self.x == other.x && self.y == other.y
+}
+assert(Vec2(1, 2) == Vec2(1, 2), "dunder eq true")
+assert(!(Vec2(1, 2) == Vec2(3, 4)), "dunder eq false")
+
+// __ne__
+fn extends __ne__(self: Vec2, other: Vec2) -> Bool {
+    return self.x != other.x || self.y != other.y
+}
+assert(Vec2(1, 2) != Vec2(3, 4), "dunder ne true")
+assert(!(Vec2(1, 2) != Vec2(1, 2)), "dunder ne false")
+
+// __lt__
+fn extends __lt__(self: Vec2, other: Vec2) -> Bool {
+    return (self.x * self.x + self.y * self.y) < (other.x * other.x + other.y * other.y)
+}
+assert(Vec2(1, 1) < Vec2(3, 4), "dunder lt true")
+assert(!(Vec2(3, 4) < Vec2(1, 1)), "dunder lt false")
+
+// __le__
+fn extends __le__(self: Vec2, other: Vec2) -> Bool {
+    return (self.x * self.x + self.y * self.y) <= (other.x * other.x + other.y * other.y)
+}
+assert(Vec2(1, 1) <= Vec2(3, 4), "dunder le less")
+assert(Vec2(3, 4) <= Vec2(3, 4), "dunder le equal")
+
+// __gt__
+fn extends __gt__(self: Vec2, other: Vec2) -> Bool {
+    return (self.x * self.x + self.y * self.y) > (other.x * other.x + other.y * other.y)
+}
+assert(Vec2(3, 4) > Vec2(1, 1), "dunder gt true")
+
+// __ge__
+fn extends __ge__(self: Vec2, other: Vec2) -> Bool {
+    return (self.x * self.x + self.y * self.y) >= (other.x * other.x + other.y * other.y)
+}
+assert(Vec2(3, 4) >= Vec2(1, 1), "dunder ge greater")
+assert(Vec2(3, 4) >= Vec2(3, 4), "dunder ge equal")
+
+// __mod__
+fn extends __mod__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x % other.x, y: self.y % other.y }
+}
+let f = Vec2(7, 10) % Vec2(3, 4)
+assert(f.x == 1, "dunder mod x")
+assert(f.y == 2, "dunder mod y")
+
+// Chain multiple overloaded operators
+let result = Vec2(1, 2) + Vec2(3, 4) - Vec2(2, 1)
+assert(result.x == 2, "chained dunder ops x")
+assert(result.y == 5, "chained dunder ops y")
+
+println("PASS: test_dunder_operators")

@@ -1,0 +1,62 @@
+module test_if_expressions
+
+import super.std.core
+
+// If expression returns a value
+let x = if true { 1 } else { 2 }
+assert(x == 1, "if expr true branch")
+
+let y = if false { 1 } else { 2 }
+assert(y == 2, "if expr false branch")
+
+// If expression with comparison
+let max = if 10 > 5 { 10 } else { 5 }
+assert(max == 10, "if expr max")
+
+// Nested if expression
+let val = 15
+fn categorize(v: Int) -> String {
+    if v < 10 { return "small" }
+    if v < 20 { return "medium" }
+    return "large"
+}
+assert(categorize(val) == "medium", "nested if via function")
+
+// If expression in function return
+fn abs(n: Int) -> Int {
+    return if n < 0 { -n } else { n }
+}
+assert(abs(5) == 5, "abs positive")
+assert(abs(-5) == 5, "abs negative")
+assert(abs(0) == 0, "abs zero")
+
+// If expression as function argument
+fn double(n: Int) -> Int { return n * 2 }
+assert(double(if true { 5 } else { 10 }) == 10, "if expr as arg")
+
+// Boolean expressions
+assert(true && true, "and true true")
+assert(!(true && false), "and true false")
+assert(true || false, "or true false")
+assert(!(false || false), "or false false")
+assert(!false, "not false")
+assert(!!true, "double not")
+
+// Comparison chains
+assert(1 < 2, "lt")
+assert(2 > 1, "gt")
+assert(1 <= 1, "le eq")
+assert(1 <= 2, "le lt")
+assert(2 >= 2, "ge eq")
+assert(3 >= 2, "ge gt")
+assert(1 == 1, "eq")
+assert(1 != 2, "ne")
+
+// Complex boolean
+let a = 5
+let b = 10
+let c = 15
+assert(a < b && b < c, "chained and")
+assert(a > c || b < c, "chained or")
+
+println("PASS: test_if_expressions")

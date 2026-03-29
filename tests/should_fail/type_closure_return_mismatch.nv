@@ -1,0 +1,3 @@
+module type_closure_return_mismatch
+// SHOULD FAIL: closure return type doesn't match annotation
+let f: fn(Int) -> Int = fn(x: Int) -> String { return "hello" }
