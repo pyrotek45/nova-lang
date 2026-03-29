@@ -1,4 +1,8 @@
-use std::{fmt::Display, ops::Deref, rc::Rc};
+use std::{
+    fmt::{self, Display},
+    ops::Deref,
+    rc::Rc,
+};
 
 use crate::fileposition::FilePosition;
 pub type TokenList = Vec<Token>;
@@ -8,6 +12,16 @@ pub enum Unary {
     Positive,
     Negative,
     Not,
+}
+
+impl Display for Unary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Unary::Positive => f.write_str("+"),
+            Unary::Negative => f.write_str("-"),
+            Unary::Not => f.write_str("!"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,9 +90,56 @@ pub enum Operator {
     /// pipe arrow
     PipeArrow,
 }
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Operator::AddAssign => "+=",
+            Operator::SubAssign => "-=",
+            Operator::And => "&&",
+            Operator::Or => "||",
+            Operator::DoubleColon => "::",
+            Operator::Colon => ":",
+            Operator::GreaterOrEqual => ">=",
+            Operator::LessOrEqual => "<=",
+            Operator::Equal => "==",
+            Operator::Assignment => "=",
+            Operator::RightArrow => "->",
+            Operator::Greater => ">",
+            Operator::Less => "<",
+            Operator::Addition => "+",
+            Operator::Subtraction => "-",
+            Operator::Division => "/",
+            Operator::Multiplication => "*",
+            Operator::Modulo => "%",
+            Operator::NotEqual => "!=",
+            Operator::Not => "!",
+            Operator::Concat => "++",
+            Operator::Access => ".",
+            Operator::ListAccess => "[]",
+            Operator::Call => "()",
+            Operator::RightTilde => "~>",
+            Operator::LeftTilde => "<~",
+            Operator::InclusiveRange => "..=",
+            Operator::ExclusiveRange => "..",
+            Operator::FatArrow => "=>",
+            Operator::PipeArrow => "|>",
+        };
+        f.write_str(s)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyWord {
     In,
+}
+
+impl Display for KeyWord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyWord::In => f.write_str("in"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
@@ -115,6 +176,30 @@ pub enum StructuralSymbol {
     Tilde,
     /// |
     Pipe,
+}
+
+impl Display for StructuralSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            StructuralSymbol::Semicolon => ";",
+            StructuralSymbol::LeftParen => "(",
+            StructuralSymbol::RightParen => ")",
+            StructuralSymbol::LeftSquareBracket => "[",
+            StructuralSymbol::RightSquareBracket => "]",
+            StructuralSymbol::Comma => ",",
+            StructuralSymbol::LeftBrace => "{",
+            StructuralSymbol::RightBrace => "}",
+            StructuralSymbol::DollarSign => "$",
+            StructuralSymbol::At => "@",
+            StructuralSymbol::QuestionMark => "?",
+            StructuralSymbol::Pound => "#",
+            StructuralSymbol::Dot => ".",
+            StructuralSymbol::Ampersand => "&",
+            StructuralSymbol::Tilde => "~",
+            StructuralSymbol::Pipe => "|",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -254,24 +339,23 @@ impl Token {
 }
 
 impl Display for TokenValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use TokenValue::*;
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Identifier(name) => write!(f, "Identifier(\"{name}\")"),
-            Integer(value) => write!(f, "Integer({value})"),
-            Float(value) => write!(f, "Float({value})"),
-            StringLiteral(value) => write!(f, "String(\"{value}\")"),
-            Char(value) => write!(f, "Char('{value}')"),
-            Bool(value) => write!(f, "Bool({value})"),
-            Operator(operator) => write!(f, "Operator({operator:?})"),
-            StructuralSymbol(sym) => write!(f, "StructuralSymbol({sym:?})"),
-            Keyword(keyword) => write!(f, "Keyword({keyword:?})"),
+            TokenValue::Identifier(name) => write!(f, "`{name}`"),
+            TokenValue::Integer(value) => write!(f, "`{value}`"),
+            TokenValue::Float(value) => write!(f, "`{value}`"),
+            TokenValue::StringLiteral(value) => write!(f, "`\"{value}\"`"),
+            TokenValue::Char(value) => write!(f, "`'{value}'`"),
+            TokenValue::Bool(value) => write!(f, "`{value}`"),
+            TokenValue::Operator(op) => write!(f, "`{op}`"),
+            TokenValue::StructuralSymbol(sym) => write!(f, "`{sym}`"),
+            TokenValue::Keyword(kw) => write!(f, "`{kw}`"),
         }
     }
 }
 
 impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.value.fmt(f)
     }
 }

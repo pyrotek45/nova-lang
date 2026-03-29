@@ -17,7 +17,7 @@ fn pop_int(state: &mut state::State) -> NovaResult<i64> {
     match pop_or_err(state)? {
         VmData::Int(v) => Ok(v),
         other => Err(Box::new(NovaError::Runtime {
-            msg: format!("Expected Int, got {:?}", other).into(),
+            msg: format!("Expected Int, got {}", other).into(),
         })),
     }
 }
@@ -27,7 +27,7 @@ fn pop_float(state: &mut state::State) -> NovaResult<f64> {
     match pop_or_err(state)? {
         VmData::Float(v) => Ok(v),
         other => Err(Box::new(NovaError::Runtime {
-            msg: format!("Expected Float, got {:?}", other).into(),
+            msg: format!("Expected Float, got {}", other).into(),
         })),
     }
 }
@@ -56,7 +56,7 @@ fn pop_bool(state: &mut state::State) -> NovaResult<bool> {
     match pop_or_err(state)? {
         VmData::Bool(v) => Ok(v),
         other => Err(Box::new(NovaError::Runtime {
-            msg: format!("Expected Bool, got {:?}", other).into(),
+            msg: format!("Expected Bool, got {}", other).into(),
         })),
     }
 }
