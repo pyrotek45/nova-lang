@@ -2,7 +2,7 @@
 
 Nova is a statically typed, expression-oriented programming language with garbage collection,
 universal function call syntax (UFCS), first-class functions, and a structural dynamic-dispatch
-system called `Dyn` types. This guide walks you through every major feature with working examples.
+system called Dyn types. This guide covers every major feature with working examples.
 
 ---
 
@@ -33,12 +33,13 @@ system called `Dyn` types. This guide walks you through every major feature with
 23. [Iterators](#23-iterators)
 24. [String Operations](#24-string-operations)
 25. [The Fuzzer](#25-the-fuzzer)
+26. [Quick Reference: Common Mistakes](#26-quick-reference-common-mistakes)
 
 ---
 
 ## 1. Module System
 
-Every Nova source file **must** begin with a `module` declaration. This sets the file's namespace.
+Every Nova source file must begin with a `module` declaration. This sets the file's namespace.
 
 ```nova
 module my_module
@@ -47,9 +48,9 @@ module my_module
 ```
 
 Module names are used when other files import this file. There is no way to have code at the
-top level without a `module` declaration — the parser will reject the file.
+top level without a `module` declaration -- the parser will reject the file.
 
-To import another module use `import`:
+To import another module:
 
 ```nova
 module main
@@ -66,9 +67,9 @@ in the `std/` folder of the project.
 
 ## 2. Variables and Types
 
-Variables are declared with `let`. Nova is **statically typed** — every variable has a fixed
-type that is set at declaration time and never changes. Nova has **no type inference** beyond
-the initial binding: the type of `x` is exactly the type of the expression on the right.
+Variables are declared with `let`. Nova is statically typed -- every variable has a fixed type
+that is set at declaration time and never changes. Nova has no type inference beyond the initial
+binding: the type of `x` is exactly the type of the expression on the right.
 
 ```nova
 let x = 42          // x : Int
@@ -85,22 +86,22 @@ let x: Int = 42
 let name: String = "Alice"
 ```
 
-**Reassignment** uses bare `=` (no `let`):
+Reassignment uses bare `=` (no `let`):
 
 ```nova
 let count = 0
-count = count + 1   // OK — same type Int
-count = "hello"     // COMPILE ERROR — type mismatch
+count = count + 1   // OK -- same type Int
+count = "hello"     // COMPILE ERROR -- type mismatch
 ```
 
-Compound assignment operators (`+=`, `-=`, `*=`, `/=`) **return Void**, so they cannot be used
-as expressions. Use them only as statements:
+Compound assignment operators (`+=`, `-=`, `*=`, `/=`) return Void, so they cannot be used as
+expressions. Use them only as statements:
 
 ```nova
 let x = 10
 x += 5      // OK as a statement
 x -= 2      // OK
-// let y = (x += 1)  // ERROR — Void cannot be assigned
+// let y = (x += 1)  // ERROR -- Void cannot be assigned
 ```
 
 ---
@@ -108,13 +109,13 @@ x -= 2      // OK
 ## 3. Built-in Types
 
 | Type | Description | Example |
-|------|-------------|---------|
+|---|---|---|
 | `Int` | 64-bit signed integer | `42`, `-7`, `0` |
 | `Float` | 64-bit floating point | `3.14`, `-0.5` |
 | `Bool` | Boolean | `true`, `false` |
 | `String` | UTF-8 text | `"hello"`, `""` |
 | `Char` | Single Unicode character | `'a'`, `'\n'`, `'\t'` |
-| `Void` | No value (function return) | — |
+| `Void` | No value (function return) | -- |
 | `Option(T)` | Maybe a value of type T | `Some(42)`, `None(Int)` |
 | `[T]` | List of T | `[1,2,3]`, `[]: Int` |
 | `(A, B, ...)` | Tuple | `(1, "hello", true)` |
@@ -125,16 +126,18 @@ x -= 2      // OK
 ## 4. Operators
 
 ### Arithmetic
+
 ```nova
 let a = 10 + 3    // 13
 let b = 10 - 3    // 7
 let c = 10 * 3    // 30
 let d = 10 / 3    // 3  (integer division)
-let e = 10 % 3    // 1  (Euclidean modulo — always non-negative)
+let e = 10 % 3    // 1  (Euclidean modulo -- always non-negative)
 let f = -10 % 3   // 2  (NOT -1; Nova uses Euclidean modulo)
 ```
 
 ### Comparison
+
 ```nova
 1 == 1      // true
 1 != 2      // true
@@ -144,19 +147,21 @@ let f = -10 % 3   // 2  (NOT -1; Nova uses Euclidean modulo)
 4 >= 5      // false
 ```
 
-### Boolean — Precedence Note
-**Nova's `||` binds more tightly than `&&`** (opposite of most languages).
-Always use parentheses when mixing:
+### Boolean -- Precedence Warning
+
+Nova's `||` binds more tightly than `&&` (opposite of most languages). Always use parentheses
+when mixing:
 
 ```nova
-// BAD — may not do what you expect:
+// Surprising -- may not do what you expect:
 let r = true || false && false   // = (true || false) && false = false
 
-// GOOD — use parens to be explicit:
+// Safe -- use parens to be explicit:
 let r = (true || false) && (true || false)   // = true
 ```
 
 ### Unary
+
 ```nova
 let neg = -5
 let not = !true   // false
@@ -180,7 +185,7 @@ if x > 100 {
 }
 ```
 
-The condition must be `Bool` — using an `Int` or any other type is a compile error.
+The condition must be `Bool` -- using an `Int` or any other type is a compile error.
 
 ### for (C-style)
 
@@ -239,7 +244,9 @@ fn add(a: Int, b: Int) -> Int {
 let result = add(3, 4)   // 7
 ```
 
-### Void functions (no return type annotation means Void)
+### Void functions
+
+A function with no return type annotation returns `Void`:
 
 ```nova
 fn greet(name: String) {
@@ -293,28 +300,25 @@ fn factorial(n: Int) -> Int {
 ```
 
 > **Note:** Nova does not support forward declarations. A function must be defined before it
-> is called. Mutual recursion can be implemented by factoring into a single function with a
-> boolean flag, or by reducing recursion to a non-mutual form.
+> is called. Mutual recursion is not directly supported.
 
 ---
 
 ## 7. Extends / UFCS
 
-The `extends` keyword makes a function callable with Universal Function Call Syntax (UFCS).
-The first parameter becomes the **receiver** (`self`).
+The `extends` keyword makes a function callable with Universal Function Call Syntax. The first
+parameter becomes the receiver.
 
 ```nova
 fn extends double(x: Int) -> Int {
     return x * 2
 }
 
-// Both are equivalent:
-let a = double(5)    // ERROR — extends functions cannot be called as regular functions
-let b = 5.double()   // OK — UFCS syntax
+let b = 5.double()   // 10 -- UFCS syntax
 ```
 
-**Extends functions can only be called as UFCS.** Calling them as regular functions is a
-compile error.
+Extends functions can only be called with UFCS dot syntax. Calling them as regular functions
+is a compile error.
 
 ### Chaining
 
@@ -324,7 +328,7 @@ UFCS calls chain naturally left-to-right:
 fn extends square(x: Int) -> Int { return x * x }
 fn extends negate(x: Int) -> Int { return -x }
 
-let r = 5.double().square().negate()   // ((5*2)^2)*-1 = -100
+let r = 5.double().square().negate()   // ((5*2)^2) * -1 = -100
 ```
 
 ### Overloaded extends
@@ -346,14 +350,14 @@ struct Point { x: Int, y: Int }
 
 fn extends magnitude(p: Point) -> Float {
     let sum = Cast::float(p.x * p.x + p.y * p.y)
-    // ... compute sqrt via approximation or Cast
     return sum.unwrap()
 }
 ```
 
 ### The `->` dispatch operator
 
-When a struct field holds a function, `->` calls that function passing the struct as its first argument:
+When a struct field holds a function, `->` calls that function passing the struct as its first
+argument:
 
 ```nova
 struct Button {
@@ -367,7 +371,6 @@ let btn = Button {
 }
 
 btn->on_click()   // calls on_click(btn)
-btn.on_click      // ERROR — this just gets the function value without calling it
 ```
 
 The `::` operator calls a struct's function field without passing self:
@@ -428,9 +431,9 @@ t->tick()
 // t.ticks is now 2
 ```
 
-### `type` field
+### The `type` field
 
-Every struct instance automatically has a `"type"` field that stores the struct's name as a
+Every struct instance automatically has a `type` field that stores the struct's name as a
 string:
 
 ```nova
@@ -445,9 +448,9 @@ println(d.type)   // "Dog"
 
 ```nova
 enum Shape {
-    Circle: Float,     // carries a Float (radius)
+    Circle: Float,              // carries a Float (radius)
     Rectangle: (Float, Float),  // carries a tuple
-    Triangle
+    Triangle                    // no payload
 }
 ```
 
@@ -487,7 +490,7 @@ fn extends first(list: [$T]) -> Option($T) {
 }
 ```
 
-Generic structs use the same `$T` syntax, declared in the struct's type parameter list:
+Generic structs declare type parameters in the struct header:
 
 ```nova
 struct Pair(A, B) {
@@ -500,11 +503,11 @@ fn extends swap(p: Pair($A, $B)) -> Pair($B, $A) {
 }
 ```
 
-> **Type inference does not exist in Nova.** Every type variable must be inferrable from the
-> argument types at the call site — the compiler will not guess.
+> Nova has no type inference. Every type variable must be inferrable from the argument types at
+> the call site.
 
-> **Raw generic extends**: `fn extends id(x: $A)` is **not supported**. Generic extends
-> functions must have a concrete type constructor as the receiver, e.g., `Wrapper($T)`.
+> Raw generic extends (`fn extends id(x: $A)`) is not supported. Generic extends functions must
+> have a concrete type constructor as the receiver, e.g. `Wrapper($T)`.
 
 ---
 
@@ -560,8 +563,8 @@ let square = |x: Int| x * x
 square(5)   // 25
 ```
 
-Closures **capture** variables from the surrounding scope. By default, captured values are
-copied. To share mutable state across closures, use `Box`:
+Closures capture variables from the surrounding scope. By default, captured values are copied.
+To share mutable state across closures, use `Box`:
 
 ```nova
 import super.std.core
@@ -582,7 +585,7 @@ inc()   // 3
 
 ```nova
 let nums = [1, 2, 3, 4, 5]
-let doubled = nums.map(|x: Int| x * 2)    // [2, 4, 6, 8, 10]
+let doubled = nums.map(|x: Int| x * 2)        // [2, 4, 6, 8, 10]
 let evens = nums.filter(|x: Int| x % 2 == 0)  // [2, 4]
 ```
 
@@ -594,7 +597,7 @@ let evens = nums.filter(|x: Int| x % 2 == 0)  // [2, 4]
 
 ```nova
 let xs = [1, 2, 3]          // [Int]
-let empty = []: Int          // empty list — type annotation required
+let empty = []: Int          // empty list -- type annotation required
 let strs = ["a", "b", "c"]  // [String]
 ```
 
@@ -608,35 +611,27 @@ xs[0]            // index (0-based)
 xs[0] = 99       // element assignment
 ```
 
-### Standard library list functions (import super.std.list)
+### Standard library list functions
 
 ```nova
 import super.std.list
 
-[1,2,3].map(|x: Int| x * 2)           // [2,4,6]
-[1,2,3,4].filter(|x: Int| x > 2)      // [3,4]
-[1,2,3].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)  // 6
+[1,2,3].map(|x: Int| x * 2)                                   // [2,4,6]
+[1,2,3,4].filter(|x: Int| x > 2)                              // [3,4]
+[1,2,3].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)         // 6
 [1,2,3].foreach(|x: Int| { println(x) })
-[[1,2],[3,4]].flatten()               // [1,2,3,4]
-[3,1,2].bubblesort()                  // [1,2,3]
-[5,3,1].sortWith(|a: Int, b: Int| a > b)  // descending
-[1,2,3].concat([4,5,6])              // [1,2,3,4,5,6]
-[0]: Int.fill(0, 5)                   // [0,0,0,0,0]
-```
-
-### List comprehension (list of ranges)
-
-```nova
-for i in 0..5 {
-    println(i)   // 0,1,2,3,4
-}
+[[1,2],[3,4]].flatten()                                        // [1,2,3,4]
+[3,1,2].bubblesort()                                           // [1,2,3]
+[5,3,1].sortWith(|a: Int, b: Int| a > b)                      // descending
+[1,2,3].concat([4,5,6])                                        // [1,2,3,4,5,6]
+[0]: Int.fill(0, 5)                                            // [0,0,0,0,0]
 ```
 
 ---
 
 ## 14. Tuples
 
-Tuples are fixed-size, typed collections. Access fields by index:
+Tuples are fixed-size, typed collections. Access elements by index:
 
 ```nova
 let t = (42, "hello", true)
@@ -659,7 +654,7 @@ let result = divmod(17, 5)
 
 ## 15. Pattern Matching
 
-`match` works on **enum values**:
+`match` works on enum values:
 
 ```nova
 enum Tree(T) {
@@ -681,8 +676,8 @@ fn depth(t: Tree(Int)) -> Int {
 }
 ```
 
-`match` arms use the variant name (without the enum prefix) as the pattern. A wildcard is
-written as an identifier that captures the value:
+Match arms use the variant name (without the enum prefix) as the pattern. An identifier in the
+arm captures the associated data:
 
 ```nova
 match color {
@@ -696,8 +691,8 @@ match color {
 
 ## 16. Pipe Operator
 
-The `|>` operator passes the left value as the first argument to the right-hand function call.
-The right-hand side **must use call syntax** (with `()`) and must be a **non-extends function**.
+The `|>` operator passes the left-hand value as the first argument to the right-hand function
+call. The right-hand side must use call syntax (with `()`) and must be a non-extends function.
 
 ```nova
 fn square(x: Int) -> Int { return x * x }
@@ -706,21 +701,17 @@ fn inc(x: Int) -> Int { return x + 1 }
 let r = 4 |> inc() |> square()   // square(inc(4)) = 25
 ```
 
-> **Extends functions cannot be used with `|>`.**
-> Use UFCS chaining (`.method()`) for extends functions instead.
+> Extends functions cannot be used with `|>`. Use UFCS chaining (`.method()`) instead.
 
 ---
 
 ## 17. Dyn Types
 
-`Dyn` types provide structural, duck-typed dispatch without inheritance. A `Dyn` type describes
-the fields a value must have — any struct with those fields satisfies the type.
+Dyn types provide structural, duck-typed dispatch without inheritance. A Dyn type describes the
+fields a value must have -- any struct with those fields satisfies the constraint.
 
 ```nova
-// Declare a Dyn type alias
-type named = Dyn(T = name: String)
-
-// Any struct with a 'name: String' field satisfies 'named'
+// Any struct with a 'name: String' field satisfies this
 struct Dog { name: String, age: Int }
 struct Robot { name: String, model: Int }
 
@@ -735,6 +726,12 @@ get_name(d)   // "Rex"
 get_name(r)   // "R2D2"
 ```
 
+### Type aliases
+
+```nova
+type named = Dyn(T = name: String)
+```
+
 ### Multi-field Dyn
 
 ```nova
@@ -743,7 +740,7 @@ fn full_info(x: Dyn(T = name: String + age: Int)) -> String {
 }
 ```
 
-### Dyn with function fields (vtable dispatch)
+### Dyn with function fields
 
 Use `->` to call a function field through a Dyn type:
 
@@ -758,7 +755,9 @@ fn render(item: renderable) -> String {
 ### Dyn lists
 
 ```nova
-let items = []: named     // a list of anything with 'name: String'
+type named = Dyn(T = name: String)
+
+let items = []: named
 items.push(Dog { name: "Rex", age: 5 })
 items.push(Robot { name: "R2D2", model: 2 })
 ```
@@ -783,6 +782,7 @@ get()   // 3
 ```
 
 `Box` is the standard way to implement:
+
 - Mutable counters shared between closures
 - Generator functions
 - Mutable fields inside closures captured by `foreach`
@@ -807,8 +807,8 @@ import super.std.tui      // terminal UI helpers
 
 ### Key std/core.nv exports
 
-| Function | Description |
-|----------|-------------|
+| Name | Description |
+|---|---|
 | `Box(T)` | Heap wrapper for mutable shared state |
 | `Gen(start)` | Creates an integer generator starting at `start` |
 | `range(n)` | Returns `[0, 1, ..., n-1]` |
@@ -816,57 +816,58 @@ import super.std.tui      // terminal UI helpers
 | `Maybe(T)` | `Just(value)` or `Nothing` |
 | `Result(A, B)` | `Ok(value)` or `Err(error)` |
 | `.orDefault(v)` | Unwrap Option or return default |
-| `.orError(msg)` | Unwrap Option or print and exit |
+| `.orError(msg)` | Unwrap Option or print error and exit |
 | `.isNone()` | True if Option is None |
 
 ---
 
 ## 20. Type System Rules
 
-Nova's type system is **strict and static**. The following are all compile-time errors:
+Nova's type system is strict and static. The following are all compile-time errors:
 
 - Passing a value of the wrong type to a function
 - Returning the wrong type from a function
 - Assigning a value of a different type to an existing variable
 - Using a variable that hasn't been declared
 - Calling a function that doesn't exist
-- Calling a function with wrong arity
+- Calling a function with the wrong number of arguments
 - Accessing a struct field that doesn't exist
 - Constructing a struct with missing or wrong-typed fields
 - Pushing a wrong-typed element into a list
-- Using an `Option(T)` where `T` is expected (must unwrap)
+- Using an `Option(T)` where `T` is expected (must unwrap first)
 - Mixing `Int` and `Float` without explicit cast
-- Calling an `extends` function on the wrong receiver type
+- Calling an extends function on the wrong receiver type
 
-**Nova has no type inference.** The type of every binding is determined at declaration, and the
+Nova has no type inference. The type of every binding is determined at declaration, and the
 compiler does not attempt to infer types from usage.
 
 ---
 
 ## 21. Garbage Collector
 
-Nova uses a **hybrid garbage collector** combining:
+Nova uses a hybrid garbage collector combining:
 
-1. **Reference counting**: Objects whose reference count drops to zero are freed immediately.
-2. **Mark-and-sweep**: A periodic sweep collects objects involved in reference cycles.
+1. **Reference counting** -- objects whose reference count drops to zero are freed immediately.
+2. **Mark-and-sweep** -- a periodic sweep collects objects involved in reference cycles.
 
 This means:
-- Most objects are freed promptly when they go out of scope
-- Circular structures (e.g., two structs that reference each other via `Box`) are still collected
-- No manual memory management is needed
+
+- Most objects are freed promptly when they go out of scope.
+- Circular structures (e.g. two structs referencing each other via `Box`) are still collected.
+- No manual memory management is needed.
 
 ### Practical implications
 
-- **Short-lived allocations** (temp strings, list intermediates) are cheap — they free on scope exit
-- **Closures** that capture `Box` values extend those values' lifetimes
-- You do not need to worry about memory leaks in normal code
-- The GC introduces no latency spikes for typical workloads
+- Short-lived allocations (temp strings, list intermediates) are cheap -- freed on scope exit.
+- Closures that capture `Box` values extend those values' lifetimes.
+- You do not need to worry about memory leaks in normal code.
+- The GC introduces no latency spikes for typical workloads.
 
 ---
 
 ## 22. Cast and Type Conversion
 
-### `Cast::string(x)` — any value → String
+### `Cast::string(x)` -- any value to String
 
 ```nova
 Cast::string(42)       // "42"
@@ -875,7 +876,7 @@ Cast::string(true)     // "true"
 Cast::string('A')      // "A"
 ```
 
-### `Cast::int(x)` — any value → Option(Int)
+### `Cast::int(x)` -- any value to Option(Int)
 
 Returns `None` if conversion fails:
 
@@ -884,13 +885,13 @@ let n = Cast::int("42")    // Some(42)
 let bad = Cast::int("abc") // None(Int)
 ```
 
-### `Cast::float(x)` — any value → Option(Float)
+### `Cast::float(x)` -- any value to Option(Float)
 
 ```nova
 let f = Cast::float(42)    // Some(42.0)
 ```
 
-### `toString(x)` — alias for Cast::string
+### `toString(x)` -- alias for Cast::string
 
 ```nova
 toString(42)   // "42"
@@ -900,7 +901,7 @@ toString(42)   // "42"
 
 ## 23. Iterators
 
-The `Iter` type (from `std/iter.nv`) provides a lazy iterator:
+The `Iter` type (from `std/iter.nv`) provides lazy iteration:
 
 ```nova
 import super.std.iter
@@ -913,10 +914,13 @@ let result = Iter::fromVec([1,2,3,4,5])
 ```
 
 Key iterator methods:
-- `Iter::fromVec(list)` — create iterator from a list
-- `.map(f)` — transform each element
-- `.filter(f)` — keep elements where `f` returns true
-- `.collect()` — materialize into a list
+
+| Method | Description |
+|---|---|
+| `Iter::fromVec(list)` | Create iterator from a list |
+| `.map(f)` | Transform each element |
+| `.filter(f)` | Keep elements where `f` returns true |
+| `.collect()` | Materialize into a list |
 
 ---
 
@@ -928,7 +932,8 @@ Strings support concatenation with `+`:
 let greeting = "Hello, " + "World!"
 ```
 
-Key string functions:
+Key string functions (from `std/string.nv`):
+
 ```nova
 import super.std.string
 
@@ -938,10 +943,11 @@ import super.std.string
 "  hello  ".trim()             // "hello"
 "Hello".toLower()              // "hello"
 "hello".toUpper()              // "HELLO"
-"hello world".split(' ')       // ["hello", "world"] (on chars)
+"hello world".split(' ')       // ["hello", "world"]
 ```
 
 Char operations:
+
 ```nova
 'a'.isAlpha()    // true
 '5'.isDigit()    // true
@@ -952,55 +958,47 @@ Char operations:
 
 ## 25. The Fuzzer
 
-Nova includes a fuzzing infrastructure to find bugs in the lexer and parser. It uses
-[cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) with libFuzzer.
+Nova includes fuzzing targets for the lexer and parser using
+[cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz).
 
 ### Setup
 
 ```bash
-# Install nightly Rust (required for fuzzing)
 rustup toolchain install nightly
-
-# Install cargo-fuzz
 cargo +nightly install cargo-fuzz
 ```
 
-### Running the fuzzer
+### Running
 
 ```bash
-# Fuzz the lexer for 30 seconds
-./fuzz/run_fuzz.sh lexer 30
-
-# Fuzz the parser for 60 seconds
-./fuzz/run_fuzz.sh parser 60
-
-# Fuzz all targets for 30 seconds each
-./fuzz/run_fuzz.sh all 30
+./fuzz/run_fuzz.sh lexer 30    # fuzz lexer for 30 seconds
+./fuzz/run_fuzz.sh parser 60   # fuzz parser for 60 seconds
+./fuzz/run_fuzz.sh all 30      # fuzz all targets
 ```
 
-Crash inputs are saved in `fuzz/artifacts/<target>/`. The fuzzer starts from a seed corpus of
-real Nova programs in `fuzz/corpus/`.
+Crash inputs are saved in `fuzz/artifacts/`. The fuzzer starts from a seed corpus of real Nova
+programs in `fuzz/corpus/`.
 
-### What the fuzzer checks
+What the fuzzer checks:
 
-- The **lexer** must never panic on arbitrary UTF-8 input
-- The **parser** must never panic on any sequence of tokens
-- Errors (parse/type errors) are expected and acceptable — panics are bugs
+- The lexer must never panic on arbitrary UTF-8 input.
+- The parser must never panic on any sequence of tokens.
+- Errors (parse/type errors) are expected and acceptable -- panics are bugs.
 
 ---
 
-## Quick Reference: Common Mistakes
+## 26. Quick Reference: Common Mistakes
 
 | Mistake | Fix |
-|---------|-----|
+|---|---|
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
-| `x += 1` used as expression | Use `x = x + 1` as a statement |
+| `x += 1` used as expression | Use `x = x + 1` in expressions; `+=` is statement-only |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
-| `5 \|> myExtendsFn()` | Only works with non-extends functions |
-| `fn extends id(x: $A)` | Not supported — use concrete type wrapper |
-| `match x { 0 => ... }` | Literals not allowed in match — use `if`/`elif` |
-| `-10 % 3 == -1` | Wrong — Nova uses Euclidean modulo: `-10 % 3 == 2` |
-| `Cast::int(x)` used as `Int` | Returns `Option(Int)` — must `.unwrap()` |
-| `Cast::float(x)` used as `Float` | Returns `Option(Float)` — must `.unwrap()` |
-| Mutual recursion (a calls b, b calls a) | Not supported — refactor to single function |
-| `struct Box(T)` | Conflicts with built-in `Box` — use a different name |
+| `5 \|> myExtendsFn()` | Pipe only works with non-extends functions |
+| `fn extends id(x: $A)` | Not supported -- use concrete type wrapper |
+| `match x { 0 => ... }` | Literals not allowed in match -- use `if`/`elif` |
+| `-10 % 3 == -1` | Wrong -- Nova uses Euclidean modulo: `-10 % 3 == 2` |
+| `Cast::int(x)` used as `Int` | Returns `Option(Int)` -- must `.unwrap()` |
+| `Cast::float(x)` used as `Float` | Returns `Option(Float)` -- must `.unwrap()` |
+| Mutual recursion | Not supported -- refactor to single function |
+| Naming a struct `Box` | Conflicts with built-in `Box` -- use a different name |

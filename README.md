@@ -2,22 +2,27 @@
 
 ![Nova Logo](nova-logo.png)
 
-Nova is a statically typed, expression-oriented programming language with:
+Nova is a statically typed, expression-oriented programming language compiled to bytecode and
+executed by a stack-based virtual machine written in Rust.
 
-- **No type inference** — types are explicit and checked at compile time
-- **Universal Function Call Syntax (UFCS)** — functions feel like methods
-- **First-class functions and closures** — functions are values
-- **Hybrid garbage collector** — reference counting + mark-and-sweep
-- **Structural Dyn types** — duck-typed dispatch without inheritance
-- **Generics** — type-parameterized structs and functions
+**Key features:**
 
-Nova is compiled to bytecode and run by a stack-based virtual machine written in Rust.
+- Explicit, static type system -- no type inference
+- Universal Function Call Syntax (UFCS)
+- First-class functions and closures
+- Generics with `$T` type parameters
+- Enums with associated data and pattern matching
+- Structural `Dyn` types for duck-typed dispatch
+- Pipe operator (`|>`) for function chaining
+- Hybrid garbage collector (reference counting + mark-and-sweep)
 
 ---
 
-## Installation
+## Getting Started
 
-Nova requires Rust (stable). Clone and build:
+### Build
+
+Nova requires a stable Rust toolchain. Clone and build:
 
 ```bash
 git clone https://github.com/pyrotek45/nova-lang
@@ -25,17 +30,15 @@ cd nova-lang
 cargo build --release
 ```
 
-The binary will be at `./target/release/nova`.
+The binary is placed at `./target/release/nova`.
 
-On NixOS, use:
+On NixOS:
 
 ```bash
 nix-shell --run "cargo build --release"
 ```
 
----
-
-## Usage
+### Run
 
 ```
 nova run   <file.nv>   Run a Nova program
@@ -66,13 +69,13 @@ module main
 import super.std.core
 import super.std.list
 
-// --- Structs ---
+// Structs
 struct Person {
     name: String,
     age: Int
 }
 
-// --- Extends functions (UFCS) ---
+// UFCS extends
 fn extends greet(p: Person) -> String {
     return "Hello, " + p.name + "! You are " + Cast::string(p.age) + " years old."
 }
@@ -80,7 +83,7 @@ fn extends greet(p: Person) -> String {
 let alice = Person { name: "Alice", age: 30 }
 println(alice.greet())
 
-// --- Enums and match ---
+// Enums and match
 enum Shape {
     Circle: Float,
     Rectangle: (Float, Float)
@@ -97,13 +100,13 @@ fn area(s: Shape) -> Float {
 println(area(Shape::Circle(5.0)))
 println(area(Shape::Rectangle((4.0, 3.0))))
 
-// --- First-class functions ---
+// First-class functions
 let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 let evens = nums.filter(|x: Int| x % 2 == 0)
 let squared = evens.map(|x: Int| x * x)
 println(squared)   // [4, 16, 36, 64, 100]
 
-// --- Box for shared mutable state ---
+// Box for shared mutable state
 let counter = Box(0)
 let inc = fn() -> Int {
     counter.value = counter.value + 1
@@ -113,14 +116,14 @@ println(inc())  // 1
 println(inc())  // 2
 println(inc())  // 3
 
-// --- Pipe operator ---
+// Pipe operator
 fn double(x: Int) -> Int { return x * 2 }
 fn add1(x: Int) -> Int { return x + 1 }
 
 let result = 5 |> add1() |> double()
 println(result)   // 12
 
-// --- Generics ---
+// Generics
 struct Pair(A, B) {
     fst: $A,
     snd: $B
@@ -135,9 +138,7 @@ let q = p.swap()
 println(q.fst)   // "hello"
 println(q.snd)   // 42
 
-// --- Dyn types (structural dispatch) ---
-type named = Dyn(T = name: String)
-
+// Dyn types (structural dispatch)
 struct Dog { name: String, breed: String }
 struct Robot { name: String, model: Int }
 
@@ -156,60 +157,62 @@ println(introduce(bot))
 ## Language Guide
 
 See [documentation/how_to_write_nova.md](documentation/how_to_write_nova.md) for the full
-language reference, including:
+language reference covering:
 
 - Module system and imports
-- Type system rules (what the compiler rejects)
-- Every operator and its precedence quirks
-- Structs, enums, generics, closures, Dyn types
-- The standard library (`std/core`, `std/list`, `std/iter`, `std/string`, etc.)
-- Box and mutable shared state patterns
-- The garbage collector and its guarantees
+- Variables, types, and operators
+- Control flow (`if`/`elif`/`else`, `for`, `while`, `match`)
+- Functions, overloading, and recursion
+- UFCS extends and method chaining
+- Structs, enums, generics, closures
+- Dyn types and structural dispatch
+- Box and mutable shared state
+- The standard library
+- Cast and type conversions
+- Iterators and string operations
 - Common mistakes and how to fix them
 
 ---
 
 ## Standard Library
 
-| Module | Contents |
-|--------|----------|
+| Module | Description |
+|---|---|
 | `std/core.nv` | `Box`, `Gen`, `Maybe`, `Result`, `range()`, `Option` helpers |
-| `std/list.nv` | `map`, `filter`, `reduce`, `foreach`, `sort`, `flatten`, `concat`, ... |
+| `std/list.nv` | `map`, `filter`, `reduce`, `foreach`, `sort`, `flatten`, `concat` |
 | `std/iter.nv` | Lazy `Iter` type with `map`, `filter`, `collect` |
-| `std/string.nv` | String/Char operations: trim, split, toLower, toUpper, ... |
-| `std/math.nv` | `sqrt`, `pow`, `abs`, `floor`, `ceil`, `sin`, `cos`, ... |
+| `std/string.nv` | `trim`, `split`, `toLower`, `toUpper`, char operations |
+| `std/math.nv` | `sqrt`, `pow`, `abs`, `floor`, `ceil`, `sin`, `cos` |
 | `std/io.nv` | `io::prompt`, `io::readFile` |
 | `std/hashmap.nv` | `HashMap` |
+| `std/tuple.nv` | Tuple utilities |
 | `std/tui.nv` | Terminal UI helpers |
 
 ---
 
-## Running Tests
+## Tests
 
-The test suite lives in `tests/`. Run it with:
+The test suite is in `tests/`. Run it with:
 
 ```bash
 cargo build --release
 bash tests/run_tests.sh
 ```
 
-The suite has two parts:
+Two categories:
 
-1. **Positive tests** (`tests/test_*.nv`) — programs that must compile, run, and print `PASS:`.
-   Currently **44 tests** covering: arithmetic, closures, enums, generics, GC stress, UFCS,
-   parser stress, lexer stress, Dyn types, iterators, higher-order functions, and more.
+- **Positive tests** (`tests/test_*.nv`) -- 55 programs that must compile, run, and print
+  `PASS:`. Covers arithmetic, closures, enums, generics, GC, UFCS, Dyn types, iterators,
+  higher-order functions, parser/lexer stress, and more.
 
-2. **Type-rejection tests** (`tests/should_fail/*.nv`) — programs that the compiler **must
-   reject**. Currently **20 tests** verifying that ill-typed programs produce compile errors:
-   wrong argument types, wrong return types, undefined variables, struct field type mismatches,
-   Int/Float confusion, missing struct fields, and more.
-
-Expected output when all tests pass:
+- **Rejection tests** (`tests/should_fail/*.nv`) -- 157 programs that the compiler must reject
+  with a type or parse error. Covers wrong argument types, wrong return types, undefined
+  variables, struct mismatches, missing fields, and other ill-typed programs.
 
 ```
-  Positive tests: 44 passed, 0 failed
-  Rejection tests: 20 passed, 0 failed
-  Total: 64 passed, 0 failed
+  Positive tests: 55 passed, 0 failed
+  Rejection tests: 157 passed, 0 failed
+  Total: 212 passed, 0 failed
 
 All tests passed!
 ```
@@ -218,44 +221,38 @@ All tests passed!
 
 ## Fuzzing
 
-Nova includes a fuzzing infrastructure to find panics in the lexer and parser. It uses
-`cargo-fuzz` with libFuzzer:
+Nova includes fuzzing targets for the lexer and parser using
+[cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz):
 
 ```bash
-# Install cargo-fuzz (requires nightly Rust)
 rustup toolchain install nightly
 cargo +nightly install cargo-fuzz
 
-# Fuzz the lexer for 60 seconds
-./fuzz/run_fuzz.sh lexer 60
-
-# Fuzz the parser for 60 seconds
-./fuzz/run_fuzz.sh parser 60
-
-# Fuzz all targets
-./fuzz/run_fuzz.sh all 30
+./fuzz/run_fuzz.sh lexer 60    # fuzz lexer for 60 seconds
+./fuzz/run_fuzz.sh parser 60   # fuzz parser for 60 seconds
+./fuzz/run_fuzz.sh all 30      # fuzz all targets
 ```
 
-The fuzzer seeds from real Nova programs in `fuzz/corpus/`. Any panics are saved to
-`fuzz/artifacts/` and represent bugs to fix.
+Crash inputs are saved to `fuzz/artifacts/`. The fuzzer seeds from real Nova programs in
+`fuzz/corpus/`.
 
 ---
 
 ## Demo Programs
 
-The `demo/` folder contains example Nova programs:
-
 | File | Description |
-|------|-------------|
-| `demo.nv` | Kitchen-sink feature showcase |
-| `fib.nv` | Fibonacci sequence |
-| `snake.nv` | Terminal snake game |
-| `forth.nv` | Forth-like interpreter |
-| `matmul.nv` | Matrix multiplication |
-| `structs.nv` | Struct patterns |
-| `option_type.nv` | Option / Maybe usage |
-
-Run any demo:
+|---|---|
+| `demo/demo.nv` | Feature showcase |
+| `demo/fib.nv` | Fibonacci sequence |
+| `demo/snake.nv` | Terminal snake game |
+| `demo/flappy.nv` | Flappy bird clone |
+| `demo/breakout.nv` | Breakout game |
+| `demo/forth.nv` | Forth-like interpreter |
+| `demo/matmul.nv` | Matrix multiplication |
+| `demo/structs.nv` | Struct patterns |
+| `demo/vtable.nv` | Dyn vtable dispatch |
+| `demo/option_type.nv` | Option / Maybe usage |
+| `demo/speedtest.nv` | Performance benchmark |
 
 ```bash
 ./target/release/nova run demo/fib.nv
@@ -269,23 +266,25 @@ Run any demo:
 nova-lang/
   novacli/       CLI entry point (run, check, dis, time, repl)
   lexer/         Tokenizer
-  parser/        Parser + type checker
+  parser/        Parser and type checker
+  typechecker/   Type checking logic
   compiler/      Bytecode compiler
   assembler/     Bytecode assembler
   optimizer/     Optimization passes
-  vm/            Stack-based virtual machine + GC
-  native/        Built-in functions (IO, string, math, regex, ...)
-  common/        Shared types (AST nodes, tokens, errors, types)
+  disassembler/  Bytecode disassembler
+  vm/            Stack-based virtual machine and GC
+  native/        Built-in functions (IO, string, math, regex, raylib)
+  common/        Shared types (AST, tokens, errors, type definitions)
   novacore/      Orchestration layer
   std/           Standard library (Nova source)
-  demo/          Demo programs
-  tests/         Test suite (positive + type-rejection)
-  fuzz/          Fuzzing targets
-  documentation/ Language docs and guide
+  demo/          Example programs
+  tests/         Test suite (positive + rejection)
+  fuzz/          Fuzzing targets and corpus
+  documentation/ Language guide and reference
 ```
 
 ---
 
 ## License
 
-See [LICENSE](LICENSE).
+Licensed under the [GNU Affero General Public License v3.0](LICENSE).
