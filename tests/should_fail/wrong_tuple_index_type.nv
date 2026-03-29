@@ -1,0 +1,5 @@
+module wrong_tuple_index_type
+// SHOULD FAIL: tuple elements are typed, accessing with wrong expectation
+// (tuple field 0 is Int, assigning to String)
+let t = (42, "hello", true)
+let s: String = t[0]

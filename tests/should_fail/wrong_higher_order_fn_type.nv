@@ -1,0 +1,9 @@
+module wrong_higher_order_fn_type
+// SHOULD FAIL: passing fn(Int)->String where fn(Int)->Int expected
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+fn to_str(x: Int) -> String {
+    return Cast::string(x)
+}
+let result = apply(to_str@(Int), 5)

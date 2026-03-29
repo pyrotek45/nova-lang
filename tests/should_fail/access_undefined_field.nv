@@ -1,0 +1,8 @@
+module access_undefined_field
+// SHOULD FAIL: accessing a field that doesn't exist on the struct
+struct Dog {
+    name: String,
+    age: Int
+}
+let d = Dog { name: "Rex", age: 5 }
+println(d.breed)

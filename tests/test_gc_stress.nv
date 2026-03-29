@@ -1,0 +1,215 @@
+module test_gc_stress
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// Deep GC Stress Tests — ref counting + sweep & collect
+// ============================================================
+
+// ---- Helpers ----
+struct Payload {
+    id: Int,
+    data: [Int],
+    tag: String
+}
+
+// 1. Thousands of short-lived struct allocations
+fn short_lived_structs() {
+    for let i = 0; i < 1000; i += 1 {
+        let p = Payload { id: i, data: [i, i*2, i*3], tag: "p" + Cast::string(i) }
+    }
+}
+short_lived_structs()
+assert(true, "1000 short-lived structs freed")
+
+// 2. Long-lived list of structs grows then drops
+fn long_lived_struct_list() {
+    let pool = []: Payload
+    for let i = 0; i < 500; i += 1 {
+        pool.push(Payload { id: i, data: [i], tag: "pool" })
+    }
+    assert(pool.len() == 500, "pool length 500")
+    // Drop all — replace with empty list
+    pool = []: Payload
+    assert(pool.len() == 0, "pool emptied")
+}
+long_lived_struct_list()
+
+// 3. Closure captures struct ref; struct outlives closure scope
+fn closure_captures_struct() {
+    let results = []: Int
+    for let i = 0; i < 20; i += 1 {
+        let captured = i
+        let f = fn() -> Int { return captured * captured }
+        results.push(f())
+    }
+    assert(results[0] == 0, "closure capture 0")
+    assert(results[5] == 25, "closure capture 5")
+    assert(results[19] == 361, "closure capture 19")
+}
+closure_captures_struct()
+
+// 4. Deep recursive allocation — builds a spine then releases
+fn build_spine(n: Int) -> [[Int]] {
+    if n == 0 {
+        return [[0]]
+    }
+    let tail = build_spine(n - 1)
+    let head = [n, n, n]
+    tail.push(head)
+    return tail
+}
+let spine = build_spine(100)
+assert(spine.len() == 101, "spine length")
+spine = []: [Int]
+assert(spine.len() == 0, "spine released")
+
+// 5. Many Box(T) allocations — each is a heap object
+fn box_stress() {
+    let boxes = []: Box(Int)
+    for let i = 0; i < 200; i += 1 {
+        boxes.push(Box(i))
+    }
+    assert(boxes[0].value == 0, "box 0")
+    assert(boxes[199].value == 199, "box 199")
+    // Mutate via Box
+    boxes[100].value = 9999
+    assert(boxes[100].value == 9999, "box mutated")
+}
+box_stress()
+
+// 6. Function values stored in list and discarded
+fn fn_list_gc() {
+    let fs = []: fn() -> Int
+    for let i = 0; i < 300; i += 1 {
+        let v = i
+        fs.push(fn() -> Int { return v })
+    }
+    let sum = 0
+    for let i = 0; i < fs.len(); i += 1 {
+        sum = sum + fs[i]()
+    }
+    // sum = 0+1+...+299 = 299*300/2 = 44850
+    assert(sum == 44850, "fn list gc sum")
+}
+fn_list_gc()
+
+// 7. Repeatedly reassigning a Box (old value must be freed)
+fn box_reassign() {
+    let b = Box(0)
+    for let i = 0; i < 500; i += 1 {
+        b.value = i
+    }
+    assert(b.value == 499, "box final value after 500 reassigns")
+}
+box_reassign()
+
+// 8. Nested closures — multi-level captures
+fn nested_closures_gc() -> fn() -> fn() -> Int {
+    let outer = Box(10)
+    return fn() -> fn() -> Int {
+        let inner = Box(outer.value + 5)
+        return fn() -> Int {
+            return inner.value * 2
+        }
+    }
+}
+let make_inner = nested_closures_gc()
+let get_val = make_inner()
+assert(get_val() == 30, "nested closure value (10+5)*2=30")
+
+// 9. Struct with function field — gc must track fn pointers
+struct Counter {
+    value: Int,
+    inc: fn(Counter) -> Int
+}
+
+fn CounterNew() -> Counter {
+    return Counter {
+        value: 0,
+        inc: fn(self: Counter) -> Int {
+            self.value = self.value + 1
+            return self.value
+        }
+    }
+}
+
+fn counter_fn_gc() {
+    let counters = []: Counter
+    for let i = 0; i < 50; i += 1 {
+        counters.push(CounterNew())
+    }
+    // Increment each counter twice
+    for let i = 0; i < counters.len(); i += 1 {
+        counters[i]->inc()
+        counters[i]->inc()
+    }
+    assert(counters[0].value == 2, "counter fn gc value 0")
+    assert(counters[49].value == 2, "counter fn gc value 49")
+}
+counter_fn_gc()
+
+// 10. Interleaved alloc/free pressure with strings
+fn string_interleave() {
+    let live = []: String
+    for let i = 0; i < 200; i += 1 {
+        live.push("alive_" + Cast::string(i))
+        if i % 10 == 9 {
+            // Drop half
+            let keep = []: String
+            for let j = 0; j < live.len(); j += 2 {
+                keep.push(live[j])
+            }
+            live = keep
+        }
+    }
+    assert(live.len() > 0, "strings survived interleave")
+}
+string_interleave()
+
+// 11. Generator pattern — Box used as iterator state
+fn make_counter_gen(start: Int) -> fn() -> Int {
+    let i = Box(start)
+    return fn() -> Int {
+        let cur = i.value
+        i.value = i.value + 1
+        return cur
+    }
+}
+
+let gen1 = make_counter_gen(0)
+let gen2 = make_counter_gen(100)
+
+for let i = 0; i < 10; i += 1 {
+    gen1()
+    gen2()
+}
+assert(gen1() == 10, "gen1 at 10")
+assert(gen2() == 110, "gen2 at 110")
+
+// 12. Many Option allocations
+fn option_gc_stress() {
+    let opts = []: Option(String)
+    for let i = 0; i < 300; i += 1 {
+        if i % 2 == 0 {
+            opts.push(Some("value_" + Cast::string(i)))
+        } else {
+            opts.push(None(String))
+        }
+    }
+    let some_count = 0
+    let none_count = 0
+    for let i = 0; i < opts.len(); i += 1 {
+        if opts[i].isSome() {
+            some_count = some_count + 1
+        } else {
+            none_count = none_count + 1
+        }
+    }
+    assert(some_count == 150, "option gc some count")
+    assert(none_count == 150, "option gc none count")
+}
+option_gc_stress()
+
+println("PASS: test_gc_stress")

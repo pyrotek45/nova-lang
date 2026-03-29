@@ -1,0 +1,6 @@
+module wrong_fn_arg_count
+// SHOULD FAIL: calling function with wrong number of arguments
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+let result = add(1, 2, 3)

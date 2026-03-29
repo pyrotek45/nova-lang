@@ -1,0 +1,6 @@
+module int_float_mismatch
+// SHOULD FAIL: Int and Float are distinct, no implicit coercion
+fn square_float(x: Float) -> Float {
+    return x * x
+}
+let result = square_float(5)

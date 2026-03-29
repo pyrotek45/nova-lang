@@ -1,0 +1,7 @@
+module missing_struct_field
+// SHOULD FAIL: struct literal missing required field
+struct Person {
+    name: String,
+    age: Int
+}
+let p = Person { name: "Alice" }

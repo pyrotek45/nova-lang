@@ -1,0 +1,5 @@
+module wrong_return_type
+// SHOULD FAIL: function declares -> String but returns Int
+fn get_value() -> String {
+    return 42
+}

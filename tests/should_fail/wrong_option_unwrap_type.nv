@@ -1,0 +1,7 @@
+module wrong_option_unwrap_type
+// SHOULD FAIL: using Option(Int) value where Int is needed without unwrap
+fn double(x: Int) -> Int {
+    return x * 2
+}
+let opt: Option(Int) = Some(5)
+let result = double(opt)

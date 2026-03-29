@@ -1,0 +1,168 @@
+module test_lexer_stress
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// Lexer Stress Tests
+// Unicode, escape sequences, number literals, edge cases
+// in tokenization
+// ============================================================
+
+// ---- String escape sequences ----
+let tab_str = "a\tb"
+let newline_str = "a\nb"
+let backslash_str = "a\\b"
+let quote_str = "say \"hello\""
+
+assert(tab_str.len() == 3, "tab escape len")
+assert(backslash_str.len() == 3, "backslash escape len")
+assert(quote_str.len() == 11, "quoted string len")
+
+// ---- Long identifier names ----
+let a_very_long_variable_name_that_tests_the_lexer_limit = 42
+let another_quite_long_variable_name_for_good_measure = 100
+assert(
+    a_very_long_variable_name_that_tests_the_lexer_limit +
+    another_quite_long_variable_name_for_good_measure == 142,
+    "long identifiers"
+)
+
+// ---- Integer literal forms ----
+let decimal = 1234567890
+let zero = 0
+let neg = -999999
+assert(decimal == 1234567890, "decimal literal")
+assert(zero == 0, "zero literal")
+assert(neg == -999999, "negative literal")
+
+// ---- Float literal forms ----
+let f1 = 0.0
+let f2 = 1.5
+let f3 = 123.456
+let f4 = -0.001
+assert(f1 == 0.0, "float 0.0")
+assert(f2 == 1.5, "float 1.5")
+assert(f3 == 123.456, "float 123.456")
+assert(f4 == -0.001, "float -0.001")
+
+// ---- Char literals ----
+let c1 = 'a'
+let c2 = 'Z'
+let c3 = '0'
+let c4 = ' '
+let c5 = '\n'
+let c6 = '\t'
+assert(c1 == 'a', "char a")
+assert(c2 == 'Z', "char Z")
+assert(c3 == '0', "char 0")
+assert(c4 == ' ', "char space")
+
+// ---- Keywords as part of identifiers ----
+let lethal = 1       // 'let' prefix
+let format2 = 2      // 'for' prefix
+let ifconfig = 3     // 'if' prefix
+let matchmaker = 4   // 'match' prefix
+let trueblue = 5     // 'true' prefix
+let false_flag = 6   // 'false' prefix (with underscore)
+
+assert(lethal == 1, "keyword prefix ident lethal")
+assert(format2 == 2, "keyword prefix ident format2")
+assert(ifconfig == 3, "keyword prefix ident ifconfig")
+assert(matchmaker == 4, "keyword prefix ident matchmaker")
+assert(trueblue == 5, "keyword prefix ident trueblue")
+assert(false_flag == 6, "keyword prefix ident false_flag")
+
+// ---- Operators adjacent with no spaces ----
+let x = 5
+let r1 = x*2+1
+let r2 = x*x-1
+let r3 = x+x*x-x/x
+assert(r1 == 11, "no-space ops x*2+1")
+assert(r2 == 24, "no-space ops x*x-1")
+assert(r3 == 29, "no-space ops x+x*x-x/x = 5+25-1=29")
+
+// ---- Comments don't affect parsing ----
+let a = 1  // inline comment
+// full line comment
+let b = 2  /* this isn't valid Nova block comment but just checking inline */
+let c = a + b
+assert(c == 3, "comments don't break parsing")
+
+// ---- Empty string ----
+let empty = ""
+assert(empty.len() == 0, "empty string len")
+assert(empty == "", "empty string eq")
+
+// ---- Single-char strings ----
+let sa = "a"
+let sb = "z"
+assert(sa.len() == 1, "single char string len")
+assert(sa == "a", "single char string eq")
+
+// ---- Operator precedence disambiguation ----
+// Nova: * before +, + before ==, == before &&, && before ||
+assert(2 + 3 * 4 == 14, "prec: *before+")
+assert(2 * 3 + 4 * 5 == 26, "prec: both *before+")
+// Nova: || binds tighter than && (note: opposite of many languages)
+// true || false = true, then true && false = false -- so add parens when mixing
+assert((true || false) && (true || false), "parens mixed bool 1")
+assert(!((false || false) && (true || false)), "parens mixed bool 2")
+assert(!(false && true || false), "prec: complex bool")
+
+// ---- Negative operator in various positions ----
+let neg1 = -1
+let neg2 = -(3 + 4)
+let neg3 = -(-5)
+assert(neg1 == -1, "neg literal")
+assert(neg2 == -7, "neg expr")
+assert(neg3 == 5, "neg neg")
+
+// ---- Chained comparison-like expressions ----
+let p = 3
+let q = 5
+let in_range = p > 0 && q < 10 && p < q
+assert(in_range, "chained comparisons")
+
+// ---- Large string concatenation ----
+fn repeat_str(s: String, n: Int) -> String {
+    let result = ""
+    for let i = 0; i < n; i += 1 {
+        result = result + s
+    }
+    return result
+}
+let hundred_x = repeat_str("x", 100)
+assert(hundred_x.len() == 100, "repeat string length")
+assert(hundred_x == repeat_str("x", 100), "repeat string eq")
+
+// ---- Semicolons as statement separators ----
+let s1 = 1; let s2 = 2; let s3 = s1 + s2
+assert(s3 == 3, "semicolon separated stmts")
+
+// ---- Multi-line expressions ----
+let long_expr = 1 +
+    2 +
+    3 +
+    4 +
+    5
+assert(long_expr == 15, "multi-line expression")
+
+// ---- Deeply nested parens ----
+let deep_paren = (((((42)))))
+assert(deep_paren == 42, "deeply nested parens")
+
+// ---- Boolean literals in various contexts ----
+let t = true
+let f = false
+assert(t == true, "bool literal true")
+assert(f == false, "bool literal false")
+assert(t != f, "bool literal ne")
+assert(t && !f, "bool literal and-not")
+
+// ---- String with numbers ----
+let num_str = "12345"
+assert(num_str.len() == 5, "numeric string len")
+assert(num_str == "12345", "numeric string eq")
+
+println("PASS: test_lexer_stress")

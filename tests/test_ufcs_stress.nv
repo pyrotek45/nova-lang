@@ -1,0 +1,308 @@
+module test_ufcs_stress
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// UFCS / extends stress test
+// Verifies that extends functions behave as methods (UFCS),
+// can chain, overload, accept generics, and are callable
+// only on the correct receiver type.
+// ============================================================
+
+// ---- Basic extends ----
+fn extends double(x: Int) -> Int {
+    return x * 2
+}
+fn extends triple(x: Int) -> Int {
+    return x * 3
+}
+fn extends negate(x: Int) -> Int {
+    return -x
+}
+fn extends square(x: Int) -> Int {
+    return x * x
+}
+fn extends isPositive(x: Int) -> Bool {
+    return x > 0
+}
+
+assert(5.double() == 10, "double 5")
+assert(3.triple() == 9, "triple 3")
+assert(7.negate() == -7, "negate 7")
+assert(4.square() == 16, "square 4")
+assert(5.isPositive(), "isPositive 5")
+assert(!(-3).isPositive(), "isPositive -3")
+
+// ---- Chaining (UFCS chains left to right) ----
+assert(3.double().triple() == 18, "chain double.triple: 3*2*3=18")
+assert(2.triple().double().negate() == -12, "chain triple.double.negate: 2*3*2=12, neg=-12")
+assert(5.double().square() == 100, "chain double.square: 5*2=10, sq=100")
+assert(3.square().double().triple() == 54, "chain sq.double.triple: 9*2*3=54")
+assert(1.double().double().double().double() == 16, "chain 4x double: 2^4=16")
+
+// ---- Extends on Float ----
+fn extends fDouble(x: Float) -> Float {
+    return x * 2.0
+}
+fn extends fFloor(x: Float) -> Float {
+    // truncate: use Cast::int (returns Option) then unwrap
+    let i = Cast::int(x)
+    if i.isSome() {
+        let iv = i.unwrap()
+        // If x was negative and not whole, subtract 1
+        let fv = Cast::float(iv)
+        if fv.isSome() {
+            return fv.unwrap()
+        }
+    }
+    return x
+}
+fn extends fAbs(x: Float) -> Float {
+    if x < 0.0 {
+        return -x
+    }
+    return x
+}
+assert(3.5.fDouble() == 7.0, "fDouble 3.5")
+assert(3.7.fFloor() == 3.0, "fFloor 3.7")
+assert((-2.5).fAbs() == 2.5, "fAbs -2.5")
+
+// ---- Extends on String ----
+fn extends shout(s: String) -> String {
+    return s + "!!!"
+}
+fn extends repeat2(s: String) -> String {
+    return s + s
+}
+fn extends isEmpty(s: String) -> Bool {
+    return s.len() == 0
+}
+assert("hello".shout() == "hello!!!", "shout hello")
+assert("ab".repeat2() == "abab", "repeat2 ab")
+assert("".isEmpty(), "isEmpty empty")
+assert(!"hi".isEmpty(), "isEmpty hi")
+assert("hello".shout().shout() == "hello!!!!!!", "chain shout.shout")
+
+// ---- Extends on Bool ----
+fn extends toInt(b: Bool) -> Int {
+    if b {
+        return 1
+    }
+    return 0
+}
+fn extends bNot(b: Bool) -> Bool {
+    return !b
+}
+assert(true.toInt() == 1, "bool toInt true")
+assert(false.toInt() == 0, "bool toInt false")
+assert(true.bNot() == false, "bNot true")
+assert(false.bNot().bNot() == false, "bNot chain")
+
+// ---- Extends on structs ----
+struct Vec2 {
+    x: Float,
+    y: Float
+}
+
+fn extends length(v: Vec2) -> Float {
+    return ((v.x * v.x) + (v.y * v.y)).fAbs()
+}
+fn extends scale(v: Vec2, factor: Float) -> Vec2 {
+    return Vec2 { x: v.x * factor, y: v.y * factor }
+}
+fn extends addVec(a: Vec2, b: Vec2) -> Vec2 {
+    return Vec2 { x: a.x + b.x, y: a.y + b.y }
+}
+fn extends toString(v: Vec2) -> String {
+    return "(" + Cast::string(v.x) + ", " + Cast::string(v.y) + ")"
+}
+
+let v1 = Vec2 { x: 3.0, y: 4.0 }
+let v2 = Vec2 { x: 1.0, y: 2.0 }
+
+assert(v1.scale(2.0).x == 6.0, "scale x")
+assert(v1.scale(2.0).y == 8.0, "scale y")
+let vsum = v1.addVec(v2)
+assert(vsum.x == 4.0, "addVec x")
+assert(vsum.y == 6.0, "addVec y")
+// Chaining: scale then add
+let vchain = v1.scale(2.0).addVec(v2)
+assert(vchain.x == 7.0, "chain scale.addVec x")
+assert(vchain.y == 10.0, "chain scale.addVec y")
+assert(v1.toString() == "(3, 4)", "vec2 toString")
+
+// ---- Overloaded extends (same name, different receiver type) ----
+fn extends describe(x: Int) -> String {
+    return "int:" + Cast::string(x)
+}
+fn extends describe(x: Float) -> String {
+    return "float:" + Cast::string(x)
+}
+fn extends describe(x: String) -> String {
+    return "str:" + x
+}
+fn extends describe(x: Bool) -> String {
+    if x {
+        return "bool:true"
+    }
+    return "bool:false"
+}
+assert(42.describe() == "int:42", "overload describe int")
+assert(3.14.describe() == "float:3.14", "overload describe float")
+assert("hello".describe() == "str:hello", "overload describe string")
+assert(true.describe() == "bool:true", "overload describe bool")
+
+// ---- Extends with generic structs ----
+struct Wrapper(T) {
+    value: $T
+}
+
+fn extends unwrap(w: Wrapper($T)) -> $T {
+    return w.value
+}
+fn extends mapWrap(w: Wrapper($A), f: fn($A) -> $B) -> Wrapper($B) {
+    return Wrapper { value: f(w.value) }
+}
+fn extends wrapToString(w: Wrapper($A)) -> String {
+    return "Wrapper(" + Cast::string(w.value) + ")"
+}
+
+let wi = Wrapper { value: 42 }
+let ws = Wrapper { value: "hello" }
+assert(wi.unwrap() == 42, "unwrap int wrapper")
+assert(ws.unwrap() == "hello", "unwrap string wrapper")
+let doubled_w = wi.mapWrap(|x: Int| x * 2)
+assert(doubled_w.value == 84, "mapWrap double")
+let str_w = wi.mapWrap(|x: Int| Cast::string(x))
+assert(str_w.value == "42", "mapWrap to string")
+
+// ---- Extends returning self (builder pattern) ----
+struct Builder {
+    parts: [String]
+}
+
+fn BuilderNew() -> Builder {
+    return Builder { parts: []: String }
+}
+
+fn extends add_part(b: Builder, part: String) -> Builder {
+    b.parts.push(part)
+    return b
+}
+fn extends build(b: Builder) -> String {
+    let result = ""
+    for i in 0..b.parts.len() {
+        if i > 0 {
+            result = result + "-"
+        }
+        result = result + b.parts[i]
+    }
+    return result
+}
+
+let built = BuilderNew()
+    .add_part("hello")
+    .add_part("world")
+    .add_part("nova")
+    .build()
+assert(built == "hello-world-nova", "builder pattern with extends")
+
+// ---- Extends on enum ----
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+fn extends opposite(d: Direction) -> Direction {
+    match d {
+        North() => { return Direction::South() }
+        South() => { return Direction::North() }
+        East()  => { return Direction::West() }
+        West()  => { return Direction::East() }
+    }
+    return d
+}
+fn extends dirName(d: Direction) -> String {
+    match d {
+        North() => { return "North" }
+        South() => { return "South" }
+        East()  => { return "East" }
+        West()  => { return "West" }
+    }
+    return "Unknown"
+}
+
+assert(Direction::North().opposite().dirName() == "South", "opposite North->South")
+assert(Direction::East().opposite().dirName() == "West", "opposite East->West")
+assert(Direction::South().opposite().opposite().dirName() == "South", "double opposite")
+
+// ---- Extends accepting another extends result ----
+fn extends clamp(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo {
+        return lo
+    }
+    if x > hi {
+        return hi
+    }
+    return x
+}
+fn extends abs(x: Int) -> Int {
+    if x < 0 {
+        return -x
+    }
+    return x
+}
+
+assert((-5).abs() == 5, "abs -5")
+assert(5.abs() == 5, "abs 5")
+assert((-10).abs().clamp(0, 8) == 8, "abs then clamp: 10 clamped to 8")
+assert(3.clamp(5, 10) == 5, "clamp below range")
+assert(15.clamp(5, 10) == 10, "clamp above range")
+assert(7.clamp(5, 10) == 7, "clamp in range")
+
+// ---- Extends with list receiver ----
+fn extends sumList(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+fn extends productList(xs: [Int]) -> Int {
+    let total = 1
+    for x in xs {
+        total = total * x
+    }
+    return total
+}
+fn extends maxList(xs: [Int]) -> Int {
+    let m = xs[0]
+    for x in xs {
+        if x > m {
+            m = x
+        }
+    }
+    return m
+}
+
+assert([1,2,3,4,5].sumList() == 15, "sumList")
+assert([1,2,3,4,5].productList() == 120, "productList")
+assert([3,1,4,1,5,9,2,6].maxList() == 9, "maxList")
+assert([10,20,30].map(|x: Int| x * 2).sumList() == 120, "map then sumList")
+
+// ---- Pipe operator interacting with non-extends ----
+fn square_plain(x: Int) -> Int {
+    return x * x
+}
+fn inc_plain(x: Int) -> Int {
+    return x + 1
+}
+let piped1 = 5 |> square_plain()
+let piped2 = 4 |> inc_plain() |> square_plain()
+assert(piped1 == 25, "pipe square 5")
+assert(piped2 == 25, "pipe inc then square: (4+1)^2=25")
+
+println("PASS: test_ufcs_stress")

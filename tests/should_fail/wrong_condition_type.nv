@@ -1,0 +1,6 @@
+module wrong_condition_type
+// SHOULD FAIL: if condition is Int, not Bool
+let x = 5
+if x {
+    println("oops")
+}
