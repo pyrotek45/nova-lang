@@ -75,13 +75,11 @@ fn extends shout(s: String) -> String {
 fn extends repeat2(s: String) -> String {
     return s + s
 }
-fn extends isEmpty(s: String) -> Bool {
-    return s.len() == 0
-}
+// isEmpty is now a native String function, so use it directly
 assert("hello".shout() == "hello!!!", "shout hello")
 assert("ab".repeat2() == "abab", "repeat2 ab")
-assert("".isEmpty(), "isEmpty empty")
-assert(!"hi".isEmpty(), "isEmpty hi")
+assert("".isEmpty(), "isEmpty empty (native)")
+assert(!"hi".isEmpty(), "isEmpty hi (native)")
 assert("hello".shout().shout() == "hello!!!!!!", "chain shout.shout")
 
 // ---- Extends on Bool ----
@@ -323,22 +321,7 @@ assert(0.between(1, 10) == false, "between 0 not in [1,10]")
 assert(10.between(1, 10) == true, "between 10 at edge")
 
 // ---- Extends on String receiver ----
-fn extends repeat(s: String, n: Int) -> String {
-    let acc = ""
-    for let i = 0; i < n; i += 1 {
-        acc = acc + s
-    }
-    return acc
-}
-fn extends startsWith(s: String, prefix: String) -> Bool {
-    if prefix.len() > s.len() { return false }
-    let sc = s.chars()
-    let pc = prefix.chars()
-    for let i = 0; i < pc.len(); i += 1 {
-        if sc[i] != pc[i] { return false }
-    }
-    return true
-}
+// repeat and startsWith are now native String functions, use them directly
 fn extends countChar(s: String, target: Char) -> Int {
     let count = 0
     for c in s.chars() {
@@ -349,12 +332,12 @@ fn extends countChar(s: String, target: Char) -> Int {
     return count
 }
 
-assert("ab".repeat(3) == "ababab", "repeat ab 3")
+assert("ab".repeat(3) == "ababab", "repeat ab 3 (native)")
 assert("hello".countChar('l') == 2, "countChar l in hello = 2")
-assert("".repeat(5) == "", "repeat empty string")
-assert("xyz".repeat(1) == "xyz", "repeat 1 = same")
-assert("hello".startsWith("hel") == true, "startsWith hel")
-assert("hello".startsWith("world") == false, "startsWith world")
+assert("".repeat(5) == "", "repeat empty string (native)")
+assert("xyz".repeat(1) == "xyz", "repeat 1 = same (native)")
+assert("hello".startsWith("hel") == true, "startsWith hel (native)")
+assert("hello".startsWith("world") == false, "startsWith world (native)")
 
 // ---- Extends on Bool receiver ----
 fn extends flip(b: Bool) -> Bool {

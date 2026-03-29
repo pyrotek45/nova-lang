@@ -1,0 +1,92 @@
+module test_native_string
+
+import super.std.core
+
+// Tests for native String:: functions
+
+// --- String::contains ---
+assert("hello world".contains("world"), "contains found")
+assert("hello world".contains("hello"), "contains at start")
+assert(!"hello world".contains("xyz"), "contains not found")
+assert("".contains("") == true, "contains empty in empty")
+assert("hello".contains(""), "contains empty in non-empty")
+
+// --- String::startsWith / endsWith ---
+assert("hello world".startsWith("hello"), "startsWith match")
+assert(!"hello world".startsWith("world"), "startsWith no match")
+assert("hello".startsWith(""), "startsWith empty prefix")
+assert("hello world".endsWith("world"), "endsWith match")
+assert(!"hello world".endsWith("hello"), "endsWith no match")
+assert("hello".endsWith(""), "endsWith empty suffix")
+
+// --- String::trim / trimStart / trimEnd ---
+assert("  hello  ".trim() == "hello", "trim both sides")
+assert("hello".trim() == "hello", "trim no change")
+assert("  hello  ".trimStart() == "hello  ", "trimStart")
+assert("  hello  ".trimEnd() == "  hello", "trimEnd")
+assert("   ".trim() == "", "trim all whitespace")
+
+// --- String::toUpper / toLower ---
+assert("hello".toUpper() == "HELLO", "toUpper")
+assert("HELLO".toLower() == "hello", "toLower")
+assert("Hello World".toUpper() == "HELLO WORLD", "toUpper mixed")
+assert("Hello World".toLower() == "hello world", "toLower mixed")
+assert("123!@#".toUpper() == "123!@#", "toUpper non-alpha")
+
+// --- String::replace ---
+assert("hello world".replace("world", "nova") == "hello nova", "replace word")
+assert("aaa".replace("a", "bb") == "bbbbbb", "replace all occurrences")
+assert("hello".replace("xyz", "abc") == "hello", "replace no match")
+assert("".replace("a", "b") == "", "replace in empty")
+
+// --- String::substring ---
+assert("hello world".substring(0, 5) == "hello", "substring start")
+assert("hello world".substring(6, 11) == "world", "substring end")
+assert("hello".substring(0, 0) == "", "substring empty")
+assert("hello".substring(1, 3) == "el", "substring middle")
+
+// --- String::indexOf ---
+assert("hello world".indexOf("world") == 6, "indexOf found")
+assert("hello world".indexOf("hello") == 0, "indexOf at start")
+assert("hello world".indexOf("xyz") == -1, "indexOf not found")
+assert("hello".indexOf("") == 0, "indexOf empty string")
+
+// --- String::repeat ---
+assert("ab".repeat(3) == "ababab", "repeat 3 times")
+assert("x".repeat(1) == "x", "repeat 1 time")
+assert("x".repeat(0) == "", "repeat 0 times")
+assert("".repeat(5) == "", "repeat empty string")
+
+// --- String::reverse ---
+assert("hello".reverse() == "olleh", "reverse word")
+assert("a".reverse() == "a", "reverse single char")
+assert("".reverse() == "", "reverse empty")
+assert("abcdef".reverse() == "fedcba", "reverse longer")
+
+// --- String::isEmpty ---
+assert("".isEmpty(), "isEmpty on empty")
+assert(!"hello".isEmpty(), "isEmpty on non-empty")
+assert(!" ".isEmpty(), "isEmpty on space (not empty)")
+
+// --- String::charAt ---
+assert("hello".charAt(0).unwrap() == 'h', "charAt 0")
+assert("hello".charAt(4).unwrap() == 'o', "charAt 4")
+assert("hello".charAt(10).isNone(), "charAt out of bounds")
+
+// --- String::split ---
+assert("a,b,c".split(",") == ["a", "b", "c"], "split comma")
+assert("hello".split(",") == ["hello"], "split no delimiter")
+assert("a::b::c".split("::") == ["a", "b", "c"], "split multi-char delim")
+
+// --- join (standalone function) ---
+assert(join(["a", "b", "c"], ", ") == "a, b, c", "join with comma")
+assert(join(["x"], "-") == "x", "join single element")
+assert(join([]: String, ",") == "", "join empty list")
+assert(join(["a", "b"], "") == "ab", "join empty separator")
+
+// --- Cast::charToInt ---
+assert(Cast::charToInt('A') == 65, "charToInt A=65")
+assert(Cast::charToInt('a') == 97, "charToInt a=97")
+assert(Cast::charToInt('0') == 48, "charToInt 0=48")
+
+println("PASS: test_native_string")

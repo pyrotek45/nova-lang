@@ -1,0 +1,60 @@
+module test_native_misc
+
+// Tests for native random, time, and IO functions
+
+// --- random (existing random_int) ---
+let ri = random(1, 10)
+assert(ri >= 1, "random >= min")
+assert(ri <= 10, "random <= max")
+
+// --- randomFloat ---
+let rf = randomFloat(0.0, 1.0)
+assert(rf >= 0.0, "randomFloat >= min")
+assert(rf <= 1.0, "randomFloat <= max")
+
+let rf2 = randomFloat(-10.0, 10.0)
+assert(rf2 >= -10.0, "randomFloat range negative")
+assert(rf2 <= 10.0, "randomFloat range positive")
+
+// --- randomBool ---
+// Can't deterministically test randomBool, just make sure it runs
+let rb = randomBool()
+assert(rb == true || rb == false, "randomBool returns bool")
+
+// --- now (milliseconds) ---
+let t1 = now()
+assert(t1 > 0, "now returns positive ms")
+let t2 = now()
+assert(t2 >= t1, "now is monotonic")
+
+// --- nowSec (seconds as float) ---
+let ts = nowSec()
+assert(ts > 0.0, "nowSec returns positive seconds")
+
+// --- writeFile / readFile / fileExists / appendFile ---
+let test_path = "/tmp/nova_test_io.txt"
+
+// Write a file
+let wrote = writeFile(test_path, "hello nova")
+assert(wrote, "writeFile returns true")
+assert(fileExists(test_path), "fileExists after write")
+
+// Read it back
+let content = readFile(test_path)
+assert(content == "hello nova", "readFile matches written content")
+
+// Append to file
+let appended = appendFile(test_path, "\nline2")
+assert(appended, "appendFile returns true")
+let content2 = readFile(test_path)
+assert(content2 == "hello nova\nline2", "readFile after append")
+
+// Overwrite
+writeFile(test_path, "overwritten")
+let content3 = readFile(test_path)
+assert(content3 == "overwritten", "readFile after overwrite")
+
+// fileExists on non-existent file
+assert(!fileExists("/tmp/nova_nonexistent_file_12345.txt"), "fileExists false for missing")
+
+println("PASS: test_native_misc")

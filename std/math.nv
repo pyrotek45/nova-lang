@@ -1,5 +1,12 @@
 module math
 
+// Integer math utilities that complement native Float:: functions
+// Native Float functions available: floor, ceil, round, abs, sqrt,
+// sin, cos, tan, atan2, log, log10, pow, exp, min, max, clamp,
+// isNan, isInfinite, Float::pi(), Float::e()
+
+// --- Int extensions ---
+
 fn extends min(self: Int, other: Int) -> Int {
     if self < other {
         return self
@@ -29,83 +36,103 @@ fn extends pow(self: Int, other: Int) -> Int {
     return result
 }
 
-// approximation method to calculate square root
-// sorry if it's not 100% accurate
-fn extends sqrt(self: Float) -> Float {
-    let x = Cast::float(self).unwrap()
-    let y = (x + 1.0) / 2.0
-
-    while y < x {
-        x = y
-        y = (x + Cast::float(self).unwrap() / x) / 2.0
-    }
-
-    return x
-}
-
+// Int sqrt delegates to the native Float::sqrt
 fn extends sqrt(self: Int) -> Float {
     return Cast::float(self).unwrap().sqrt()
 }
 
-// limit a value between a minimum and a maximum value
+// Int exp delegates to the native Float::exp
+fn extends exp(self: Int) -> Float {
+    return Cast::float(self).unwrap().exp()
+}
+
+// Limit a value between a minimum and a maximum value
 fn extends clamp(self: Int, min: Int, max: Int) -> Int {
     if self < min {
         return min
     }
-    
     if self > max {
         return max
     }
-
     return self
 }
 
-// calculate the factorial of a number
+// Calculate the factorial of a number
 fn extends factorial(self: Int) -> Int {
     let result = 1
-
     for let i = 2; i <= self; i += 1 {
         result = result * i
     }
-
     return result
 }
 
-// calculate the greatest common divisor
+// Calculate the greatest common divisor
 fn extends gcd(self: Int, other: Int) -> Int {
     let a = self.abs()
     let b = other.abs()
-
     while b != 0 {
         let temp = b
         b = a % b
         a = temp
     }
-
     return a
 }
 
-// calculate the least common multiple
+// Calculate the least common multiple
 fn extends lcm(self: Int, other: Int) -> Int {
     return (self * other).abs() / self.gcd(other)
 }
 
-// exponentiate a floating point number
-// it uses approximation so don't rely on this for
-// precise results
-fn extends exp(self: Float) -> Float {
-    let result = 1.0
-    let term = 1.0
+// Check if an integer is even
+fn extends isEven(self: Int) -> Bool {
+    return self % 2 == 0
+}
 
-    for let n = 1.0; n < 20.0; n += 1.0 {
-        term = term * self / n
-        result = result + term
+// Check if an integer is odd
+fn extends isOdd(self: Int) -> Bool {
+    return self % 2 != 0
+}
+
+// Return the sign of an integer (-1, 0, or 1)
+fn extends sign(self: Int) -> Int {
+    if self > 0 { return 1 }
+    if self < 0 { return -1 }
+    return 0
+}
+
+// Modular exponentiation: (base^exp) % mod
+fn extends modpow(self: Int, exp: Int, mod: Int) -> Int {
+    let result = 1
+    let base = self % mod
+    let e = exp
+    while e > 0 {
+        if e % 2 == 1 {
+            result = (result * base) % mod
+        }
+        e = e / 2
+        base = (base * base) % mod
     }
-
     return result
 }
 
+// Fibonacci number at position n
+fn fib(n: Int) -> Int {
+    if n <= 1 { return n }
+    let a = 0
+    let b = 1
+    for let i = 2; i <= n; i += 1 {
+        let temp = a + b
+        a = b
+        b = temp
+    }
+    return b
+}
+
+// --- Standalone utility functions ---
+
+// Convert an integer to binary string
 fn bin(n: Int) -> String {
+    if n == 0 { return "0" }
     if n < 0 {
         return "-" + bin(-n)
     }
@@ -118,11 +145,49 @@ fn bin(n: Int) -> String {
     return result
 }
 
+// Convert an integer to hexadecimal string
+fn hex(n: Int) -> String {
+    if n == 0 { return "0" }
+    if n < 0 {
+        return "-" + hex(-n)
+    }
+    let digits = "0123456789abcdef"
+    let result = ""
+    let i = n
+    while i > 0 {
+        let d = i % 16
+        result = Cast::string(digits.charAt(d).unwrap()) + result
+        i = i / 16
+    }
+    return result
+}
+
+// Integer division and modulo (returns a tuple)
 fn divmod(n: Int, d: Int) -> (Int, Int) {
     return (n / d, n % d)
 }
 
+// Degrees to radians
+fn toRadians(degrees: Float) -> Float {
+    return degrees * Float::pi() / 180.0
+}
+
+// Radians to degrees
+fn toDegrees(radians: Float) -> Float {
+    return radians * 180.0 / Float::pi()
+}
+
+// Linear interpolation between two values
+fn lerp(a: Float, b: Float, t: Float) -> Float {
+    return a + (b - a) * t
+}
+
+// Map a value from one range to another
+fn remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Float) -> Float {
+    return toLow + (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow)
+}
+
+// Round a float to the nearest integer (convenience wrapper)
 fn round(n: Float) -> Int {
-    // since its a Float, should be safe to cast
     return Cast::int(n + 0.5).unwrap()
 }

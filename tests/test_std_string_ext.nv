@@ -1,0 +1,59 @@
+module test_std_string
+
+import super.std.string
+import super.std.core
+
+// --- split by char ---
+assert("a,b,c".split(',') == ["a", "b", "c"], "split by comma char")
+assert("hello".split(',') == ["hello"], "split no match char")
+
+// --- padLeft / padRight ---
+assert("42".padLeft(5, '0') == "00042", "padLeft with zeros")
+assert("hi".padRight(5, '.') == "hi...", "padRight with dots")
+assert("hello".padLeft(3, '0') == "hello", "padLeft already long enough")
+
+// --- center ---
+assert("hi".center(6, '-') == "--hi--", "center even")
+assert("x".center(4, '.') == ".x..", "center odd")
+assert("hello".center(3, '-') == "hello", "center already long enough")
+
+// --- count ---
+assert("abcabc".count("abc") == 2, "count two occurrences")
+assert("hello".count("xyz") == 0, "count no match")
+assert("aaaa".count("aa") == 2, "count non-overlapping")
+
+// --- isDigit / isAlpha / isAlphanumeric ---
+assert("12345".isDigit(), "isDigit true")
+assert(!"12a45".isDigit(), "isDigit false with letter")
+assert(!"".isDigit(), "isDigit false empty")
+assert("hello".isAlpha(), "isAlpha true")
+assert(!"he11o".isAlpha(), "isAlpha false with digit")
+assert("abc123".isAlphanumeric(), "isAlphanumeric true")
+assert(!"abc 123".isAlphanumeric(), "isAlphanumeric false with space")
+
+// --- capitalize ---
+assert("hello".capitalize() == "Hello", "capitalize word")
+assert("HELLO".capitalize() == "HELLO", "capitalize already upper")
+assert("".capitalize() == "", "capitalize empty")
+assert("a".capitalize() == "A", "capitalize single char")
+
+// --- title ---
+assert("hello world".title() == "Hello World", "title case")
+assert("the quick fox".title() == "The Quick Fox", "title multi words")
+
+// --- removeChar ---
+assert("hello".removeChar('l') == "heo", "removeChar l")
+assert("aabbcc".removeChar('b') == "aacc", "removeChar b")
+
+// --- lines ---
+let multiline = "line1\nline2\nline3"
+let ls = multiline.lines()
+assert(ls.len() == 3, "lines count")
+assert(ls[0] == "line1", "lines first")
+assert(ls[2] == "line3", "lines last")
+
+// --- words ---
+assert("hello  world  nova".words() == ["hello", "world", "nova"], "words extracts words")
+assert("single".words() == ["single"], "words single word")
+
+println("PASS: test_std_string")

@@ -2,9 +2,7 @@ module List
 
 import core
 
-fn extends clear(list: [$T]) {
-    list = []: $T
-}
+// clear is now a native function (List::clear)
 
 fn extends __eq__(a: [$T], b: [$T]) -> Bool {
     if a.len() != b.len() {

@@ -3,11 +3,21 @@ module hashmap
 import list
 import core
 
+// A simple key-value hash map built on parallel lists
 struct HashMap(K,V) {
     keys: [$K],
     values: [$V],
 }
 
+// Create a new empty HashMap
+fn extends(HashMap) default() -> HashMap($K,$V) {
+    return HashMap {
+        keys: []:$K,
+        values: []:$V,
+    }
+}
+
+// Convert a HashMap to a readable string
 fn extends toString(self: HashMap($K,$V)) -> String {
     let result = "{"
     for let i = 0; i < self.keys.len(); i += 1 {
@@ -20,41 +30,40 @@ fn extends toString(self: HashMap($K,$V)) -> String {
     return result
 }
 
-fn  extends(HashMap) default() -> HashMap($K,$V) {
-    return HashMap {
-        keys: []:$K,
-        values: []:$V,
-    }
-}
-
+// Insert or update a key-value pair
 fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
-    for key in self.keys {
-        if key == k {
-            self.values[List::indexOf(self.keys, key)] = v;
-            return;
+    for let i = 0; i < self.keys.len(); i += 1 {
+        if self.keys[i] == k {
+            self.values[i] = v
+            return
         }
     }
     self.keys.push(k)
     self.values.push(v)
 }
 
+// Get the value for a key, or None if not found
 fn extends get(self: HashMap($K,$V), k: $K) -> Option($V) {
-    for key in self.keys {
-        if key == k {
-            return self.values[List::indexOf(self.keys, key)];
+    for let i = 0; i < self.keys.len(); i += 1 {
+        if self.keys[i] == k {
+            return Some(self.values[i])
         }
     }
     return None($V)
 }
 
+// Delete a key-value pair by key
 fn extends delete(self: HashMap($K,$V), k: $K) {
-    let index = List::indexOf(self.keys, k)
-    if index != -1 {
-        self.keys.remove(index)
-        self.values.remove(index)
+    for let i = 0; i < self.keys.len(); i += 1 {
+        if self.keys[i] == k {
+            self.keys.remove(i)
+            self.values.remove(i)
+            return
+        }
     }
 }
 
+// Check if a key exists
 fn extends has(self: HashMap($K,$V), k: $K) -> Bool {
     for key in self.keys {
         if key == k {
@@ -62,4 +71,46 @@ fn extends has(self: HashMap($K,$V), k: $K) -> Bool {
         }
     }
     return false
+}
+
+// Return the number of entries
+fn extends size(self: HashMap($K,$V)) -> Int {
+    return self.keys.len()
+}
+
+// Check if the map is empty
+fn extends isEmpty(self: HashMap($K,$V)) -> Bool {
+    return self.keys.len() == 0
+}
+
+// Clear all entries
+fn extends clear(self: HashMap($K,$V)) {
+    self.keys = []:$K
+    self.values = []:$V
+}
+
+// Get the value for a key, or a default if not found
+fn extends getOrDefault(self: HashMap($K,$V), k: $K, default: $V) -> $V {
+    for let i = 0; i < self.keys.len(); i += 1 {
+        if self.keys[i] == k {
+            return self.values[i]
+        }
+    }
+    return default
+}
+
+// Get all entries as a list of tuples
+fn extends entries(self: HashMap($K,$V)) -> [($K,$V)] {
+    let result = []:($K,$V)
+    for let i = 0; i < self.keys.len(); i += 1 {
+        result.push((self.keys[i], self.values[i]))
+    }
+    return result
+}
+
+// Apply a function to each entry
+fn extends forEach(self: HashMap($K,$V), f: fn($K,$V)) {
+    for let i = 0; i < self.keys.len(); i += 1 {
+        f(self.keys[i], self.values[i])
+    }
 }

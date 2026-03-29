@@ -1,7 +1,141 @@
 module string
 
+// String utilities that complement the native String:: functions
+// Native functions available: contains, startsWith, endsWith, trim,
+// trimStart, trimEnd, toUpper, toLower, replace, substring, indexOf,
+// repeat, reverse, isEmpty, charAt, split (by String delimiter)
+
 import list
 
+// Split a string by a character delimiter
+// (complements native String::split which splits by string delimiter)
 fn extends split(x: String, y: Char) -> [String] {
     return x.chars().split(y).map(|x: [Char]| x.string())
+}
+
+// Pad a string on the left to reach a target width
+fn extends padLeft(s: String, width: Int, pad: Char) -> String {
+    let result = s
+    while result.len() < width {
+        result = Cast::string(pad) + result
+    }
+    return result
+}
+
+// Pad a string on the right to reach a target width
+fn extends padRight(s: String, width: Int, pad: Char) -> String {
+    let result = s
+    while result.len() < width {
+        result = result + Cast::string(pad)
+    }
+    return result
+}
+
+// Center a string with padding on both sides
+fn extends center(s: String, width: Int, pad: Char) -> String {
+    if s.len() >= width {
+        return s
+    }
+    let total_pad = width - s.len()
+    let left_pad = total_pad / 2
+    let right_pad = total_pad - left_pad
+    let result = ""
+    for let i = 0; i < left_pad; i += 1 {
+        result = result + Cast::string(pad)
+    }
+    result = result + s
+    for let i = 0; i < right_pad; i += 1 {
+        result = result + Cast::string(pad)
+    }
+    return result
+}
+
+// Count how many times a substring appears
+fn extends count(s: String, sub: String) -> Int {
+    if sub.isEmpty() { return 0 }
+    let n = 0
+    let i = 0
+    while i <= s.len() - sub.len() {
+        if s.substring(i, i + sub.len()) == sub {
+            n += 1
+            i += sub.len()
+        } else {
+            i += 1
+        }
+    }
+    return n
+}
+
+// Check if a string contains only digits
+fn extends isDigit(s: String) -> Bool {
+    if s.isEmpty() { return false }
+    for c in s.chars() {
+        if !c.isDigit() {
+            return false
+        }
+    }
+    return true
+}
+
+// Check if a string contains only alphabetic characters
+fn extends isAlpha(s: String) -> Bool {
+    if s.isEmpty() { return false }
+    for c in s.chars() {
+        if !c.isAlpha() {
+            return false
+        }
+    }
+    return true
+}
+
+// Check if a string contains only alphanumeric characters
+fn extends isAlphanumeric(s: String) -> Bool {
+    if s.isEmpty() { return false }
+    for c in s.chars() {
+        if !c.isAlphanumeric() {
+            return false
+        }
+    }
+    return true
+}
+
+// Capitalize the first character of a string
+fn extends capitalize(s: String) -> String {
+    if s.isEmpty() { return s }
+    let first = s.charAt(0).unwrap().toUpper()
+    if s.len() == 1 {
+        return Cast::string(first)
+    }
+    return Cast::string(first) + s.substring(1, s.len())
+}
+
+// Convert a string to title case (capitalize each word)
+fn extends title(s: String) -> String {
+    let words = s.split(" ")
+    let result = []: String
+    for w in words {
+        result.push(w.capitalize())
+    }
+    return join(result, " ")
+}
+
+// Remove all occurrences of a character from a string
+fn extends removeChar(s: String, c: Char) -> String {
+    let result = ""
+    for ch in s.chars() {
+        if ch != c {
+            result = result + Cast::string(ch)
+        }
+    }
+    return result
+}
+
+// Extract lines from a multi-line string
+fn extends lines(s: String) -> [String] {
+    return s.split("\n")
+}
+
+// Extract words (split by whitespace)
+fn extends words(s: String) -> [String] {
+    return s.split(" ").filter(|w: String| !w.isEmpty())
 }

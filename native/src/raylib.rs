@@ -184,6 +184,36 @@ pub fn raylib_rendering(state: &mut state::State) -> NovaResult<()> {
                 Draw::Line(x1, y1, x2, y2, color) => {
                     d.draw_line(x1, y1, x2, y2, color);
                 }
+                Draw::LineThick(x1, y1, x2, y2, thick, color) => {
+                    d.draw_line_ex(
+                        Vector2::new(x1 as f32, y1 as f32),
+                        Vector2::new(x2 as f32, y2 as f32),
+                        thick,
+                        color,
+                    );
+                }
+                Draw::RectangleLines(x, y, w, h, color) => {
+                    d.draw_rectangle_lines(x, y, w, h, color);
+                }
+                Draw::RoundedRectangle(x, y, w, h, roundness, color) => {
+                    d.draw_rectangle_rounded(
+                        Rectangle::new(x as f32, y as f32, w as f32, h as f32),
+                        roundness,
+                        8,
+                        color,
+                    );
+                }
+                Draw::CircleLines(x, y, radius, color) => {
+                    d.draw_circle_lines(x, y, radius, color);
+                }
+                Draw::Triangle(x1, y1, x2, y2, x3, y3, color) => {
+                    d.draw_triangle(
+                        Vector2::new(x1, y1),
+                        Vector2::new(x2, y2),
+                        Vector2::new(x3, y3),
+                        color,
+                    );
+                }
                 Draw::Sprite(sprite_index, x, y) => {
                     if let Some(texture) = state.sprites.get(sprite_index) {
                         d.draw_texture(texture.as_ref(), x, y, Color::WHITE);
@@ -601,6 +631,146 @@ pub fn create_sprite_from_array(state: &mut state::State) -> NovaResult<()> {
         ],
     };
     state.memory.allocate(sprite_obj);
+    Ok(())
+}
+
+// ---------------------------------------------------------------
+// Additional raylib functions
+// ---------------------------------------------------------------
+
+pub fn raylib_draw_rectangle_lines(state: &mut state::State) -> NovaResult<()> {
+    let color = pop_color(state)?;
+    let h = pop_int(state)? as i32;
+    let w = pop_int(state)? as i32;
+    let y = pop_int(state)? as i32;
+    let x = pop_int(state)? as i32;
+    state
+        .draw_queue
+        .push(Draw::RectangleLines(x, y, w, h, color));
+    Ok(())
+}
+
+pub fn raylib_draw_circle_lines(state: &mut state::State) -> NovaResult<()> {
+    let color = pop_color(state)?;
+    let radius = pop_int(state)? as i32;
+    let y = pop_int(state)? as i32;
+    let x = pop_int(state)? as i32;
+    state
+        .draw_queue
+        .push(Draw::CircleLines(x, y, radius as f32, color));
+    Ok(())
+}
+
+pub fn raylib_draw_triangle(state: &mut state::State) -> NovaResult<()> {
+    let color = pop_color(state)?;
+    let y3 = pop_int(state)? as f32;
+    let x3 = pop_int(state)? as f32;
+    let y2 = pop_int(state)? as f32;
+    let x2 = pop_int(state)? as f32;
+    let y1 = pop_int(state)? as f32;
+    let x1 = pop_int(state)? as f32;
+    state
+        .draw_queue
+        .push(Draw::Triangle(x1, y1, x2, y2, x3, y3, color));
+    Ok(())
+}
+
+pub fn raylib_draw_line_thick(state: &mut state::State) -> NovaResult<()> {
+    let color = pop_color(state)?;
+    let thick = pop_float(state)? as f32;
+    let y2 = pop_int(state)? as i32;
+    let x2 = pop_int(state)? as i32;
+    let y1 = pop_int(state)? as i32;
+    let x1 = pop_int(state)? as i32;
+    state
+        .draw_queue
+        .push(Draw::LineThick(x1, y1, x2, y2, thick, color));
+    Ok(())
+}
+
+pub fn raylib_get_screen_width(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let w = { rl_rc.borrow().get_screen_width() as i64 };
+    state.memory.stack.push(VmData::Int(w));
+    Ok(())
+}
+
+pub fn raylib_get_screen_height(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let h = { rl_rc.borrow().get_screen_height() as i64 };
+    state.memory.stack.push(VmData::Int(h));
+    Ok(())
+}
+
+pub fn raylib_set_target_fps(state: &mut state::State) -> NovaResult<()> {
+    let fps = pop_int(state)? as u32;
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    rl_rc.borrow_mut().set_target_fps(fps);
+    Ok(())
+}
+
+pub fn raylib_get_fps(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let fps = { rl_rc.borrow().get_fps() as i64 };
+    state.memory.stack.push(VmData::Int(fps));
+    Ok(())
+}
+
+pub fn raylib_measure_text(state: &mut state::State) -> NovaResult<()> {
+    let size = pop_int(state)? as i32;
+    let text = pop_string(state)?;
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let width = { rl_rc.borrow().measure_text(&text, size) as i64 };
+    state.memory.stack.push(VmData::Int(width));
+    Ok(())
+}
+
+pub fn raylib_get_mouse_wheel(state: &mut state::State) -> NovaResult<()> {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let wheel = { rl_rc.borrow().get_mouse_wheel_move() as f64 };
+    state.memory.stack.push(VmData::Float(wheel));
+    Ok(())
+}
+
+pub fn raylib_is_key_up(state: &mut state::State) -> NovaResult<()> {
+    let key_name = pop_string(state)?;
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+    let up = {
+        let rl = rl_rc.borrow();
+        if let Some(key) = string_to_key(&key_name) {
+            rl.is_key_up(key)
+        } else {
+            true
+        }
+    };
+    state.memory.stack.push(VmData::Bool(up));
+    Ok(())
+}
+
+pub fn raylib_draw_rounded_rectangle(state: &mut state::State) -> NovaResult<()> {
+    let color = pop_color(state)?;
+    let roundness = pop_float(state)? as f32;
+    let h = pop_int(state)? as i32;
+    let w = pop_int(state)? as i32;
+    let y = pop_int(state)? as i32;
+    let x = pop_int(state)? as i32;
+    state
+        .draw_queue
+        .push(Draw::RoundedRectangle(x, y, w, h, roundness, color));
     Ok(())
 }
 

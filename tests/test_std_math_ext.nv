@@ -1,0 +1,87 @@
+module test_std_math_ext
+
+import super.std.math
+
+// --- Int extensions ---
+assert(3.min(5) == 3, "min(3,5)")
+assert(5.min(3) == 3, "min(5,3)")
+assert(3.max(5) == 5, "max(3,5)")
+assert((-5).abs() == 5, "abs(-5)")
+assert(5.abs() == 5, "abs(5)")
+assert(2.pow(10) == 1024, "pow 2^10")
+assert(3.pow(0) == 1, "pow x^0")
+
+// --- Int sqrt / exp delegates ---
+assert(4.sqrt() == 2.0, "int sqrt 4")
+assert(9.sqrt() == 3.0, "int sqrt 9")
+
+// --- clamp ---
+assert(5.clamp(0, 10) == 5, "clamp in range")
+assert((-5).clamp(0, 10) == 0, "clamp below min")
+assert(15.clamp(0, 10) == 10, "clamp above max")
+
+// --- factorial ---
+assert(0.factorial() == 1, "factorial 0")
+assert(1.factorial() == 1, "factorial 1")
+assert(5.factorial() == 120, "factorial 5")
+assert(10.factorial() == 3628800, "factorial 10")
+
+// --- gcd / lcm ---
+assert(12.gcd(8) == 4, "gcd(12,8)")
+assert(7.gcd(5) == 1, "gcd(7,5) coprime")
+assert(12.lcm(8) == 24, "lcm(12,8)")
+assert(3.lcm(4) == 12, "lcm(3,4)")
+
+// --- isEven / isOdd ---
+assert(4.isEven(), "isEven 4")
+assert(!3.isEven(), "isEven 3 false")
+assert(3.isOdd(), "isOdd 3")
+assert(!4.isOdd(), "isOdd 4 false")
+assert(0.isEven(), "isEven 0")
+
+// --- sign ---
+assert(5.sign() == 1, "sign positive")
+assert((-3).sign() == -1, "sign negative")
+assert(0.sign() == 0, "sign zero")
+
+// --- modpow ---
+assert(2.modpow(10, 1000) == 24, "modpow 2^10 mod 1000")
+assert(3.modpow(4, 100) == 81, "modpow 3^4 mod 100")
+
+// --- fib ---
+assert(fib(0) == 0, "fib 0")
+assert(fib(1) == 1, "fib 1")
+assert(fib(10) == 55, "fib 10")
+assert(fib(20) == 6765, "fib 20")
+
+// --- bin / hex ---
+assert(bin(10) == "1010", "bin 10")
+assert(bin(255) == "11111111", "bin 255")
+assert(bin(0) == "0", "bin 0")
+assert(hex(255) == "ff", "hex 255")
+assert(hex(16) == "10", "hex 16")
+assert(hex(0) == "0", "hex 0")
+
+// --- divmod ---
+let dm = divmod(17, 5)
+assert(dm[0] == 3, "divmod quotient")
+assert(dm[1] == 2, "divmod remainder")
+
+// --- toRadians / toDegrees ---
+let r = toRadians(180.0)
+assert(r > 3.14, "toRadians 180 > 3.14")
+assert(r < 3.15, "toRadians 180 < 3.15")
+let d = toDegrees(Float::pi())
+assert(d > 179.9, "toDegrees pi > 179.9")
+assert(d < 180.1, "toDegrees pi < 180.1")
+
+// --- lerp ---
+assert(lerp(0.0, 10.0, 0.5) == 5.0, "lerp midpoint")
+assert(lerp(0.0, 10.0, 0.0) == 0.0, "lerp start")
+assert(lerp(0.0, 10.0, 1.0) == 10.0, "lerp end")
+
+// --- round ---
+assert(round(2.7) == 3, "round up")
+assert(round(2.3) == 2, "round down")
+
+println("PASS: test_std_math_ext")

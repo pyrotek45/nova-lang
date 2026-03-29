@@ -33,6 +33,7 @@ pub struct Parser {
     pub ast: Ast,
     pub typechecker: TypeChecker,
     pub modules: table::Table<Rc<str>>,
+    depth: usize,
 }
 
 pub fn default() -> Parser {
@@ -44,6 +45,7 @@ pub fn default() -> Parser {
         index: 0,
         typechecker: tc,
         modules: Table::new(),
+        depth: 0,
     }
 }
 
@@ -56,6 +58,7 @@ pub fn new(filepath: impl AsRef<Path>) -> Parser {
         index: 0,
         typechecker: tc,
         modules: Table::new(),
+        depth: 0,
     }
 }
 
@@ -1503,7 +1506,26 @@ impl Parser {
         }
     }
 
+    fn check_depth(&mut self) -> NovaResult<()> {
+        const MAX_DEPTH: usize = 64;
+        if self.depth > MAX_DEPTH {
+            return Err(self.generate_error(
+                "Expression too deeply nested",
+                format!("exceeded maximum nesting depth of {MAX_DEPTH}"),
+            ));
+        }
+        Ok(())
+    }
+
     fn factor(&mut self) -> NovaResult<Expr> {
+        self.depth += 1;
+        self.check_depth()?;
+        let result = self.factor_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn factor_inner(&mut self) -> NovaResult<Expr> {
         let mut left: Expr;
         if let Ok(Some(sign)) = self.sign() {
             self.advance();
@@ -2746,6 +2768,14 @@ impl Parser {
     }
 
     fn expr(&mut self) -> NovaResult<Expr> {
+        self.depth += 1;
+        self.check_depth()?;
+        let result = self.expr_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn expr_inner(&mut self) -> NovaResult<Expr> {
         match self.current_token_value() {
             Some(Identifier(id)) if "let" == id.deref() => {
                 return self.let_expr();
@@ -4002,7 +4032,13 @@ impl Parser {
                 import_filepath.set_extension("nv");
                 import_filepath
             }
-            _ => panic!(),
+            _ => {
+                return Err(self.generate_error_with_pos(
+                    "Expected import path",
+                    "expected a module path or string literal after 'import'",
+                    pos,
+                ));
+            }
         };
         let resolved_filepath = match self
             .filepath

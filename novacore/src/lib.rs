@@ -112,6 +112,9 @@ impl NovaCore {
         self.parser.modules.insert("Cast".into());
         self.parser.modules.insert("Regex".into());
         self.parser.modules.insert("raylib".into());
+        self.parser.modules.insert("String".into());
+        self.parser.modules.insert("Char".into());
+        self.parser.modules.insert("Float".into());
         self.parser
             .typechecker
             .environment
@@ -430,6 +433,169 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::create_sprite_from_array,
         );
+        // raylib draw rectangle outline
+        self.add_function(
+            "raylib::drawRectangleLines",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_rectangle_lines,
+        );
+        // raylib draw circle outline
+        self.add_function(
+            "raylib::drawCircleLines",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_circle_lines,
+        );
+        // raylib draw filled triangle
+        self.add_function(
+            "raylib::drawTriangle",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_triangle,
+        );
+        // raylib draw thick line
+        self.add_function(
+            "raylib::drawLineThick",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Float,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_line_thick,
+        );
+        // raylib draw rounded rectangle
+        self.add_function(
+            "raylib::drawRoundedRectangle",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Int,
+                    TType::Float,
+                    TType::Tuple {
+                        elements: vec![TType::Int, TType::Int, TType::Int],
+                    },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_draw_rounded_rectangle,
+        );
+        // raylib get screen width
+        self.add_function(
+            "raylib::getScreenWidth",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_screen_width,
+        );
+        // raylib get screen height
+        self.add_function(
+            "raylib::getScreenHeight",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_screen_height,
+        );
+        // raylib set target FPS
+        self.add_function(
+            "raylib::setTargetFPS",
+            TType::Function {
+                parameters: vec![TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_set_target_fps,
+        );
+        // raylib get current FPS
+        self.add_function(
+            "raylib::getFPS",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_fps,
+        );
+        // raylib measure text width
+        self.add_function(
+            "raylib::measureText",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_measure_text,
+        );
+        // raylib get mouse wheel move
+        self.add_function(
+            "raylib::getMouseWheel",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_get_mouse_wheel,
+        );
+        // raylib is key up (not pressed)
+        self.add_function(
+            "raylib::isKeyUp",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_key_up,
+        );
         // add regex match, takes two strings and returns a bool
         self.add_function(
             "Regex::matches",
@@ -649,7 +815,7 @@ impl NovaCore {
                 }),
             },
             common::nodes::SymbolKind::GenericFunction,
-            native::list::pop,
+            native::list::pop_item,
         );
         self.add_function(
             "random",
@@ -708,6 +874,569 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::io::read_file,
+        );
+        // ---------------------------------------------------------------
+        // New string functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "String::contains",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_contains,
+        );
+        self.add_function(
+            "String::startsWith",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_starts_with,
+        );
+        self.add_function(
+            "String::endsWith",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_ends_with,
+        );
+        self.add_function(
+            "String::trim",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim,
+        );
+        self.add_function(
+            "String::trimStart",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim_start,
+        );
+        self.add_function(
+            "String::trimEnd",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim_end,
+        );
+        self.add_function(
+            "String::toUpper",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_to_upper,
+        );
+        self.add_function(
+            "String::toLower",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_to_lower,
+        );
+        self.add_function(
+            "String::replace",
+            TType::Function {
+                parameters: vec![TType::String, TType::String, TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_replace,
+        );
+        self.add_function(
+            "String::substring",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int, TType::Int],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_substring,
+        );
+        self.add_function(
+            "String::indexOf",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_index_of,
+        );
+        self.add_function(
+            "String::repeat",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_repeat,
+        );
+        self.add_function(
+            "String::reverse",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_reverse,
+        );
+        self.add_function(
+            "String::isEmpty",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_is_empty,
+        );
+        self.add_function(
+            "String::charAt",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Char),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_char_at,
+        );
+        self.add_function(
+            "String::split",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_split,
+        );
+        self.add_function(
+            "join",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::String),
+                    },
+                    TType::String,
+                ],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_join,
+        );
+        self.add_function(
+            "Cast::charToInt",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::char_to_int,
+        );
+        // ---------------------------------------------------------------
+        // Char functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "Char::isAlpha",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_alpha,
+        );
+        self.add_function(
+            "Char::isDigit",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_digit,
+        );
+        self.add_function(
+            "Char::isWhitespace",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_whitespace,
+        );
+        self.add_function(
+            "Char::isAlphanumeric",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_alphanumeric,
+        );
+        self.add_function(
+            "Char::toUpper",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Char),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_to_upper,
+        );
+        self.add_function(
+            "Char::toLower",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Char),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_to_lower,
+        );
+        self.add_function(
+            "Char::isUpper",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_upper,
+        );
+        self.add_function(
+            "Char::isLower",
+            TType::Function {
+                parameters: vec![TType::Char],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::char::char_is_lower,
+        );
+        // ---------------------------------------------------------------
+        // Float math functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "Float::floor",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_floor,
+        );
+        self.add_function(
+            "Float::ceil",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_ceil,
+        );
+        self.add_function(
+            "Float::round",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_round,
+        );
+        self.add_function(
+            "Float::abs",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_abs,
+        );
+        self.add_function(
+            "Float::sqrt",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_sqrt,
+        );
+        self.add_function(
+            "Float::sin",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_sin,
+        );
+        self.add_function(
+            "Float::cos",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_cos,
+        );
+        self.add_function(
+            "Float::tan",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_tan,
+        );
+        self.add_function(
+            "Float::atan2",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_atan2,
+        );
+        self.add_function(
+            "Float::log",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_log,
+        );
+        self.add_function(
+            "Float::log10",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_log10,
+        );
+        self.add_function(
+            "Float::pow",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_pow,
+        );
+        self.add_function(
+            "Float::exp",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_exp,
+        );
+        self.add_function(
+            "Float::min",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_min,
+        );
+        self.add_function(
+            "Float::max",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_max,
+        );
+        self.add_function(
+            "Float::clamp",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_clamp,
+        );
+        self.add_function(
+            "Float::isNan",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_is_nan,
+        );
+        self.add_function(
+            "Float::isInfinite",
+            TType::Function {
+                parameters: vec![TType::Float],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_is_infinite,
+        );
+        self.add_function(
+            "Float::pi",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_pi,
+        );
+        self.add_function(
+            "Float::e",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::float::float_e,
+        );
+        // ---------------------------------------------------------------
+        // List functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "List::insert",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "a".into() }),
+                    },
+                    TType::Int,
+                    TType::Generic { name: "a".into() },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::insert,
+        );
+        self.add_function(
+            "List::swap",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "a".into() }),
+                    },
+                    TType::Int,
+                    TType::Int,
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::swap,
+        );
+        self.add_function(
+            "List::clear",
+            TType::Function {
+                parameters: vec![TType::List {
+                    inner: Box::new(TType::Generic { name: "a".into() }),
+                }],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::clear,
+        );
+        self.add_function(
+            "List::set",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "a".into() }),
+                    },
+                    TType::Int,
+                    TType::Generic { name: "a".into() },
+                ],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::set,
+        );
+        // ---------------------------------------------------------------
+        // Random functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "randomFloat",
+            TType::Function {
+                parameters: vec![TType::Float, TType::Float],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::random::random_float,
+        );
+        self.add_function(
+            "randomBool",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::random::random_bool,
+        );
+        // ---------------------------------------------------------------
+        // Time functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "now",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::Function,
+            native::time::now_ms,
+        );
+        self.add_function(
+            "nowSec",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Float),
+            },
+            common::nodes::SymbolKind::Function,
+            native::time::now_sec,
+        );
+        // ---------------------------------------------------------------
+        // IO functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "writeFile",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::write_file,
+        );
+        self.add_function(
+            "fileExists",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::file_exists,
+        );
+        self.add_function(
+            "appendFile",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::append_file,
         );
     }
 

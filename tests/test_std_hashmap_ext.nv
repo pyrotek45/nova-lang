@@ -1,0 +1,57 @@
+module test_std_hashmap_ext
+
+import super.std.hashmap
+import super.std.core
+
+// --- Create and insert ---
+let m = HashMap::default() @[K: String, V: Int]
+m.insert("a", 1)
+m.insert("b", 2)
+m.insert("c", 3)
+
+// --- get ---
+assert(m.get("a").unwrap() == 1, "get a")
+assert(m.get("b").unwrap() == 2, "get b")
+assert(m.get("z").isNone(), "get missing key")
+
+// --- has ---
+assert(m.has("a"), "has a")
+assert(!m.has("z"), "has z false")
+
+// --- size ---
+assert(m.size() == 3, "size after 3 inserts")
+
+// --- isEmpty ---
+let empty = HashMap::default() @[K: Int, V: Int]
+assert(empty.isEmpty(), "isEmpty on empty map")
+assert(!m.isEmpty(), "isEmpty on non-empty map")
+
+// --- update existing key ---
+m.insert("a", 100)
+assert(m.get("a").unwrap() == 100, "update existing key")
+assert(m.size() == 3, "size unchanged after update")
+
+// --- delete ---
+m.delete("b")
+assert(!m.has("b"), "delete removes key")
+assert(m.size() == 2, "size after delete")
+
+// --- getOrDefault ---
+assert(m.getOrDefault("a", 0) == 100, "getOrDefault existing")
+assert(m.getOrDefault("missing", 42) == 42, "getOrDefault missing")
+
+// --- entries ---
+let ents = m.entries()
+assert(ents.len() == 2, "entries length")
+
+// --- clear ---
+m.clear()
+assert(m.isEmpty(), "clear empties map")
+assert(m.size() == 0, "clear sets size to 0")
+
+// --- toString ---
+let m2 = HashMap::default() @[K: String, V: Int]
+m2.insert("x", 1)
+assert(m2.toString() == "{x => 1}", "toString single entry")
+
+println("PASS: test_std_hashmap_ext")
