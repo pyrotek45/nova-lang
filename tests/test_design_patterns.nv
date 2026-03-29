@@ -1,0 +1,894 @@
+module test_design_patterns
+
+import super.std.core
+import super.std.list
+
+// ============================================================================
+// Design Patterns in Nova — without OOP
+//
+// Nova has no classes, no inheritance, no interfaces. Instead it uses:
+//   - Structs + extends functions  (data + behaviour)
+//   - Closures + Box               (mutable state, encapsulation)
+//   - Dyn types                    (structural polymorphism / duck typing)
+//   - Enums + match                (algebraic data types, variant dispatch)
+//   - Higher-order functions        (strategy, visitor, template method)
+//   - Operator overloading          (dunder methods)
+//
+// Each pattern is demonstrated at least twice with different domains.
+// ============================================================================
+
+// ============================
+// 1. STRATEGY PATTERN
+// ============================
+// Replace algorithms at runtime via function fields / HOF.
+
+// Strategy 1a: sorting comparison strategies
+fn sort_with(data: [Int], compare: fn(Int, Int) -> Bool) -> [Int] {
+    let result = clone(data)
+    // simple bubble sort to demonstrate strategy
+    let n = result.len()
+    for let i = 0; i < n; i += 1 {
+        for let j = 0; j < n - 1 - i; j += 1 {
+            if compare(result[j], result[j + 1]) {
+                let tmp = result[j]
+                result[j] = result[j + 1]
+                result[j + 1] = tmp
+            }
+        }
+    }
+    return result
+}
+
+let nums = [3, 1, 4, 1, 5, 9, 2, 6]
+let ascending = sort_with(nums, |a: Int, b: Int| a > b)
+assert(ascending[0] == 1, "strategy: ascending[0]")
+assert(ascending[1] == 1, "strategy: ascending[1]")
+assert(ascending[7] == 9, "strategy: ascending last")
+
+let descending = sort_with(nums, |a: Int, b: Int| a < b)
+assert(descending[0] == 9, "strategy: descending[0]")
+assert(descending[7] == 1, "strategy: descending last")
+
+// Strategy 1b: text formatting strategies
+struct Formatter {
+    format: fn(String) -> String,
+}
+
+let upper_fmt = Formatter { format: |s: String| s.toUpper() }
+let shout_fmt = Formatter { format: |s: String| s.toUpper() + "!!!" }
+let whisper_fmt = Formatter { format: |s: String| s.toLower() + "..." }
+
+assert(upper_fmt::format("hello") == "HELLO", "strategy: upper format")
+assert(shout_fmt::format("hello") == "HELLO!!!", "strategy: shout format")
+assert(whisper_fmt::format("Hello") == "hello...", "strategy: whisper format")
+
+// Strategy 1c: pricing strategies via closures
+fn make_pricer(discount: Float) -> fn(Float) -> Float {
+    return |price: Float| price * (1.0 - discount)
+}
+
+let no_discount = make_pricer(0.0)
+let half_off = make_pricer(0.5)
+let vip = make_pricer(0.25)
+
+assert(no_discount(100.0) == 100.0, "strategy: no discount")
+assert(half_off(100.0) == 50.0, "strategy: half off")
+assert(vip(100.0) == 75.0, "strategy: vip discount")
+
+// ============================
+// 2. OBSERVER PATTERN
+// ============================
+// Notify multiple listeners when state changes, using closures.
+
+// Observer 2a: event system via list of callbacks
+struct EventBus {
+    listeners: [fn(String)],
+}
+
+fn EventBusNew() -> EventBus {
+    return EventBus { listeners: []: fn(String) }
+}
+
+fn extends subscribe(bus: EventBus, cb: fn(String)) {
+    bus.listeners.push(cb)
+}
+
+fn extends emit(bus: EventBus, event: String) {
+    for cb in bus.listeners {
+        cb(event)
+    }
+}
+
+let log = Box("")
+let bus = EventBusNew()
+bus.subscribe(|e: String| { log.value = log.value + "A:" + e + ";" })
+bus.subscribe(|e: String| { log.value = log.value + "B:" + e + ";" })
+bus.emit("click")
+assert(log.value == "A:click;B:click;", "observer: two listeners")
+bus.emit("hover")
+assert(log.value == "A:click;B:click;A:hover;B:hover;", "observer: second emit")
+
+// Observer 2b: typed observer with counter
+struct Counter {
+    value: Int,
+    on_change: [fn(Int)],
+}
+
+fn CounterNew() -> Counter {
+    return Counter { value: 0, on_change: []: fn(Int) }
+}
+
+fn extends watch(c: Counter, cb: fn(Int)) {
+    c.on_change.push(cb)
+}
+
+fn extends set(c: Counter, v: Int) {
+    c.value = v
+    for cb in c.on_change {
+        cb(v)
+    }
+}
+
+let history = Box("")
+let counter = CounterNew()
+counter.watch(|v: Int| { history.value = history.value + Cast::string(v) + "," })
+counter.set(10)
+counter.set(20)
+counter.set(30)
+assert(history.value == "10,20,30,", "observer: counter history")
+assert(counter.value == 30, "observer: counter value")
+
+// ============================
+// 3. FACTORY PATTERN
+// ============================
+// Centralize object creation behind a function.
+
+// Factory 3a: shape factory using enums
+enum Shape {
+    Circle: Int,
+    Rect: (Int, Int),
+    Square: Int
+}
+
+fn extends area(s: Shape) -> Int {
+    match s {
+        Circle(r) => { return 3 * r * r }  // approx pi*r^2
+        Rect(dims) => { return dims[0] * dims[1] }
+        Square(side) => { return side * side }
+    }
+    return 0
+}
+
+fn createShape(kind: String, size: Int) -> Shape {
+    if kind == "circle" { return Shape::Circle(size) }
+    if kind == "square" { return Shape::Square(size) }
+    return Shape::Rect((size, size * 2))
+}
+
+let c = createShape("circle", 5)
+assert(c.area() == 75, "factory: circle area 3*25=75")
+
+let sq = createShape("square", 4)
+assert(sq.area() == 16, "factory: square area")
+
+let r = createShape("rect", 3)
+assert(r.area() == 18, "factory: rect area 3*6=18")
+
+// Factory 3b: enemy factory with different stats
+struct Enemy {
+    name: String,
+    hp: Int,
+    attack: Int,
+}
+
+fn createEnemy(kind: String) -> Enemy {
+    if kind == "goblin" {
+        return Enemy { name: "Goblin", hp: 30, attack: 5 }
+    }
+    if kind == "dragon" {
+        return Enemy { name: "Dragon", hp: 200, attack: 50 }
+    }
+    return Enemy { name: "Slime", hp: 10, attack: 1 }
+}
+
+let goblin = createEnemy("goblin")
+assert(goblin.hp == 30, "factory: goblin hp")
+assert(goblin.attack == 5, "factory: goblin attack")
+
+let dragon = createEnemy("dragon")
+assert(dragon.hp == 200, "factory: dragon hp")
+assert(dragon.attack == 50, "factory: dragon attack")
+
+let slime = createEnemy("default")
+assert(slime.name == "Slime", "factory: default enemy")
+
+// ============================
+// 4. BUILDER PATTERN
+// ============================
+// Construct complex objects step by step via chained extends.
+
+// Builder 4a: query builder
+struct Query {
+    table: String,
+    conditions: [String],
+    limit_val: Int,
+}
+
+fn QueryNew(table: String) -> Query {
+    return Query { table: table, conditions: []: String, limit_val: -1 }
+}
+
+fn extends where_(q: Query, cond: String) -> Query {
+    q.conditions.push(cond)
+    return q
+}
+
+fn extends limit(q: Query, n: Int) -> Query {
+    q.limit_val = n
+    return q
+}
+
+fn joinStrings(parts: [String], delim: String) -> String {
+    let result = ""
+    for let i = 0; i < parts.len(); i += 1 {
+        if i > 0 { result = result + delim }
+        result = result + parts[i]
+    }
+    return result
+}
+
+fn extends toSQL(q: Query) -> String {
+    let sql = "SELECT * FROM " + q.table
+    if q.conditions.len() > 0 {
+        sql = sql + " WHERE " + joinStrings(q.conditions, " AND ")
+    }
+    if q.limit_val > 0 {
+        sql = sql + " LIMIT " + Cast::string(q.limit_val)
+    }
+    return sql
+}
+
+let query = QueryNew("users")
+    .where_("age > 18")
+    .where_("active = true")
+    .limit(10)
+    .toSQL()
+assert(query == "SELECT * FROM users WHERE age > 18 AND active = true LIMIT 10", "builder: query")
+
+// Builder 4b: HTML builder
+struct HtmlBuilder {
+    parts: [String],
+}
+
+fn HtmlBuilderNew() -> HtmlBuilder {
+    return HtmlBuilder { parts: []: String }
+}
+
+fn extends tag(b: HtmlBuilder, name: String, content: String) -> HtmlBuilder {
+    b.parts.push("<" + name + ">" + content + "</" + name + ">")
+    return b
+}
+
+fn extends raw(b: HtmlBuilder, text: String) -> HtmlBuilder {
+    b.parts.push(text)
+    return b
+}
+
+fn extends render(b: HtmlBuilder) -> String {
+    return joinStrings(b.parts, "")
+}
+
+let html = HtmlBuilderNew()
+    .tag("h1", "Title")
+    .tag("p", "Hello world")
+    .raw("<hr>")
+    .tag("p", "Footer")
+    .render()
+assert(html == "<h1>Title</h1><p>Hello world</p><hr><p>Footer</p>", "builder: html")
+
+// ============================
+// 5. DECORATOR PATTERN
+// ============================
+// Wrap functions with additional behaviour using HOF.
+
+// Decorator 5a: logging decorator
+fn with_log(name: String, f: fn(Int) -> Int) -> fn(Int) -> Int {
+    let log = Box("")
+    return |x: Int| {
+        log.value = name + "(" + Cast::string(x) + ")"
+        f(x)
+    }
+}
+
+let logged_double = with_log("double", |x: Int| x * 2)
+assert(logged_double(5) == 10, "decorator: logged double")
+assert(logged_double(0) == 0, "decorator: logged double zero")
+
+// Decorator 5b: caching/memoization decorator
+fn with_cache(f: fn(Int) -> Int) -> fn(Int) -> Int {
+    let cache = Box(-1)  // simple: cache last result
+    let cached_input = Box(-999)
+    return fn(x: Int) -> Int {
+        if x == cached_input.value {
+            return cache.value
+        }
+        let result = f(x)
+        cached_input.value = x
+        cache.value = result
+        return result
+    }
+}
+
+let call_count = Box(0)
+let expensive = with_cache(|x: Int| {
+    call_count.value += 1
+    x * x * x
+})
+assert(expensive(3) == 27, "decorator: cache miss")
+assert(call_count.value == 1, "decorator: one call")
+assert(expensive(3) == 27, "decorator: cache hit")
+assert(call_count.value == 1, "decorator: still one call")
+assert(expensive(4) == 64, "decorator: new input")
+assert(call_count.value == 2, "decorator: two calls")
+
+// Decorator 5c: chained decorators
+fn add_prefix(prefix: String, f: fn(String) -> String) -> fn(String) -> String {
+    return |s: String| prefix + f(s)
+}
+
+fn add_suffix(suffix: String, f: fn(String) -> String) -> fn(String) -> String {
+    return |s: String| f(s) + suffix
+}
+
+let base = |s: String| s
+let decorated = add_prefix("[", add_suffix("]", base))
+assert(decorated("hello") == "[hello]", "decorator: prefix+suffix")
+
+let double_dec = add_prefix("<<", add_suffix(">>", add_prefix("(", add_suffix(")", base))))
+assert(double_dec("x") == "<<(x)>>", "decorator: double wrap")
+
+// ============================
+// 6. COMMAND PATTERN
+// ============================
+// Encapsulate operations as data, support undo.
+
+// Command 6a: text editor commands
+enum EditCmd {
+    Insert: String,
+    Delete: Int,
+    Replace: (String, String)
+}
+
+fn apply_cmd(text: String, cmd: EditCmd) -> String {
+    match cmd {
+        Insert(s) => { return text + s }
+        Delete(n) => {
+            if n >= text.len() { return "" }
+            return text.substring(0, text.len() - n)
+        }
+        Replace(args) => { return text.replace(args[0], args[1]) }
+    }
+    return text
+}
+
+let doc = "Hello"
+doc = apply_cmd(doc, EditCmd::Insert(" World"))
+assert(doc == "Hello World", "command: insert")
+doc = apply_cmd(doc, EditCmd::Delete(6))
+assert(doc == "Hello", "command: delete")
+doc = apply_cmd(doc, EditCmd::Replace(("Hello", "Hi")))
+assert(doc == "Hi", "command: replace")
+
+// Command 6b: undo stack
+struct UndoStack {
+    state: Int,
+    history: [Int],
+}
+
+fn UndoStackNew(initial: Int) -> UndoStack {
+    return UndoStack { state: initial, history: []: Int }
+}
+
+fn extends execute(stack: UndoStack, op: fn(Int) -> Int) {
+    stack.history.push(stack.state)
+    stack.state = op(stack.state)
+}
+
+fn extends undo(stack: UndoStack) -> Bool {
+    if stack.history.len() == 0 { return false }
+    let prev = stack.history[stack.history.len() - 1]
+    stack.history = stack.history[0:stack.history.len() - 1]
+    stack.state = prev
+    return true
+}
+
+let us = UndoStackNew(0)
+us.execute(|x: Int| x + 10)
+assert(us.state == 10, "command: undo +10")
+us.execute(|x: Int| x * 3)
+assert(us.state == 30, "command: undo *3")
+us.undo()
+assert(us.state == 10, "command: undo back to 10")
+us.undo()
+assert(us.state == 0, "command: undo back to 0")
+
+// ============================
+// 7. STATE PATTERN
+// ============================
+// Use enums to model state machines with explicit transitions.
+
+// State 7a: traffic light
+enum Light {
+    Red,
+    Yellow,
+    Green
+}
+
+fn extends next(l: Light) -> Light {
+    match l {
+        Red() => { return Light::Green() }
+        Green() => { return Light::Yellow() }
+        Yellow() => { return Light::Red() }
+    }
+    return Light::Red()
+}
+
+fn extends name(l: Light) -> String {
+    match l {
+        Red() => { return "red" }
+        Green() => { return "green" }
+        Yellow() => { return "yellow" }
+    }
+    return "?"
+}
+
+let light = Light::Red()
+assert(light.name() == "red", "state: initial red")
+light = light.next()
+assert(light.name() == "green", "state: red->green")
+light = light.next()
+assert(light.name() == "yellow", "state: green->yellow")
+light = light.next()
+assert(light.name() == "red", "state: yellow->red")
+
+// State 7b: connection state machine
+enum ConnState {
+    Disconnected,
+    Connecting: String,
+    Connected: String,
+    Error: String
+}
+
+fn extends transition(s: ConnState, action: String) -> ConnState {
+    match s {
+        Disconnected() => {
+            if action == "connect" { return ConnState::Connecting("server") }
+            return s
+        }
+        Connecting(host) => {
+            if action == "success" { return ConnState::Connected(host) }
+            if action == "fail" { return ConnState::Error("timeout") }
+            return s
+        }
+        Connected(host) => {
+            if action == "disconnect" { return ConnState::Disconnected() }
+            return s
+        }
+        Error(msg) => {
+            if action == "retry" { return ConnState::Connecting("server") }
+            return s
+        }
+    }
+    return s
+}
+
+fn extends label(s: ConnState) -> String {
+    match s {
+        Disconnected() => { return "disconnected" }
+        Connecting(h) => { return "connecting:" + h }
+        Connected(h) => { return "connected:" + h }
+        Error(e) => { return "error:" + e }
+    }
+    return "?"
+}
+
+let conn = ConnState::Disconnected()
+assert(conn.label() == "disconnected", "state: initial disconnected")
+conn = conn.transition("connect")
+assert(conn.label() == "connecting:server", "state: connecting")
+conn = conn.transition("success")
+assert(conn.label() == "connected:server", "state: connected")
+conn = conn.transition("disconnect")
+assert(conn.label() == "disconnected", "state: back to disconnected")
+
+// Error path
+let conn2 = ConnState::Disconnected()
+conn2 = conn2.transition("connect")
+conn2 = conn2.transition("fail")
+assert(conn2.label() == "error:timeout", "state: error path")
+conn2 = conn2.transition("retry")
+assert(conn2.label() == "connecting:server", "state: retry from error")
+
+// ============================
+// 8. ADAPTER PATTERN
+// ============================
+// Wrap one interface to look like another using Dyn types.
+
+// Adapter 8a: temperature converter adapters
+struct Celsius { temp: Float }
+struct Fahrenheit { temp: Float }
+
+fn extends toCommon(c: Celsius) -> Float { return c.temp }
+fn extends toCommon(f: Fahrenheit) -> Float { return (f.temp - 32.0) * 5.0 / 9.0 }
+
+fn compare_temps(a: Float, b: Float) -> String {
+    if a > b { return "hotter" }
+    if a < b { return "colder" }
+    return "same"
+}
+
+let boiling_c = Celsius { temp: 100.0 }
+let boiling_f = Fahrenheit { temp: 212.0 }
+let warm_f = Fahrenheit { temp: 68.0 }
+
+assert(boiling_c.toCommon() == 100.0, "adapter: celsius direct")
+// 212F = 100C, 68F = 20C
+assert(compare_temps(boiling_c.toCommon(), warm_f.toCommon()) == "hotter", "adapter: 100C > 68F")
+
+// Adapter 8b: Dyn-based adapter for different data sources
+struct ArraySource { data: [Int] }
+struct RangeSource { start: Int, end: Int }
+
+fn extends getItems(s: ArraySource) -> [Int] { return s.data }
+fn extends getItems(s: RangeSource) -> [Int] {
+    let result = []: Int
+    for let i = s.start; i < s.end; i += 1 {
+        result.push(i)
+    }
+    return result
+}
+
+let arr_src = ArraySource { data: [10, 20, 30] }
+let rng_src = RangeSource { start: 1, end: 4 }
+
+assert(arr_src.getItems()[0] == 10, "adapter: array source")
+assert(rng_src.getItems()[0] == 1, "adapter: range source")
+assert(rng_src.getItems().len() == 3, "adapter: range source len")
+
+// ============================
+// 9. COMPOSITE PATTERN
+// ============================
+// Tree structures where leaf and branch are the same type.
+
+// Composite 9a: file system tree using enums
+enum FSNode {
+    File: (String, Int),
+    Dir: (String, [FSNode])
+}
+
+fn extends totalSize(node: FSNode) -> Int {
+    match node {
+        File(info) => { return info[1] }
+        Dir(info) => {
+            let sum = 0
+            for child in info[1] {
+                sum += child.totalSize()
+            }
+            return sum
+        }
+    }
+    return 0
+}
+
+fn extends nodeName(node: FSNode) -> String {
+    match node {
+        File(info) => { return info[0] }
+        Dir(info) => { return info[0] }
+    }
+    return "?"
+}
+
+let tree = FSNode::Dir(("root", [
+    FSNode::File(("a.txt", 100)),
+    FSNode::File(("b.txt", 200)),
+    FSNode::Dir(("sub", [
+        FSNode::File(("c.txt", 50))
+    ]))
+]))
+
+assert(tree.totalSize() == 350, "composite: total size 100+200+50")
+assert(tree.nodeName() == "root", "composite: root name")
+
+// Composite 9b: arithmetic expression tree
+enum Expr {
+    Num: Int,
+    Add: (Expr, Expr),
+    Mul: (Expr, Expr)
+}
+
+fn extends eval(e: Expr) -> Int {
+    match e {
+        Num(n) => { return n }
+        Add(pair) => { return pair[0].eval() + pair[1].eval() }
+        Mul(pair) => { return pair[0].eval() * pair[1].eval() }
+    }
+    return 0
+}
+
+// (2 + 3) * 4 = 20
+let expr = Expr::Mul((
+    Expr::Add((Expr::Num(2), Expr::Num(3))),
+    Expr::Num(4)
+))
+assert(expr.eval() == 20, "composite: (2+3)*4=20")
+
+// 1 + (2 * 3) = 7
+let expr2 = Expr::Add((Expr::Num(1), Expr::Mul((Expr::Num(2), Expr::Num(3)))))
+assert(expr2.eval() == 7, "composite: 1+(2*3)=7")
+
+// ============================
+// 10. TEMPLATE METHOD PATTERN
+// ============================
+// Define algorithm skeleton, let specific steps vary via function params.
+
+// Template 10a: data processing pipeline
+fn process_data(
+    data: [Int],
+    filter_fn: fn(Int) -> Bool,
+    transform_fn: fn(Int) -> Int,
+    combine_fn: fn(Int, Int) -> Int,
+    initial: Int
+) -> Int {
+    let acc = initial
+    for item in data {
+        if filter_fn(item) {
+            acc = combine_fn(acc, transform_fn(item))
+        }
+    }
+    return acc
+}
+
+// Sum of squares of even numbers
+let result1 = process_data(
+    [1, 2, 3, 4, 5, 6],
+    |x: Int| x % 2 == 0,
+    |x: Int| x * x,
+    |a: Int, b: Int| a + b,
+    0
+)
+assert(result1 == 56, "template: sum squares evens 4+16+36=56")
+
+// Product of odd numbers
+let result2 = process_data(
+    [1, 2, 3, 4, 5],
+    |x: Int| x % 2 != 0,
+    |x: Int| x,
+    |a: Int, b: Int| a * b,
+    1
+)
+assert(result2 == 15, "template: product odds 1*3*5=15")
+
+// Template 10b: report generator
+fn generate_report(
+    title: String,
+    items: [String],
+    format_header: fn(String) -> String,
+    format_item: fn(String, Int) -> String,
+    format_footer: fn(Int) -> String
+) -> String {
+    let parts = []: String
+    parts.push(format_header(title))
+    for let i = 0; i < items.len(); i += 1 {
+        parts.push(format_item(items[i], i + 1))
+    }
+    parts.push(format_footer(items.len()))
+    return joinStrings(parts, "\n")
+}
+
+let plain = generate_report(
+    "Tasks",
+    ["Buy milk", "Code"],
+    |t: String| "=== " + t + " ===",
+    |item: String, num: Int| Cast::string(num) + ". " + item,
+    |count: Int| "Total: " + Cast::string(count)
+)
+assert(plain.contains("=== Tasks ==="), "template: plain header")
+assert(plain.contains("1. Buy milk"), "template: plain item 1")
+assert(plain.contains("Total: 2"), "template: plain footer")
+
+// ============================
+// 11. ITERATOR PATTERN (manual)
+// ============================
+// Provide sequential access to elements without exposing internals.
+
+// Iterator 11a: range iterator via closures
+fn range_iter(start: Int, end: Int) -> fn() -> Option(Int) {
+    let current = Box(start)
+    return fn() -> Option(Int) {
+        if current.value >= end {
+            return None(Int)
+        }
+        let val = current.value
+        current.value += 1
+        return Some(val)
+    }
+}
+
+let it = range_iter(0, 5)
+let collected = []: Int
+while true {
+    let val = it()
+    if val.isNone() { break }
+    collected.push(val.unwrap())
+}
+assert(collected.len() == 5, "iterator: range len")
+assert(collected[0] == 0, "iterator: range[0]")
+assert(collected[4] == 4, "iterator: range[4]")
+
+// Iterator 11b: fibonacci iterator
+fn fib_iter(max: Int) -> fn() -> Option(Int) {
+    let a = Box(0)
+    let b = Box(1)
+    return fn() -> Option(Int) {
+        if a.value > max { return None(Int) }
+        let val = a.value
+        let next = a.value + b.value
+        a.value = b.value
+        b.value = next
+        return Some(val)
+    }
+}
+
+let fibs = []: Int
+let fib_it = fib_iter(20)
+while true {
+    let v = fib_it()
+    if v.isNone() { break }
+    fibs.push(v.unwrap())
+}
+assert(fibs[0] == 0, "iterator: fib[0]")
+assert(fibs[1] == 1, "iterator: fib[1]")
+assert(fibs[6] == 8, "iterator: fib[6]=8")
+assert(fibs[7] == 13, "iterator: fib[7]=13")
+
+// ============================
+// 12. CHAIN OF RESPONSIBILITY
+// ============================
+// Pass a request through a chain of handlers.
+
+fn make_handler(
+    can_handle: fn(Int) -> Bool,
+    handle: fn(Int) -> String,
+    next: fn(Int) -> String
+) -> fn(Int) -> String {
+    return fn(x: Int) -> String {
+        if can_handle(x) { return handle(x) }
+        return next(x)
+    }
+}
+
+let fallback = |x: Int| "unhandled:" + Cast::string(x)
+let neg_handler = make_handler(
+    |x: Int| x < 0,
+    |x: Int| "negative:" + Cast::string(x),
+    fallback
+)
+let zero_handler = make_handler(
+    |x: Int| x == 0,
+    |x: Int| "zero",
+    neg_handler
+)
+let pos_handler = make_handler(
+    |x: Int| x > 0,
+    |x: Int| "positive:" + Cast::string(x),
+    zero_handler
+)
+
+assert(pos_handler(5) == "positive:5", "chain: positive")
+assert(pos_handler(0) == "zero", "chain: zero")
+assert(pos_handler(-3) == "negative:-3", "chain: negative")
+
+// ============================
+// 13. SINGLETON PATTERN
+// ============================
+// Ensure only one instance by returning the same closure-captured state.
+
+fn make_config() -> fn(String) -> String {
+    let data = Box("default")
+    let initialized = Box(false)
+    return |action: String| {
+        if action == "init" && !initialized.value {
+            data.value = "initialized"
+            initialized.value = true
+        }
+        data.value
+    }
+}
+
+let config = make_config()
+assert(config("get") == "default", "singleton: before init")
+config("init")
+assert(config("get") == "initialized", "singleton: after init")
+config("init")  // second init should be ignored
+assert(config("get") == "initialized", "singleton: idempotent init")
+
+// ============================
+// 14. DYN DISPATCH (Polymorphism)
+// ============================
+// Use Dyn types for structural typing / duck typing.
+
+struct Dog { name: String, sound: String }
+struct Cat { name: String, sound: String }
+struct Robot2 { name: String, sound: String }
+
+fn greet(thing: Dyn(T = name: String + sound: String)) -> String {
+    return thing.name + " says " + thing.sound
+}
+
+let dog = Dog { name: "Rex", sound: "woof" }
+let cat = Cat { name: "Mimi", sound: "meow" }
+let bot = Robot2 { name: "R2", sound: "beep" }
+
+assert(greet(dog) == "Rex says woof", "dyn: dog greet")
+assert(greet(cat) == "Mimi says meow", "dyn: cat greet")
+assert(greet(bot) == "R2 says beep", "dyn: robot greet")
+
+// Dyn with -> dispatch for vtable pattern
+struct Renderable {
+    label: String,
+    render: fn(Renderable) -> String,
+}
+
+fn makeBtn(text: String) -> Renderable {
+    return Renderable {
+        label: text,
+        render: fn(self: Renderable) -> String {
+            return "[" + self.label + "]"
+        }
+    }
+}
+
+fn makeLink(text: String) -> Renderable {
+    return Renderable {
+        label: text,
+        render: fn(self: Renderable) -> String {
+            return "<" + self.label + ">"
+        }
+    }
+}
+
+let widgets = [makeBtn("OK"), makeLink("Home"), makeBtn("Cancel")]
+assert(widgets[0]->render() == "[OK]", "dyn vtable: button")
+assert(widgets[1]->render() == "<Home>", "dyn vtable: link")
+assert(widgets[2]->render() == "[Cancel]", "dyn vtable: button 2")
+
+// ============================
+// 15. MEDIATOR PATTERN
+// ============================
+// Components communicate through a central mediator.
+
+struct Mediator {
+    log: [String],
+}
+
+fn MediatorNew() -> Mediator {
+    return Mediator { log: []: String }
+}
+
+fn extends send(m: Mediator, from: String, to: String, msg: String) {
+    m.log.push(from + "->" + to + ":" + msg)
+}
+
+fn extends getLog(m: Mediator) -> [String] {
+    return m.log
+}
+
+let med = MediatorNew()
+med.send("A", "B", "hello")
+med.send("B", "A", "hi back")
+med.send("A", "C", "ping")
+assert(med.getLog().len() == 3, "mediator: 3 messages")
+assert(med.getLog()[0] == "A->B:hello", "mediator: first msg")
+assert(med.getLog()[2] == "A->C:ping", "mediator: third msg")
+
+println("PASS: test_design_patterns")

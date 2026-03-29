@@ -28,12 +28,14 @@ system called Dyn types. This guide covers every major feature with working exam
 18. [Box and Mutable Shared State](#18-box-and-mutable-shared-state)
 19. [Imports and the Standard Library](#19-imports-and-the-standard-library)
 20. [Type System Rules](#20-type-system-rules)
-21. [Garbage Collector](#21-garbage-collector)
+21. [Memory Model Deep Dive](#21-memory-model-deep-dive)
 22. [Cast and Type Conversion](#22-cast-and-type-conversion)
 23. [Iterators](#23-iterators)
 24. [String Operations](#24-string-operations)
-25. [The Fuzzer](#25-the-fuzzer)
-26. [Quick Reference: Common Mistakes](#26-quick-reference-common-mistakes)
+25. [Design Patterns Without OOP](#25-design-patterns-without-oop)
+26. [The Fuzzer](#26-the-fuzzer)
+27. [Tips and Tricks](#27-tips-and-tricks)
+28. [Quick Reference: Common Mistakes](#28-quick-reference-common-mistakes)
 
 ---
 
@@ -299,8 +301,23 @@ fn factorial(n: Int) -> Int {
 }
 ```
 
-> **Note:** Nova does not support forward declarations. A function must be defined before it
-> is called. Mutual recursion is not directly supported.
+> **Note:** Nova supports forward declarations for mutual recursion. Declare the function
+> signature (with no body) before its first use, then provide the full definition later:
+>
+> ```nova
+> fn isEven(n: Int) -> Bool        // forward declaration
+> fn isOdd(n: Int) -> Bool         // forward declaration
+>
+> fn isEven(n: Int) -> Bool {
+>     if n == 0 { return true }
+>     return isOdd(n - 1)
+> }
+>
+> fn isOdd(n: Int) -> Bool {
+>     if n == 0 { return false }
+>     return isEven(n - 1)
+> }
+> ```
 
 ---
 
@@ -843,25 +860,166 @@ compiler does not attempt to infer types from usage.
 
 ---
 
-## 21. Garbage Collector
+## 21. Memory Model Deep Dive
 
-Nova uses a hybrid garbage collector combining:
+Nova uses a hybrid memory model: **reference counting** for deterministic cleanup plus
+**mark-and-sweep** garbage collection for cycle breaking. Understanding this model will help
+you write efficient, correct code.
 
-1. **Reference counting** -- objects whose reference count drops to zero are freed immediately.
-2. **Mark-and-sweep** -- a periodic sweep collects objects involved in reference cycles.
+### Value Types vs. Reference Types
 
-This means:
+**Value types** live on the stack and are copied on assignment and when passed to functions:
 
-- Most objects are freed promptly when they go out of scope.
-- Circular structures (e.g. two structs referencing each other via `Box`) are still collected.
-- No manual memory management is needed.
+| Type | Storage | Assignment behaviour |
+|---|---|---|
+| `Int` | Stack (64-bit) | Copied |
+| `Float` | Stack (64-bit) | Copied |
+| `Bool` | Stack | Copied |
+| `Char` | Stack | Copied |
 
-### Practical implications
+**Reference types** live on the heap and are **aliased** on assignment — both variables point
+to the same underlying object:
 
-- Short-lived allocations (temp strings, list intermediates) are cheap -- freed on scope exit.
-- Closures that capture `Box` values extend those values' lifetimes.
-- You do not need to worry about memory leaks in normal code.
-- The GC introduces no latency spikes for typical workloads.
+| Type | Storage | Assignment behaviour |
+|---|---|---|
+| `[T]` (List) | Heap | Aliased (shared reference) |
+| `String` | Heap | Aliased (shared reference) |
+| Struct | Heap | Aliased (shared reference) |
+| Tuple | Heap | Aliased (shared reference) |
+| Enum (with data) | Heap | Aliased (shared reference) |
+| Closure | Heap | Aliased (shared reference) |
+
+### Aliasing in Action
+
+When you assign a list, struct, or string to another variable, you create a second name for
+the **same** object. Mutations through either variable are visible through the other:
+
+```nova
+let a = [1, 2, 3]
+let b = a           // b is an ALIAS of a — same object
+b.push(4)
+println(a.len())    // 4 — the push is visible through a!
+
+let p = Point { x: 1, y: 2 }
+let q = p           // q is an alias of p
+q.x = 99
+println(p.x)        // 99 — both p and q see the change
+```
+
+This also applies when passing to functions. Heap objects are passed by reference:
+
+```nova
+fn add_item(list: [Int]) {
+    list.push(99)
+}
+
+let my_list = [1, 2]
+add_item(my_list)
+println(my_list.len())   // 3 — the function modified the original
+```
+
+### The `clone()` Built-in
+
+`clone()` creates a **deep copy** of any value. The clone is fully independent — mutations to
+the clone never affect the original, and vice versa.
+
+```nova
+let original = [1, 2, 3]
+let copy = clone(original)
+copy.push(4)
+copy[0] = 99
+println(original.len())   // 3 — original is untouched
+println(original[0])      // 1 — still the original value
+```
+
+Deep cloning applies recursively to nested structures:
+
+```nova
+struct Container { items: [Int], label: String }
+
+let c1 = Container { items: [10, 20], label: "box" }
+let c2 = clone(c1)
+c2.items.push(30)
+c2.label = "copy"
+println(c1.items.len())   // 2 — inner list was deep-cloned
+println(c1.label)         // "box" — string was deep-cloned
+```
+
+**When to use `clone()`:**
+
+- When you need an independent snapshot of a list or struct
+- In loops where you accumulate snapshots of changing state
+- When passing data to a function that should not modify the original
+- When building prototype/template patterns (clone a prototype to create variants)
+
+**When NOT to use `clone()`:**
+
+- For primitives (Int, Float, Bool, Char) — they're already copied automatically
+- When you intentionally want shared mutation (e.g., a shared counter)
+- In tight performance loops where sharing is fine
+
+### Clone and Box
+
+`Box(T)` is a struct, so it follows reference semantics. Assigning a `Box` creates an alias:
+
+```nova
+import super.std.core
+
+let b1 = Box(42)
+let b2 = b1        // alias — SAME Box
+b2.value = 0
+println(b1.value)   // 0 — both see the change
+```
+
+Cloning a `Box` creates an independent copy:
+
+```nova
+let b3 = Box(42)
+let b4 = clone(b3)
+b4.value = 0
+println(b3.value)   // 42 — b3 is independent
+```
+
+### Reference Counting
+
+Every heap object has a reference count that tracks how many variables point to it. When the
+count drops to zero, the object is freed immediately. This gives Nova deterministic cleanup
+for most objects — you don't need to wait for a GC pause.
+
+### Mark-and-Sweep Cycle Collector
+
+Reference counting alone cannot handle cycles (A points to B, B points to A). Nova
+periodically runs a mark-and-sweep collector to find and free cyclic garbage. The collector:
+
+1. Marks all objects reachable from the stack (roots)
+2. Sweeps all unmarked objects
+3. Adjusts the GC threshold adaptively (targeting ~16ms frame time)
+
+In practice, this means:
+- Short-lived allocations are freed immediately (ref-count drops to zero)
+- Cyclic structures are collected periodically
+- No manual memory management is ever needed
+- There are no latency spikes for typical workloads
+
+### Loop Variable Capture
+
+Closures capture the **variable binding**, not a snapshot of its value. In a loop, all
+closures would capture the same loop variable (which ends at its final value). To capture
+the current iteration's value, **rebind** with `let`:
+
+```nova
+let fns = []: fn() -> Int
+
+for let i = 0; i < 5; i += 1 {
+    let captured = i   // ← rebind to freeze the value
+    fns.push(fn() -> Int { return captured })
+}
+
+fns[0]()   // 0
+fns[4]()   // 4
+```
+
+Without the rebind, all closures would return 5 (the final value of `i`).
 
 ---
 
@@ -956,7 +1114,220 @@ Char operations:
 
 ---
 
-## 25. The Fuzzer
+## 25. Design Patterns Without OOP
+
+Nova has no classes, no inheritance, and no interfaces. Instead, it achieves the same goals
+through composition of its core features. Here's how common design patterns map to Nova.
+
+### Strategy Pattern
+
+Replace an algorithm at runtime by passing different functions:
+
+```nova
+fn process(data: [Int], strategy: fn(Int) -> Int) -> [Int] {
+    return data.map(strategy)
+}
+
+process([1, 2, 3], |x: Int| x * 2)    // [2, 4, 6]
+process([1, 2, 3], |x: Int| x * x)    // [1, 4, 9]
+```
+
+Or use a struct with a function field:
+
+```nova
+struct Formatter { format: fn(String) -> String }
+
+let upper = Formatter { format: |s: String| s.toUpper() }
+upper::format("hello")   // "HELLO"
+```
+
+### Observer Pattern
+
+Use a list of callbacks that are invoked when state changes:
+
+```nova
+import super.std.core
+
+struct EventBus { listeners: [fn(String)] }
+
+fn extends subscribe(bus: EventBus, cb: fn(String)) {
+    bus.listeners.push(cb)
+}
+
+fn extends emit(bus: EventBus, event: String) {
+    for cb in bus.listeners { cb(event) }
+}
+```
+
+### Factory Pattern
+
+Centralize creation behind a function:
+
+```nova
+fn createEnemy(kind: String) -> Enemy {
+    if kind == "goblin" { return Enemy { name: "Goblin", hp: 30 } }
+    if kind == "dragon" { return Enemy { name: "Dragon", hp: 200 } }
+    return Enemy { name: "Slime", hp: 10 }
+}
+```
+
+### Builder Pattern
+
+Chain extends methods that modify and return the struct:
+
+```nova
+fn extends where_(q: Query, cond: String) -> Query {
+    q.conditions.push(cond)
+    return q
+}
+
+fn extends limit(q: Query, n: Int) -> Query {
+    q.limit_val = n
+    return q
+}
+
+let sql = QueryNew("users").where_("age > 18").limit(10).toSQL()
+```
+
+### Decorator Pattern
+
+Wrap a function with additional behaviour:
+
+```nova
+fn with_log(name: String, f: fn(Int) -> Int) -> fn(Int) -> Int {
+    return |x: Int| {
+        println(name + "(" + Cast::string(x) + ")")
+        f(x)
+    }
+}
+
+let logged = with_log("double", |x: Int| x * 2)
+logged(5)   // prints "double(5)", returns 10
+```
+
+### State Machine Pattern
+
+Use enums to model states, extends for transitions:
+
+```nova
+enum Light { Red, Yellow, Green }
+
+fn extends next(l: Light) -> Light {
+    match l {
+        Red()    => { return Light::Green() }
+        Green()  => { return Light::Yellow() }
+        Yellow() => { return Light::Red() }
+    }
+    return Light::Red()
+}
+```
+
+### Command Pattern
+
+Encode operations as enum variants:
+
+```nova
+enum Cmd { Insert: String, Delete: Int }
+
+fn apply(text: String, cmd: Cmd) -> String {
+    match cmd {
+        Insert(s) => { return text + s }
+        Delete(n) => { return text.substring(0, text.len() - n) }
+    }
+    return text
+}
+```
+
+### Composite Pattern
+
+Model tree structures with recursive enums:
+
+```nova
+enum Expr { Num: Int, Add: (Expr, Expr), Mul: (Expr, Expr) }
+
+fn extends eval(e: Expr) -> Int {
+    match e {
+        Num(n)    => { return n }
+        Add(pair) => { return pair[0].eval() + pair[1].eval() }
+        Mul(pair) => { return pair[0].eval() * pair[1].eval() }
+    }
+    return 0
+}
+```
+
+### Prototype Pattern
+
+Clone an existing object and modify the copy:
+
+```nova
+let proto = Config { host: "localhost", port: 8080 }
+let dev = clone(proto)
+dev.port = 3000   // proto.port is still 8080
+```
+
+### Adapter Pattern (Dyn Types)
+
+Use Dyn types to accept any struct with the required fields:
+
+```nova
+fn get_name(thing: Dyn(T = name: String)) -> String {
+    return thing.name
+}
+
+// Works with any struct that has a 'name' field
+get_name(Dog { name: "Rex" })
+get_name(Robot { name: "R2" })
+```
+
+### Singleton Pattern
+
+Use a closure-captured Box that initializes once:
+
+```nova
+import super.std.core
+
+fn make_config() -> fn(String) -> String {
+    let data = Box("default")
+    let init = Box(false)
+    return fn(action: String) -> String {
+        if action == "init" && !init.value {
+            data.value = "ready"
+            init.value = true
+        }
+        return data.value
+    }
+}
+```
+
+### Template Method Pattern
+
+Define a skeleton algorithm with pluggable steps:
+
+```nova
+fn process(data: [Int], filter: fn(Int) -> Bool,
+           transform: fn(Int) -> Int,
+           combine: fn(Int, Int) -> Int, init: Int) -> Int {
+    let acc = init
+    for item in data {
+        if filter(item) { acc = combine(acc, transform(item)) }
+    }
+    return acc
+}
+```
+
+> **Key insight:** Nova replaces OOP's virtual dispatch with:
+> - **Closures** for strategy/command/observer
+> - **Enums + match** for state machines and variant types
+> - **Dyn types** for structural polymorphism
+> - **Extends + UFCS** for method-like syntax
+> - **clone()** for the prototype pattern
+>
+> See `tests/test_design_patterns.nv` and `tests/test_design_patterns2.nv` for 27+ fully
+> tested implementations.
+
+---
+
+## 26. The Fuzzer
 
 Nova includes fuzzing targets for the lexer and parser using
 [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz).
@@ -987,18 +1358,166 @@ What the fuzzer checks:
 
 ---
 
-## 26. Quick Reference: Common Mistakes
+## 27. Tips and Tricks
+
+### Use `elif` instead of `else if`
+
+Nova uses `elif` for chained conditionals. `else if` is a syntax error:
+
+```nova
+// ✓ Correct
+if x > 10 {
+    println("big")
+} elif x > 5 {
+    println("medium")
+} else {
+    println("small")
+}
+
+// ✗ Wrong — this will NOT compile
+// } else if x > 5 {
+```
+
+### Closures that return values need `fn` syntax
+
+Short lambdas (`|x: Int| expr`) work for single expressions. But if a closure has control flow
+(if/return), use the full `fn` syntax with an explicit return type:
+
+```nova
+// ✗ May fail type inference:
+// let f = |x: Int| { if x > 0 { return x } else { return 0 } }
+
+// ✓ Use full fn syntax:
+let f = fn(x: Int) -> Int {
+    if x > 0 { return x }
+    return 0
+}
+```
+
+### Every function returning a value needs an explicit `return`
+
+Nova does not have implicit returns. The last expression in a function body is NOT
+automatically returned — you must write `return`:
+
+```nova
+// ✗ Compile error: "Function must return a value"
+// fn square(x: Int) -> Int { x * x }
+
+// ✓ Correct:
+fn square(x: Int) -> Int { return x * x }
+```
+
+### There is no `*=` operator
+
+Only `+=`, `-=`, and `/=` are available. For multiplication assignment, write it out:
+
+```nova
+let x = 5
+x = x * 3   // not x *= 3
+```
+
+### Empty lists need a type annotation
+
+```nova
+// ✗ Error:
+// let xs = []
+
+// ✓ Correct:
+let xs = []: Int
+let strs = []: String
+let nested = []: [Int]    // list of int lists
+```
+
+### No-data enum variants still need `()`
+
+```nova
+enum Color { Red, Green, Blue }
+
+let c = Color::Red()    // ← the () is required, even though Red has no data
+```
+
+### Use `@[A: Type]` for generic enum no-data variants
+
+When constructing a generic enum's no-data variant, the compiler can't infer the type
+parameter. Use the `@[T: ConcreteType]` annotation:
+
+```nova
+enum Maybe(A) { Just: $A, Nothing }
+
+let x = Maybe::Nothing() @[A: Int]   // tells the compiler this is Maybe(Int)
+```
+
+### String concatenation with `+`
+
+You can only concatenate `String + String`. To include other types, convert first:
+
+```nova
+let msg = "Count: " + Cast::string(42)    // "Count: 42"
+let pi  = "Pi is " + Cast::string(3.14)   // "Pi is 3.14"
+```
+
+### The `->` operator vs `.` vs `::`
+
+These three have distinct meanings on structs:
+
+| Syntax | Meaning |
+|---|---|
+| `s.field` | Access a data field |
+| `s.method()` | Call an extends method (UFCS) |
+| `s::fn_field()` | Call a function stored in a field (no self passed) |
+| `s->fn_field()` | Call a function stored in a field, passing `s` as first arg |
+
+### `format` and `printf` for string interpolation
+
+Nova doesn't have string interpolation syntax, but `format` and `printf` work with `{}`
+placeholders:
+
+```nova
+let name = "Alice"
+let age = 30
+let msg = format("Hello, {}! You are {} years old.", [name, Cast::string(age)])
+printf("{} is {} years old\n", [name, Cast::string(age)])
+```
+
+### Sorting with custom comparators
+
+```nova
+import super.std.list
+
+let nums = [5, 3, 1, 4, 2]
+let sorted = nums.sortWith(|a: Int, b: Int| a > b)   // ascending
+```
+
+### Use `if let` for safe Option unwrapping
+
+```nova
+let maybe_val = Cast::int("42")
+if let val = maybe_val {
+    println("Got: " + Cast::string(val))
+}
+```
+
+---
+
+## 28. Quick Reference: Common Mistakes
 
 | Mistake | Fix |
 |---|---|
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
 | `x += 1` used as expression | Use `x = x + 1` in expressions; `+=` is statement-only |
+| `x *= 2` | No `*=` operator — use `x = x * 2` |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends functions |
-| `fn extends id(x: $A)` | Not supported -- use concrete type wrapper |
-| `match x { 0 => ... }` | Literals not allowed in match -- use `if`/`elif` |
-| `-10 % 3 == -1` | Wrong -- Nova uses Euclidean modulo: `-10 % 3 == 2` |
-| `Cast::int(x)` used as `Int` | Returns `Option(Int)` -- must `.unwrap()` |
-| `Cast::float(x)` used as `Float` | Returns `Option(Float)` -- must `.unwrap()` |
-| Mutual recursion | Not supported -- refactor to single function |
-| Naming a struct `Box` | Conflicts with built-in `Box` -- use a different name |
+| `fn extends id(x: $A)` | Not supported — use concrete type wrapper |
+| `match x { 0 => ... }` | Literals not allowed in match — use `if`/`elif` |
+| `-10 % 3 == -1` | Wrong — Nova uses Euclidean modulo: `-10 % 3 == 2` |
+| `Cast::int(x)` used as `Int` | Returns `Option(Int)` — must `.unwrap()` |
+| `Cast::float(x)` used as `Float` | Returns `Option(Float)` — must `.unwrap()` |
+| Mutual recursion without forward decl | Use forward declarations: `fn name(params) -> Type` |
+| `else if x > 0 { }` | Use `elif x > 0 { }` — `else if` is a syntax error |
+| Lambda with control flow | Use `fn(params) -> Type { }` not `\|params\| { }` |
+| `fn f(x: Int) -> Int { x * x }` | Must have explicit `return x * x` |
+| `let b = a` where `a` is a list | Creates an alias! Use `clone(a)` for a copy |
+| `Color::Red` (no parens) | Must write `Color::Red()` even for no-data variants |
+| `Maybe::Nothing()` without type | Use `Maybe::Nothing() @[A: Int]` for generic no-data |
+| `\|\| true && false` precedence | `\|\|` binds tighter than `&&` in Nova — use parens |
