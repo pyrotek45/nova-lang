@@ -791,6 +791,89 @@ impl NovaCore {
             native::terminal::clear_screen,
         );
         self.add_function(
+            "terminal::moveTo",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::move_to,
+        );
+        self.add_function(
+            "terminal::getSize",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Tuple {
+                    elements: vec![TType::Int, TType::Int],
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::get_size,
+        );
+        self.add_function(
+            "terminal::setForeground",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Int, TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::set_foreground,
+        );
+        self.add_function(
+            "terminal::setBackground",
+            TType::Function {
+                parameters: vec![TType::Int, TType::Int, TType::Int],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::set_background,
+        );
+        self.add_function(
+            "terminal::resetColor",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::reset_color,
+        );
+        self.add_function(
+            "terminal::print",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::term_print,
+        );
+        self.add_function(
+            "terminal::flush",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::flush,
+        );
+        self.add_function(
+            "terminal::enableMouse",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::enable_mouse,
+        );
+        self.add_function(
+            "terminal::disableMouse",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::terminal::disable_mouse,
+        );
+        self.add_function(
             "List::push",
             TType::Function {
                 parameters: vec![
@@ -1048,6 +1131,15 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::str::char_to_int,
+        );
+        self.add_function(
+            "hash",
+            TType::Function {
+                parameters: vec![TType::Generic { name: "a".into() }],
+                return_type: Box::new(TType::Int),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::str::hash_value,
         );
         // ---------------------------------------------------------------
         // Char functions

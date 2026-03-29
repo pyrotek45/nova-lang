@@ -1,0 +1,47 @@
+module test_terminal_ext
+
+// =========================================================================
+// Terminal function tests — verifies function signatures compile and
+// non-interactive functions produce correct results.
+// Interactive / visual functions (rawmode, getch, rawread, mouse,
+// moveTo, colors, cursor) are NOT called here because they emit
+// escape codes that can interfere with test output.
+// =========================================================================
+
+// --- terminal::getSize ---
+let size = terminal::getSize()
+let w = size[0]
+let h = size[1]
+assert(w > 0, "terminal width > 0")
+assert(h > 0, "terminal height > 0")
+
+// --- terminal::print + flush ---
+terminal::print("")
+terminal::flush()
+
+// --- Compile-check: verify all terminal function signatures resolve ---
+// We define a function that references each signature so the type-checker
+// validates them, but we gate the actual calls behind `false` so they
+// never execute in CI.
+fn terminalSmokeTest() {
+    if false {
+        terminal::rawmode(true)
+        terminal::rawmode(false)
+        terminal::getch()
+        terminal::rawread(100)
+        terminal::clearScreen()
+        terminal::hideCursor()
+        terminal::showCursor()
+        terminal::moveTo(0, 0)
+        terminal::setForeground(0, 0, 0)
+        terminal::setBackground(0, 0, 0)
+        terminal::resetColor()
+        terminal::print("x")
+        terminal::flush()
+        terminal::enableMouse()
+        terminal::disableMouse()
+    }
+}
+terminalSmokeTest()
+
+println("PASS: test_terminal_ext")

@@ -1,0 +1,142 @@
+module test_hashmap_perf
+
+import super.std.hashmap
+import super.std.core
+
+// =========================================================================
+// Comprehensive HashMap tests — exercises hash-based bucket lookup,
+// auto-resize, deletion, re-insertion, and all accessor methods.
+// =========================================================================
+
+// --- hash() builtin ---
+let h1 = hash("hello")
+let h2 = hash("hello")
+let h3 = hash("world")
+assert(h1 == h2, "hash deterministic for same string")
+assert(h1 != h3, "hash differs for different strings")
+assert(hash(0) == hash(0), "hash deterministic for int")
+assert(hash('a') == hash('a'), "hash deterministic for char")
+
+// --- Basic insert / get / has ---
+let m = HashMap::default() @[K: String, V: Int]
+m.insert("a", 1)
+m.insert("b", 2)
+m.insert("c", 3)
+assert(m.get("a").unwrap() == 1, "get a")
+assert(m.get("b").unwrap() == 2, "get b")
+assert(m.get("c").unwrap() == 3, "get c")
+assert(m.get("z").isNone(), "get missing key returns None")
+assert(m.has("a"), "has a")
+assert(m.has("b"), "has b")
+assert(!m.has("z"), "has z false")
+
+// --- size / isEmpty ---
+assert(m.size() == 3, "size 3")
+assert(!m.isEmpty(), "not empty")
+let empty = HashMap::default() @[K: Int, V: Int]
+assert(empty.isEmpty(), "empty map isEmpty")
+assert(empty.size() == 0, "empty map size 0")
+
+// --- Update existing key ---
+m.insert("a", 100)
+assert(m.get("a").unwrap() == 100, "update a to 100")
+assert(m.size() == 3, "size unchanged after update")
+
+// --- Delete ---
+m.delete("b")
+assert(!m.has("b"), "b deleted")
+assert(m.size() == 2, "size 2 after delete")
+m.delete("nonexistent")
+assert(m.size() == 2, "delete nonexistent no change")
+
+// --- Re-insert after delete ---
+m.insert("b", 42)
+assert(m.has("b"), "b re-inserted")
+assert(m.get("b").unwrap() == 42, "b has new value")
+assert(m.size() == 3, "size back to 3")
+
+// --- getOrDefault ---
+assert(m.getOrDefault("a", 0) == 100, "getOrDefault existing")
+assert(m.getOrDefault("missing", 42) == 42, "getOrDefault missing")
+
+// --- Int keys ---
+let mi = HashMap::default() @[K: Int, V: String]
+mi.insert(1, "one")
+mi.insert(2, "two")
+mi.insert(3, "three")
+assert(mi.get(1).unwrap() == "one", "int key get 1")
+assert(mi.get(2).unwrap() == "two", "int key get 2")
+assert(mi.size() == 3, "int key map size")
+mi.delete(2)
+assert(!mi.has(2), "int key deleted")
+
+// --- Stress: insert 500 entries, triggers resize ---
+let big = HashMap::default() @[K: String, V: Int]
+for let i = 0; i < 500; i += 1 {
+    big.insert(Cast::string(i), i * 10)
+}
+assert(big.size() == 500, "big map size 500")
+for let i = 0; i < 500; i += 1 {
+    assert(big.get(Cast::string(i)).unwrap() == i * 10, "big get " + Cast::string(i))
+}
+
+// Verify resize happened (numBuckets > initial 16)
+assert(big.numBuckets > 16, "resize happened")
+
+// --- Update all in big map ---
+for let i = 0; i < 500; i += 1 {
+    big.insert(Cast::string(i), i)
+}
+assert(big.size() == 500, "big map size still 500 after updates")
+for let i = 0; i < 500; i += 1 {
+    assert(big.get(Cast::string(i)).unwrap() == i, "big updated " + Cast::string(i))
+}
+
+// --- Delete half ---
+for let i = 0; i < 250; i += 1 {
+    big.delete(Cast::string(i))
+}
+assert(big.size() == 250, "250 left after deleting half")
+for let i = 250; i < 500; i += 1 {
+    assert(big.has(Cast::string(i)), "remaining key " + Cast::string(i))
+}
+
+// --- entries ---
+let m2 = HashMap::default() @[K: String, V: Int]
+m2.insert("x", 10)
+m2.insert("y", 20)
+let ents = m2.entries()
+assert(ents.len() == 2, "entries len 2")
+
+// --- keys / values ---
+let ks = m2.keys()
+let vs = m2.values()
+assert(ks.len() == 2, "keys len 2")
+assert(vs.len() == 2, "values len 2")
+
+// --- forEach ---
+let forEachCount = 0
+m2.forEach(fn (k: String, v: Int) {
+    forEachCount += 1
+})
+// Note: closures do not capture mutable locals by reference,
+// so we verify forEach compiles and runs without error.
+// Functional correctness is validated via entries/keys/values above.
+
+// --- clear ---
+m2.clear()
+assert(m2.isEmpty(), "clear empties map")
+assert(m2.size() == 0, "clear sets size to 0")
+
+// Re-insert after clear
+m2.insert("z", 99)
+assert(m2.get("z").unwrap() == 99, "insert after clear")
+assert(m2.size() == 1, "size 1 after clear + insert")
+
+// --- toString ---
+let m3 = HashMap::default() @[K: String, V: Int]
+m3.insert("only", 1)
+let s = m3.toString()
+assert(s == "{only => 1}", "toString single")
+
+println("PASS: test_hashmap_perf")

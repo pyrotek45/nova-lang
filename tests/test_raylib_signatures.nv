@@ -1,0 +1,55 @@
+module test_raylib_signatures
+
+// =========================================================================
+// Raylib compile-check test — verifies all raylib function signatures
+// resolve at compile time.  Every call is gated behind `if false` so
+// nothing actually executes (no window is opened, no GPU required).
+// =========================================================================
+
+fn raylibSmokeTest() {
+    if false {
+        // Window & timing
+        raylib::init("test", 800, 600, 60)
+        let r = raylib::rendering()
+        let sw = raylib::getScreenWidth()
+        let sh = raylib::getScreenHeight()
+        raylib::setTargetFPS(30)
+        let fps = raylib::getFPS()
+        let t = raylib::getTime()
+        let dt = raylib::getFrameTime()
+        raylib::sleep(0)
+
+        // Drawing
+        raylib::clear((0,0,0))
+        raylib::drawText("hi", 0, 0, 20, (255,255,255))
+        raylib::drawFPS(10, 10)
+        let tw = raylib::measureText("hi", 20)
+        raylib::drawRectangle(0, 0, 10, 10, (255,0,0))
+        raylib::drawRectangleLines(0, 0, 10, 10, (0,255,0))
+        raylib::drawRoundedRectangle(0, 0, 10, 10, 0.5, (0,0,255))
+        raylib::drawCircle(50, 50, 10, (255,255,0))
+        raylib::drawCircleLines(50, 50, 10, (0,255,255))
+        raylib::drawLine(0, 0, 100, 100, (255,0,255))
+        raylib::drawLineThick(0, 0, 100, 100, 2.0, (128,128,128))
+        raylib::drawTriangle(0, 0, 50, 100, 100, 0, (200,200,200))
+
+        // Keyboard
+        let k = raylib::getKey()
+        let kp = raylib::isKeyPressed("space")
+        let kr = raylib::isKeyReleased("space")
+        let ku = raylib::isKeyUp("space")
+
+        // Mouse
+        let mp = raylib::mousePosition()
+        let mb = raylib::isMousePressed("left")
+        let mr = raylib::isMouseReleased("left")
+        let mw = raylib::getMouseWheel()
+
+        // Sprites
+        let sprite = raylib::buildSprite(2, 2, 2, [(255,0,0),(0,255,0),(0,0,255),(255,255,0)])
+        raylib::drawSprite(sprite, 0, 0)
+    }
+}
+
+raylibSmokeTest()
+println("PASS: test_raylib_signatures")
