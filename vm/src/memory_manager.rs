@@ -440,7 +440,8 @@ impl MemoryManager {
                 entry.ref_count -= 1;
             }
             if entry.ref_count == 0 {
-                let entry = self.heap[index].take().unwrap();
+                // Safety: we know this entry exists because we just matched on it above.
+                let Some(entry) = self.heap[index].take() else { return; };
 
                 for child in &entry.object.data {
                     if let Some(child_idx) = get_heap_index(child) {
@@ -771,9 +772,10 @@ impl MemoryManager {
         }
         self.shrink_heap();
 
-        // show debug info about heap after collection
-        println!(
-            "GC: live objects = {}, heap size = {}, free list size = {}",
+        // GC complete — debug info only in dev builds
+        #[cfg(debug_assertions)]
+        eprintln!(
+            "GC: live={}, heap_size={}, free_list={}",
             self.live_count(),
             self.heap.len(),
             self.free_list.len()

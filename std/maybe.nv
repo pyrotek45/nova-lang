@@ -1,0 +1,158 @@
+// ============================================================
+// std/maybe.nv -- The Maybe(T) algebraic data type
+// ============================================================
+//
+// Maybe(T) is a *user-defined* enum that wraps an optional value.
+// It is structurally different from the built-in Option(T):
+//
+//   ┌──────────────────┬──────────────────────────────────────────┐
+//   │                  │  VM representation                       │
+//   ├──────────────────┼──────────────────────────────────────────┤
+//   │  Option(T)       │  a plain value on the stack, or the      │
+//   │  (built-in)      │  special VmData::None sentinel.          │
+//   │                  │  Created with Some(x) / None(T).         │
+//   │                  │  Checked with .isSome() / .unwrap().     │
+//   ├──────────────────┼──────────────────────────────────────────┤
+//   │  Maybe(T)        │  a heap-allocated enum object with a     │
+//   │  (this module)   │  tag and an optional payload.            │
+//   │                  │  Created with Maybe::Just(x) /           │
+//   │                  │  Maybe::Nothing().                       │
+//   │                  │  Matched with a `match` expression.      │
+//   └──────────────────┴──────────────────────────────────────────┘
+//
+// Use Option(T) when you want the lightest-weight nullable value.
+// Use Maybe(T) when you want pattern-matching on a tagged union,
+// or when the "absent" state needs to carry its type explicitly
+// (e.g., storing a Maybe(Int) in a generic container).
+//
+// Usage:
+//   import super.std.maybe
+//
+//   let x = Maybe::Just(42)
+//   let y = Maybe::Nothing() @[A: Int]
+//
+//   match x {
+//       Just(v) => { println(Cast::string(v)) }
+//       Nothing() => { println("nothing") }
+//   }
+//
+//   if x.isJust() {
+//       println(x.toString())
+//   }
+// ============================================================
+
+module maybe
+
+// The Maybe algebraic type.
+//
+// Just(value)  -- contains a value of type T
+// Nothing      -- represents absence of a value (no payload)
+//
+enum Maybe(A) {
+    Just: $A,
+    Nothing
+}
+
+// isJust -- true if this Maybe holds a value
+//
+//   let x = Maybe::Just(10)
+//   x.isJust()   // true
+//
+fn extends isJust(self: Maybe($A)) -> Bool {
+    match self {
+        Just(x) => {return true}
+        Nothing() => {return false}
+    }
+    return false
+}
+
+// isNothing -- true if this Maybe is empty
+//
+//   let x = Maybe::Nothing() @[A: Int]
+//   x.isNothing()  // true
+//
+fn extends isNothing(self: Maybe($A)) -> Bool {
+    match self {
+        Just(x) => {return false}
+        Nothing() => {return true}
+    }
+    return true
+}
+
+// unwrap -- extract the value, printing an error and exiting if Nothing
+//
+//   let v = Maybe::Just(5).unwrap()   // 5
+//
+fn extends unwrap(self: Maybe($A)) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {
+            println("error: called unwrap() on Nothing")
+            exit()
+        }
+    }
+    return unreachable() @[T: $A]
+}
+
+// orDefault -- return the contained value or a fallback
+//
+//   Maybe::Nothing() @[A: Int].orDefault(0)   // 0
+//
+fn extends orDefault(self: Maybe($A), default: $A) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {return default}
+    }
+    return default
+}
+
+// orDoFn -- return the value or compute a fallback lazily
+//
+//   Maybe::Nothing() @[A: Int].orDoFn(|| 99)  // 99
+//
+fn extends orDoFn(self: Maybe($A), f: fn() -> $A) -> $A {
+    match self {
+        Just(x) => {return x}
+        Nothing() => {return f()}
+    }
+    return f()
+}
+
+// map -- transform the inner value if present
+//
+//   Maybe::Just(3).map(|x: Int| x * 2)  // Maybe::Just(6)
+//
+fn extends map(self: Maybe($A), f: fn($A) -> $B) -> Maybe($B) {
+    match self {
+        Just(x) => {return Maybe::Just(f(x))}
+        Nothing() => {return Maybe::Nothing() @[A: $B]}
+    }
+    return Maybe::Nothing() @[A: $B]
+}
+
+// toString -- human-readable representation
+//
+//   Maybe::Just(42).toString()    // "Just(42)"
+//   Maybe::Nothing().toString()   // "Nothing"
+//
+fn extends toString(self: Maybe($A)) -> String {
+    let result = ""
+    match self {
+        Just(x) => {result = "Just(" + Cast::string(x) + ")"}
+        Nothing() => {result = "Nothing"}
+    }
+    return result
+}
+
+// toOption -- convert a Maybe to the built-in Option type
+//
+//   Maybe::Just(10).toOption()    // Some(10)
+//   Maybe::Nothing().toOption()   // None(Int)
+//
+fn extends toOption(self: Maybe($A)) -> Option($A) {
+    match self {
+        Just(x) => {return Some(x)}
+        Nothing() => {return None($A)}
+    }
+    return None($A)
+}

@@ -2,8 +2,10 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::memory_manager::{MemoryManager, VmData};
+use common::error::{NovaError, NovaResult};
 use raylib::prelude::*;
+
+use crate::memory_manager::{MemoryManager, VmData};
 
 #[derive(Debug, Clone)]
 pub enum Draw {
@@ -115,9 +117,9 @@ impl State {
     }
     #[inline(always)]
     pub fn next_arr<const LEN: usize>(&mut self) -> [u8; LEN] {
-        let arr = self.program[self.current_instruction..][..LEN]
+        let arr: [u8; LEN] = self.program[self.current_instruction..][..LEN]
             .try_into()
-            .unwrap();
+            .expect("program bytecode is malformed: unexpected end of instructions");
         self.current_instruction += LEN;
         arr
     }
@@ -146,18 +148,28 @@ impl State {
     }
 
     #[inline(always)]
-    pub fn deallocate_registers(&mut self) {
+    pub fn deallocate_registers(&mut self) -> NovaResult<()> {
         if let Some(window) = self.window.pop() {
             let remove = self.memory.stack.len() - window;
             for _ in 0..remove {
                 self.memory.pop();
             }
         }
-        self.offset = *self.window.last().unwrap();
+        let offset = self.window.last().ok_or_else(|| {
+            Box::new(NovaError::Runtime {
+                msg: "Internal error: call stack frame underflow during deallocation".into(),
+            })
+        })?;
+        self.offset = *offset;
+        Ok(())
     }
 
-    pub fn deallocate_registers_with_return(&mut self) {
-        let returnvalue = *self.memory.stack.last().unwrap();
+    pub fn deallocate_registers_with_return(&mut self) -> NovaResult<()> {
+        let returnvalue = *self.memory.stack.last().ok_or_else(|| {
+            Box::new(NovaError::Runtime {
+                msg: "Internal error: stack is empty when returning a value".into(),
+            })
+        })?;
 
         // Python would INCREF the return value before cleaning locals
         self.memory.inc_value(returnvalue);
@@ -169,12 +181,18 @@ impl State {
             }
         }
 
-        self.offset = *self.window.last().unwrap();
+        let offset = self.window.last().ok_or_else(|| {
+            Box::new(NovaError::Runtime {
+                msg: "Internal error: call stack frame underflow during return".into(),
+            })
+        })?;
+        self.offset = *offset;
 
         // Push back the return value; now it's owned by the caller frame
         self.memory.stack.push(returnvalue);
 
         // Python would DECREF the return value in the callee, but we already did that by cleaning locals
         // Don't DECREF returnvalue here — it's now owned by the caller
+        Ok(())
     }
 }

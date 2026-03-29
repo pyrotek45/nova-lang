@@ -1,0 +1,543 @@
+module test_syntax_sugar
+
+import super.std.core
+import super.std.list
+
+// ============================================================
+// Syntax Sugar & Special Syntax -- comprehensive tests
+// Covers: tuples, ranges, for-in, list comprehensions (with
+//         guards, nesting, functions), slicing (negative, step),
+//         bind (~>), trailing closures, :: and -> dispatch,
+//         @() refs, @[] annotations, empty closures, if/while let,
+//         forward declarations, and the pipe operator.
+// ============================================================
+
+// ============================================================
+// 1. Single-element tuples
+// ============================================================
+let t1 = (42,)
+assert(t1[0] == 42, "single-element tuple Int")
+
+let t2 = ("hello",)
+assert(t2[0] == "hello", "single-element tuple String")
+
+let t3 = (true,)
+assert(t3[0] == true, "single-element tuple Bool")
+
+// Distinguish single-element from grouped expression
+let pair = (1, 2)
+assert(pair[0] == 1, "pair fst")
+assert(pair[1] == 2, "pair snd")
+
+let single = (1,)
+assert(single[0] == 1, "single vs pair")
+
+// ============================================================
+// 2. Range-based for loops
+// ============================================================
+
+// Exclusive range: 0..5 → [0, 1, 2, 3, 4]
+let sum_ex = 0
+for i in 0..5 {
+    sum_ex += i
+}
+assert(sum_ex == 10, "exclusive range 0..5 sum")
+
+// Inclusive range: 0..=5 → [0, 1, 2, 3, 4, 5]
+let sum_inc = 0
+for i in 0..=5 {
+    sum_inc += i
+}
+assert(sum_inc == 15, "inclusive range 0..=5 sum")
+
+// Range with non-zero start
+let sum_mid = 0
+for i in 3..7 {
+    sum_mid += i
+}
+assert(sum_mid == 18, "range 3..7 sum")
+
+// Inclusive with non-zero start
+let sum_mid2 = 0
+for i in 3..=7 {
+    sum_mid2 += i
+}
+assert(sum_mid2 == 25, "range 3..=7 sum")
+
+// Empty range (start == end for exclusive)
+let sum_empty = 0
+for i in 5..5 {
+    sum_empty += 1
+}
+assert(sum_empty == 0, "empty exclusive range")
+
+// Single-iteration inclusive range
+let sum_one = 0
+for i in 5..=5 {
+    sum_one += i
+}
+assert(sum_one == 5, "single-iteration inclusive range")
+
+// Large range
+let sum_large = 0
+for i in 0..100 {
+    sum_large += 1
+}
+assert(sum_large == 100, "range 0..100 count")
+
+// ============================================================
+// 3. For-in collection
+// ============================================================
+let items = [10, 20, 30, 40]
+let sum_items = 0
+for item in items {
+    sum_items += item
+}
+assert(sum_items == 100, "for-in collection sum")
+
+// For-in with strings
+let words = ["hello", "world"]
+let joined = ""
+for w in words {
+    joined = joined + w
+}
+assert(joined == "helloworld", "for-in strings")
+
+// For-in with empty list (zero iterations)
+let nothing = 0
+for x in []: Int {
+    nothing = 1
+}
+assert(nothing == 0, "for-in empty list")
+
+// ============================================================
+// 4. List comprehensions -- basic
+// ============================================================
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+assert(squares[0] == 1, "comp squares 0")
+assert(squares[4] == 25, "comp squares 4")
+assert(squares.len() == 5, "comp squares len")
+
+// Comprehension producing strings
+let labels = [x in [1, 2, 3] | "item_" + Cast::string(x)]
+assert(labels[0] == "item_1", "comp string 0")
+assert(labels[2] == "item_3", "comp string 2")
+
+// Comprehension with function call in body
+fn cube(n: Int) -> Int { return n * n * n }
+let cubes = [x in [1, 2, 3, 4] | cube(x)]
+assert(cubes[0] == 1, "comp fn 1^3")
+assert(cubes[1] == 8, "comp fn 2^3")
+assert(cubes[2] == 27, "comp fn 3^3")
+assert(cubes[3] == 64, "comp fn 4^3")
+
+// Comprehension with .to() as source (range helper from std/core)
+let from_range = [x in 0.to(5) | x * 10]
+assert(from_range[0] == 0, "comp range 0")
+assert(from_range[4] == 40, "comp range 4")
+assert(from_range.len() == 5, "comp range len")
+
+// ============================================================
+// 5. List comprehensions -- guard clauses
+// ============================================================
+
+// Single guard: [x in list | expr | guard]
+let even_squares = [x in [1, 2, 3, 4, 5, 6] | x * x | x % 2 == 0]
+assert(even_squares.len() == 3, "comp guard len")
+assert(even_squares[0] == 4, "comp guard 2^2")
+assert(even_squares[1] == 16, "comp guard 4^2")
+assert(even_squares[2] == 36, "comp guard 6^2")
+
+// Multiple guard clauses: [x in list | expr | g1 | g2 | g3]
+// Even numbers, greater than 5, less than 15
+let multi_guard = [x in 1.to(21) | x | x % 2 == 0 | x > 5 | x < 15]
+assert(multi_guard.len() == 5, "multi-guard len")
+assert(multi_guard[0] == 6, "multi-guard 6")
+assert(multi_guard[1] == 8, "multi-guard 8")
+assert(multi_guard[2] == 10, "multi-guard 10")
+assert(multi_guard[3] == 12, "multi-guard 12")
+assert(multi_guard[4] == 14, "multi-guard 14")
+
+// Guard with complex boolean expression
+let fizzbuzz = [x in 1.to(16) | x | (x % 3 == 0) || (x % 5 == 0)]
+assert(fizzbuzz[0] == 3, "fizzbuzz 3")
+assert(fizzbuzz[1] == 5, "fizzbuzz 5")
+assert(fizzbuzz[2] == 6, "fizzbuzz 6")
+assert(fizzbuzz[3] == 9, "fizzbuzz 9")
+assert(fizzbuzz[4] == 10, "fizzbuzz 10")
+assert(fizzbuzz[5] == 12, "fizzbuzz 12")
+assert(fizzbuzz[6] == 15, "fizzbuzz 15")
+assert(fizzbuzz.len() == 7, "fizzbuzz len")
+
+// Guard that filters everything
+let none_pass = [x in [1, 2, 3] | x | x > 100]
+assert(none_pass.len() == 0, "guard filters all")
+
+// Guard that keeps everything
+let all_pass = [x in [1, 2, 3] | x * 2 | x > 0]
+assert(all_pass.len() == 3, "guard keeps all")
+assert(all_pass[0] == 2, "guard keeps all 0")
+assert(all_pass[2] == 6, "guard keeps all 2")
+
+// ============================================================
+// 6. List comprehensions -- nested (2-level and 3-level)
+// ============================================================
+
+// 2-level nested: [x in l1, y in l2 | expr]
+let pairs = [x in [1, 2, 3], y in [10, 20] | x + y]
+assert(pairs.len() == 6, "nested 2-level len")
+assert(pairs[0] == 11, "nested 1+10")
+assert(pairs[1] == 21, "nested 1+20")
+assert(pairs[2] == 12, "nested 2+10")
+assert(pairs[3] == 22, "nested 2+20")
+assert(pairs[4] == 13, "nested 3+10")
+assert(pairs[5] == 23, "nested 3+20")
+
+// 2-level with guard: skip diagonal
+let off_diag = [x in 1.to(4), y in 1.to(4) | x * 10 + y | x != y]
+assert(off_diag.len() == 6, "nested guard len")
+assert(off_diag[0] == 12, "nested guard 12")
+assert(off_diag[1] == 13, "nested guard 13")
+assert(off_diag[2] == 21, "nested guard 21")
+assert(off_diag[3] == 23, "nested guard 23")
+assert(off_diag[4] == 31, "nested guard 31")
+assert(off_diag[5] == 32, "nested guard 32")
+
+// 3-level nested: [x in l1, y in l2, z in l3 | expr]
+let triples = [x in [1, 2], y in [10, 20], z in [100, 200] | x + y + z]
+assert(triples.len() == 8, "nested 3-level len")
+assert(triples[0] == 111, "triple 1+10+100")
+assert(triples[1] == 211, "triple 1+10+200")
+assert(triples[7] == 222, "triple 2+20+200")
+
+// ============================================================
+// 7. Array slicing -- Python-style [start:end]
+// ============================================================
+let xs = [10, 20, 30, 40, 50]
+
+// Basic slice
+let sl1 = xs[0:3]
+assert(sl1.len() == 3, "slice [0:3] len")
+assert(sl1[0] == 10, "slice [0:3] first")
+assert(sl1[2] == 30, "slice [0:3] last")
+
+// Slice from middle
+let sl2 = xs[1:4]
+assert(sl2.len() == 3, "slice [1:4] len")
+assert(sl2[0] == 20, "slice [1:4] first")
+assert(sl2[2] == 40, "slice [1:4] last")
+
+// Slice to end (omit end)
+let sl3 = xs[2:]
+assert(sl3.len() == 3, "slice [2:] len")
+assert(sl3[0] == 30, "slice [2:] first")
+assert(sl3[2] == 50, "slice [2:] last")
+
+// Slice from start (omit start)
+let sl4 = xs[:3]
+assert(sl4.len() == 3, "slice [:3] len")
+assert(sl4[0] == 10, "slice [:3] first")
+assert(sl4[2] == 30, "slice [:3] last")
+
+// Full slice (copy)
+let sl5 = xs[:]
+assert(sl5.len() == 5, "slice [:] len")
+assert(sl5[0] == 10, "slice [:] first")
+assert(sl5[4] == 50, "slice [:] last")
+
+// Empty slice (start == end)
+let sl6 = xs[2:2]
+assert(sl6.len() == 0, "slice [2:2] empty")
+
+// Single-element slice
+let sl7 = xs[2:3]
+assert(sl7.len() == 1, "slice [2:3] single")
+assert(sl7[0] == 30, "slice [2:3] value")
+
+// ============================================================
+// 8. Array slicing -- negative indices
+// ============================================================
+let ys = [10, 20, 30, 40, 50]
+
+// Last N elements
+let neg1 = ys[-2:]
+assert(neg1.len() == 2, "slice [-2:] len")
+assert(neg1[0] == 40, "slice [-2:] first")
+assert(neg1[1] == 50, "slice [-2:] last")
+
+// All but last N
+let neg2 = ys[:-2]
+assert(neg2.len() == 3, "slice [:-2] len")
+assert(neg2[0] == 10, "slice [:-2] first")
+assert(neg2[2] == 30, "slice [:-2] last")
+
+// Negative both: [-3:-1] → elements at index 2, 3
+let neg3 = ys[-3:-1]
+assert(neg3.len() == 2, "slice [-3:-1] len")
+assert(neg3[0] == 30, "slice [-3:-1] first")
+assert(neg3[1] == 40, "slice [-3:-1] last")
+
+// Last element via slice
+let neg4 = ys[-1:]
+assert(neg4.len() == 1, "slice [-1:] len")
+assert(neg4[0] == 50, "slice [-1:] value")
+
+// All but first via negative
+let neg5 = ys[-4:]
+assert(neg5.len() == 4, "slice [-4:] len")
+assert(neg5[0] == 20, "slice [-4:] first")
+
+// ============================================================
+// 9. Array slicing -- step/stride with $
+// ============================================================
+let zs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+// Every 2nd element in range: [start:end$step]
+let step1 = zs[0:8$2]
+assert(step1.len() == 4, "step [0:8$2] len")
+assert(step1[0] == 0, "step [0:8$2] first")
+assert(step1[1] == 2, "step [0:8$2] second")
+assert(step1[3] == 6, "step [0:8$2] last")
+
+// Every 3rd element from start: [:$3]
+let step2 = zs[:$3]
+assert(step2[0] == 0, "step [:$3] first")
+assert(step2[1] == 3, "step [:$3] second")
+assert(step2[2] == 6, "step [:$3] third")
+assert(step2[3] == 9, "step [:$3] fourth")
+assert(step2.len() == 4, "step [:$3] len")
+
+// Every 2nd from index 1: [1:$2]
+let step3 = zs[1:$2]
+assert(step3[0] == 1, "step [1:$2] first")
+assert(step3[1] == 3, "step [1:$2] second")
+assert(step3[2] == 5, "step [1:$2] third")
+assert(step3[3] == 7, "step [1:$2] fourth")
+assert(step3[4] == 9, "step [1:$2] fifth")
+assert(step3.len() == 5, "step [1:$2] len")
+
+// Negative start with step
+let step4 = zs[-4:-1$1]
+assert(step4.len() == 3, "step [-4:-1$1] len")
+assert(step4[0] == 6, "step [-4:-1$1] first")
+assert(step4[1] == 7, "step [-4:-1$1] second")
+assert(step4[2] == 8, "step [-4:-1$1] last")
+
+// Step 4 across full array
+let step5 = zs[:$4]
+assert(step5[0] == 0, "step [:$4] first")
+assert(step5[1] == 4, "step [:$4] second")
+assert(step5[2] == 8, "step [:$4] third")
+assert(step5.len() == 3, "step [:$4] len")
+
+// Slice + step: [2:8$3]
+let step6 = zs[2:8$3]
+assert(step6[0] == 2, "step [2:8$3] first")
+assert(step6[1] == 5, "step [2:8$3] second")
+assert(step6.len() == 2, "step [2:8$3] len")
+
+// ============================================================
+// 10. Bind operator (~>)
+// ============================================================
+
+// Basic bind: evaluate expr, bind to name, use in block
+let r1 = 42 ~> x { x + 8 }
+assert(r1 == 50, "bind basic")
+
+// Bind with arithmetic in block
+let r2 = 10 ~> a { a * 2 + 5 }
+assert(r2 == 25, "bind arithmetic")
+
+// Bind with grouped expression
+let r3 = (3 + 4) ~> x { x * x }
+assert(r3 == 49, "bind with expression")
+
+// Bind to name a method-call result
+let r4 = [1, 2, 3, 4, 5].len() ~> n { n * n }
+assert(r4 == 25, "bind names complex expr")
+
+// Bind with string
+let r5 = "hello" ~> s { s + " world" }
+assert(r5 == "hello world", "bind string concat")
+
+// ============================================================
+// 11. Trailing closures
+// ============================================================
+fn apply(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+
+// Basic trailing closure: fn(args): |params| expr
+let tr1 = apply(5): |x: Int| x * 3
+assert(tr1 == 15, "trailing closure basic")
+
+// Trailing closure with multi-param function
+fn transform(x: Int, y: Int, f: fn(Int, Int) -> Int) -> Int {
+    return f(x, y)
+}
+let tr2 = transform(3, 4): |a: Int, b: Int| a * b
+assert(tr2 == 12, "trailing closure multi-param")
+
+// Trailing closure with UFCS
+fn extends applyTo(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+let tr3 = 7.applyTo(): |x: Int| x + 3
+assert(tr3 == 10, "trailing closure UFCS")
+
+// ============================================================
+// 12. :: field access and -> dispatch
+// ============================================================
+
+// :: calls a function stored in a field WITHOUT passing self
+struct Calculator {
+    add: fn(Int, Int) -> Int,
+    name: String
+}
+let calc = Calculator {
+    add: |a: Int, b: Int| a + b,
+    name: "BasicCalc"
+}
+let sum_calc = calc::add(10, 20)
+assert(sum_calc == 30, ":: field access call")
+
+// -> calls a function stored in a field, passing the struct as first arg
+struct Widget {
+    label: String,
+    render: fn(Widget) -> String
+}
+let w = Widget {
+    label: "OK",
+    render: fn(self: Widget) -> String {
+        return "[" + self.label + "]"
+    }
+}
+let rendered = w->render()
+assert(rendered == "[OK]", "-> dispatch")
+
+// ============================================================
+// 13. @(Type) function references
+// ============================================================
+fn double(x: Int) -> Int { return x * 2 }
+fn double(x: Float) -> Float { return x * 2.0 }
+
+let int_double = double@(Int)
+assert(int_double(5) == 10, "@ function ref Int")
+
+// ============================================================
+// 14. @[T: Type] type annotations
+// ============================================================
+enum Maybe2(A) {
+    Just2: $A,
+    Nothing2
+}
+let nothing_int = Maybe2::Nothing2() @[A: Int]
+assert(true, "@[T: Type] annotation compiled")
+
+// ============================================================
+// 15. || empty closure syntax
+// ============================================================
+let get_42 = || 42
+assert(get_42() == 42, "empty params closure")
+
+let get_hello = || "hello"
+assert(get_hello() == "hello", "empty params closure string")
+
+// Empty closure with block body
+let counter = Box(0)
+let inc = || {
+    counter.value += 1
+    counter.value
+}
+assert(inc() == 1, "empty closure block 1")
+assert(inc() == 2, "empty closure block 2")
+
+// ============================================================
+// 16. if let / while let
+// ============================================================
+let opt_some: Option(Int) = Some(99)
+let opt_none: Option(Int) = None(Int)
+
+let if_let_val = 0
+if let v = opt_some {
+    if_let_val = v
+}
+assert(if_let_val == 99, "if let Some unwrap")
+
+let if_let_else = 0
+if let v = opt_none {
+    if_let_else = v
+} else {
+    if_let_else = -1
+}
+assert(if_let_else == -1, "if let None else branch")
+
+// ============================================================
+// 17. Forward declarations
+// ============================================================
+fn isEvenTest(n: Int) -> Bool
+fn isOddTest(n: Int) -> Bool {
+    if n == 0 { return false }
+    return isEvenTest(n - 1)
+}
+fn isEvenTest(n: Int) -> Bool {
+    if n == 0 { return true }
+    return isOddTest(n - 1)
+}
+assert(isEvenTest(4) == true, "forward decl even 4")
+assert(isOddTest(3) == true, "forward decl odd 3")
+assert(isEvenTest(7) == false, "forward decl even 7")
+
+// ============================================================
+// 18. Pipe operator |>
+// ============================================================
+fn add1(x: Int) -> Int { return x + 1 }
+fn square(x: Int) -> Int { return x * x }
+
+let piped = 4 |> add1() |> square()
+assert(piped == 25, "pipe operator")
+
+let piped2 = 1 |> add1() |> add1() |> add1()
+assert(piped2 == 4, "pipe chain")
+
+// ============================================================
+// 19. Comprehension with .to() (range syntax only works in for loops)
+// ============================================================
+let range_comp = [i in 0.to(5) | i * i]
+assert(range_comp[0] == 0, "range comp 0")
+assert(range_comp[4] == 16, "range comp 4")
+
+// Larger comprehension with .to() and guard
+let primes_ish = [n in 2.to(20) | n | (n % 2 != 0) || (n == 2)]
+assert(primes_ish[0] == 2, "range comp guard 2")
+assert(primes_ish[1] == 3, "range comp guard 3")
+
+// ============================================================
+// 20. Slicing used in real patterns
+// ============================================================
+
+// Drop first and last
+let middle = [1, 2, 3, 4, 5][1:-1]
+assert(middle.len() == 3, "drop first/last len")
+assert(middle[0] == 2, "drop first/last 0")
+assert(middle[2] == 4, "drop first/last 2")
+
+// Take first 3
+let head = [10, 20, 30, 40, 50][:3]
+assert(head.len() == 3, "take first 3 len")
+assert(head[2] == 30, "take first 3 last")
+
+// Take last 3
+let tail = [10, 20, 30, 40, 50][-3:]
+assert(tail.len() == 3, "take last 3 len")
+assert(tail[0] == 30, "take last 3 first")
+assert(tail[2] == 50, "take last 3 last")
+
+// Slice of a comprehension result
+let comp_then_slice = [x in 0.to(10) | x * x][2:5]
+assert(comp_then_slice.len() == 3, "comp+slice len")
+assert(comp_then_slice[0] == 4, "comp+slice 2^2")
+assert(comp_then_slice[1] == 9, "comp+slice 3^2")
+assert(comp_then_slice[2] == 16, "comp+slice 4^2")
+
+println("PASS: All syntax sugar tests passed")
