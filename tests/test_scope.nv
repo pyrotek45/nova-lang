@@ -1,0 +1,87 @@
+module test_scope
+
+import super.std.core
+
+// Block scoping
+let x = 10
+if true {
+    let y = 20
+    assert(x == 10, "outer visible in block")
+    assert(y == 20, "inner defined in block")
+}
+
+// Modifying outer from inner scope
+let a = 1
+if true {
+    a = 2
+}
+assert(a == 2, "outer modified from block")
+
+// Nested blocks
+let v = 0
+if true {
+    if true {
+        if true {
+            v = 42
+        }
+    }
+}
+assert(v == 42, "deeply nested block modifies outer")
+
+// Loop creates new scope each iteration
+let values = []: Int
+for let i = 0; i < 5; i += 1 {
+    let local = i * 10
+    values.push(local)
+}
+assert(values.len() == 5, "loop scope values length")
+assert(values[0] == 0, "loop scope iteration 0")
+assert(values[4] == 40, "loop scope iteration 4")
+
+// Function creates its own scope
+let outer = 100
+fn get_outer() -> Int {
+    return outer
+}
+assert(get_outer() == 100, "function sees outer scope")
+
+// Function parameters are local
+fn add_to(x: Int) -> Int {
+    let local = x + 10
+    return local
+}
+assert(add_to(5) == 15, "function local scope")
+
+// While loop scope
+let w = 0
+let n = 3
+while n > 0 {
+    let inner = n
+    w += inner
+    n -= 1
+}
+assert(w == 6, "while loop scope accumulation")
+
+// For-in scope
+let for_sum = 0
+for item in [10, 20, 30] {
+    let doubled = item * 2
+    for_sum += doubled
+}
+assert(for_sum == 120, "for-in scope")
+
+// Closure captures outer scope
+let captured = 42
+let get_captured = || captured
+assert(get_captured() == 42, "closure captures outer")
+
+// Closure over mutable state
+let state = Box(0)
+let mutate = || {
+    state.value += 1
+}
+mutate()
+mutate()
+assert(state.value == 2, "closure mutates captured")
+
+println("PASS: test_scope")

@@ -1,0 +1,56 @@
+module test_tuples
+
+// Tuple construction
+let pair = (1, 2)
+assert(pair[0] == 1, "tuple first")
+assert(pair[1] == 2, "tuple second")
+
+// Triple
+let triple = (10, 20, 30)
+assert(triple[0] == 10, "triple 0")
+assert(triple[1] == 20, "triple 1")
+assert(triple[2] == 30, "triple 2")
+
+// Mixed type tuples
+let mixed = (42, "hello")
+assert(mixed[0] == 42, "mixed tuple int")
+assert(mixed[1] == "hello", "mixed tuple string")
+
+// Tuple of tuple
+let nested = ((1, 2), (3, 4))
+assert(nested[0][0] == 1, "nested tuple [0][0]")
+assert(nested[1][1] == 4, "nested tuple [1][1]")
+
+// Tuple assignment to variable
+let t: (Int, Int) = (5, 10)
+assert(t[0] == 5, "typed tuple 0")
+assert(t[1] == 10, "typed tuple 1")
+
+// Tuple in function return
+fn make_pair(a: Int, b: Int) -> (Int, Int) {
+    return (a, b)
+}
+
+let p = make_pair(7, 8)
+assert(p[0] == 7, "returned tuple 0")
+assert(p[1] == 8, "returned tuple 1")
+
+// Tuple as function argument
+fn sum_pair(p: (Int, Int)) -> Int {
+    return p[0] + p[1]
+}
+
+assert(sum_pair((3, 4)) == 7, "tuple as argument")
+
+// Tuple of three types
+let tri = (1, "two", 3.0)
+assert(tri[0] == 1, "tri int")
+assert(tri[1] == "two", "tri string")
+assert(tri[2] == 3.0, "tri float")
+
+// Single element wrapping
+let single = (42, true)
+assert(single[0] == 42, "pair with bool 0")
+assert(single[1] == true, "pair with bool 1")
+
+println("PASS: test_tuples")

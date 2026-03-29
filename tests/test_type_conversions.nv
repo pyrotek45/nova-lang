@@ -1,0 +1,55 @@
+module test_type_conversions
+
+// Cast::string from int
+assert(Cast::string(42) == "42", "int to string")
+assert(Cast::string(0) == "0", "zero to string")
+assert(Cast::string(-5) == "-5", "negative int to string")
+
+// Cast::string from bool
+assert(Cast::string(true) == "true", "bool true to string")
+assert(Cast::string(false) == "false", "bool false to string")
+
+// Cast::string from float
+let fs = Cast::string(3.14)
+assert(fs.len() > 0, "float to string not empty")
+
+// Cast::string from char
+assert(Cast::string('a') == "a", "char to string")
+
+// Cast::int from string
+let parsed = Cast::int("123")
+assert(parsed.isSome(), "string to int valid")
+assert(parsed.unwrap() == 123, "string to int value")
+
+let negative = Cast::int("-42")
+assert(negative.isSome(), "negative string to int valid")
+assert(negative.unwrap() == -42, "negative string to int value")
+
+let invalid = Cast::int("abc")
+assert(!invalid.isSome(), "invalid string to int is None")
+
+let empty = Cast::int("")
+assert(!empty.isSome(), "empty string to int is None")
+
+// Cast::float
+let float_from_int = Cast::float(42)
+assert(float_from_int.isSome(), "int to float valid")
+assert(float_from_int.unwrap() == 42.0, "int to float value")
+
+// String concat coercion
+let mixed = "value: " + Cast::string(42)
+assert(mixed == "value: 42", "string concat with cast")
+
+// chr - int to char
+assert(chr(65) == 'A', "int to char A")
+assert(chr(90) == 'Z', "int to char Z")
+assert(chr(97) == 'a', "int to char a")
+assert(chr(122) == 'z', "int to char z")
+assert(chr(48) == '0', "int to char 0")
+assert(chr(57) == '9', "int to char 9")
+
+// toString generic
+let s = toString(42)
+assert(s == "42", "toString generic int")
+
+println("PASS: test_type_conversions")

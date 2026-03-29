@@ -1,0 +1,108 @@
+module test_std_core
+
+import super.std.core
+
+// Box
+let b = Box(42)
+assert(b.value == 42, "box value")
+b.value = 99
+assert(b.value == 99, "box mutation")
+
+// Box show (just make sure it doesn't crash)
+let sb = Box("hello")
+let bs = sb.toString()
+assert(bs == "hello", "box toString")
+
+// Gen
+let g = Gen(10)
+assert(g() == 10, "gen start")
+assert(g() == 11, "gen next")
+assert(g() == 12, "gen next 2")
+
+// Option orError with Some
+let opt = Some(42)
+let val = opt.orError("should not error")
+assert(val == 42, "orError with Some")
+
+// Option orDefault
+let d1 = Some(10).orDefault(99)
+assert(d1 == 10, "orDefault Some")
+let d2 : Option(Int) = None(Int)
+let d2v = d2.orDefault(99)
+assert(d2v == 99, "orDefault None")
+
+// Option isNone
+assert(!Some(1).isNone(), "Some isNone false")
+assert(None(Int).isNone(), "None isNone true")
+
+// Option orDoFn
+let lazy1 = Some(5).orDoFn(|| 999)
+assert(lazy1 == 5, "orDoFn Some")
+let lazy2 : Option(Int) = None(Int)
+let lazy2v = lazy2.orDoFn(|| 999)
+assert(lazy2v == 999, "orDoFn None")
+
+// Maybe type
+let j = Maybe::Just(42)
+let n = Maybe::Nothing() @[A: Int]
+assert(j.isJust(), "Maybe Just isJust")
+assert(!n.isJust(), "Maybe Nothing not isJust")
+
+// Maybe toString
+assert(j.toString() == "Just(42)", "Maybe Just toString")
+assert(n.toString() == "Nothing", "Maybe Nothing toString")
+
+// Option to Maybe
+let m1 = Some(7).toMaybe()
+assert(m1.isJust(), "Option to Maybe Just")
+
+let m2 : Option(Int) = None(Int)
+let m2m = m2.toMaybe()
+assert(!m2m.isJust(), "Option to Maybe Nothing")
+
+// Result type
+let ok = Result::Ok(42) @[B: String]
+let err = Result::Err("fail") @[A: Int]
+
+assert(ok.isOk(), "Result Ok isOk")
+assert(!err.isOk(), "Result Err not isOk")
+
+// Result toString
+assert(ok.toString() == "Ok(42)", "Result Ok toString")
+assert(err.toString() == "Err(fail)", "Result Err toString")
+
+// Option to Result
+let opt_ok = Some(10).toResult("error msg")
+assert(opt_ok.isOk(), "Option Some to Result Ok")
+
+let opt_err : Option(Int) = None(Int)
+let res_err = opt_err.toResult("missing")
+assert(!res_err.isOk(), "Option None to Result Err")
+
+// range function
+let r = range(5)
+assert(r.len() == 5, "range(5)")
+let r2 = range(2, 5)
+assert(r2.len() == 3, "range(2,5)")
+assert(r2[0] == 2, "range(2,5) first")
+
+// .to()
+let t = 3.to(7)
+assert(t.len() == 4, "3.to(7)")
+assert(t[0] == 3, "3.to(7) first")
+assert(t[3] == 6, "3.to(7) last")
+
+// .toStep()
+let s = 0.toStep(10, 3)
+assert(s.len() == 4, "toStep length")
+assert(s[0] == 0, "toStep 0")
+assert(s[1] == 3, "toStep 1")
+assert(s[3] == 9, "toStep 3")
+
+// iota
+let io = 4.iota()
+assert(io.len() == 4, "iota 4")
+assert(io[0] == 0, "iota first")
+assert(io[3] == 3, "iota last")
+
+println("PASS: test_std_core")

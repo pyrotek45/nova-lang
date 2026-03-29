@@ -1,0 +1,49 @@
+module test_list_comprehension
+
+import super.std.list
+
+// Basic list comprehension
+let squares = [x in 0.to(5) | x * x]
+assert(squares.len() == 5, "comprehension length")
+assert(squares[0] == 0, "comprehension 0^2")
+assert(squares[1] == 1, "comprehension 1^2")
+assert(squares[4] == 16, "comprehension 4^2")
+
+// Nested list comprehension (produces flat list)
+let pairs = [x in 0.to(3), y in 0.to(2) | x * 10 + y]
+assert(pairs.len() == 6, "nested comprehension length 3*2")
+assert(pairs[0] == 0, "nested 0,0")
+assert(pairs[1] == 1, "nested 0,1")
+assert(pairs[2] == 10, "nested 1,0")
+assert(pairs[3] == 11, "nested 1,1")
+assert(pairs[4] == 20, "nested 2,0")
+assert(pairs[5] == 21, "nested 2,1")
+
+// Comprehension with function call in body
+fn triple(x: Int) -> Int {
+    return x * 3
+}
+let tripled = [x in 0.to(4) | triple(x)]
+assert(tripled[0] == 0, "comprehension with fn 0")
+assert(tripled[1] == 3, "comprehension with fn 1")
+assert(tripled[3] == 9, "comprehension with fn 3")
+
+// Comprehension producing strings
+let strs = [x in 0.to(3) | Cast::string(x)]
+assert(strs[0] == "0", "string comprehension 0")
+assert(strs[1] == "1", "string comprehension 1")
+assert(strs[2] == "2", "string comprehension 2")
+
+// Comprehension with expressions
+let expr_comp = [x in 1.to(6) | (x * x) + 1]
+assert(expr_comp[0] == 2, "expr comp 1^2 + 1")
+assert(expr_comp[1] == 5, "expr comp 2^2 + 1")
+assert(expr_comp[4] == 26, "expr comp 5^2 + 1")
+
+// range() function for comprehension
+let ranged = [x in range(5) | x]
+assert(ranged.len() == 5, "range comprehension length")
+assert(ranged[0] == 0, "range comp 0")
+assert(ranged[4] == 4, "range comp 4")
+
+println("PASS: test_list_comprehension")

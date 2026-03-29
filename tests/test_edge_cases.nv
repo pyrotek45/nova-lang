@@ -1,0 +1,132 @@
+module test_edge_cases
+
+import super.std.list
+import super.std.core
+
+// Edge case: empty list operations
+let empty = []: Int
+assert(empty.len() == 0, "empty list length")
+
+// Edge case: single element list
+let single = [42]
+assert(single.len() == 1, "single element list")
+assert(single[0] == 42, "single element access")
+
+// Edge case: zero value
+assert(0 == 0, "zero equality")
+assert(0 + 0 == 0, "zero addition")
+assert(0 * 100 == 0, "zero multiplication")
+assert(!false, "not false")
+
+// Edge case: negative zero float
+let neg_zero = -0.0
+assert(neg_zero == 0.0, "negative zero equals zero")
+
+// Edge case: empty string
+let empty_str = ""
+assert(empty_str.len() == 0, "empty string length")
+assert(empty_str == "", "empty string equality")
+assert(empty_str + "hello" == "hello", "empty string concat")
+
+// Edge case: single char string
+assert("a".len() == 1, "single char string length")
+
+// Edge case: string with spaces
+assert("  ".len() == 2, "whitespace string length")
+
+// Edge case: boolean in different contexts
+let t = true
+let f = false
+assert(t, "true variable")
+assert(!f, "not false variable")
+assert(t == true, "true == true")
+assert(f == false, "false == false")
+
+// Edge case: if expression with complex condition
+let val = if (1 < 2) && (3 < 4) { "yes" } else { "no" }
+assert(val == "yes", "complex if expression")
+
+// Edge case: deeply nested function calls
+fn a(x: Int) -> Int { return x + 1 }
+fn b(x: Int) -> Int { return a(x) + 1 }
+fn c(x: Int) -> Int { return b(x) + 1 }
+fn d(x: Int) -> Int { return c(x) + 1 }
+fn e(x: Int) -> Int { return d(x) + 1 }
+assert(e(0) == 5, "deeply nested function calls")
+
+// Edge case: for loop that doesn't execute
+let count = 0
+for let i = 10; i < 5; i += 1 {
+    count += 1
+}
+assert(count == 0, "non-executing for loop")
+
+// Edge case: while loop that doesn't execute
+let wcount = 0
+while false {
+    wcount += 1
+}
+assert(wcount == 0, "non-executing while loop")
+
+// Edge case: single iteration loops
+let once = 0
+for let i = 0; i < 1; i += 1 {
+    once += 1
+}
+assert(once == 1, "single iteration for")
+
+// Edge case: immediate break
+let broke = 0
+for let i = 0; i < 100; i += 1 {
+    break
+}
+assert(true, "immediate break works")
+
+// Edge case: continue as first statement
+let skip_sum = 0
+for let i = 0; i < 5; i += 1 {
+    if i < 3 {
+        continue
+    }
+    skip_sum += i
+}
+assert(skip_sum == 7, "continue skips 0,1,2: sum of 3+4 = 7")
+
+// Edge case: list of empty lists
+let empties = [[]: Int, []: Int, []: Int]
+assert(empties.len() == 3, "list of empties length")
+assert(empties[0].len() == 0, "inner empty length")
+
+// Edge case: function returning None
+fn maybe_val(flag: Bool) -> Option(Int) {
+    if flag {
+        return Some(42)
+    }
+    return None(Int)
+}
+assert(maybe_val(true).isSome(), "maybe true")
+assert(!maybe_val(false).isSome(), "maybe false")
+
+// Edge case: large integer arithmetic
+let big = 1000000000
+assert(big * 2 == 2000000000, "large int multiply")
+
+// Edge case: multiple returns in function
+fn multi_return(x: Int) -> String {
+    if x < 0 {
+        return "negative"
+    }
+    if x == 0 {
+        return "zero"
+    }
+    if x < 10 {
+        return "small"
+    }
+    return "large"
+}
+assert(multi_return(-1) == "negative", "multi return negative")
+assert(multi_return(0) == "zero", "multi return zero")
+assert(multi_return(5) == "small", "multi return small")
+assert(multi_return(100) == "large", "multi return large")
+
+println("PASS: test_edge_cases")

@@ -1,0 +1,59 @@
+module test_variables
+
+// Basic let bindings
+let a = 10
+assert(a == 10, "basic let binding")
+
+// Type-annotated let
+let b : Int = 42
+assert(b == 42, "annotated let binding")
+
+// Let with expression
+let c = 3 + 4 * 5
+assert(c == 23, "let with expression")
+
+// Reassignment
+let d = 1
+d = 2
+assert(d == 2, "reassignment")
+
+// Multiple variables
+let x = 10
+let y = 20
+let z = x + y
+assert(z == 30, "multiple variables")
+
+// Reassignment with self-reference
+let counter = 0
+counter = counter + 1
+assert(counter == 1, "self-referencing assignment")
+
+// Variable shadowing in inner scope
+let outer = 10
+if true {
+    let inner = 20
+    assert(inner == 20, "inner scope variable")
+    assert(outer == 10, "outer visible in inner scope")
+}
+
+// Different types
+let int_var : Int = 42
+let float_var : Float = 3.14
+let bool_var : Bool = true
+let char_var : Char = 'z'
+let string_var : String = "hello"
+
+assert(int_var == 42, "int variable")
+assert(float_var > 3.13, "float variable")
+assert(bool_var, "bool variable")
+assert(char_var == 'z', "char variable")
+assert(string_var == "hello", "string variable")
+
+// Variable used in different expressions
+let base = 5
+assert(base + 1 == 6, "var in addition")
+assert(base * 2 == 10, "var in multiplication")
+assert(base - 3 == 2, "var in subtraction")
+assert(base > 0, "var in comparison")
+
+println("PASS: test_variables")

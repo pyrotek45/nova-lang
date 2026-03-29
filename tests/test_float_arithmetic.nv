@@ -1,0 +1,42 @@
+module test_float_arithmetic
+
+// Basic float arithmetic
+assert(1.0 + 1.0 == 2.0, "1.0 + 1.0 should be 2.0")
+assert(10.0 - 3.0 == 7.0, "10.0 - 3.0 should be 7.0")
+assert(4.0 * 5.0 == 20.0, "4.0 * 5.0 should be 20.0")
+assert(10.0 / 2.0 == 5.0, "10.0 / 2.0 should be 5.0")
+
+// Fractional results
+assert(1.0 / 3.0 * 3.0 < 1.001, "float division precision")
+assert(1.0 / 3.0 * 3.0 > 0.999, "float division precision lower bound")
+
+// Negative floats
+assert(-1.5 + 3.5 == 2.0, "negative float addition")
+assert(-2.0 * -3.0 == 6.0, "negative float multiplication")
+assert(-10.0 / 4.0 == -2.5, "negative float division")
+
+// Mixed operations
+assert(2.5 * 4.0 == 10.0, "2.5 * 4.0 = 10.0")
+assert(7.5 / 2.5 == 3.0, "7.5 / 2.5 = 3.0")
+
+// Float comparison
+assert(1.5 < 2.5, "1.5 < 2.5")
+assert(3.0 > 2.0, "3.0 > 2.0")
+assert(!(1.0 > 1.0), "1.0 is not > 1.0")
+
+// Float assignment operators
+let x = 10.0
+x = x + 2.5
+assert(x == 12.5, "float +=")
+x = x - 0.5
+assert(x == 12.0, "float -=")
+x = x * 2.0
+assert(x == 24.0, "float *=")
+x = x / 8.0
+assert(x == 3.0, "float /=")
+
+// Float negation
+let y = 3.14
+assert(-y < 0.0, "float negation is negative")
+
+println("PASS: test_float_arithmetic")

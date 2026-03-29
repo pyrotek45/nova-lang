@@ -1,0 +1,172 @@
+module test_gc_refcount
+
+import super.std.core
+import super.std.list
+
+// Test 1: Basic allocation and deallocation
+// Create many short-lived objects
+fn make_and_discard() {
+    for let i = 0; i < 100; i += 1 {
+        let s = "temporary_" + Cast::string(i)
+        let l = [1, 2, 3, 4, 5]
+    }
+}
+make_and_discard()
+assert(true, "basic alloc/dealloc survived")
+
+// Test 2: Lots of list allocations
+fn list_stress() {
+    for let i = 0; i < 50; i += 1 {
+        let l = []: Int
+        for let j = 0; j < 100; j += 1 {
+            l.push(j)
+        }
+        // l goes out of scope each iteration
+    }
+}
+list_stress()
+assert(true, "list stress survived")
+
+// Test 3: Struct allocation stress
+struct Node {
+    value: Int,
+    label: String,
+}
+
+fn struct_stress() {
+    for let i = 0; i < 200; i += 1 {
+        let n = Node { value: i, label: "node_" + Cast::string(i) }
+    }
+}
+struct_stress()
+assert(true, "struct stress survived")
+
+// Test 4: Nested object allocation
+fn nested_stress() {
+    for let i = 0; i < 50; i += 1 {
+        let inner = []: [Int]
+        for let j = 0; j < 20; j += 1 {
+            inner.push([j, j*2, j*3])
+        }
+    }
+}
+nested_stress()
+assert(true, "nested stress survived")
+
+// Test 5: String concatenation stress (creates many intermediate strings)
+fn string_concat_stress() {
+    let result = ""
+    for let i = 0; i < 100; i += 1 {
+        result = result + Cast::string(i)
+    }
+    assert(result.len() > 0, "string concat result")
+}
+string_concat_stress()
+assert(true, "string concat stress survived")
+
+// Test 6: List push/pop cycle (allocate then release)
+fn push_pop_cycle() {
+    let l = []: Int
+    for let cycle = 0; cycle < 10; cycle += 1 {
+        // Push many items
+        for let i = 0; i < 100; i += 1 {
+            l.push(i)
+        }
+        // Pop them all
+        while l.len() > 0 {
+            l.pop()
+        }
+    }
+    assert(l.len() == 0, "push pop cycle empty")
+}
+push_pop_cycle()
+
+// Test 7: Function pointer allocation
+fn fn_alloc_stress() {
+    let fns = []: fn(Int) -> Int
+    for let i = 0; i < 50; i += 1 {
+        let factor = i
+        fns.push(|x: Int| x * factor)
+    }
+    // Verify they work
+    assert(fns[0](10) == 0, "fn alloc 0")
+    assert(fns[5](10) == 50, "fn alloc 5")
+    assert(fns[49](10) == 490, "fn alloc 49")
+}
+fn_alloc_stress()
+
+// Test 8: Recursive data structure stress
+fn recursive_build(depth: Int) -> [Int] {
+    if depth == 0 {
+        return [0]
+    }
+    let inner = recursive_build(depth - 1)
+    inner.push(depth)
+    return inner
+}
+let deep = recursive_build(50)
+assert(deep.len() == 51, "recursive build length")
+assert(deep[50] == 50, "recursive build last value")
+
+// Test 9: Many closures capturing shared mutable state
+fn closure_gc_stress() {
+    let state = Box(0)
+    let closures = []: fn() -> Int
+    for let i = 0; i < 100; i += 1 {
+        closures.push(fn() -> Int {
+            state.value = state.value + 1
+            return state.value
+        })
+    }
+    // Call all closures
+    for let i = 0; i < 100; i += 1 {
+        closures[i]()
+    }
+    assert(state.value == 100, "100 closures all incremented")
+}
+closure_gc_stress()
+
+// Test 10: Struct with list field stress
+struct Container {
+    items: [String],
+}
+
+fn container_stress() {
+    for let i = 0; i < 50; i += 1 {
+        let c = Container { items: []: String }
+        for let j = 0; j < 20; j += 1 {
+            c.items.push("item_" + Cast::string(j))
+        }
+    }
+}
+container_stress()
+assert(true, "container stress survived")
+
+// Test 11: Alternating allocation patterns
+fn alternating_alloc() {
+    for let i = 0; i < 100; i += 1 {
+        if i % 3 == 0 {
+            let s = "string_" + Cast::string(i)
+        } elif i % 3 == 1 {
+            let l = [i, i+1, i+2]
+        } else {
+            let n = Node { value: i, label: Cast::string(i) }
+        }
+    }
+}
+alternating_alloc()
+assert(true, "alternating alloc survived")
+
+// Test 12: Large single allocation
+fn large_alloc() {
+    let big = []: Int
+    for let i = 0; i < 10000; i += 1 {
+        big.push(i)
+    }
+    assert(big.len() == 10000, "large alloc size")
+    assert(big[0] == 0, "large alloc first")
+    assert(big[9999] == 9999, "large alloc last")
+}
+large_alloc()
+
+println("PASS: test_gc_refcount")

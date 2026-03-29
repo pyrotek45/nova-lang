@@ -1,0 +1,118 @@
+module test_list_advanced
+
+import super.std.list
+import super.std.core
+
+// quicksort
+let sorted = [5, 3, 8, 1, 9, 2, 7, 4, 6].quicksort()
+assert(sorted[0] == 1, "quicksort first")
+assert(sorted[4] == 5, "quicksort middle")
+assert(sorted[8] == 9, "quicksort last")
+
+// bubblesort
+let bsorted = [5, 2, 8, 1, 4].bubblesort()
+assert(bsorted[0] == 1, "bubblesort first")
+assert(bsorted[4] == 8, "bubblesort last")
+
+// foldl
+let sum = [1, 2, 3, 4].foldl(|a: Int, b: Int| a + b)
+assert(sum == 10, "foldl sum")
+
+let product = [1, 2, 3, 4].foldl(|a: Int, b: Int| a * b)
+assert(product == 24, "foldl product")
+
+// foldr
+let rsum = [1, 2, 3, 4].foldr(|a: Int, b: Int| a + b)
+assert(rsum == 10, "foldr sum")
+
+// reduce
+let reduced = [1, 2, 3, 4, 5].reduce(fn(acc: Int, val: Int, idx: Int) -> Int {
+    return acc + val
+}, 0)
+assert(reduced == 15, "reduce sum")
+
+// flatmap
+let flat = [1, 2, 3].flatmap(|x: Int| [x, x * 10])
+assert(flat.len() == 6, "flatmap length")
+assert(flat[0] == 1, "flatmap 0")
+assert(flat[1] == 10, "flatmap 1")
+assert(flat[2] == 2, "flatmap 2")
+assert(flat[3] == 20, "flatmap 3")
+
+// chunk
+let chunks = [1, 2, 3, 4, 5, 6].chunk(2)
+assert(chunks.len() == 3, "chunk count")
+assert(chunks[0].len() == 2, "chunk 0 length")
+assert(chunks[0][0] == 1, "chunk 0,0")
+assert(chunks[1][0] == 3, "chunk 1,0")
+assert(chunks[2][1] == 6, "chunk 2,1")
+
+// windows
+let wins = [1, 2, 3, 4, 5].windows(3)
+assert(wins.len() == 3, "windows count")
+assert(wins[0][0] == 1, "window 0,0")
+assert(wins[0][2] == 3, "window 0,2")
+assert(wins[2][0] == 3, "window 2,0")
+assert(wins[2][2] == 5, "window 2,2")
+
+// find
+let found = [1, 2, 3, 4, 5].find(|x: Int| x > 3)
+assert(found.isSome(), "find found")
+assert(found.unwrap() == 4, "find value")
+
+let not_found = [1, 2, 3].find(|x: Int| x > 10)
+assert(!not_found.isSome(), "find not found")
+
+// filterMap
+let fm = [1, 2, 3, 4, 5].filterMap(fn(x: Int) -> Option(Int) {
+    if x % 2 == 0 {
+        return Some(x * 10)
+    }
+    return None(Int)
+})
+assert(fm.len() == 2, "filterMap length")
+assert(fm[0] == 20, "filterMap 0")
+assert(fm[1] == 40, "filterMap 1")
+
+// mapWhile
+let mw = [1, 2, 3, 0, 5, 6].mapWhile(fn(x: Int) -> Option(Int) {
+    if x > 0 {
+        return Some(x * 2)
+    }
+    return None(Int)
+})
+assert(mw.len() == 3, "mapWhile stops at None")
+assert(mw[0] == 2, "mapWhile 0")
+assert(mw[1] == 4, "mapWhile 1")
+assert(mw[2] == 6, "mapWhile 2")
+
+// sortWith custom comparator
+let custom_sorted = [3, 1, 4, 1, 5].sortWith(|a: Int, b: Int| a > b)
+assert(custom_sorted[0] == 1, "sortWith first")
+assert(custom_sorted[4] == 5, "sortWith last")
+
+// split
+let split_result = [1, 0, 2, 0, 3].split(0)
+assert(split_result.len() == 3, "split count")
+assert(split_result[0][0] == 1, "split 0,0")
+assert(split_result[1][0] == 2, "split 1,0")
+assert(split_result[2][0] == 3, "split 2,0")
+
+// unzip
+let unzipped = [(1, "a"), (2, "b"), (3, "c")].unzip()
+assert(unzipped[0].len() == 3, "unzip first len")
+assert(unzipped[1].len() == 3, "unzip second len")
+
+// flatten
+let flattened = [[1, 2], [3, 4], [5, 6]].flatten()
+assert(flattened.len() == 6, "flatten length")
+assert(flattened[0] == 1, "flatten 0")
+assert(flattened[5] == 6, "flatten 5")
+
+// dropIndex
+let dropped = [10, 20, 30, 40].dropIndex(1)
+assert(dropped.len() == 3, "dropIndex length")
+assert(dropped[0] == 10, "dropIndex kept 0")
+assert(dropped[1] == 30, "dropIndex shifted")
+
+println("PASS: test_list_advanced")

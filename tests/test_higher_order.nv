@@ -1,0 +1,94 @@
+module test_higher_order
+
+import super.std.list
+import super.std.core
+
+// Function as parameter
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+assert(apply(|x: Int| x + 1, 5) == 6, "fn as param")
+
+// Function returning function
+fn multiplier(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x * n
+}
+let times3 = multiplier(3)
+assert(times3(4) == 12, "fn returning fn")
+assert(times3(7) == 21, "fn returning fn 2")
+
+// Composing functions
+fn compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return |x: Int| f(g(x))
+}
+let inc = |x: Int| x + 1
+let dbl = |x: Int| x * 2
+let inc_then_dbl = compose(dbl, inc)
+assert(inc_then_dbl(3) == 8, "compose: dbl(inc(3)) = 8")
+
+let dbl_then_inc = compose(inc, dbl)
+assert(dbl_then_inc(3) == 7, "compose: inc(dbl(3)) = 7")
+
+// Map with different functions
+let nums = [1, 2, 3, 4, 5]
+let squared = nums.map(|x: Int| x * x)
+let doubled = nums.map(|x: Int| x * 2)
+let negated = nums.map(|x: Int| -x)
+
+assert(squared[2] == 9, "map squared")
+assert(doubled[2] == 6, "map doubled")
+assert(negated[2] == -3, "map negated")
+
+// Filter with predicate
+let evens = [1,2,3,4,5,6,7,8,9,10].filter(|x: Int| x % 2 == 0)
+assert(evens.len() == 5, "filter evens length")
+
+let odds = [1,2,3,4,5,6,7,8,9,10].filter(|x: Int| x % 2 != 0)
+assert(odds.len() == 5, "filter odds length")
+
+// foreach - use Box for mutable capture across closure boundary
+let total = Box(0)
+let foreach_list = [1, 2, 3, 4, 5]
+foreach_list.foreach(|x: Int| {
+    total.value = total.value + x
+})
+assert(total.value == 15, "foreach accumulation")
+
+// Currying
+fn curry2(f: fn(Int, Int) -> Int) -> fn(Int) -> fn(Int) -> Int {
+    return fn(a: Int) -> fn(Int) -> Int {
+        return fn(b: Int) -> Int {
+            return f(a, b)
+        }
+    }
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn mul(a: Int, b: Int) -> Int {
+    return a * b
+}
+
+let curried_add = curry2(add@(Int,Int))
+assert(curried_add(3)(4) == 7, "curried add")
+
+let add5 = curried_add(5)
+assert(add5(10) == 15, "partial application")
+assert(add5(20) == 25, "partial application 2")
+
+// Function stored in struct
+struct Action {
+    execute: fn(Int) -> Int,
+}
+let actions = [
+    Action { execute: |x: Int| x + 1 },
+    Action { execute: |x: Int| x * 2 },
+    Action { execute: |x: Int| x * x },
+]
+assert(actions[0]::execute(5) == 6, "struct fn field 0")
+assert(actions[1]::execute(5) == 10, "struct fn field 1")
+assert(actions[2]::execute(5) == 25, "struct fn field 2")
+
+println("PASS: test_higher_order")

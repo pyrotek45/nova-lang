@@ -116,6 +116,25 @@ impl NovaCore {
             .environment
             .custom_types
             .insert("Sprite".into(), vec![]);
+        // assert functions
+        self.add_function(
+            "assert",
+            TType::Function {
+                parameters: vec![TType::Bool],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::assert::assert_true,
+        );
+        self.add_function(
+            "assert",
+            TType::Function {
+                parameters: vec![TType::Bool, TType::String],
+                return_type: Box::new(TType::Void),
+            },
+            common::nodes::SymbolKind::Function,
+            native::assert::assert_msg,
+        );
         self.add_function(
             "List::remove",
             TType::Function {

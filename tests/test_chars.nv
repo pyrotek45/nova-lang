@@ -1,0 +1,42 @@
+module test_chars
+
+// Char literals
+let c = 'a'
+assert(c == 'a', "char literal")
+
+// Char comparison
+assert('a' == 'a', "char eq")
+assert('a' != 'b', "char ne")
+
+// Chars from string
+let chars = "hello".chars()
+assert(chars[0] == 'h', "char from string h")
+assert(chars[1] == 'e', "char from string e")
+assert(chars[4] == 'o', "char from string o")
+
+// Special chars
+let newline_char = '\n'
+let tab_char = '\t'
+
+// Char to int via chr
+let ch = chr(65)
+assert(ch == 'A', "chr(65) is A")
+
+let ch2 = chr(97)
+assert(ch2 == 'a', "chr(97) is a")
+
+let ch3 = chr(48)
+assert(ch3 == '0', "chr(48) is 0")
+
+// Char in list
+let charlist = ['a', 'b', 'c']
+assert(charlist.len() == 3, "char list length")
+assert(charlist[0] == 'a', "char list access")
+
+// Char conversion roundtrip
+let original = "Nova!"
+let chars2 = original.chars()
+let back = chars2.string()
+assert(back == "Nova!", "char conversion roundtrip")
+
+println("PASS: test_chars")

@@ -1,0 +1,73 @@
+module test_function_overloading
+
+// Overload by parameter type
+fn describe(x: Int) -> String {
+    return "int"
+}
+
+fn describe(x: String) -> String {
+    return "string"
+}
+
+fn describe(x: Bool) -> String {
+    return "bool"
+}
+
+fn describe(x: Float) -> String {
+    return "float"
+}
+
+assert(describe(42) == "int", "overload int")
+assert(describe("hi") == "string", "overload string")
+assert(describe(true) == "bool", "overload bool")
+assert(describe(3.14) == "float", "overload float")
+
+// Overload by arity
+fn combine(a: Int) -> Int {
+    return a
+}
+
+fn combine(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn combine(a: Int, b: Int, c: Int) -> Int {
+    return a + b + c
+}
+
+assert(combine(1) == 1, "overload arity 1")
+assert(combine(1, 2) == 3, "overload arity 2")
+assert(combine(1, 2, 3) == 6, "overload arity 3")
+
+// Function pointer to specific overload
+let int_desc = describe@(Int)
+let str_desc = describe@(String)
+
+assert(int_desc(99) == "int", "function pointer overload int")
+assert(str_desc("yo") == "string", "function pointer overload string")
+
+// Overloaded extends functions
+fn extends info(x: Int) -> String {
+    return "integer"
+}
+
+fn extends info(x: String) -> String {
+    return "text"
+}
+
+assert(5.info() == "integer", "extends overload int")
+assert("hi".info() == "text", "extends overload string")
+
+// Overloaded with different return types handled via parameters
+fn process(x: Int) -> Int {
+    return x * 2
+}
+
+fn process(x: String) -> String {
+    return x + x
+}
+
+assert(process(5) == 10, "overload return int")
+assert(process("ab") == "abab", "overload return string")
+
+println("PASS: test_function_overloading")

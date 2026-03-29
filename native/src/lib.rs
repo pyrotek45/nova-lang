@@ -1,3 +1,4 @@
+pub mod assert;
 pub mod char;
 pub mod float;
 pub mod io;
