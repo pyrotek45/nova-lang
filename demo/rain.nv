@@ -1,0 +1,217 @@
+module rain_demo
+
+// ─────────────────────────────────────────────────────────
+// Matrix Rain — falling column effects with variable density
+// Stress-tests GC with massive draw-call count + struct churn
+//
+// Controls:
+//   UP / DOWN    — increase / decrease number of columns
+//   LEFT / RIGHT — slow down / speed up fall speed
+//   SPACE        — toggle rainbow mode
+//   C            — cycle base color (green/cyan/amber/white)
+//   R            — reset
+// ─────────────────────────────────────────────────────────
+
+import super.std.math
+
+let WIDTH  = 1200
+let HEIGHT = 800
+let CHAR_SIZE = 16
+let MAX_COLS  = 150
+
+let numColumns = 60
+let fallSpeed  = 3
+let rainbow    = false
+let colorMode  = 0   // 0=green, 1=cyan, 2=amber, 3=white
+
+raylib::init("Nova Matrix Rain", WIDTH, HEIGHT, 60)
+
+struct Drop {
+    col:    Int,     // column index (x = col * spacing)
+    y:      Int,     // current y position (in character rows)
+    speed:  Int,     // rows per frame
+    length: Int,     // tail length
+    chars:  Int,     // counter for character cycling
+}
+
+let drops = []: Drop
+let colSpacing = WIDTH / numColumns
+
+fn getBaseColor() -> (Int, Int, Int) {
+    if colorMode == 0 { return (0, 255, 70) }    // green
+    if colorMode == 1 { return (0, 200, 255) }   // cyan
+    if colorMode == 2 { return (255, 180, 0) }    // amber
+    return (220, 220, 220)                         // white
+}
+
+fn rebuildDrops() {
+    drops = []: Drop
+    colSpacing = WIDTH / numColumns
+    if colSpacing < 8 { colSpacing = 8 }
+    for c in 0..numColumns {
+        let sp = fallSpeed + random(-1, 1)
+        if sp < 1 { sp = 1 }
+        let length = random(5, 25)
+        drops.push(Drop {
+            col: c,
+            y: random(-30, 0),
+            speed: sp,
+            length: length,
+            chars: random(0, 100),
+        })
+    }
+}
+
+rebuildDrops()
+
+// Characters to display — digits and symbols
+let charSet = "01234567890ABCDEF!@#$%^&*<>{}[]"
+
+fn getCharAt(idx: Int) -> String {
+    let i = idx % charSet.len()
+    if i < 0 { i = i + charSet.len() }
+    return Cast::string(charSet.charAt(i).unwrap())
+}
+
+fn updateAndDrawDrops() {
+    for d in drops {
+        d.chars += 1
+        d.y += d.speed
+
+        let rows = HEIGHT / CHAR_SIZE
+        let baseColor = getBaseColor()
+        let br = baseColor[0]
+        let bg = baseColor[1]
+        let bb = baseColor[2]
+
+        // Draw the tail
+        let px = d.col * colSpacing
+        for j in 0..d.length {
+            let row = d.y - j
+            if row >= 0 && row < rows {
+                let py = row * CHAR_SIZE
+
+                // Fade based on position in tail
+                let fade = 255 - (j * 255) / d.length
+                if fade < 0 { fade = 0 }
+
+                let cr = 0
+                let cg = 0
+                let cb = 0
+
+                if rainbow {
+                    // Rainbow: shift hue based on column and time
+                    let hue = (d.col * 17 + d.chars * 3) % 360
+                    if hue < 120 {
+                        cr = (255 * (120 - hue)) / 120
+                        cg = (255 * hue) / 120
+                        cb = 0
+                    }
+                    if hue >= 120 && hue < 240 {
+                        let h = hue - 120
+                        cr = 0
+                        cg = (255 * (120 - h)) / 120
+                        cb = (255 * h) / 120
+                    }
+                    if hue >= 240 {
+                        let h = hue - 240
+                        cr = (255 * h) / 120
+                        cg = 0
+                        cb = (255 * (120 - h)) / 120
+                    }
+                } else {
+                    cr = br
+                    cg = bg
+                    cb = bb
+                }
+
+                // Head character is bright white
+                if j == 0 {
+                    cr = 255
+                    cg = 255
+                    cb = 255
+                } else {
+                    cr = (cr * fade) / 255
+                    cg = (cg * fade) / 255
+                    cb = (cb * fade) / 255
+                }
+
+                let ch = getCharAt(d.chars + j * 7)
+                raylib::drawText(ch, px, py, CHAR_SIZE, (cr, cg, cb))
+            }
+        }
+
+        // Reset when fully off screen
+        if d.y - d.length > rows {
+            d.y = random(-20, -5)
+            d.speed = fallSpeed + random(-1, 1)
+            if d.speed < 1 { d.speed = 1 }
+            d.length = random(5, 25)
+        }
+    }
+}
+
+// ── Main loop ───────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear((0, 0, 0))
+
+    // ── Input ───────────────────────────────────────────
+    if raylib::isKeyPressed("KEY_UP") {
+        numColumns += 10
+        if numColumns > MAX_COLS { numColumns = MAX_COLS }
+        rebuildDrops()
+    }
+    if raylib::isKeyPressed("KEY_DOWN") {
+        numColumns -= 10
+        if numColumns < 5 { numColumns = 5 }
+        rebuildDrops()
+    }
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        fallSpeed += 1
+        if fallSpeed > 10 { fallSpeed = 10 }
+        // Update existing drops
+        for d in drops {
+            d.speed = fallSpeed + random(-1, 1)
+            if d.speed < 1 { d.speed = 1 }
+        }
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        fallSpeed -= 1
+        if fallSpeed < 1 { fallSpeed = 1 }
+        for d in drops {
+            d.speed = fallSpeed + random(-1, 1)
+            if d.speed < 1 { d.speed = 1 }
+        }
+    }
+    if raylib::isKeyPressed("KEY_SPACE") {
+        rainbow = !rainbow
+    }
+    if raylib::isKeyPressed("KEY_C") {
+        colorMode += 1
+        if colorMode > 3 { colorMode = 0 }
+    }
+    if raylib::isKeyPressed("KEY_R") {
+        numColumns = 60
+        fallSpeed = 3
+        rainbow = false
+        colorMode = 0
+        rebuildDrops()
+    }
+
+    // ── Update + Draw ───────────────────────────────────
+    updateAndDrawDrops()
+
+    // ── HUD ─────────────────────────────────────────────
+    let totalChars = 0
+    for d in drops {
+        totalChars += d.length
+    }
+    let info1 = "Columns: " + Cast::string(numColumns) + "  Chars drawn: ~" + Cast::string(totalChars)
+    let info2 = "Speed: " + Cast::string(fallSpeed) + "  Rainbow: " + Cast::string(rainbow)
+    let help  = "[Up/Down] Columns  [Left/Right] Speed  [Space] Rainbow  [C] Color  [R] Reset"
+
+    raylib::drawText(info1, 10, 10, 18, (200, 200, 200))
+    raylib::drawFPS(10, 32)
+    raylib::drawText(info2, 10, 54, 16, (180, 180, 100))
+    raylib::drawText(help, 10, HEIGHT - 28, 14, (100, 100, 100))
+}

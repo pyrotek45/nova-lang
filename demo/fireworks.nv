@@ -1,0 +1,205 @@
+module fireworks_demo
+
+// ─────────────────────────────────────────────────────────
+// Interactive Fireworks — click to launch, keys to control
+// Stress-tests GC with explosive bursts of short-lived particles
+//
+// Controls:
+//   Left-click   — launch a rocket at the mouse position
+//   UP / DOWN    — increase / decrease explosion size
+//   LEFT / RIGHT — decrease / increase rocket speed
+//   SPACE        — toggle auto-launch mode
+//   R            — clear all particles
+// ─────────────────────────────────────────────────────────
+
+import super.std.math
+
+let WIDTH  = 1200
+let HEIGHT = 800
+let GRAVITY = 1
+
+// Tunable parameters
+let explosionSize = 120     // particles per explosion
+let rocketSpeed   = 12      // how fast rockets climb
+let autoLaunch    = false   // continuous launching
+let autoTimer     = 0
+
+raylib::init("Nova Fireworks", WIDTH, HEIGHT, 60)
+
+// ── Rocket: flies upward then explodes ──────────────────
+struct Rocket {
+    x:    Int,
+    y:    Int,
+    vy:   Int,
+    targetY: Int,
+    r:    Int,
+    g:    Int,
+    b:    Int,
+}
+
+// ── Spark: fragment of an explosion ─────────────────────
+struct Spark {
+    x:    Int,
+    y:    Int,
+    vx:   Int,
+    vy:   Int,
+    life: Int,
+    r:    Int,
+    g:    Int,
+    b:    Int,
+    size: Int,
+}
+
+let rockets = []: Rocket
+let sparks  = []: Spark
+
+fn launchRocket(tx: Int, ty: Int) {
+    let r = random(100, 255)
+    let g = random(100, 255)
+    let b = random(100, 255)
+    rockets.push(Rocket {
+        x: tx,
+        y: HEIGHT,
+        vy: -rocketSpeed,
+        targetY: ty,
+        r: r, g: g, b: b,
+    })
+}
+
+fn explode(rx: Int, ry: Int, cr: Int, cg: Int, cb: Int) {
+    for i in 0..explosionSize {
+        let vx = random(-10, 10)
+        let vy = random(-10, 10)
+        let life = random(20, 55)
+        let size = random(1, 4)
+        // Mix base color with some randomness
+        let sr = (cr + random(-40, 40)).clamp(0, 255)
+        let sg = (cg + random(-40, 40)).clamp(0, 255)
+        let sb = (cb + random(-40, 40)).clamp(0, 255)
+        sparks.push(Spark {
+            x: rx, y: ry,
+            vx: vx, vy: vy,
+            life: life,
+            r: sr, g: sg, b: sb,
+            size: size,
+        })
+    }
+}
+
+fn updateRockets() {
+    let i = 0
+    while i < rockets.len() {
+        let rk = rockets[i]
+        rk.y += rk.vy
+
+        // Draw the rocket trail
+        raylib::drawCircle(rk.x, rk.y, 3, (rk.r, rk.g, rk.b))
+        raylib::drawCircle(rk.x, rk.y + 4, 2, (255, 200, 80))
+
+        // Has rocket reached its target?
+        if rk.y <= rk.targetY {
+            explode(rk.x, rk.y, rk.r, rk.g, rk.b)
+            rockets.remove(i)
+        } else {
+            i += 1
+        }
+    }
+}
+
+fn updateSparks() {
+    let i = 0
+    while i < sparks.len() {
+        let s = sparks[i]
+
+        s.x  += s.vx
+        s.y  += s.vy
+        s.vy += GRAVITY
+        s.life -= 1
+
+        // Slow down horizontally
+        if s.vx > 0 { s.vx -= 0 }
+        if s.vx < 0 { s.vx += 0 }
+
+        // Fade
+        let fade = s.life * 5
+        if fade > 255 { fade = 255 }
+        if fade < 0   { fade = 0   }
+        let dr = (s.r * fade) / 255
+        let dg = (s.g * fade) / 255
+        let db = (s.b * fade) / 255
+
+        raylib::drawCircle(s.x, s.y, s.size, (dr, dg, db))
+
+        if s.life <= 0 {
+            sparks.remove(i)
+        } else {
+            i += 1
+        }
+    }
+}
+
+// ── Main loop ───────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear((5, 5, 15))
+
+    let mouse = raylib::mousePosition()
+    let mx = mouse[0]
+    let my = mouse[1]
+
+    // ── Input ───────────────────────────────────────────
+    if raylib::isMousePressed("Left") {
+        launchRocket(mx, my)
+    }
+
+    if raylib::isKeyPressed("KEY_UP") {
+        explosionSize += 20
+        if explosionSize > 500 { explosionSize = 500 }
+    }
+    if raylib::isKeyPressed("KEY_DOWN") {
+        explosionSize -= 20
+        if explosionSize < 10 { explosionSize = 10 }
+    }
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        rocketSpeed += 2
+        if rocketSpeed > 30 { rocketSpeed = 30 }
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        rocketSpeed -= 2
+        if rocketSpeed < 4 { rocketSpeed = 4 }
+    }
+    if raylib::isKeyPressed("KEY_SPACE") {
+        autoLaunch = !autoLaunch
+    }
+    if raylib::isKeyPressed("KEY_R") {
+        sparks  = []: Spark
+        rockets = []: Rocket
+    }
+
+    // Auto-launch mode
+    if autoLaunch {
+        autoTimer += 1
+        if autoTimer >= 8 {
+            autoTimer = 0
+            let ax = random(100, WIDTH - 100)
+            let ay = random(80, HEIGHT / 2)
+            launchRocket(ax, ay)
+        }
+    }
+
+    // ── Update + Draw ───────────────────────────────────
+    updateRockets()
+    updateSparks()
+
+    // ── HUD ─────────────────────────────────────────────
+    let total = rockets.len() + sparks.len()
+    let info1 = "Particles: " + Cast::string(total)
+    let info2 = "Explosion: " + Cast::string(explosionSize) + "  Speed: " + Cast::string(rocketSpeed)
+    let info3 = "Auto: " + Cast::string(autoLaunch)
+    let help  = "[Click] Launch  [Up/Down] Size  [Left/Right] Speed  [Space] Auto  [R] Reset"
+
+    raylib::drawText(info1, 10, 10, 20, (200, 200, 200))
+    raylib::drawFPS(10, 36)
+    raylib::drawText(info2, 10, 62, 18, (180, 180, 100))
+    raylib::drawText(info3, 10, 84, 18, (180, 180, 100))
+    raylib::drawText(help, 10, HEIGHT - 30, 16, (120, 120, 120))
+}
