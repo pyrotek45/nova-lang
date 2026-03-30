@@ -21,13 +21,13 @@ let MAX_COLS  = 150
 
 raylib::init("Nova Matrix Rain", WIDTH, HEIGHT, 60)
 
-// Wrap mutable settings in a struct so closures share one reference
 struct Settings {
     numColumns: Int,
     fallSpeed:  Int,
     rainbow:    Bool,
     colorMode:  Int,
     colSpacing: Int,
+    needRebuild: Bool,
 }
 
 let cfg = Settings {
@@ -35,74 +35,125 @@ let cfg = Settings {
     fallSpeed:  3,
     rainbow:    false,
     colorMode:  0,
-    colSpacing: WIDTH / 60,
+    colSpacing: 20,
+    needRebuild: false,
 }
 
 struct Drop {
-    col:    Int,     // column index (x = col * spacing)
-    y:      Int,     // current y position (in character rows)
-    speed:  Int,     // rows per frame
-    length: Int,     // tail length
-    chars:  Int,     // counter for character cycling
+    col:    Int,
+    y:      Int,
+    speed:  Int,
+    length: Int,
+    chars:  Int,
 }
 
 let drops = []: Drop
+let charSet = "0123456789ABCDEF"
 
-fn getBaseColor() -> (Int, Int, Int) {
-    if cfg.colorMode == 0 { return (0, 255, 70) }    // green
-    if cfg.colorMode == 1 { return (0, 200, 255) }   // cyan
-    if cfg.colorMode == 2 { return (255, 180, 0) }    // amber
-    return (220, 220, 220)                              // white
+// Build initial drops
+cfg.colSpacing = WIDTH / cfg.numColumns
+for c in 0..cfg.numColumns {
+    let sp = cfg.fallSpeed + random(-1, 1)
+    if sp < 1 { sp = 1 }
+    drops.push(Drop {
+        col: c,
+        y: random(-30, 0),
+        speed: sp,
+        length: random(5, 25),
+        chars: random(0, 100),
+    })
 }
 
-fn rebuildDrops() {
-    drops = []: Drop
-    cfg.colSpacing = WIDTH / cfg.numColumns
-    if cfg.colSpacing < 8 { cfg.colSpacing = 8 }
-    for c in 0..cfg.numColumns {
-        let sp = cfg.fallSpeed + random(-1, 1)
-        if sp < 1 { sp = 1 }
-        let length = random(5, 25)
-        drops.push(Drop {
-            col: c,
-            y: random(-30, 0),
-            speed: sp,
-            length: length,
-            chars: random(0, 100),
-        })
+// ── Main loop ───────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear((0, 0, 0))
+
+    // ── Input ───────────────────────────────────────────
+    if raylib::isKeyPressed("KEY_UP") {
+        cfg.numColumns += 10
+        if cfg.numColumns > MAX_COLS { cfg.numColumns = MAX_COLS }
+        cfg.needRebuild = true
     }
-}
+    if raylib::isKeyPressed("KEY_DOWN") {
+        cfg.numColumns -= 10
+        if cfg.numColumns < 5 { cfg.numColumns = 5 }
+        cfg.needRebuild = true
+    }
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        cfg.fallSpeed += 1
+        if cfg.fallSpeed > 10 { cfg.fallSpeed = 10 }
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        cfg.fallSpeed -= 1
+        if cfg.fallSpeed < 1 { cfg.fallSpeed = 1 }
+    }
+    if raylib::isKeyPressed("KEY_SPACE") {
+        cfg.rainbow = !cfg.rainbow
+    }
+    if raylib::isKeyPressed("KEY_C") {
+        cfg.colorMode += 1
+        if cfg.colorMode > 3 { cfg.colorMode = 0 }
+    }
+    if raylib::isKeyPressed("KEY_R") {
+        cfg.numColumns = 60
+        cfg.fallSpeed = 3
+        cfg.rainbow = false
+        cfg.colorMode = 0
+        cfg.needRebuild = true
+    }
 
-rebuildDrops()
+    // ── Rebuild drops if needed ─────────────────────────
+    if cfg.needRebuild {
+        cfg.needRebuild = false
+        while drops.len() > 0 { drops.remove(0) }
+        cfg.colSpacing = WIDTH / cfg.numColumns
+        if cfg.colSpacing < 8 { cfg.colSpacing = 8 }
+        for c in 0..cfg.numColumns {
+            let sp = cfg.fallSpeed + random(-1, 1)
+            if sp < 1 { sp = 1 }
+            drops.push(Drop {
+                col: c,
+                y: random(-30, 0),
+                speed: sp,
+                length: random(5, 25),
+                chars: random(0, 100),
+            })
+        }
+    }
 
-// Characters to display — digits and symbols
-let charSet = "01234567890ABCDEF!@#$%^&*<>{}[]"
+    // ── Update + Draw drops ─────────────────────────────
+    let rows = HEIGHT / CHAR_SIZE
 
-fn getCharAt(idx: Int) -> String {
-    let i = idx % charSet.len()
-    if i < 0 { i = i + charSet.len() }
-    return Cast::string(charSet.charAt(i).unwrap())
-}
+    let br = 0
+    let bg2 = 255
+    let bb = 70
+    if cfg.colorMode == 1 {
+        br = 0
+        bg2 = 200
+        bb = 255
+    }
+    if cfg.colorMode == 2 {
+        br = 255
+        bg2 = 180
+        bb = 0
+    }
+    if cfg.colorMode == 3 {
+        br = 220
+        bg2 = 220
+        bb = 220
+    }
 
-fn updateAndDrawDrops() {
     for d in drops {
         d.chars += 1
         d.y += d.speed
 
-        let rows = HEIGHT / CHAR_SIZE
-        let baseColor = getBaseColor()
-        let br = baseColor[0]
-        let bg = baseColor[1]
-        let bb = baseColor[2]
-
-        // Draw the tail
         let px = d.col * cfg.colSpacing
+
         for j in 0..d.length {
             let row = d.y - j
             if row >= 0 && row < rows {
                 let py = row * CHAR_SIZE
 
-                // Fade based on position in tail
                 let fade = 255 - (j * 255) / d.length
                 if fade < 0 { fade = 0 }
 
@@ -111,7 +162,6 @@ fn updateAndDrawDrops() {
                 let cb = 0
 
                 if cfg.rainbow {
-                    // Rainbow: shift hue based on column and time
                     let hue = (d.col * 17 + d.chars * 3) % 360
                     if hue < 120 {
                         cr = (255 * (120 - hue)) / 120
@@ -132,11 +182,10 @@ fn updateAndDrawDrops() {
                     }
                 } else {
                     cr = br
-                    cg = bg
+                    cg = bg2
                     cb = bb
                 }
 
-                // Head character is bright white
                 if j == 0 {
                     cr = 255
                     cg = 255
@@ -147,7 +196,9 @@ fn updateAndDrawDrops() {
                     cb = (cb * fade) / 255
                 }
 
-                let ch = getCharAt(d.chars + j * 7)
+                let idx = (d.chars + j * 7) % charSet.len()
+                if idx < 0 { idx = idx + charSet.len() }
+                let ch = Cast::string(charSet.charAt(idx).unwrap())
                 raylib::drawText(ch, px, py, CHAR_SIZE, (cr, cg, cb))
             }
         }
@@ -160,57 +211,6 @@ fn updateAndDrawDrops() {
             d.length = random(5, 25)
         }
     }
-}
-
-// ── Main loop ───────────────────────────────────────────
-while raylib::rendering() {
-    raylib::clear((0, 0, 0))
-
-    // ── Input ───────────────────────────────────────────
-    if raylib::isKeyPressed("KEY_UP") {
-        cfg.numColumns += 10
-        if cfg.numColumns > MAX_COLS { cfg.numColumns = MAX_COLS }
-        rebuildDrops()
-    }
-    if raylib::isKeyPressed("KEY_DOWN") {
-        cfg.numColumns -= 10
-        if cfg.numColumns < 5 { cfg.numColumns = 5 }
-        rebuildDrops()
-    }
-    if raylib::isKeyPressed("KEY_RIGHT") {
-        cfg.fallSpeed += 1
-        if cfg.fallSpeed > 10 { cfg.fallSpeed = 10 }
-        // Update existing drops
-        for d in drops {
-            d.speed = cfg.fallSpeed + random(-1, 1)
-            if d.speed < 1 { d.speed = 1 }
-        }
-    }
-    if raylib::isKeyPressed("KEY_LEFT") {
-        cfg.fallSpeed -= 1
-        if cfg.fallSpeed < 1 { cfg.fallSpeed = 1 }
-        for d in drops {
-            d.speed = cfg.fallSpeed + random(-1, 1)
-            if d.speed < 1 { d.speed = 1 }
-        }
-    }
-    if raylib::isKeyPressed("KEY_SPACE") {
-        cfg.rainbow = !cfg.rainbow
-    }
-    if raylib::isKeyPressed("KEY_C") {
-        cfg.colorMode += 1
-        if cfg.colorMode > 3 { cfg.colorMode = 0 }
-    }
-    if raylib::isKeyPressed("KEY_R") {
-        cfg.numColumns = 60
-        cfg.fallSpeed = 3
-        cfg.rainbow = false
-        cfg.colorMode = 0
-        rebuildDrops()
-    }
-
-    // ── Update + Draw ───────────────────────────────────
-    updateAndDrawDrops()
 
     // ── HUD ─────────────────────────────────────────────
     let totalChars = 0

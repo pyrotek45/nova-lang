@@ -180,8 +180,8 @@ while raylib::rendering() {
         cfg.autoLaunch = !cfg.autoLaunch
     }
     if raylib::isKeyPressed("KEY_R") {
-        sparks  = []: Spark
-        rockets = []: Rocket
+        while sparks.len() > 0 { sparks.remove(0) }
+        while rockets.len() > 0 { rockets.remove(0) }
     }
 
     // Auto-launch mode
