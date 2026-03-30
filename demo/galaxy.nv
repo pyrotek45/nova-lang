@@ -204,8 +204,8 @@ while raylib::rendering() {
         cfg.trailMode = !cfg.trailMode
     }
     if raylib::isKeyPressed("KEY_R") {
-        stars = []: Star
-        wells = []: Well
+        while stars.len() > 0 { stars.remove(0) }
+        while wells.len() > 0 { wells.remove(0) }
         wells.push(Well { x: WIDTH / 2, y: HEIGHT / 2, mass: 50 })
     }
     if raylib::isKeyPressed("KEY_G") {

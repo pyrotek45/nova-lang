@@ -164,7 +164,7 @@ while raylib::rendering() {
         if cfg.bgIndex > 3 { cfg.bgIndex = 0 }
     }
     if raylib::isKeyPressed("KEY_R") {
-        balls = []: Ball
+        while balls.len() > 0 { balls.remove(0) }
     }
     if raylib::isMousePressed("Left") {
         addBalls(50, mx, my)
