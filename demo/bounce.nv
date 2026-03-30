@@ -20,12 +20,22 @@ import super.std.math
 let WIDTH  = 1200
 let HEIGHT = 800
 
-let gravityOn = true
-let glowOn    = false
-let bgIndex   = 0
-let ballSize  = 4
-
 raylib::init("Nova Bounce Stress", WIDTH, HEIGHT, 60)
+
+// Wrap mutable settings in a struct so closures share one reference
+struct Settings {
+    gravityOn: Bool,
+    glowOn:    Bool,
+    bgIndex:   Int,
+    ballSize:  Int,
+}
+
+let cfg = Settings {
+    gravityOn: true,
+    glowOn:    false,
+    bgIndex:   0,
+    ballSize:  4,
+}
 
 struct Ball {
     x:  Int,
@@ -47,7 +57,7 @@ fn addBalls(count: Int, cx: Int, cy: Int) {
         let r = random(60, 255)
         let g = random(60, 255)
         let b = random(60, 255)
-        let rad = ballSize + random(-1, 1)
+        let rad = cfg.ballSize + random(-1, 1)
         if rad < 1 { rad = 1 }
         balls.push(Ball {
             x: cx, y: cy,
@@ -69,7 +79,7 @@ fn removeBalls(count: Int) {
 fn updateBalls() {
     for b in balls {
         // Gravity
-        if gravityOn {
+        if cfg.gravityOn {
             b.vy += 1
         }
 
@@ -96,24 +106,24 @@ fn updateBalls() {
             b.vx += random(-1, 1)
         }
 
-        // Draw the ball
-        raylib::drawCircle(b.x, b.y, b.rad, (b.r, b.g, b.b))
-
         // Optional glow (draws a larger dim circle under)
-        if glowOn {
+        if cfg.glowOn {
             let gr = b.r / 4
             let gg = b.g / 4
             let gb = b.b / 4
             raylib::drawCircle(b.x, b.y, b.rad + 3, (gr, gg, gb))
         }
+
+        // Draw the ball
+        raylib::drawCircle(b.x, b.y, b.rad, (b.r, b.g, b.b))
     }
 }
 
 fn getBgColor() -> (Int, Int, Int) {
-    if bgIndex == 0 { return (10, 10, 15) }
-    if bgIndex == 1 { return (15, 5, 20) }
-    if bgIndex == 2 { return (5, 15, 10) }
-    if bgIndex == 3 { return (20, 15, 5) }
+    if cfg.bgIndex == 0 { return (10, 10, 15) }
+    if cfg.bgIndex == 1 { return (15, 5, 20) }
+    if cfg.bgIndex == 2 { return (5, 15, 10) }
+    if cfg.bgIndex == 3 { return (20, 15, 5) }
     return (10, 10, 15)
 }
 
@@ -136,22 +146,22 @@ while raylib::rendering() {
         removeBalls(200)
     }
     if raylib::isKeyPressed("KEY_RIGHT") {
-        ballSize += 1
-        if ballSize > 20 { ballSize = 20 }
+        cfg.ballSize += 1
+        if cfg.ballSize > 20 { cfg.ballSize = 20 }
     }
     if raylib::isKeyPressed("KEY_LEFT") {
-        ballSize -= 1
-        if ballSize < 1 { ballSize = 1 }
+        cfg.ballSize -= 1
+        if cfg.ballSize < 1 { cfg.ballSize = 1 }
     }
     if raylib::isKeyPressed("KEY_SPACE") {
-        gravityOn = !gravityOn
+        cfg.gravityOn = !cfg.gravityOn
     }
     if raylib::isKeyPressed("KEY_G") {
-        glowOn = !glowOn
+        cfg.glowOn = !cfg.glowOn
     }
     if raylib::isKeyPressed("KEY_C") {
-        bgIndex += 1
-        if bgIndex > 3 { bgIndex = 0 }
+        cfg.bgIndex += 1
+        if cfg.bgIndex > 3 { cfg.bgIndex = 0 }
     }
     if raylib::isKeyPressed("KEY_R") {
         balls = []: Ball
@@ -165,7 +175,7 @@ while raylib::rendering() {
 
     // ── HUD ─────────────────────────────────────────────
     let info1 = "Balls: " + Cast::string(balls.len())
-    let info2 = "Size: " + Cast::string(ballSize) + "  Gravity: " + Cast::string(gravityOn) + "  Glow: " + Cast::string(glowOn)
+    let info2 = "Size: " + Cast::string(cfg.ballSize) + "  Gravity: " + Cast::string(cfg.gravityOn) + "  Glow: " + Cast::string(cfg.glowOn)
     let help  = "[Up] +200  [Down] -200  [Click] +50  [Left/Right] Size  [Space] Gravity  [G] Glow  [C] BG  [R] Reset"
 
     raylib::drawText(info1, 10, 10, 20, (200, 200, 200))

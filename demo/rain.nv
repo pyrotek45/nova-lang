@@ -19,12 +19,24 @@ let HEIGHT = 800
 let CHAR_SIZE = 16
 let MAX_COLS  = 150
 
-let numColumns = 60
-let fallSpeed  = 3
-let rainbow    = false
-let colorMode  = 0   // 0=green, 1=cyan, 2=amber, 3=white
-
 raylib::init("Nova Matrix Rain", WIDTH, HEIGHT, 60)
+
+// Wrap mutable settings in a struct so closures share one reference
+struct Settings {
+    numColumns: Int,
+    fallSpeed:  Int,
+    rainbow:    Bool,
+    colorMode:  Int,
+    colSpacing: Int,
+}
+
+let cfg = Settings {
+    numColumns: 60,
+    fallSpeed:  3,
+    rainbow:    false,
+    colorMode:  0,
+    colSpacing: WIDTH / 60,
+}
 
 struct Drop {
     col:    Int,     // column index (x = col * spacing)
@@ -35,21 +47,20 @@ struct Drop {
 }
 
 let drops = []: Drop
-let colSpacing = WIDTH / numColumns
 
 fn getBaseColor() -> (Int, Int, Int) {
-    if colorMode == 0 { return (0, 255, 70) }    // green
-    if colorMode == 1 { return (0, 200, 255) }   // cyan
-    if colorMode == 2 { return (255, 180, 0) }    // amber
-    return (220, 220, 220)                         // white
+    if cfg.colorMode == 0 { return (0, 255, 70) }    // green
+    if cfg.colorMode == 1 { return (0, 200, 255) }   // cyan
+    if cfg.colorMode == 2 { return (255, 180, 0) }    // amber
+    return (220, 220, 220)                              // white
 }
 
 fn rebuildDrops() {
     drops = []: Drop
-    colSpacing = WIDTH / numColumns
-    if colSpacing < 8 { colSpacing = 8 }
-    for c in 0..numColumns {
-        let sp = fallSpeed + random(-1, 1)
+    cfg.colSpacing = WIDTH / cfg.numColumns
+    if cfg.colSpacing < 8 { cfg.colSpacing = 8 }
+    for c in 0..cfg.numColumns {
+        let sp = cfg.fallSpeed + random(-1, 1)
         if sp < 1 { sp = 1 }
         let length = random(5, 25)
         drops.push(Drop {
@@ -85,7 +96,7 @@ fn updateAndDrawDrops() {
         let bb = baseColor[2]
 
         // Draw the tail
-        let px = d.col * colSpacing
+        let px = d.col * cfg.colSpacing
         for j in 0..d.length {
             let row = d.y - j
             if row >= 0 && row < rows {
@@ -99,7 +110,7 @@ fn updateAndDrawDrops() {
                 let cg = 0
                 let cb = 0
 
-                if rainbow {
+                if cfg.rainbow {
                     // Rainbow: shift hue based on column and time
                     let hue = (d.col * 17 + d.chars * 3) % 360
                     if hue < 120 {
@@ -144,7 +155,7 @@ fn updateAndDrawDrops() {
         // Reset when fully off screen
         if d.y - d.length > rows {
             d.y = random(-20, -5)
-            d.speed = fallSpeed + random(-1, 1)
+            d.speed = cfg.fallSpeed + random(-1, 1)
             if d.speed < 1 { d.speed = 1 }
             d.length = random(5, 25)
         }
@@ -157,44 +168,44 @@ while raylib::rendering() {
 
     // ── Input ───────────────────────────────────────────
     if raylib::isKeyPressed("KEY_UP") {
-        numColumns += 10
-        if numColumns > MAX_COLS { numColumns = MAX_COLS }
+        cfg.numColumns += 10
+        if cfg.numColumns > MAX_COLS { cfg.numColumns = MAX_COLS }
         rebuildDrops()
     }
     if raylib::isKeyPressed("KEY_DOWN") {
-        numColumns -= 10
-        if numColumns < 5 { numColumns = 5 }
+        cfg.numColumns -= 10
+        if cfg.numColumns < 5 { cfg.numColumns = 5 }
         rebuildDrops()
     }
     if raylib::isKeyPressed("KEY_RIGHT") {
-        fallSpeed += 1
-        if fallSpeed > 10 { fallSpeed = 10 }
+        cfg.fallSpeed += 1
+        if cfg.fallSpeed > 10 { cfg.fallSpeed = 10 }
         // Update existing drops
         for d in drops {
-            d.speed = fallSpeed + random(-1, 1)
+            d.speed = cfg.fallSpeed + random(-1, 1)
             if d.speed < 1 { d.speed = 1 }
         }
     }
     if raylib::isKeyPressed("KEY_LEFT") {
-        fallSpeed -= 1
-        if fallSpeed < 1 { fallSpeed = 1 }
+        cfg.fallSpeed -= 1
+        if cfg.fallSpeed < 1 { cfg.fallSpeed = 1 }
         for d in drops {
-            d.speed = fallSpeed + random(-1, 1)
+            d.speed = cfg.fallSpeed + random(-1, 1)
             if d.speed < 1 { d.speed = 1 }
         }
     }
     if raylib::isKeyPressed("KEY_SPACE") {
-        rainbow = !rainbow
+        cfg.rainbow = !cfg.rainbow
     }
     if raylib::isKeyPressed("KEY_C") {
-        colorMode += 1
-        if colorMode > 3 { colorMode = 0 }
+        cfg.colorMode += 1
+        if cfg.colorMode > 3 { cfg.colorMode = 0 }
     }
     if raylib::isKeyPressed("KEY_R") {
-        numColumns = 60
-        fallSpeed = 3
-        rainbow = false
-        colorMode = 0
+        cfg.numColumns = 60
+        cfg.fallSpeed = 3
+        cfg.rainbow = false
+        cfg.colorMode = 0
         rebuildDrops()
     }
 
@@ -206,8 +217,8 @@ while raylib::rendering() {
     for d in drops {
         totalChars += d.length
     }
-    let info1 = "Columns: " + Cast::string(numColumns) + "  Chars drawn: ~" + Cast::string(totalChars)
-    let info2 = "Speed: " + Cast::string(fallSpeed) + "  Rainbow: " + Cast::string(rainbow)
+    let info1 = "Columns: " + Cast::string(cfg.numColumns) + "  Chars drawn: ~" + Cast::string(totalChars)
+    let info2 = "Speed: " + Cast::string(cfg.fallSpeed) + "  Rainbow: " + Cast::string(cfg.rainbow)
     let help  = "[Up/Down] Columns  [Left/Right] Speed  [Space] Rainbow  [C] Color  [R] Reset"
 
     raylib::drawText(info1, 10, 10, 18, (200, 200, 200))
