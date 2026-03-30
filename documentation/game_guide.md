@@ -56,6 +56,16 @@ from your first window to a complete game architecture. For the full API referen
     - [21.3 Spatial Grid for Broad-Phase Collision](#213-spatial-grid-for-broad-phase-collision)
     - [21.4 Avoid Allocations in the Hot Loop](#214-avoid-allocations-in-the-hot-loop)
     - [21.5 Quick Reference](#215-quick-reference)
+22. [Tips and Tricks](#22-tips-and-tricks)
+    - [22.1 Frame-based Animation](#221-frame-based-animation)
+    - [22.2 Screen Shake](#222-screen-shake)
+    - [22.3 Hit Flash](#223-hit-flash)
+    - [22.4 Wave Spawner](#224-wave-spawner)
+    - [22.5 Integer Lerp and Clamp](#225-integer-lerp-and-clamp)
+    - [22.6 Debug Overlay](#226-debug-overlay)
+    - [22.7 Particle Burst](#227-particle-burst)
+    - [22.8 Score Popup](#228-score-popup)
+    - [22.9 Quick Reference](#229-quick-reference)
 
 ---
 
@@ -127,10 +137,10 @@ let px = 400.0
 let py = 300.0
 
 while raylib::rendering() {
-    let dt = raylib::getFrameTime()
+    let dt = raylib::getFrameTime()   // Float (seconds since last frame)
 
     if raylib::isKeyPressed("KEY_RIGHT") {
-        px = px + speed * Cast::float(dt).unwrap()
+        px = px + speed * dt
     }
 
     // Convert to int for drawing
@@ -1678,7 +1688,7 @@ and then draw the pause menu on top — no state duplication:
 
 ```nova
 fn drawPauseOverlay(gs: GameState) {
-    raylib::drawRect(0, 0, 800, 600, (0, 0, 0))   // dark overlay
+    raylib::drawRectangle(0, 0, 800, 600, (0, 0, 0))   // dark overlay
     raylib::drawText("PAUSED",    300, 250, 50, (255, 255, 255))
     raylib::drawText("Resume: P", 320, 320, 24, (200, 200, 200))
     raylib::drawText("Quit:   Q", 320, 350, 24, (200, 200, 200))
@@ -1766,9 +1776,8 @@ Point-and-click, bullet targeting, and RTS controls all need to know where in th
 
 ```nova
 fn mouseWorldPos(cam: Camera) -> (Int, Int) {
-    let mx = raylib::getMouseX()
-    let my = raylib::getMouseY()
-    return cam.screenToWorld(mx, my)
+    let pos = raylib::mousePosition()
+    return cam.screenToWorld(pos[0], pos[1])
 }
 ```
 
@@ -2088,3 +2097,353 @@ Other tips:
 | Mouse click in world space | `cam.screenToWorld(mouseX, mouseY)` |
 | Camera tracking player | `cam.follow(px, py, screenW, screenH, mapW, mapH)` |
 | Modular project layout | One module per concern, `GameState` threaded through |
+
+---
+
+## 22. Tips and Tricks
+
+Practical recipes for common game-dev problems. Each one is a self-contained pattern
+you can drop into any Nova + raylib project.
+
+### 22.1 Frame-based Animation
+
+Track which sprite frame to show and advance at a fixed rate:
+
+```nova
+struct Animation {
+    frame:         Int,   // current frame index
+    frameCount:    Int,   // total number of frames
+    ticksPerFrame: Int,   // game ticks before advancing
+    counter:       Int,   // ticks since last advance
+}
+
+fn mkAnimation(frames: Int, speed: Int) -> Animation {
+    return Animation { frame: 0, frameCount: frames, ticksPerFrame: speed, counter: 0 }
+}
+
+fn extends advance(a: Animation) {
+    a.counter = a.counter + 1
+    if a.counter >= a.ticksPerFrame {
+        a.counter = 0
+        a.frame = (a.frame + 1) % a.frameCount
+    }
+}
+```
+
+Usage with sprites:
+
+```nova
+let walkAnim = mkAnimation(4, 8)   // 4 frames, advance every 8 ticks
+
+while raylib::rendering() {
+    walkAnim.advance()
+    raylib::drawSpriteFrame(hero, walkAnim.frame, px, py)
+}
+```
+
+### 22.2 Screen Shake
+
+Add juice on big hits or explosions. Offset all draw calls by a random-ish displacement
+that decays over time:
+
+```nova
+struct Shake {
+    intensity: Int,
+    remaining: Int,
+}
+
+fn mkShake() -> Shake { return Shake { intensity: 0, remaining: 0 } }
+
+fn extends trigger(s: Shake, amount: Int, duration: Int) {
+    s.intensity = amount
+    s.remaining = duration
+}
+
+fn extends offset(s: Shake) -> (Int, Int) {
+    if s.remaining <= 0 { return (0, 0) }
+    s.remaining = s.remaining - 1
+    let ox = (s.remaining * s.intensity) % 7 - 3
+    let oy = (s.remaining * s.intensity * 3) % 7 - 3
+    return (ox, oy)
+}
+```
+
+Apply every frame by adding the offset to your camera or draw positions:
+
+```nova
+let shake = mkShake()
+
+// On explosion:
+shake.trigger(6, 15)
+
+// In draw phase:
+let ofs = shake.offset()
+let drawX = screenX + ofs[0]
+let drawY = screenY + ofs[1]
+```
+
+### 22.3 Hit Flash
+
+Make an entity blink after taking damage. Skip drawing on alternating ticks:
+
+```nova
+struct Flash {
+    remaining: Int,
+    visible:   Bool,
+}
+
+fn mkFlash() -> Flash { return Flash { remaining: 0, visible: true } }
+
+fn extends trigger(f: Flash, duration: Int) { f.remaining = duration }
+
+fn extends tick(f: Flash) {
+    if f.remaining > 0 {
+        f.remaining = f.remaining - 1
+        f.visible = f.remaining % 4 < 2   // toggle every 2 ticks
+    } else {
+        f.visible = true
+    }
+}
+```
+
+In the draw function:
+
+```nova
+player.flash.tick()
+if player.flash.visible {
+    player->draw()
+}
+```
+
+On hit:
+
+```nova
+player.flash.trigger(20)   // blink for 20 ticks
+```
+
+### 22.4 Wave Spawner
+
+Space enemy waves evenly. The struct counts down and returns `true` when it's time
+to spawn:
+
+```nova
+struct WaveSpawner {
+    wave:       Int,
+    countdown:  Int,
+    spawnDelay: Int,   // ticks between waves
+}
+
+fn mkSpawner(delay: Int) -> WaveSpawner {
+    return WaveSpawner { wave: 0, countdown: delay, spawnDelay: delay }
+}
+
+fn extends tick(ws: WaveSpawner) -> Bool {
+    ws.countdown = ws.countdown - 1
+    if ws.countdown <= 0 {
+        ws.wave = ws.wave + 1
+        ws.countdown = ws.spawnDelay
+        return true
+    }
+    return false
+}
+```
+
+Usage:
+
+```nova
+let spawner = mkSpawner(120)   // every 2 seconds at 60fps
+
+while raylib::rendering() {
+    if spawner.tick() {
+        // spawn (spawner.wave * 2) enemies — scale with wave number
+        let count = spawner.wave * 2
+        for i in 0..count {
+            enemies.push(mkEnemy(i * 60, 0, spawner.wave))
+        }
+    }
+}
+```
+
+### 22.5 Integer Lerp and Clamp
+
+Two tiny helpers you will use everywhere:
+
+```nova
+fn lerp(a: Int, b: Int, t: Int, tmax: Int) -> Int {
+    return a + (b - a) * t / tmax
+}
+
+fn clamp(val: Int, lo: Int, hi: Int) -> Int {
+    if val < lo { return lo }
+    if val > hi { return hi }
+    return val
+}
+```
+
+Smooth a health bar:
+
+```nova
+let displayHP = player.hp
+// Each frame, creep displayHP toward the real value
+displayHP = lerp(displayHP, player.hp, 1, 4)   // 1/4 speed
+```
+
+Clamp the player inside the screen:
+
+```nova
+player.x = clamp(player.x, 0, SCREEN_W - player.w)
+player.y = clamp(player.y, 0, SCREEN_H - player.h)
+```
+
+### 22.6 Debug Overlay
+
+Toggle a debug view with a key press. Draw hitboxes, position text, entity counts:
+
+```nova
+let debug = Box(0)   // 0 = off, 1 = on
+
+while raylib::rendering() {
+    if raylib::isKeyReleased("KEY_F3") {
+        debug.value = if debug.value == 0 { 1 } else { 0 }
+    }
+
+    // Normal draw ...
+    raylib::clear((10, 10, 20))
+    drawWorld(gs)
+
+    // Debug overlay
+    if debug.value == 1 {
+        // Draw hitboxes
+        for e in gs.enemies {
+            if e.active {
+                raylib::drawRectangleLines(e.x, e.y, e.w, e.h, (0, 255, 0))
+            }
+        }
+        raylib::drawText("Enemies: " + Cast::string(gs.enemies.len()), 10, 40, 16, (0, 255, 0))
+        raylib::drawText("Bullets: " + Cast::string(bullets.len()),     10, 60, 16, (0, 255, 0))
+        raylib::drawText("FPS: " + Cast::string(raylib::getFPS()),      10, 80, 16, (0, 255, 0))
+    }
+}
+```
+
+### 22.7 Particle Burst
+
+A cheap particle system using the object pool pattern from §21.1. Spawn N particles
+on an event; each moves with its own velocity and dies after a set lifetime:
+
+```nova
+struct Particle {
+    x:      Int,
+    y:      Int,
+    vx:     Int,
+    vy:     Int,
+    life:   Int,   // ticks remaining
+    active: Int,
+}
+
+let particles = []: Particle
+
+fn initParticles(size: Int) {
+    let i = Box(0)
+    while i.value < size {
+        particles.push(Particle { x: 0, y: 0, vx: 0, vy: 0, life: 0, active: 0 })
+        i.value = i.value + 1
+    }
+}
+
+fn burst(cx: Int, cy: Int, count: Int) {
+    let spawned = Box(0)
+    for p in particles {
+        if p.active == 0 && spawned.value < count {
+            p.x  = cx
+            p.y  = cy
+            p.vx = (spawned.value * 7) % 11 - 5   // pseudo-random spread
+            p.vy = (spawned.value * 3) % 9 - 6
+            p.life = 30
+            p.active = 1
+            spawned.value = spawned.value + 1
+        }
+    }
+}
+
+fn updateParticles() {
+    for p in particles {
+        if p.active == 1 {
+            p.x = p.x + p.vx
+            p.y = p.y + p.vy
+            p.life = p.life - 1
+            if p.life <= 0 { p.active = 0 }
+        }
+    }
+}
+
+fn drawParticles() {
+    for p in particles {
+        if p.active == 1 {
+            let brightness = p.life * 8   // fade out
+            raylib::drawCircle(p.x, p.y, 2, (brightness, brightness, brightness))
+        }
+    }
+}
+```
+
+Call `burst(enemy.x, enemy.y, 12)` when an enemy dies. Looks great with very little code.
+
+### 22.8 Score Popup
+
+Show floating score text that drifts up and fades:
+
+```nova
+struct Popup {
+    x:    Int,
+    y:    Int,
+    text: String,
+    life: Int,
+    active: Int,
+}
+
+let popups = []: Popup
+
+fn spawnPopup(x: Int, y: Int, text: String) {
+    popups.push(Popup { x: x, y: y, text: text, life: 40, active: 1 })
+}
+
+fn updatePopups() {
+    for p in popups {
+        if p.active == 1 {
+            p.y = p.y - 1        // float upward
+            p.life = p.life - 1
+            if p.life <= 0 { p.active = 0 }
+        }
+    }
+}
+
+fn drawPopups() {
+    for p in popups {
+        if p.active == 1 {
+            let alpha = p.life * 6   // fades out
+            raylib::drawText(p.text, p.x, p.y, 16, (255, 255, alpha))
+        }
+    }
+}
+```
+
+Usage:
+
+```nova
+spawnPopup(enemy.x, enemy.y, "+100")
+```
+
+### 22.9 Quick Reference
+
+| Trick | Key Idea |
+|---|---|
+| Frame animation | Counter mod ticksPerFrame advances `frame` |
+| Screen shake | Decaying random offset applied to all draws |
+| Hit flash | Skip drawing on alternating ticks while `remaining > 0` |
+| Wave spawner | Countdown → reset + increment wave number |
+| Integer lerp | `a + (b - a) * t / tmax` — no floats needed |
+| Clamp | `if val < lo → lo, elif val > hi → hi, else val` |
+| Debug overlay | Toggle with a key; draw hitboxes, counters, FPS |
+| Particles | Object pool + velocity + lifetime → cheap visual effects |
+| Score popup | Floating text that drifts up and fades each tick |
