@@ -2,52 +2,50 @@
 // std/core.nv -- Core standard library entry point
 // ============================================================
 //
-// This module provides the essential building blocks that most
-// Nova programs need.  Import with:
+// The "batteries included" import for most Nova programs.
+// One import gives you Option helpers, Maybe, Result, Box,
+// Gen, and range utilities:
 //
 //   import super.std.core
 //
 // What you get:
 //
-//   ┌─────────────────┬────────────────────────────────────────────┐
-//   │  Box(T)         │  Generic single-field wrapper struct.       │
-//   │  Gen(start)     │  Stateful integer generator closure.        │
-//   ├─────────────────┼────────────────────────────────────────────┤
-//   │  Option helpers │  orError, orDefault, orDoFn, isNone,       │
-//   │  (built-in)     │  toMaybe, toResult                         │
-//   │                 │  The Option type itself is built into the   │
-//   │                 │  VM: Some(x) is a plain stack value and     │
-//   │                 │  None(T) is the VmData::None sentinel.      │
-//   │                 │  It is NOT a heap object.                   │
-//   ├─────────────────┼────────────────────────────────────────────┤
-//   │  Maybe(T)       │  User-defined enum: Just(x) | Nothing.     │
-//   │  (heap object)  │  Stored as a tagged heap object; use for    │
-//   │                 │  pattern matching on nullable values.        │
-//   │                 │  Differs from Option: it lives on the heap  │
-//   │                 │  and is a full algebraic data type.         │
-//   ├─────────────────┼────────────────────────────────────────────┤
-//   │  Result(T,E)    │  User-defined enum: Ok(x) | Err(e).        │
-//   │  (heap object)  │  Stored as a tagged heap object; use for    │
-//   │                 │  fallible functions.                        │
-//   ├─────────────────┼────────────────────────────────────────────┤
-//   │  Range helpers  │  iota(n), range(n), range(start,end),      │
-//   │                 │  n.to(end), toStep(start,end,step)          │
-//   └─────────────────┴────────────────────────────────────────────┘
+//   Box(T)          Generic single-field wrapper struct.
+//   Gen(start)      Stateful integer generator closure.
+//   range(n)        Returns [0, 1, ..., n-1].
+//   range(s, e)     Returns [s, s+1, ..., e-1].
+//   n.to(end)       Returns [n, n+1, ..., end-1] (UFCS).
+//   n.iota()        Returns [0, 1, ..., n-1] (UFCS).
+//   toStep(s,e,st)  Returns [s, s+st, ..., < e].
 //
-// For standalone imports of individual components:
-//   import super.std.option   // just Option helpers
-//   import super.std.maybe    // just Maybe enum
-//   import super.std.result   // just Result enum
+//   Option helpers (from option.nv):
+//     .orError(msg)   Unwrap Option or exit with message.
+//     .orDefault(v)   Unwrap Option or return fallback.
+//     .orDoFn(f)      Unwrap Option or compute lazily.
+//     .isNone()       True if Option is None.
+//
+//   Maybe(T) enum: Just(x) | Nothing
+//     .isJust()  .isNothing()  .unwrap()  .orDefault()
+//     .orDoFn()  .map()  .toString()  .toOption()
+//
+//   Result(A,B) enum: Ok(x) | Err(e)
+//     .isOk()  .isErr()  .unwrap()  .unwrapErr()
+//     .orDefault()  .orDoFn()  .map()  .mapErr()
+//     .toString()  .toOption()
+//
+//   Bridges:
+//     .toMaybe()      Convert Option to Maybe.
+//     .toResult(err)  Convert Option to Result.
 //
 // ============================================================
 
 module core
 
-import super.std.option
+import option
 
 // ── Box ─────────────────────────────────────────────────────────────
 // A single-field generic wrapper.  Useful for capturing a mutable
-// value in a closure (since closures capture by value).
+// value in a closure (since closures capture primitives by value).
 //
 //   let counter = Box(0)
 //   let inc = || { counter.value += 1 }
@@ -83,17 +81,15 @@ fn Gen(start: Int) -> fn() -> Int {
     }
 }
 
-// ── Maybe(T) ─────────────────────────────────────────────────────────
-//
+// ── Maybe(T) ────────────────────────────────────────────────────────
 // A heap-allocated algebraic type for optional values.
 // Unlike the built-in Option(T) (a VM stack sentinel), Maybe is a
-// tagged enum object on the heap, suitable for pattern matching and
-// generic containers.
+// tagged enum on the heap, suitable for pattern matching.
 //
 //   let x = Maybe::Just(42)
 //   let y = Maybe::Nothing() @[A: Int]
 //   match x {
-//       Just(v)  => { println(Cast::string(v)) }
+//       Just(v)   => { println(Cast::string(v)) }
 //       Nothing() => { println("nothing") }
 //   }
 //
@@ -170,8 +166,7 @@ fn extends toOption(self: Maybe($A)) -> Option($A) {
     return None($A)
 }
 
-// ── Result(T, E) ──────────────────────────────────────────────────────
-//
+// ── Result(T, E) ────────────────────────────────────────────────────
 // A heap-allocated algebraic type for fallible operations.
 // Ok(value) represents success; Err(e) represents failure.
 //

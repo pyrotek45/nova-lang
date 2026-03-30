@@ -1,0 +1,77 @@
+module test_module_system
+
+import super.std.core
+import super.std.math
+
+// ===== TEST 1: Enum variant construction via Type::Variant =====
+// :: is used for enum variants (Type::Variant) and static/associated functions (Type::func)
+// It is NOT for accessing module-level functions like C++ namespaces.
+
+let r = Result::Ok(42) @[B: String]
+let e = Result::Err("bad") @[A: Int]
+println("TEST 1a - Result::Ok: " + r.toString())
+println("TEST 1b - Result::Err: " + e.toString())
+
+let m1 = Maybe::Just(10)
+let m2 = Maybe::Nothing() @[A: Int]
+println("TEST 1c - Maybe::Just: " + m1.toString())
+println("TEST 1d - Maybe::Nothing: " + m2.toString())
+
+// ===== TEST 2: Extension methods (UFCS) =====
+// fn extends funcName(self: Type) defines a method callable as value.funcName()
+println("TEST 2a - isOk: " + Cast::string(r.isOk()))
+println("TEST 2b - unwrap: " + Cast::string(r.unwrap()))
+println("TEST 2c - orDefault: " + Cast::string(e.orDefault(0)))
+
+// ===== TEST 3: Import brings all names into scope =====
+// After `import super.std.core`, we can directly use:
+// - Result, Maybe (enum types)
+// - Box (struct)
+// - Gen (function)
+// - range (function)
+// No module:: prefix needed for these.
+let b = Box(99)
+println("TEST 3a - Box: " + b.toString())
+let g = Gen(5)
+println("TEST 3b - Gen(5) first call: " + Cast::string(g()))
+println("TEST 3c - Gen(5) second call: " + Cast::string(g()))
+
+let r2 = range(3)
+println("TEST 3d - range(3): " + Cast::string(r2))
+
+// ===== TEST 4: Built-in type associated functions via :: =====
+// Int, Float, String, Bool, Char, Cast, Option - built-in types support ::
+println("TEST 4a - Cast::string: " + Cast::string(42))
+println("TEST 4b - Cast::int: " + Cast::string(Cast::int("123").unwrap()))
+println("TEST 4c - Float::pi: " + Cast::string(Float::pi()))
+println("TEST 4d - Cast::float: " + Cast::string(Cast::float(5).unwrap()))
+
+// ===== TEST 5: Extension methods from math module =====
+// `import super.std.math` adds Int::min, Int::max, Int::abs, etc.
+// These are called via UFCS: value.method()
+let x = 5
+println("TEST 5a - Int.min: " + Cast::string(x.min(3)))
+println("TEST 5b - Int.max: " + Cast::string(x.max(10)))
+println("TEST 5c - Int.abs: " + Cast::string((-7).abs()))
+
+// ===== TEST 6: Option built-in type =====
+// Option is built into the VM, Some(x) and None(T) are special forms
+let s = Some(42)
+let n: Option(Int) = None(Int)
+println("TEST 6a - Some isSome: " + Cast::string(s.isSome()))
+println("TEST 6b - None isSome: " + Cast::string(n.isSome()))
+println("TEST 6c - unwrap Some: " + Cast::string(s.unwrap()))
+
+// ===== TEST 7: toMaybe and toResult bridges =====
+let opt1 = Some(100)
+let opt2: Option(Int) = None(Int)
+println("TEST 7a - Some.toMaybe: " + opt1.toMaybe().toString())
+println("TEST 7b - None.toMaybe: " + opt2.toMaybe().toString())
+println("TEST 7c - Some.toResult: " + opt1.toResult("missing").toString())
+println("TEST 7d - None.toResult: " + opt2.toResult("missing").toString())
+
+// ===== TEST 8: Maybe -> Option bridge =====
+let mj = Maybe::Just(77)
+println("TEST 8a - Maybe.toOption isSome: " + Cast::string(mj.toOption().isSome()))
+
+println("ALL MODULE TESTS PASSED")

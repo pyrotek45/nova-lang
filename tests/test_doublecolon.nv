@@ -1,0 +1,40 @@
+module test_doublecolon
+
+import super.std.math
+import super.std.core
+
+// ===== What :: actually means in Nova =====
+// The :: operator is used for:
+// 1. Enum variant construction: Result::Ok(42), Maybe::Just(x)
+// 2. Associated/static functions on types: Cast::string(), Float::pi(), HashMap::default()
+// 3. Module-level function namespacing for fn extends mod(ModuleName) functions
+//
+// It is NOT used as a general namespace accessor like C++ (module::func)
+// Regular functions from imported modules are just called by name.
+
+// Test 1: Can we call math::bin()? (module prefix on regular function)
+// This FAILS because bin() was defined as a plain fn, not fn extends mod(math)
+// So math::bin looks for a function named "math::bin" which doesn't exist.
+// let b = math::bin(10)  // ERROR: Not a valid call: math::bin
+
+// Test 2: Regular call without prefix - this is how you call imported functions
+let b2 = bin(10)
+println("TEST DC2 - bin(10): " + b2)
+
+// Test 3: Enum variant construction
+let r = Result::Ok(42) @[B: String]
+println("TEST DC3 - Result::Ok: " + r.toString())
+
+// Test 4: Built-in type associated function
+println("TEST DC4 - Cast::string: " + Cast::string(99))
+println("TEST DC5 - Float::pi: " + Cast::string(Float::pi()))
+
+// Test 5: fn extends mod(Iter) - module-level static functions
+// Iter::fromRange creates an Iter
+import super.std.iter
+import super.std.list
+let it = Iter::fromRange(0, 5)
+let collected = it.collect()
+println("TEST DC6 - Iter::fromRange: " + Cast::string(collected))
+
+println("ALL DOUBLECOLON TESTS PASSED")
