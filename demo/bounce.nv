@@ -1,0 +1,175 @@
+module bouncing_demo
+
+// ─────────────────────────────────────────────────────────
+// Bouncing Balls Stress Test — wall collisions, gravity toggle
+// Pushes GC with massive numbers of persistent objects
+//
+// Controls:
+//   UP        — add 200 balls
+//   DOWN      — remove 200 balls
+//   LEFT/RIGHT — shrink / grow ball size
+//   SPACE     — toggle gravity
+//   G         — toggle wall-glow effect
+//   C         — cycle background color
+//   R         — reset
+//   Left-click — add 50 balls at mouse position
+// ─────────────────────────────────────────────────────────
+
+import super.std.math
+
+let WIDTH  = 1200
+let HEIGHT = 800
+
+let gravityOn = true
+let glowOn    = false
+let bgIndex   = 0
+let ballSize  = 4
+
+raylib::init("Nova Bounce Stress", WIDTH, HEIGHT, 60)
+
+struct Ball {
+    x:  Int,
+    y:  Int,
+    vx: Int,
+    vy: Int,
+    r:  Int,
+    g:  Int,
+    b:  Int,
+    rad: Int,
+}
+
+let balls = []: Ball
+
+fn addBalls(count: Int, cx: Int, cy: Int) {
+    for i in 0..count {
+        let vx = random(-8, 8)
+        let vy = random(-10, 2)
+        let r = random(60, 255)
+        let g = random(60, 255)
+        let b = random(60, 255)
+        let rad = ballSize + random(-1, 1)
+        if rad < 1 { rad = 1 }
+        balls.push(Ball {
+            x: cx, y: cy,
+            vx: vx, vy: vy,
+            r: r, g: g, b: b,
+            rad: rad,
+        })
+    }
+}
+
+fn removeBalls(count: Int) {
+    for i in 0..count {
+        if balls.len() > 0 {
+            balls.remove(balls.len() - 1)
+        }
+    }
+}
+
+fn updateBalls() {
+    for b in balls {
+        // Gravity
+        if gravityOn {
+            b.vy += 1
+        }
+
+        b.x += b.vx
+        b.y += b.vy
+
+        // Wall bouncing with energy loss
+        if b.x - b.rad < 0 {
+            b.x = b.rad
+            b.vx = -(b.vx * 9) / 10
+        }
+        if b.x + b.rad > WIDTH {
+            b.x = WIDTH - b.rad
+            b.vx = -(b.vx * 9) / 10
+        }
+        if b.y - b.rad < 0 {
+            b.y = b.rad
+            b.vy = -(b.vy * 9) / 10
+        }
+        if b.y + b.rad > HEIGHT {
+            b.y = HEIGHT - b.rad
+            b.vy = -(b.vy * 9) / 10
+            // Add a little horizontal drift on floor bounce
+            b.vx += random(-1, 1)
+        }
+
+        // Draw the ball
+        raylib::drawCircle(b.x, b.y, b.rad, (b.r, b.g, b.b))
+
+        // Optional glow (draws a larger dim circle under)
+        if glowOn {
+            let gr = b.r / 4
+            let gg = b.g / 4
+            let gb = b.b / 4
+            raylib::drawCircle(b.x, b.y, b.rad + 3, (gr, gg, gb))
+        }
+    }
+}
+
+fn getBgColor() -> (Int, Int, Int) {
+    if bgIndex == 0 { return (10, 10, 15) }
+    if bgIndex == 1 { return (15, 5, 20) }
+    if bgIndex == 2 { return (5, 15, 10) }
+    if bgIndex == 3 { return (20, 15, 5) }
+    return (10, 10, 15)
+}
+
+// Start with some balls
+addBalls(200, WIDTH / 2, HEIGHT / 4)
+
+// ── Main loop ───────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear(getBgColor())
+
+    let mouse = raylib::mousePosition()
+    let mx = mouse[0]
+    let my = mouse[1]
+
+    // ── Input ───────────────────────────────────────────
+    if raylib::isKeyPressed("KEY_UP") {
+        addBalls(200, random(100, WIDTH - 100), random(50, HEIGHT / 2))
+    }
+    if raylib::isKeyPressed("KEY_DOWN") {
+        removeBalls(200)
+    }
+    if raylib::isKeyPressed("KEY_RIGHT") {
+        ballSize += 1
+        if ballSize > 20 { ballSize = 20 }
+    }
+    if raylib::isKeyPressed("KEY_LEFT") {
+        ballSize -= 1
+        if ballSize < 1 { ballSize = 1 }
+    }
+    if raylib::isKeyPressed("KEY_SPACE") {
+        gravityOn = !gravityOn
+    }
+    if raylib::isKeyPressed("KEY_G") {
+        glowOn = !glowOn
+    }
+    if raylib::isKeyPressed("KEY_C") {
+        bgIndex += 1
+        if bgIndex > 3 { bgIndex = 0 }
+    }
+    if raylib::isKeyPressed("KEY_R") {
+        balls = []: Ball
+    }
+    if raylib::isMousePressed("Left") {
+        addBalls(50, mx, my)
+    }
+
+    // ── Update + Draw ───────────────────────────────────
+    updateBalls()
+
+    // ── HUD ─────────────────────────────────────────────
+    let info1 = "Balls: " + Cast::string(balls.len())
+    let info2 = "Size: " + Cast::string(ballSize) + "  Gravity: " + Cast::string(gravityOn) + "  Glow: " + Cast::string(glowOn)
+    let help  = "[Up] +200  [Down] -200  [Click] +50  [Left/Right] Size  [Space] Gravity  [G] Glow  [C] BG  [R] Reset"
+
+    raylib::drawText(info1, 10, 10, 20, (200, 200, 200))
+    raylib::drawFPS(10, 36)
+    raylib::drawText(info2, 10, 62, 18, (180, 180, 100))
+    raylib::drawText(help, 10, HEIGHT - 30, 16, (120, 120, 120))
+}
