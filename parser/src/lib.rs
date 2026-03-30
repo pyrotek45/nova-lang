@@ -633,12 +633,13 @@ impl Parser {
         {
             //println!("captured id {}", identifier);
             let pos = self.get_current_token_position();
-            self.typechecker
+            if let Some(cap) = self
+                .typechecker
                 .environment
                 .captured
                 .last_mut()
-                .unwrap()
-                .insert(
+            {
+                cap.insert(
                     identifier.clone(),
                     Symbol {
                         id: identifier.clone(),
@@ -647,6 +648,7 @@ impl Parser {
                         kind: SymbolKind::Captured,
                     },
                 );
+            }
             self.handle_function_call(
                 function_type,
                 function_id,
@@ -763,14 +765,13 @@ impl Parser {
         // check to see if type is generic and then checkt to see if it is live and if it is not live, throw an error
         let generic_list = TypeChecker::collect_generics(std::slice::from_ref(&ttype));
         for generic in generic_list.items {
-            if !self
+            let is_live = self
                 .typechecker
                 .environment
                 .live_generics
                 .last()
-                .unwrap()
-                .has(&generic)
-            {
+                .map_or(false, |lg| lg.has(&generic));
+            if !is_live {
                 return Err(Box::new(NovaError::SimpleTypeError {
                     msg: format!("E1 Generic Type '{generic}' is not live").into(),
                     position: pos,
@@ -802,14 +803,13 @@ impl Parser {
             let ttype = self.ttype()?;
             let generic_list = TypeChecker::collect_generics(std::slice::from_ref(&ttype));
             for generic in generic_list.items {
-                if !self
+                let is_live = self
                     .typechecker
                     .environment
                     .live_generics
                     .last()
-                    .unwrap()
-                    .has(&generic)
-                {
+                    .map_or(false, |lg| lg.has(&generic));
+                if !is_live {
                     return Err(Box::new(NovaError::SimpleTypeError {
                         msg: format!("E1 Generic Type '{}' is not live", generic).into(),
                         position: pos,
@@ -889,12 +889,13 @@ impl Parser {
         {
             //println!("captured id: call {}", identifier);
             let pos = self.get_current_token_position();
-            self.typechecker
+            if let Some(cap) = self
+                .typechecker
                 .environment
                 .captured
                 .last_mut()
-                .unwrap()
-                .insert(
+            {
+                cap.insert(
                     identifier.clone(),
                     Symbol {
                         id: identifier.clone(),
@@ -903,6 +904,7 @@ impl Parser {
                         kind: SymbolKind::Captured,
                     },
                 );
+            }
             self.handle_function_call(
                 function_type,
                 function_id,
@@ -954,7 +956,11 @@ impl Parser {
                     .get(type_name)
                 {
                     let TType::Custom { type_params, .. } = lhs.get_type() else {
-                        panic!("not a custom type")
+                        return Err(self.generate_error_with_pos(
+                            "Expected a custom type with type parameters",
+                            format!("got {}", lhs.get_type()),
+                            pos,
+                        ));
                     };
                     fields
                         .iter()
@@ -1449,12 +1455,13 @@ impl Parser {
         } else if let Some((ttype, _, kind)) =
             self.typechecker.environment.get_type_capture(&identifier)
         {
-            self.typechecker
+            if let Some(cap) = self
+                .typechecker
                 .environment
                 .captured
                 .last_mut()
-                .unwrap()
-                .insert(
+            {
+                cap.insert(
                     identifier.clone(),
                     Symbol {
                         id: identifier.clone(),
@@ -1463,6 +1470,7 @@ impl Parser {
                         kind: SymbolKind::Captured,
                     },
                 );
+            }
             self.typechecker.environment.insert_symbol(
                 &identifier,
                 ttype.clone(),
@@ -1499,12 +1507,13 @@ impl Parser {
             //     "environment {:?}",
             //     self.typechecker.environment.captured.last().unwrap()
             // );
-            self.typechecker
+            if let Some(cap) = self
+                .typechecker
                 .environment
                 .captured
                 .last_mut()
-                .unwrap()
-                .insert(
+            {
+                cap.insert(
                     identifier.clone(),
                     Symbol {
                         id: identifier.clone(),
@@ -1513,6 +1522,7 @@ impl Parser {
                         kind: SymbolKind::Captured,
                     },
                 );
+            }
             self.typechecker.environment.insert_symbol(
                 &identifier,
                 ttype.clone(),
@@ -1743,22 +1753,21 @@ impl Parser {
                     .environment
                     .captured
                     .last()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.0.clone())
-                    .collect();
+                    .map(|cap| cap.iter().map(|v| v.0.clone()).collect())
+                    .unwrap_or_default();
 
                 self.typechecker.environment.pop_scope();
 
                 for c in captured.iter() {
                     if let Some(mc) = self.typechecker.environment.get_type_capture(&c.clone()) {
                         let pos = self.get_current_token_position();
-                        self.typechecker
+                        if let Some(cap) = self
+                            .typechecker
                             .environment
                             .captured
                             .last_mut()
-                            .unwrap()
-                            .insert(
+                        {
+                            cap.insert(
                                 c.clone(),
                                 Symbol {
                                     id: mc.1,
@@ -1767,6 +1776,7 @@ impl Parser {
                                     kind: mc.2,
                                 },
                             );
+                        }
                     }
                 }
 
@@ -1775,10 +1785,8 @@ impl Parser {
                     .environment
                     .captured
                     .last()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.0.clone())
-                    .collect();
+                    .map(|cap| cap.iter().map(|v| v.0.clone()).collect())
+                    .unwrap_or_default();
 
                 for arg in parameters.iter() {
                     let name = arg.1.clone();
@@ -5349,10 +5357,8 @@ impl Parser {
             .environment
             .captured
             .last()
-            .unwrap()
-            .iter()
-            .map(|v| v.0.clone())
-            .collect();
+            .map(|cap| cap.iter().map(|v| v.0.clone()).collect())
+            .unwrap_or_default();
 
         self.typechecker.environment.pop_scope();
         self.typechecker.environment.live_generics.pop();
@@ -5360,12 +5366,13 @@ impl Parser {
             if let Some(mc) = self.typechecker.environment.get_type_capture(&c.clone()) {
                 let pos = self.get_current_token_position();
 
-                self.typechecker
+                if let Some(cap) = self
+                    .typechecker
                     .environment
                     .captured
                     .last_mut()
-                    .unwrap()
-                    .insert(
+                {
+                    cap.insert(
                         c.clone(),
                         Symbol {
                             id: mc.1,
@@ -5374,6 +5381,7 @@ impl Parser {
                             kind: mc.2,
                         },
                     );
+                }
             }
         }
 
@@ -5382,10 +5390,8 @@ impl Parser {
             .environment
             .captured
             .last()
-            .unwrap()
-            .iter()
-            .map(|v| v.0.clone())
-            .collect();
+            .map(|cap| cap.iter().map(|v| v.0.clone()).collect())
+            .unwrap_or_default();
         for arg in parameters.iter() {
             let name = arg.1.clone();
             // check if name is in captured
@@ -5397,15 +5403,13 @@ impl Parser {
         }
 
         for dc in captured.iter() {
-            if let Some(v) = self.typechecker.environment.values.last().unwrap().get(dc) {
-                if let SymbolKind::Captured = v.kind {
-                } else {
-                    self.typechecker
-                        .environment
-                        .captured
-                        .last_mut()
-                        .unwrap()
-                        .remove(dc);
+            if let Some(scope) = self.typechecker.environment.values.last() {
+                if let Some(v) = scope.get(dc) {
+                    if !matches!(v.kind, SymbolKind::Captured) {
+                        if let Some(cap) = self.typechecker.environment.captured.last_mut() {
+                            cap.remove(dc);
+                        }
+                    }
                 }
             }
         }

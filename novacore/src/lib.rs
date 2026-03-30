@@ -66,7 +66,10 @@ impl NovaCore {
                 let compiler_id = {
                     let types = match function_type.clone() {
                         TType::Function { parameters, .. } => parameters,
-                        _ => panic!("Expected function type"),
+                        _ => {
+                            debug_assert!(false, "add_function called with non-function type");
+                            return;
+                        }
                     };
                     generate_unique_string(function_id, &types)
                 };
@@ -1767,15 +1770,11 @@ impl NovaCore {
         self.assembler.assemble();
         self.vm.runtime_errors_table = self.assembler.runtime_error_table.clone();
         self.vm.state.program = self.assembler.output.clone();
-        self.vm.state.current_dir = PathBuf::from(
-            self.filepath
-                .as_ref()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        );
+        if let Some(fp) = self.filepath.as_ref() {
+            if let Some(parent) = fp.parent() {
+                self.vm.state.current_dir = parent.to_path_buf();
+            }
+        }
         Ok(())
     }
 

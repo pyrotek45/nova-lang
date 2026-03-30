@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::HashMap;
 
 use common::{
@@ -293,7 +292,8 @@ impl Assembler {
                 self.output[(*replace as usize) + 2] = t[2];
                 self.output[(*replace as usize) + 3] = t[3];
             } else {
-                panic!("Assembly ERROR: No label {target} exist, exiting");
+                eprintln!("Assembly ERROR: No label {target} exists, exiting");
+                std::process::exit(1);
             }
         }
     }
