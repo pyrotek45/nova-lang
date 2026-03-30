@@ -20,11 +20,20 @@ let WIDTH  = 1200
 let HEIGHT = 800
 let MAX_STARS = 30000
 
-let spawnRate    = 8       // stars per frame
-let gravStrength = 3       // gravity multiplier
-let trailMode    = false
-
 raylib::init("Nova Galaxy", WIDTH, HEIGHT, 60)
+
+// Wrap mutable settings in a struct so closures share one reference
+struct Settings {
+    spawnRate:    Int,
+    gravStrength: Int,
+    trailMode:    Bool,
+}
+
+let cfg = Settings {
+    spawnRate:    8,
+    gravStrength: 3,
+    trailMode:    false,
+}
 
 struct Star {
     x:  Int,
@@ -103,7 +112,7 @@ fn updateStars() {
             if dist < 100 { dist = 100 }  // avoid division issues
 
             // Simple integer gravity: direction * strength / distance
-            let force = (w.mass * gravStrength) / (dist / 100 + 1)
+            let force = (w.mass * cfg.gravStrength) / (dist / 100 + 1)
             if force < 1 { force = 1 }
 
             if dx > 0 { s.vx += force }
@@ -152,7 +161,7 @@ fn drawWells() {
 
 // ── Main loop ───────────────────────────────────────────
 while raylib::rendering() {
-    if !trailMode {
+    if !cfg.trailMode {
         raylib::clear((2, 2, 8))
     } else {
         // Dim overlay for trails
@@ -176,23 +185,23 @@ while raylib::rendering() {
     }
 
     if raylib::isKeyPressed("KEY_UP") {
-        spawnRate += 4
-        if spawnRate > 100 { spawnRate = 100 }
+        cfg.spawnRate += 4
+        if cfg.spawnRate > 100 { cfg.spawnRate = 100 }
     }
     if raylib::isKeyPressed("KEY_DOWN") {
-        spawnRate -= 4
-        if spawnRate < 1 { spawnRate = 1 }
+        cfg.spawnRate -= 4
+        if cfg.spawnRate < 1 { cfg.spawnRate = 1 }
     }
     if raylib::isKeyPressed("KEY_RIGHT") {
-        gravStrength += 1
-        if gravStrength > 20 { gravStrength = 20 }
+        cfg.gravStrength += 1
+        if cfg.gravStrength > 20 { cfg.gravStrength = 20 }
     }
     if raylib::isKeyPressed("KEY_LEFT") {
-        gravStrength -= 1
-        if gravStrength < 1 { gravStrength = 1 }
+        cfg.gravStrength -= 1
+        if cfg.gravStrength < 1 { cfg.gravStrength = 1 }
     }
     if raylib::isKeyPressed("KEY_SPACE") {
-        trailMode = !trailMode
+        cfg.trailMode = !cfg.trailMode
     }
     if raylib::isKeyPressed("KEY_R") {
         stars = []: Star
@@ -204,14 +213,14 @@ while raylib::rendering() {
     }
 
     // ── Spawn + Update ──────────────────────────────────
-    spawnStars(spawnRate)
+    spawnStars(cfg.spawnRate)
     updateStars()
     drawWells()
 
     // ── HUD ─────────────────────────────────────────────
     let info1 = "Stars: " + Cast::string(stars.len()) + "  Wells: " + Cast::string(wells.len())
-    let info2 = "Spawn: " + Cast::string(spawnRate) + "/frame  Gravity: " + Cast::string(gravStrength)
-    let info3 = "Trails: " + Cast::string(trailMode)
+    let info2 = "Spawn: " + Cast::string(cfg.spawnRate) + "/frame  Gravity: " + Cast::string(cfg.gravStrength)
+    let info3 = "Trails: " + Cast::string(cfg.trailMode)
     let help  = "[Click] Add Well  [Right] Remove  [Up/Down] Spawn  [Left/Right] Gravity  [Space] Trails  [G] Burst  [R] Reset"
 
     raylib::drawText(info1, 10, 10, 20, (200, 200, 200))

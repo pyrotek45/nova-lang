@@ -18,13 +18,22 @@ let WIDTH  = 1200
 let HEIGHT = 800
 let GRAVITY = 1
 
-// Tunable parameters
-let explosionSize = 120     // particles per explosion
-let rocketSpeed   = 12      // how fast rockets climb
-let autoLaunch    = false   // continuous launching
-let autoTimer     = 0
-
 raylib::init("Nova Fireworks", WIDTH, HEIGHT, 60)
+
+// Wrap mutable settings in a struct so closures share one reference
+struct Settings {
+    explosionSize: Int,
+    rocketSpeed:   Int,
+    autoLaunch:    Bool,
+    autoTimer:     Int,
+}
+
+let cfg = Settings {
+    explosionSize: 120,
+    rocketSpeed:   12,
+    autoLaunch:    false,
+    autoTimer:     0,
+}
 
 // ── Rocket: flies upward then explodes ──────────────────
 struct Rocket {
@@ -60,14 +69,14 @@ fn launchRocket(tx: Int, ty: Int) {
     rockets.push(Rocket {
         x: tx,
         y: HEIGHT,
-        vy: -rocketSpeed,
+        vy: -cfg.rocketSpeed,
         targetY: ty,
         r: r, g: g, b: b,
     })
 }
 
 fn explode(rx: Int, ry: Int, cr: Int, cg: Int, cb: Int) {
-    for i in 0..explosionSize {
+    for i in 0..cfg.explosionSize {
         let vx = random(-10, 10)
         let vy = random(-10, 10)
         let life = random(20, 55)
@@ -152,23 +161,23 @@ while raylib::rendering() {
     }
 
     if raylib::isKeyPressed("KEY_UP") {
-        explosionSize += 20
-        if explosionSize > 500 { explosionSize = 500 }
+        cfg.explosionSize += 20
+        if cfg.explosionSize > 500 { cfg.explosionSize = 500 }
     }
     if raylib::isKeyPressed("KEY_DOWN") {
-        explosionSize -= 20
-        if explosionSize < 10 { explosionSize = 10 }
+        cfg.explosionSize -= 20
+        if cfg.explosionSize < 10 { cfg.explosionSize = 10 }
     }
     if raylib::isKeyPressed("KEY_RIGHT") {
-        rocketSpeed += 2
-        if rocketSpeed > 30 { rocketSpeed = 30 }
+        cfg.rocketSpeed += 2
+        if cfg.rocketSpeed > 30 { cfg.rocketSpeed = 30 }
     }
     if raylib::isKeyPressed("KEY_LEFT") {
-        rocketSpeed -= 2
-        if rocketSpeed < 4 { rocketSpeed = 4 }
+        cfg.rocketSpeed -= 2
+        if cfg.rocketSpeed < 4 { cfg.rocketSpeed = 4 }
     }
     if raylib::isKeyPressed("KEY_SPACE") {
-        autoLaunch = !autoLaunch
+        cfg.autoLaunch = !cfg.autoLaunch
     }
     if raylib::isKeyPressed("KEY_R") {
         sparks  = []: Spark
@@ -176,10 +185,10 @@ while raylib::rendering() {
     }
 
     // Auto-launch mode
-    if autoLaunch {
-        autoTimer += 1
-        if autoTimer >= 8 {
-            autoTimer = 0
+    if cfg.autoLaunch {
+        cfg.autoTimer += 1
+        if cfg.autoTimer >= 8 {
+            cfg.autoTimer = 0
             let ax = random(100, WIDTH - 100)
             let ay = random(80, HEIGHT / 2)
             launchRocket(ax, ay)
@@ -193,8 +202,8 @@ while raylib::rendering() {
     // ── HUD ─────────────────────────────────────────────
     let total = rockets.len() + sparks.len()
     let info1 = "Particles: " + Cast::string(total)
-    let info2 = "Explosion: " + Cast::string(explosionSize) + "  Speed: " + Cast::string(rocketSpeed)
-    let info3 = "Auto: " + Cast::string(autoLaunch)
+    let info2 = "Explosion: " + Cast::string(cfg.explosionSize) + "  Speed: " + Cast::string(cfg.rocketSpeed)
+    let info3 = "Auto: " + Cast::string(cfg.autoLaunch)
     let help  = "[Click] Launch  [Up/Down] Size  [Left/Right] Speed  [Space] Auto  [R] Reset"
 
     raylib::drawText(info1, 10, 10, 20, (200, 200, 200))
