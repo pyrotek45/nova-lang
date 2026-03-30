@@ -1,0 +1,384 @@
+module guide_audit
+import super.std.core
+import super.std.list
+
+// === §8 Collision Detection ===
+
+fn rectsOverlap(ax: Int, ay: Int, aw: Int, ah: Int,
+                bx: Int, by: Int, bw: Int, bh: Int) -> Bool {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+fn circlesOverlap(x1: Int, y1: Int, r1: Int, x2: Int, y2: Int, r2: Int) -> Bool {
+    let dx = x1 - x2
+    let dy = y1 - y2
+    let dist_sq = dx * dx + dy * dy
+    let radii = r1 + r2
+    return dist_sq < radii * radii
+}
+
+fn pointInRect(px: Int, py: Int, rx: Int, ry: Int, rw: Int, rh: Int) -> Bool {
+    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh
+}
+
+assert(rectsOverlap(0, 0, 10, 10, 5, 5, 10, 10), "rects overlap")
+assert(!rectsOverlap(0, 0, 10, 10, 100, 100, 10, 10), "rects don't overlap")
+assert(circlesOverlap(0, 0, 10, 5, 0, 10), "circles overlap")
+assert(!circlesOverlap(0, 0, 5, 100, 0, 5), "circles don't overlap")
+assert(pointInRect(5, 5, 0, 0, 10, 10), "point in rect")
+assert(!pointInRect(50, 50, 0, 0, 10, 10), "point outside rect")
+println("§8 collision: OK")
+
+// === §12 Entity patterns - Bullet struct + extends ===
+
+struct Bullet {
+    x: Int,
+    y: Int,
+    speed: Int,
+    active: Bool,
+}
+
+fn extends updateBullet(b: Bullet) {
+    b.y -= b.speed
+    if b.y < 0 { b.active = false }
+}
+
+let b = Bullet { x: 100, y: 50, speed: 8, active: true }
+b.updateBullet()
+assert(b.y == 42, "bullet moved")
+assert(b.active, "bullet still active")
+
+let b2 = Bullet { x: 100, y: 5, speed: 8, active: true }
+b2.updateBullet()
+assert(!b2.active, "bullet deactivated off screen")
+println("§12 bullet pattern: OK")
+
+// === §12 Timer pattern ===
+
+struct Timer {
+    remaining: Int,
+    interval: Int,
+}
+
+fn TimerNew(ms: Int) -> Timer {
+    return Timer { remaining: ms, interval: ms }
+}
+
+fn extends tick(t: Timer, dt_ms: Int) -> Bool {
+    t.remaining -= dt_ms
+    if t.remaining <= 0 {
+        t.remaining = t.interval
+        return true
+    }
+    return false
+}
+
+let spawn_timer = TimerNew(1000)
+assert(!spawn_timer.tick(400), "timer not ready at 400")
+assert(!spawn_timer.tick(400), "timer not ready at 800")
+assert(spawn_timer.tick(400), "timer fires at 1200")
+assert(spawn_timer.remaining == 1000, "timer reset")
+println("§12 timer: OK")
+
+// === §16 Entity system - enum tag + collision ===
+
+enum EntityKind {
+    Player,
+    Enemy:  Int,
+    Pickup: Int,
+    BulletKind,
+}
+
+struct Entity {
+    x: Int, y: Int, w: Int, h: Int,
+    vx: Int, vy: Int,
+    kind: EntityKind,
+    active: Bool,
+}
+
+fn mkPlayer(x: Int, y: Int) -> Entity {
+    return Entity { x: x, y: y, w: 32, h: 32, vx: 0, vy: 0,
+                    kind: EntityKind::Player(), active: true }
+}
+
+fn mkEnemy(x: Int, y: Int, hp: Int) -> Entity {
+    return Entity { x: x, y: y, w: 24, h: 24, vx: -2, vy: 0,
+                    kind: EntityKind::Enemy(hp), active: true }
+}
+
+fn mkPickup(x: Int, y: Int, pts: Int) -> Entity {
+    return Entity { x: x, y: y, w: 16, h: 16, vx: 0, vy: 0,
+                    kind: EntityKind::Pickup(pts), active: true }
+}
+
+fn mkBulletEntity(x: Int, y: Int) -> Entity {
+    return Entity { x: x, y: y, w: 4, h: 10, vx: 0, vy: -12,
+                    kind: EntityKind::BulletKind(), active: true }
+}
+
+fn extends moveE(e: Entity) {
+    e.x += e.vx
+    e.y += e.vy
+}
+
+fn extends keepInBounds(e: Entity, w: Int, h: Int) {
+    if e.x < 0        { e.x = 0 }
+    if e.y < 0        { e.y = 0 }
+    if e.x + e.w > w  { e.x = w - e.w }
+    if e.y + e.h > h  { e.y = h - e.h }
+}
+
+fn extends overlaps(a: Entity, b: Entity) -> Bool {
+    return rectsOverlap(a.x, a.y, a.w, a.h, b.x, b.y, b.w, b.h)
+}
+
+let player = mkPlayer(100, 100)
+let enemy = mkEnemy(110, 110, 2)
+assert(player.overlaps(enemy), "player overlaps enemy")
+
+let far_enemy = mkEnemy(500, 500, 1)
+assert(!player.overlaps(far_enemy), "player doesn't overlap far enemy")
+
+// Collision response via match
+let score = Box(0)
+
+fn handleCollision(a: Entity, b: Entity) {
+    match a.kind {
+        BulletKind() => {
+            match b.kind {
+                Enemy(hp) => {
+                    a.active = false
+                    if hp <= 1 { b.active = false }
+                    else { b.kind = EntityKind::Enemy(hp - 1) }
+                    score.value += 10
+                }
+                _ => { }
+            }
+        }
+        Player() => {
+            match b.kind {
+                Pickup(pts) => {
+                    score.value += pts
+                    b.active = false
+                }
+                _ => { }
+            }
+        }
+        _ => { }
+    }
+}
+
+let bullet = mkBulletEntity(110, 110)
+handleCollision(bullet, enemy)
+assert(!bullet.active, "bullet dies on hit")
+assert(score.value == 10, "score incremented")
+// enemy had hp 2, now hp 1
+assert(enemy.active, "enemy survived with hp > 1")
+
+let pickup = mkPickup(100, 100, 50)
+handleCollision(player, pickup)
+assert(score.value == 60, "pickup collected")
+assert(!pickup.active, "pickup consumed")
+
+println("§16 entity system: OK")
+
+// === §19 Screen stack ===
+
+enum Screen {
+    MainMenu,
+    Playing,
+    Paused,
+    GameOver: Int,
+    Options,
+}
+
+let stack = []: Screen
+
+fn pushScreen(s: Screen) { stack.push(s) }
+
+fn popScreen() {
+    if stack.len() > 0 { stack.pop() }
+}
+
+fn currentScreen() -> Option(Screen) {
+    if stack.len() == 0 { return None(Screen) }
+    return Some(stack[stack.len() - 1])
+}
+
+pushScreen(Screen::MainMenu())
+pushScreen(Screen::Playing())
+pushScreen(Screen::Paused())
+assert(stack.len() == 3, "3 screens")
+popScreen()
+assert(stack.len() == 2, "popped paused")
+let cur = currentScreen()
+assert(cur.isSome(), "have a screen")
+pushScreen(Screen::GameOver(42))
+assert(stack.len() == 3, "pushed game over")
+
+println("§19 screen stack: OK")
+
+// === §20 Camera ===
+
+struct Camera {
+    x:    Int,
+    y:    Int,
+    zoom: Int,
+}
+
+fn mkCamera(x: Int, y: Int) -> Camera {
+    return Camera { x: x, y: y, zoom: 100 }
+}
+
+fn extends worldToScreen(cam: Camera, wx: Int, wy: Int) -> (Int, Int) {
+    let sx = (wx - cam.x) * cam.zoom / 100
+    let sy = (wy - cam.y) * cam.zoom / 100
+    return (sx, sy)
+}
+
+fn extends screenToWorld(cam: Camera, sx: Int, sy: Int) -> (Int, Int) {
+    let wx = sx * 100 / cam.zoom + cam.x
+    let wy = sy * 100 / cam.zoom + cam.y
+    return (wx, wy)
+}
+
+let cam = mkCamera(100, 50)
+let sp = cam.worldToScreen(200, 150)
+assert(sp[0] == 100, "cam wts x")
+assert(sp[1] == 100, "cam wts y")
+let wp = cam.screenToWorld(sp[0], sp[1])
+assert(wp[0] == 200, "cam stw x roundtrip")
+assert(wp[1] == 150, "cam stw y roundtrip")
+
+// Zoom 2x
+let cam2 = Camera { x: 0, y: 0, zoom: 200 }
+let sp2 = cam2.worldToScreen(50, 50)
+assert(sp2[0] == 100, "2x zoom x")
+assert(sp2[1] == 100, "2x zoom y")
+
+println("§20 camera: OK")
+
+// === §21 Cooldown ===
+
+struct Cooldown {
+    remaining: Int,
+    duration:  Int,
+}
+
+fn mkCooldown(durationMs: Int) -> Cooldown {
+    return Cooldown { remaining: 0, duration: durationMs }
+}
+
+fn extends ready(c: Cooldown) -> Bool { return c.remaining <= 0 }
+
+fn extends useCd(c: Cooldown) {
+    if c.remaining <= 0 { c.remaining = c.duration }
+}
+
+fn extends tickCd(c: Cooldown, dt: Int) {
+    if c.remaining > 0 { c.remaining = c.remaining - dt }
+}
+
+let gun = mkCooldown(500)
+assert(gun.ready(), "initially ready")
+gun.useCd()
+assert(!gun.ready(), "not ready after use")
+gun.tickCd(300)
+assert(!gun.ready(), "still not ready")
+gun.tickCd(200)
+assert(gun.ready(), "ready after full cooldown")
+
+println("§21 cooldown: OK")
+
+// === §21 Object Pool ===
+
+struct PoolBullet {
+    x: Int, y: Int, vx: Int, vy: Int, active: Int,
+}
+
+let bulletPool = []: PoolBullet
+
+fn initPool(size: Int) {
+    let i = Box(0)
+    while i.value < size {
+        bulletPool.push(PoolBullet { x: 0, y: 0, vx: 0, vy: -8, active: 0 })
+        i.value = i.value + 1
+    }
+}
+
+fn spawnPoolBullet(px: Int, py: Int, vx: Int, vy: Int) {
+    for b in bulletPool {
+        if b.active == 0 {
+            b.x = px
+            b.y = py
+            b.vx = vx
+            b.vy = vy
+            b.active = 1
+            return
+        }
+    }
+}
+
+initPool(10)
+assert(bulletPool.len() == 10, "pool initialized")
+spawnPoolBullet(100, 200, 0, -8)
+spawnPoolBullet(150, 200, 0, -8)
+let active_count = Box(0)
+for pb in bulletPool { if pb.active == 1 { active_count.value = active_count.value + 1 } }
+assert(active_count.value == 2, "two pool bullets active")
+
+println("§21 object pool: OK")
+
+// === §18 Input action map (fn field + -> dispatch) ===
+
+struct Action {
+    name:  String,
+    check: fn(Action) -> Bool,
+}
+
+let key_left  = Box(0)
+let key_right = Box(0)
+let key_fire  = Box(0)
+
+let actions = [
+    Action { name: "move_left",  check: fn(self: Action) -> Bool { return key_left.value  == 1 } },
+    Action { name: "move_right", check: fn(self: Action) -> Bool { return key_right.value == 1 } },
+    Action { name: "fire",       check: fn(self: Action) -> Bool { return key_fire.value  == 1 } },
+]: Action
+
+fn isPressed(name: String) -> Bool {
+    for a in actions {
+        if a.name == name {
+            return a->check()
+        }
+    }
+    return false
+}
+
+key_left.value = 1
+assert(isPressed("move_left"), "left pressed")
+assert(!isPressed("move_right"), "right not pressed")
+assert(!isPressed("fire"), "fire not pressed")
+key_left.value = 0
+key_fire.value = 1
+assert(isPressed("fire"), "fire pressed after rebind")
+
+// Rebind test
+fn rebind(name: String, newCheck: fn(Action) -> Bool) {
+    for a in actions {
+        if a.name == name {
+            a.check = newCheck
+            return
+        }
+    }
+}
+
+let alt_fire = Box(0)
+rebind("fire", fn(self: Action) -> Bool { return alt_fire.value == 1 })
+assert(!isPressed("fire"), "fire off after rebind")
+alt_fire.value = 1
+assert(isPressed("fire"), "fire on with alt key")
+
+println("§18 input abstraction: OK")
+
+println("PASS: guide_audit")

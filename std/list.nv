@@ -1,8 +1,27 @@
+// ============================================================
+// std/list.nv -- List extension methods
+// ============================================================
+//
+// Adds a comprehensive set of functional-style operations to Nova's
+// built-in list type. Import with:
+//
+//   import super.std.list
+//
+// All functions use UFCS (called with dot notation on a list):
+//   [1,2,3].map(|x: Int| x * 2)   // [2, 4, 6]
+//   [3,1,2].quicksort()            // [1, 2, 3]
+//
+// Native list operations (no import needed):
+//   .len()  .push(x)  .remove(i)  .set(i, x)  .clear()
+//   .pop()  .insert(i, x)  .chars()  .string()
+//
+// ============================================================
+
 module List
 
 import core
 
-// clear is now a native function (List::clear)
+// ── Equality ────────────────────────────────────────────────────────
 
 fn extends __eq__(a: [$T], b: [$T]) -> Bool {
     if a.len() != b.len() {
@@ -26,6 +45,8 @@ fn extends dropIndex(list: [$T], index: Int) -> [$T] {
     return result
 }
 
+// ── Building and modifying ──────────────────────────────────────────
+
 fn extends fill(list: [$A], input: $A, amount: Int) -> [$A] {
     for let i = 0; i < amount; i += 1 {
         list.push(input)
@@ -40,6 +61,8 @@ fn extends map(list: [$A], f: fn($A) -> $B) -> [$B] {
     }
     return result
 }
+
+// ── Transforming (map, filter, flatmap) ─────────────────────────────
 
 fn extends flatmap(list: [$T], f: fn($T) -> [$U]) -> [$U] {
     let result = []:$U
@@ -67,6 +90,8 @@ fn extends foreach(list: [$A], f: fn($A)) {
     }
 }
 
+// ── Searching and querying ──────────────────────────────────────────
+
 fn extends indexOf(arr: [$K], k: $K) -> Int {
     let index = 0
     for let i = 0; i < arr.len(); i += 1 {
@@ -77,6 +102,8 @@ fn extends indexOf(arr: [$K], k: $K) -> Int {
     }
     return -1;
 }
+
+// ── Flattening and reducing ─────────────────────────────────────────
 
 fn extends flatten(input: [[$T]]) -> [$T] {
     let result = []: $T
@@ -96,6 +123,8 @@ fn extends reduce(input: [$T], f: fn($A,$T,Int) -> $A, initial: $A) -> $A {
     return result
 }
 
+
+// ── Splitting and chunking ──────────────────────────────────────────
 
 fn extends split(input: [$T], delim: $T) -> [[$T]] {
     let result = []: [$T]
@@ -148,6 +177,8 @@ fn extends splitWhen(input: [$T], f: fn($T) -> Bool) -> [[$T]] {
     return result
 }
 
+// ── Sorting ─────────────────────────────────────────────────────────
+
 fn extends sortWith(input: [$T], f: fn($T,$T) -> Bool) -> [$T] {
     let result = input
     for let i = 0; i < result.len(); i += 1 {
@@ -174,6 +205,8 @@ fn extends bubblesort(input: [Int]) -> [Int] {
     }
     return result
 }
+
+// ── Combining ───────────────────────────────────────────────────────
 
 fn extends append(input: [$T], arraytwo: [$T]) -> [$T] {
   for let i = 0; i < arraytwo.len(); i += 1 {
@@ -221,6 +254,8 @@ fn extends quicksort(array: [Int]) -> [Int] {
   return left.append(equal).append(right)
 }
 
+// ── Folding ─────────────────────────────────────────────────────────
+
 fn extends foldl(input: [$T], f: fn($T,$T) -> $T) -> $T {
     let result = clone(input[0])
     for let i = 1; i < input.len(); i += 1 {
@@ -236,6 +271,8 @@ fn extends foldr(input: [$T], f: fn($T,$T) -> $T) -> $T {
     }
     return result
 }
+
+// ── Slicing ─────────────────────────────────────────────────────────
 
 fn extends slice(input: [$T], start: Int, end: Int) -> [$T] {
     let result = []: $T
@@ -255,6 +292,8 @@ fn extends chunk(input: [$T], size: Int) -> [[$T]] {
     }
     return result
 }
+
+// ── Aggregation ─────────────────────────────────────────────────────
 
 fn extends sum(input: [Int]) -> Int {
     let result = 0
@@ -319,6 +358,8 @@ fn extends any(input: [Bool]) -> Bool {
     return false
 }
 
+// ── Pairing and zipping ─────────────────────────────────────────────
+
 fn extends zip(input: [$A], input2: [$B]) -> [($A,$B)] {
     let result = []: ($A,$B)
     for let i = 0; i < input.len(); i += 1 {
@@ -336,6 +377,8 @@ fn extends unzip(input: [($A,$B)]) -> ([$A],[$B]) {
     }
     return (result,result2)
 }
+
+// ── Reordering and utility ──────────────────────────────────────────
 
 fn extends reverse(input: [$T]) -> [$T] {
     let result = []: $T
@@ -371,6 +414,8 @@ fn extends windows(input: [$T], size: Int) -> [[$T]] {
     }
     return result
 }
+
+// ── Filtering variants ──────────────────────────────────────────────
 
 fn extends mapWhile(list: [$A], f: fn($A) -> Option($B)) -> [$B] {
     let result = []:$B
@@ -427,6 +472,8 @@ fn extends isEmpty(input: [$T]) -> Bool {
     return input.len() == 0
 }
 
+// ── Taking and dropping ─────────────────────────────────────────────
+
 fn extends take(input: [$T], n: Int) -> [$T] {
     return input.slice(0,n)
 }
@@ -459,6 +506,8 @@ fn extends dropWhile(input: [$T], f: fn($T) -> Bool) -> [$T] {
     }
     return result
 }
+
+// ── Grouping and partitioning ───────────────────────────────────────
 
 fn extends partition(input: [$T], f: fn($T) -> Bool) -> ([$T],[$T]) {
     let left = []:$T
@@ -649,7 +698,7 @@ fn extends anyIn(input: [$T], values: [[$T]]) -> Bool {
     return false
 }
 
-// matrix 
+// ── Matrix operations ───────────────────────────────────────────────
 
 fn extends allRotations(matrix: [[$T]], x_index: Int, y_index: Int, length: Int) -> [[$T]] {
     let result = []: [$T]
@@ -758,7 +807,7 @@ fn extends diagonalStencil(matrix: [[$T]], x_index: Int, y_index: Int, length: I
     return result
 }
 
-// bitmask
+// ── Bitmask ─────────────────────────────────────────────────────────
 
 struct Bitmask {
     data: [Int]

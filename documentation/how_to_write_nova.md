@@ -42,29 +42,269 @@ system called Dyn types. This guide covers every major feature with working exam
 
 ## 1. Module System
 
-Every Nova source file must begin with a `module` declaration. This sets the file's namespace.
+Every Nova source file must begin with a `module` declaration. The module name is an
+identifier that registers the file with the compiler.
 
 ```nova
 module my_module
 
-// code goes here
+// all code goes here
 ```
 
-Module names are used when other files import this file. There is no way to have code at the
-top level without a `module` declaration -- the parser will reject the file.
+There is no way to have code at the top level without a `module` declaration — the parser
+will reject the file.
 
-To import another module:
+### Importing modules
+
+To import another module, use the `import` statement. The path is resolved relative to the
+current file's directory. The special identifier `super` means "go up one directory."
 
 ```nova
 module main
 
-import super.std.core   // imports std/core.nv relative to the project root
+import super.std.core     // imports ../std/core.nv (relative to this file)
 import super.std.list
-import super.std.iter
+import super.std.math
 ```
 
-The `super` prefix means "go up one directory from this file." Standard library modules live
-in the `std/` folder of the project.
+Standard library modules live in the `std/` folder of the project root. When your file is
+inside a subfolder (e.g., `demo/`, `tests/`), you need `super` to reach `std/`.
+
+### What importing does
+
+**Import flattens all definitions into the caller's scope.** When you write
+`import super.std.math`, every function, struct, and enum defined in `std/math.nv` becomes
+directly available — you call them by name, not with a module prefix:
+
+```nova
+module main
+import super.std.math
+
+// These are all directly available after importing math:
+let b = bin(10)                  // "1010"
+let h = hex(255)                 // "ff"
+let r = lerp(0.0, 10.0, 0.5)    // 5.0
+let f = fib(10)                  // 55
+
+// Extension methods are also available via dot notation:
+let v = (-7).abs()               // 7
+let m = 5.min(3)                 // 3
+```
+
+> **Important:** There is no `module::function()` namespace syntax for calling regular
+> functions. `math::bin(10)` is a **compile error**. Just call `bin(10)` directly.
+
+### Re-importing and deduplication
+
+If a module has already been imported (directly or transitively), importing it again is a
+no-op — the parser skips it. This means you can safely import the same module in multiple
+files without duplicate-definition errors.
+
+### Module names reserve identifiers
+
+When a module is imported, its module name becomes a reserved identifier in the current
+scope. **You cannot use a module name as a variable name.** For example, if you import a
+file whose first line is `module result`, then `let result = ...` will be a compile error
+in any file that (transitively) imports it.
+
+This is why the standard library module is named `core` rather than having `core.nv`
+import separate `result.nv` and `maybe.nv` files — a module named `result` would prevent
+the extremely common `let result = ...` pattern everywhere.
+
+**Tip:** Choose module names that won't collide with common variable names. Prefer
+descriptive names like `string_utils`, `game_state`, or `my_module` over generic words
+like `data`, `value`, or `result`.
+
+### The `::` operator
+
+The `::` operator has three distinct uses in Nova. None of them are general namespace access:
+
+**1. Enum variant construction** — `EnumName::Variant(value)`:
+
+```nova
+import super.std.core
+
+let r = Result::Ok(42) @[B: String]
+let e = Result::Err("bad") @[A: Int]
+let m = Maybe::Just(10)
+let n = Maybe::Nothing() @[A: Int]
+```
+
+**2. Type-level static functions** — `TypeName::function()`:
+
+These are created with `fn extends(TypeName)` syntax and are called on the type name, not
+on an instance. They are typically constructors or factory functions:
+
+```nova
+// Definition (in std/hashmap.nv):
+fn extends(HashMap) default() -> HashMap($K,$V) { ... }
+
+// Usage:
+let map = HashMap::default() @[K: String, V: Int]
+
+// Definition (in std/iter.nv):
+fn extends(Iter) fromVec(input: [$A]) -> Iter($A) { ... }
+
+// Usage:
+let it = Iter::fromVec([1, 2, 3])
+```
+
+This also works for built-in types: `Cast::string()`, `Cast::int()`, `Cast::float()`,
+`Float::pi()`, `Float::e()`.
+
+**3. Struct function-field call (no self)** — `instance::field()`:
+
+When a struct has a function stored in a field, `::` calls it without passing the struct
+as an argument:
+
+```nova
+struct Formatter { format: fn(String) -> String }
+let f = Formatter { format: |s: String| s.toUpper() }
+f::format("hello")   // calls format("hello") — no self passed
+```
+
+Compare with `->` which passes the struct as the first argument:
+
+```nova
+struct Handler { handle: fn(Handler, String) -> String }
+let h = Handler { handle: fn(self: Handler, msg: String) -> String {
+    return "handled: " + msg
+}}
+h->handle("test")    // calls handle(h, "test") — h passed as self
+```
+
+### Instance methods vs. static functions vs. module functions
+
+Nova has three `extends` forms. Understanding the difference is key:
+
+**Instance methods** — `fn extends funcName(self: Type)`:
+
+The first parameter is the receiver. Called with dot notation (UFCS):
+
+```nova
+fn extends double(x: Int) -> Int { return x * 2 }
+5.double()   // 10
+```
+
+**Type-level static functions** — `fn extends(TypeName) funcName(...)`:
+
+No self parameter. Called with `TypeName::funcName()`:
+
+```nova
+fn extends(Point) origin() -> Point {
+    return Point { x: 0, y: 0 }
+}
+Point::origin()   // creates a new Point
+```
+
+**Module-level functions** — `fn mod(ModuleName) funcName(...)`:
+
+Rare. Creates a function callable as `ModuleName::funcName()`. The module must already be
+declared (via `module ModuleName` at the top of a file that has been imported):
+
+```nova
+// In some_module.nv:
+module some_module
+
+fn mod(some_module) greet() -> String {
+    return "hello from module"
+}
+
+// In another file:
+import some_module
+some_module::greet()   // "hello from module"
+```
+
+> **When to use which:** Most code uses instance methods (`fn extends func(self: Type)`)
+> and type-level static functions (`fn extends(Type) func()`). Module-level functions
+> (`fn mod(...)`) are rarely needed since import already flattens everything into
+> scope.
+
+### Design pattern: Structs as namespaces
+
+Since `fn extends(TypeName) funcName()` creates a function callable as
+`TypeName::funcName()`, you can use a struct as a **namespace** to group related
+functions under a common prefix. This is Nova's idiomatic way to build "toolbox" modules
+with clean, collision-free APIs.
+
+**Basic pattern — empty struct as a namespace:**
+
+```nova
+module string_utils
+
+// The struct acts as a namespace. It has no fields.
+struct StringUtils {}
+
+fn extends(StringUtils) repeat(s: String, n: Int) -> String {
+    let result = ""
+    for let i = 0; i < n; i += 1 { result = result + s }
+    return result
+}
+
+fn extends(StringUtils) isPalindrome(s: String) -> Bool {
+    return s == s.reverse()
+}
+
+// Usage:
+StringUtils::repeat("ha", 3)       // "hahaha"
+StringUtils::isPalindrome("racecar") // true
+```
+
+**Constructor pattern — `@[]` for generic type hints:**
+
+When a struct has generic type parameters, the caller may need to supply types that
+can't be inferred from the arguments. The `@[Param: ConcreteType]` syntax provides
+these type hints at the call site:
+
+```nova
+fn extends(HashMap) default() -> HashMap($K,$V) {
+    let nb = 16
+    return HashMap {
+        buckets: _makeBuckets(nb) @[K: $K, V: $V],
+        numBuckets: nb,
+        count: 0,
+    }
+}
+
+// At the call site, K and V can't be inferred from zero arguments,
+// so you supply them with @[]:
+let map = HashMap::default() @[K: String, V: Int]
+```
+
+The `@[]` annotation is only needed when the compiler can't infer the generic
+parameters from context. If the function's arguments already determine the types,
+no annotation is needed:
+
+```nova
+fn extends(Iter) fromVec(input: [$A]) -> Iter($A) { ... }
+
+// $A is inferred from the argument type — no @[] needed:
+let it = Iter::fromVec([1, 2, 3])   // Iter(Int)
+```
+
+**Real-world example — the standard library HashMap:**
+
+The `HashMap` struct in `std/hashmap.nv` demonstrates this pattern perfectly.
+The struct is both a data container **and** a namespace for its own constructor:
+
+```nova
+import super.std.hashmap
+
+// Construct via static function (TypeName::func):
+let scores = HashMap::default() @[K: String, V: Int]
+
+// Instance methods via dot notation (UFCS):
+scores.insert("Alice", 100)
+scores.insert("Bob", 85)
+let v = scores.get("Alice").orDefault(0)   // 100
+```
+
+**When to use this pattern:**
+
+- Group related utility functions under a descriptive type name
+- Create multiple named constructors for a type (`Point::origin()`, `Point::fromAngle()`)
+- Build "toolbox" libraries where collision-free naming matters
+- Provide factory functions that configure complex structs with sensible defaults
 
 ---
 
@@ -1097,27 +1337,46 @@ get()   // 3
 import super.std.core     // Box, Gen, Maybe, Result, Option helpers, range()
 import super.std.list     // map, filter, reduce, foreach, sort, flatten, ...
 import super.std.iter     // Iter type: fromVec, map, filter, collect, ...
-import super.std.string   // string manipulation
-import super.std.math     // mathematical functions
-import super.std.io       // io::prompt, io::readFile
-import super.std.hashmap  // HashMap
-import super.std.tuple    // tuple utilities
-import super.std.tui      // terminal UI helpers
+import super.std.string   // string manipulation extensions
+import super.std.math     // mathematical functions and Int/Float extensions
+import super.std.io       // prompt(), readLines(), writeLines()
+import super.std.hashmap  // HashMap type with insert, get, delete, ...
+import super.std.tuple    // tuple utilities (swap, mapFirst, mapSecond)
+import super.std.color    // named colors as (Int,Int,Int) tuples for raylib
+import super.std.tui      // terminal UI helpers (rawmode, drawBox, etc.)
+import super.std.widget   // raylib GUI widgets (Button, Label, Panel, etc.)
+import super.std.option   // Option extensions (orDefault, orError, isNone)
+import super.std.maybe    // Maybe(T) enum (Just/Nothing) -- standalone
+import super.std.result   // Result(A,B) enum (Ok/Err) -- standalone
 ```
+
+All imports flatten their definitions into the caller's scope. You call functions by
+name — not with a module prefix. For example, after `import super.std.math`, you write
+`bin(10)` not `math::bin(10)`.
+
+### How modules are organized
+
+Each `.nv` file starts with `module name` and defines types, functions, and extensions.
+The `module` declaration registers the name so the parser can deduplicate imports.
+Files can import each other using relative paths (`import sibling`) or
+parent-relative paths (`import super.folder.file`).
 
 ### Key std/core.nv exports
 
-| Name | Description |
-|---|---|
-| `Box(T)` | Heap wrapper for mutable shared state |
-| `Gen(start)` | Creates an integer generator starting at `start` |
-| `range(n)` | Returns `[0, 1, ..., n-1]` |
-| `range(start, end)` | Returns `[start, ..., end-1]` |
-| `Maybe(T)` | `Just(value)` or `Nothing` |
-| `Result(A, B)` | `Ok(value)` or `Err(error)` |
-| `.orDefault(v)` | Unwrap Option or return default |
-| `.orError(msg)` | Unwrap Option or print error and exit |
-| `.isNone()` | True if Option is None |
+| Name | Kind | Description |
+|---|---|---|
+| `Box(T)` | Struct | Heap wrapper for mutable shared state |
+| `Gen(start)` | Function | Creates an integer generator starting at `start` |
+| `range(n)` | Function | Returns `[0, 1, ..., n-1]` |
+| `range(start, end)` | Function | Returns `[start, ..., end-1]` |
+| `n.to(end)` | Extension | Returns `[n, n+1, ..., end-1]` (UFCS) |
+| `Maybe(T)` | Enum | `Maybe::Just(value)` or `Maybe::Nothing()` |
+| `Result(A, B)` | Enum | `Result::Ok(value)` or `Result::Err(error)` |
+| `.orDefault(v)` | Extension | Unwrap Option/Maybe/Result or return default |
+| `.orError(msg)` | Extension | Unwrap Option or print error and exit |
+| `.isNone()` | Extension | True if Option is None |
+| `.toMaybe()` | Extension | Convert Option to Maybe |
+| `.toResult(err)` | Extension | Convert Option to Result |
 
 ---
 

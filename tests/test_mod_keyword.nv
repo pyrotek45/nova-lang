@@ -1,0 +1,49 @@
+module test_mod_keyword
+
+// ===== Testing fn mod(ModName) =====
+// This is how you create functions callable via ModName::funcName()
+
+// Define our own module-namespaced function using mod()
+fn mod(test_mod_keyword) greet(name: String) -> String {
+    return "Hello, " + name + "!"
+}
+
+// Call it with module:: prefix
+let msg = test_mod_keyword::greet("Nova")
+println("TEST MOD1 - mod function: " + msg)
+
+// Can we also call it without prefix? Let's try:
+// let msg2 = greet("World")  // This would look for plain "greet"
+
+// ===== Testing fn extends(TypeName) - type-level static functions =====
+struct Point {
+    x: Int,
+    y: Int
+}
+
+fn extends(Point) origin() -> Point {
+    return Point { x: 0, y: 0 }
+}
+
+fn extends toString(self: Point) -> String {
+    return "(" + Cast::string(self.x) + ", " + Cast::string(self.y) + ")"
+}
+
+let p = Point::origin()
+println("TEST MOD2 - type static: " + p.toString())
+
+// ===== Testing fn extends funcName(self: Type) - instance methods =====
+fn extends distanceTo(self: Point, other: Point) -> String {
+    let dx = self.x - other.x
+    let dy = self.y - other.y
+    return Cast::string(dx * dx + dy * dy)
+}
+
+let p2 = Point { x: 3, y: 4 }
+println("TEST MOD3 - instance method: " + p.distanceTo(p2))
+
+// ===== Module re-export test =====
+// When you import a file, all its definitions merge into caller's scope
+// The module name just registers as a known module identifier
+
+println("ALL MOD KEYWORD TESTS PASSED")
