@@ -232,8 +232,8 @@ fn repl_session() -> ! {
         let sig = line_editor.read_line(&prompt);
         match sig {
             Ok(Signal::Success(mut line)) => {
-                line_editor.sync_history().unwrap();
-                io::stdout().flush().unwrap();
+                let _ = line_editor.sync_history();
+                let _ = io::stdout().flush();
                 //dbg!(line.clone());
                 match line.as_str() {
                     "show" => {
@@ -246,7 +246,7 @@ fn repl_session() -> ! {
                         exit(0);
                     }
                     "clear" => {
-                        line_editor.clear_screen().unwrap();
+                        let _ = line_editor.clear_screen();
                         continue;
                     }
                     "new" => {
@@ -271,7 +271,9 @@ fn repl_session() -> ! {
                     "back" => {
                         if states.len() > 1 {
                             states.pop();
-                            novarepl = states.last().unwrap().clone();
+                            if let Some(last) = states.last() {
+                                novarepl = last.clone();
+                            }
                             prompt.left_prompt = DefaultPromptSegment::Basic(format!(
                                 "Session: {}  $",
                                 states.len()
@@ -283,37 +285,53 @@ fn repl_session() -> ! {
                     }
                     pline => {
                         if pline.starts_with("session") {
-                            let session = pline.split_whitespace().collect::<Vec<&str>>()[1]
-                                .parse::<usize>()
-                                .unwrap();
-                            if session < states.len() {
-                                novarepl = states[session].clone();
-                                states.truncate(session + 1);
-                                prompt.left_prompt = DefaultPromptSegment::Basic(format!(
-                                    "Session: {}  $",
-                                    states.len()
-                                ));
-                            } else {
-                                println!("Session not found");
+                            let parts: Vec<&str> = pline.split_whitespace().collect();
+                            let session = parts
+                                .get(1)
+                                .and_then(|s| s.parse::<usize>().ok());
+                            match session {
+                                Some(session) if session < states.len() => {
+                                    novarepl = states[session].clone();
+                                    states.truncate(session + 1);
+                                    prompt.left_prompt = DefaultPromptSegment::Basic(format!(
+                                        "Session: {}  $",
+                                        states.len()
+                                    ));
+                                }
+                                _ => {
+                                    println!("Session not found");
+                                }
                             }
                             continue;
                         }
                         // save to file
                         if pline.starts_with("save") {
-                            let file = pline.split_whitespace().collect::<Vec<&str>>()[1];
-                            // save the current session to a file
+                            let parts: Vec<&str> = pline.split_whitespace().collect();
+                            let Some(filename) = parts.get(1) else {
+                                println!("Usage: save <filename>");
+                                continue;
+                            };
                             // check if the file exists
-                            if std::path::Path::new(file).exists() {
+                            if std::path::Path::new(filename).exists() {
                                 println!("File already exists, do you want to overwrite it? (y/n)");
                                 let mut response = String::new();
-                                io::stdin().read_line(&mut response).unwrap();
+                                if io::stdin().read_line(&mut response).is_err() {
+                                    println!("Failed to read input");
+                                    continue;
+                                }
                                 if response.trim() != "y" {
                                     continue;
                                 }
                             }
-                            let mut file = std::fs::File::create(file).unwrap();
-                            file.write_all(b"module repl\n\n").unwrap();
-                            file.write_all(novarepl.current_repl.as_bytes()).unwrap();
+                            match std::fs::File::create(filename) {
+                                Ok(mut file) => {
+                                    let _ = file.write_all(b"module repl\n\n");
+                                    let _ = file.write_all(novarepl.current_repl.as_bytes());
+                                }
+                                Err(e) => {
+                                    println!("Failed to create file: {}", e);
+                                }
+                            }
                             continue;
                         }
 

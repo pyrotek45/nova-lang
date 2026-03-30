@@ -54,7 +54,9 @@ impl<T> Table<T> {
         T: Borrow<K>,
         K: PartialEq,
     {
-        self.items.remove(self.get_index(item).unwrap());
+        if let Some(idx) = self.get_index(item) {
+            self.items.remove(idx);
+        }
     }
 }
 

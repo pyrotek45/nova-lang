@@ -294,9 +294,14 @@ impl Compiler {
                             // Otherwise, get the global variable if it exists
                             self.asm.push(Asm::GETGLOBAL(index as u32));
                         } else {
-                            // Debug output for missing variable
-                            dbg!(captured_var);
-                            panic!("Captured variable not found in local or global scope.");
+                            return Err(Box::new(common::error::NovaError::Compiler {
+                                msg: format!(
+                                    "Captured variable '{}' not found in local or global scope",
+                                    captured_var
+                                )
+                                .into(),
+                                note: "".into(),
+                            }));
                         }
                     }
 
@@ -1496,10 +1501,14 @@ impl Compiler {
                         // Otherwise, get the global variable if it exists
                         self.asm.push(Asm::GETGLOBAL(index as u32));
                     } else {
-                        // Debug output for missing variable
-                        // dbg!(&captured_var);
-                        // dbg!(&self.variables);
-                        panic!("Captured variable not found in local or global scope.");
+                        return Err(Box::new(common::error::NovaError::Compiler {
+                            msg: format!(
+                                "Captured variable '{}' not found in local or global scope",
+                                captured_var
+                            )
+                            .into(),
+                            note: "".into(),
+                        }));
                     }
                 }
                 // Generate a jump label for the closure function

@@ -240,7 +240,7 @@ impl Disassembler {
                     }
                     let string = match String::from_utf8(string) {
                         Ok(ok) => ok,
-                        Err(_) => panic!(),
+                        Err(e) => format!("<invalid UTF-8: {}>", e),
                     };
                     self.out(&format!("Push String: {}", string))
                 }
