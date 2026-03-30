@@ -1,0 +1,17 @@
+module bench_07_long_lived
+// Benchmark 7: Long-lived vs short-lived mix
+// Keeps a "nursery" of 1000 objects alive while churning 100k temporaries.
+// Tests GC's ability to skip rooted objects during sweep.
+
+let nursery = []: [Int]
+for i in 0..1000 {
+    nursery.push([i, i+1, i+2])
+}
+
+// Now churn short-lived objects while nursery stays alive
+for i in 0..100000 {
+    let tmp = [i, i*2]
+}
+
+// Touch nursery so it stays alive through the whole run
+let check = nursery[500]

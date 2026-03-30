@@ -699,12 +699,10 @@ impl Vm {
                             .ok_or_else(|| Box::new(NovaError::Runtime {
                                 msg: "CONCAT: invalid heap reference".into(),
                             }))?;
-                        let combined = object1
-                            .data
-                            .iter()
-                            .cloned()
-                            .chain(object2.data.iter().cloned())
-                            .collect::<Vec<VmData>>();
+                        let total_len = object1.data.len() + object2.data.len();
+                        let mut combined = Vec::with_capacity(total_len);
+                        combined.extend_from_slice(&object1.data);
+                        combined.extend_from_slice(&object2.data);
                         (object1.object_type.clone(), combined)
                     };
                     let new_object = Object::new(new_object_type, new_data);

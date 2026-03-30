@@ -1,0 +1,15 @@
+module bench_06_deep_nesting
+// Benchmark 6: Deep nesting / linked-list-style chains
+// Creates deeply nested list-of-lists, stresses recursive ref counting on dec.
+
+fn build(depth: Int) -> [Int] {
+    if depth <= 0 {
+        return [0]
+    }
+    let inner = build(depth - 1)
+    return [depth]
+}
+
+for i in 0..10000 {
+    let chain = build(50)
+}

@@ -1,0 +1,12 @@
+module bench_04_struct_churn
+// Benchmark 4: Struct allocation & churn
+// Allocates many structs in a loop. Tests struct heap entry creation/teardown.
+
+struct Point {
+    x: Int,
+    y: Int
+}
+
+for i in 0..100000 {
+    let p = Point(i, i * 2)
+}

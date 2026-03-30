@@ -1,0 +1,10 @@
+module bench_01_mass_alloc
+// Benchmark 1: Mass allocation throughput
+// Allocates N lists in a loop, measures how fast the allocator is
+// when there's minimal live data (short-lived objects).
+
+let N = 100000
+
+for i in 0..N {
+    let tmp = [1, 2, 3, 4, 5]
+}

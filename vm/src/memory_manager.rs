@@ -240,6 +240,8 @@ pub struct MemoryManager {
     base_threshold: usize,
     next_gc: usize,
     last_gc: Option<Instant>,
+    /// Reusable mark-bit buffer — avoids allocating a new Vec every GC cycle.
+    mark_bits: Vec<bool>,
 }
 
 impl MemoryManager {
@@ -252,6 +254,7 @@ impl MemoryManager {
             base_threshold,
             next_gc: base_threshold,
             last_gc: None,
+            mark_bits: Vec::new(),
         }
     }
 
@@ -390,12 +393,7 @@ impl MemoryManager {
     /// push_string: push a string to the heap
     /// This will place the new index on the stack
     pub fn push_string(&mut self, s: String) {
-        let chars: Vec<VmData> = s.chars().map(VmData::Char).collect();
-        let obj = Object {
-            object_type: ObjectType::String,
-            table: HashMap::new(),
-            data: chars,
-        };
+        let obj = Object::string(s);
         let idx = self.allocate(obj);
         self.stack.push(VmData::Object(idx));
     }
@@ -433,39 +431,43 @@ impl MemoryManager {
         }
     }
 
+    /// Decrement reference count, freeing the entry and its children iteratively.
+    /// Uses an explicit worklist to avoid stack overflow on deeply nested structures.
     #[inline]
     pub fn dec(&mut self, index: usize) {
+        // Fast path: just decrement and return if still alive.
         if let Some(Some(entry)) = self.heap.get_mut(index) {
-            if entry.ref_count > 0 {
+            if entry.ref_count > 1 {
                 entry.ref_count -= 1;
+                return;
             }
-            if entry.ref_count == 0 {
-                // Safety: we know this entry exists because we just matched on it above.
-                let Some(entry) = self.heap[index].take() else { return; };
-
-                for child in &entry.object.data {
-                    if let Some(child_idx) = get_heap_index(child) {
-                        self.dec(child_idx);
+        }
+        // Slow path: ref_count reaches 0 — iterative free.
+        let mut worklist = vec![index];
+        while let Some(idx) = worklist.pop() {
+            if let Some(Some(entry)) = self.heap.get_mut(idx) {
+                if entry.ref_count > 0 {
+                    entry.ref_count -= 1;
+                }
+                if entry.ref_count == 0 {
+                    let Some(entry) = self.heap[idx].take() else {
+                        continue;
+                    };
+                    // Queue children for decrement instead of recursing.
+                    for child in &entry.object.data {
+                        if let Some(child_idx) = get_heap_index(child) {
+                            worklist.push(child_idx);
+                        }
                     }
-                }
-
-                // After recursive dec of children, the heap may have shrunk.
-                // Re-check whether this index is still within bounds.
-                if index >= self.heap.len() {
-                    return;
-                }
-
-                if index == self.heap.len() - 1 {
-                    self.heap.pop();
-                    self.shrink_heap();
-                } else {
-                    self.free_list.push(index);
+                    // Reclaim slot.
+                    self.free_list.push(idx);
                 }
             }
         }
     }
 
-    #[inline]
+    /// Shrink trailing None entries from the heap and clean up the free list.
+    /// Only called during collect_cycles to amortise cost.
     fn shrink_heap(&mut self) {
         while let Some(last) = self.heap.last() {
             if last.is_none() {
@@ -474,7 +476,8 @@ impl MemoryManager {
                 break;
             }
         }
-        self.free_list.retain(|&idx| idx < self.heap.len());
+        let heap_len = self.heap.len();
+        self.free_list.retain(|&idx| idx < heap_len);
     }
 
     #[inline]
@@ -583,6 +586,7 @@ impl MemoryManager {
     }
 
     /// Internal deep clone implementation for a heap pointer.
+    /// Unified path: deep-clone all children in `data`, preserve table only for structs.
     fn deep_clone_heap_internal(
         &mut self,
         index: usize,
@@ -599,174 +603,85 @@ impl MemoryManager {
                 return 0;
             }
         };
-        let new_index = match clone_obj.object_type {
-            ObjectType::List => {
-                let new_items: Vec<VmData> = clone_obj
-                    .data
-                    .iter()
-                    .map(|item| match item {
-                        VmData::Object(child) => {
-                            VmData::Object(self.deep_clone_heap_internal(*child, cache))
-                        }
-                        other => *other,
-                    })
-                    .collect();
-                self.allocate(Object {
-                    object_type: ObjectType::List,
-                    table: HashMap::new(),
-                    data: new_items,
-                })
-            }
-            ObjectType::Struct(name) => {
-                let mut new_map = HashMap::new();
-                let mut new_data = clone_obj.data.clone();
-                for (k, &v) in &clone_obj.table {
-                    let new_v = match &clone_obj.data[v] {
-                        VmData::Object(child) => {
-                            VmData::Object(self.deep_clone_heap_internal(*child, cache))
-                        }
-                        other => *other,
-                    };
-                    new_data[v] = new_v;
-                    new_map.insert(k.clone(), v);
+
+        // Deep-clone all children in data.
+        let new_data: Vec<VmData> = clone_obj
+            .data
+            .iter()
+            .map(|item| match item {
+                VmData::Object(child) => {
+                    VmData::Object(self.deep_clone_heap_internal(*child, cache))
                 }
-                self.allocate(Object {
-                    object_type: ObjectType::Struct(name),
-                    table: new_map,
-                    data: new_data,
-                })
-            }
-            ObjectType::String => self.allocate(Object {
-                object_type: ObjectType::String,
-                table: HashMap::new(),
-                data: clone_obj.data.clone(),
-            }),
-            ObjectType::Closure(func_ptr) => {
-                let new_env: Vec<VmData> = clone_obj
-                    .data
-                    .iter()
-                    .map(|item| match item {
-                        VmData::Object(child) => {
-                            VmData::Object(self.deep_clone_heap_internal(*child, cache))
-                        }
-                        other => *other,
-                    })
-                    .collect();
-                self.allocate(Object {
-                    object_type: ObjectType::Closure(func_ptr),
-                    table: HashMap::new(),
-                    data: new_env,
-                })
-            }
-            ObjectType::Tuple => {
-                let new_items: Vec<VmData> = clone_obj
-                    .data
-                    .iter()
-                    .map(|item| match item {
-                        VmData::Object(child) => {
-                            VmData::Object(self.deep_clone_heap_internal(*child, cache))
-                        }
-                        other => *other,
-                    })
-                    .collect();
-                self.allocate(Object {
-                    object_type: ObjectType::Tuple,
-                    table: HashMap::new(),
-                    data: new_items,
-                })
-            }
-            ObjectType::Enum { name, tag } => {
-                let new_data: Vec<VmData> = clone_obj
-                    .data
-                    .iter()
-                    .map(|item| match item {
-                        VmData::Object(child) => {
-                            VmData::Object(self.deep_clone_heap_internal(*child, cache))
-                        }
-                        other => *other,
-                    })
-                    .collect();
-                self.allocate(Object {
-                    object_type: ObjectType::Enum {
-                        name: name.clone(),
-                        tag,
-                    },
-                    table: HashMap::new(),
-                    data: new_data,
-                })
-            }
+                other => *other,
+            })
+            .collect();
+
+        // Struct objects carry a table mapping field names → data indices.
+        let new_table = if matches!(clone_obj.object_type, ObjectType::Struct(_)) {
+            clone_obj.table.clone()
+        } else {
+            HashMap::new()
         };
+
+        let new_index = self.allocate(Object {
+            object_type: clone_obj.object_type.clone(),
+            table: new_table,
+            data: new_data,
+        });
         cache.insert(index, new_index);
         new_index
     }
 
     /// Internal cycle collection (mark-sweep).
+    /// Uses a reusable mark-bit buffer to avoid allocation every cycle,
+    /// and a unified traversal for all object types (every child in `data` is walked).
     fn collect_cycles(&mut self) {
         let len = self.heap.len();
-        let mut marked = vec![false; len];
 
-        // Mark phase.
+        // Reuse the mark-bit buffer; resize and clear.
+        self.mark_bits.resize(len, false);
+        // Safety: all values are bool; fill with false.
+        self.mark_bits.iter_mut().for_each(|b| *b = false);
+
+        // Mark phase — roots are everything reachable from the stack.
         let mut worklist = Vec::new();
         for value in &self.stack {
             if let Some(idx) = get_heap_index(value) {
-                if idx < len && !marked[idx] {
-                    marked[idx] = true;
+                if idx < len && !self.mark_bits[idx] {
+                    self.mark_bits[idx] = true;
                     worklist.push(idx);
                 }
             }
         }
         while let Some(idx) = worklist.pop() {
             if let Some(Some(entry)) = self.heap.get(idx) {
-                match entry.object.object_type {
-                    ObjectType::List | ObjectType::Tuple => {
-                        for item in &entry.object.data {
-                            if let Some(child_idx) = get_heap_index(item) {
-                                if child_idx < len && !marked[child_idx] {
-                                    marked[child_idx] = true;
-                                    worklist.push(child_idx);
-                                }
+                // Walk all children in data — covers List, Tuple, Closure, Enum, String.
+                for item in &entry.object.data {
+                    if let Some(child_idx) = get_heap_index(item) {
+                        if child_idx < len && !self.mark_bits[child_idx] {
+                            self.mark_bits[child_idx] = true;
+                            worklist.push(child_idx);
+                        }
+                    }
+                }
+                // Structs also keep references via the table.
+                if matches!(entry.object.object_type, ObjectType::Struct(_)) {
+                    for &data_idx in entry.object.table.values() {
+                        if let Some(child_idx) = get_heap_index(&entry.object.data[data_idx]) {
+                            if child_idx < len && !self.mark_bits[child_idx] {
+                                self.mark_bits[child_idx] = true;
+                                worklist.push(child_idx);
                             }
                         }
                     }
-                    ObjectType::Struct(_) => {
-                        for &item in entry.object.table.values() {
-                            if let Some(child_idx) = get_heap_index(&entry.object.data[item]) {
-                                if child_idx < len && !marked[child_idx] {
-                                    marked[child_idx] = true;
-                                    worklist.push(child_idx);
-                                }
-                            }
-                        }
-                    }
-                    ObjectType::Closure(_) => {
-                        for item in &entry.object.data {
-                            if let Some(child_idx) = get_heap_index(item) {
-                                if child_idx < len && !marked[child_idx] {
-                                    marked[child_idx] = true;
-                                    worklist.push(child_idx);
-                                }
-                            }
-                        }
-                    }
-                    ObjectType::Enum { .. } => {
-                        for item in &entry.object.data {
-                            if let Some(child_idx) = get_heap_index(item) {
-                                if child_idx < len && !marked[child_idx] {
-                                    marked[child_idx] = true;
-                                    worklist.push(child_idx);
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
                 }
             }
         }
 
         // Sweep phase.
-        for (i, maybe_entry) in self.heap.iter_mut().enumerate() {
-            if maybe_entry.is_some() && !marked[i] {
-                *maybe_entry = None;
+        for i in 0..len {
+            if self.heap[i].is_some() && !self.mark_bits[i] {
+                self.heap[i] = None;
                 self.free_list.push(i);
             }
         }

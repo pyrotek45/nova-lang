@@ -1,0 +1,9 @@
+module bench_02_list_grow
+// Benchmark 2: List growth (push in loop)
+// Grows a single list to a large size. Tests incremental allocation
+// and how the heap handles one large object.
+
+let big = []: Int
+for i in 0..100000 {
+    big.push(i)
+}
