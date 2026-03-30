@@ -268,7 +268,8 @@ pub fn raylib_get_mouse_position(state: &mut state::State) -> NovaResult<()> {
         table: Default::default(),
         data: vec![VmData::Int(x), VmData::Int(y)],
     };
-    state.memory.allocate(tuple);
+    let idx = state.memory.allocate(tuple);
+    state.memory.stack.push(VmData::Object(idx));
     Ok(())
 }
 

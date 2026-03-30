@@ -1,0 +1,109 @@
+module particle_demo
+
+// ─────────────────────────────────────────────────────────
+// Particle Fountain — mouse-following particle effects
+// Stress-tests the GC with thousands of short-lived structs
+// ─────────────────────────────────────────────────────────
+
+let WIDTH  = 1200
+let HEIGHT = 800
+let MAX_PARTICLES = 5000
+let SPAWN_RATE = 40        // particles per frame
+let GRAVITY = 1
+
+raylib::init("Nova Particle Storm", WIDTH, HEIGHT, 60)
+
+struct Particle {
+    x:   Int,
+    y:   Int,
+    vx:  Int,
+    vy:  Int,
+    life: Int,
+    r:   Int,
+    g:   Int,
+    b:   Int,
+    size: Int,
+}
+
+// ── Particle pool ───────────────────────────────────────
+let particles = []: Particle
+
+fn spawnParticles(mx: Int, my: Int, count: Int) {
+    for i in 0..count {
+        if particles.len() >= MAX_PARTICLES {
+            break
+        }
+        let vx = random(-8, 8)
+        let vy = random(-12, -2)
+        let life = random(20, 60)
+        let r = random(50, 255)
+        let g = random(50, 255)
+        let b = random(50, 255)
+        let size = random(2, 6)
+        particles.push(Particle {
+            x: mx, y: my,
+            vx: vx, vy: vy,
+            life: life,
+            r: r, g: g, b: b,
+            size: size,
+        })
+    }
+}
+
+fn updateAndDrawParticles() {
+    let i = 0
+    while i < particles.len() {
+        let p = particles[i]
+
+        // Physics
+        p.x  += p.vx
+        p.y  += p.vy
+        p.vy += GRAVITY
+        p.life -= 1
+
+        // Fade color toward black as life decreases
+        let fade = p.life * 4
+        if fade > 255 { fade = 255 }
+        if fade < 0   { fade = 0   }
+
+        let dr = (p.r * fade) / 255
+        let dg = (p.g * fade) / 255
+        let db = (p.b * fade) / 255
+
+        // Draw
+        raylib::drawCircle(p.x, p.y, p.size, (dr, dg, db))
+
+        // Remove dead particles
+        if p.life <= 0 {
+            particles.remove(i)
+        } else {
+            i += 1
+        }
+    }
+}
+
+// ── Main loop ───────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear((10, 10, 15))
+
+    // Get mouse position
+    let mouse = raylib::mousePosition()
+    let mx = mouse[0]
+    let my = mouse[1]
+
+    // Spawn particles at mouse
+    spawnParticles(mx, my, SPAWN_RATE)
+
+    // Update + draw all particles
+    updateAndDrawParticles()
+
+    // HUD
+    let countStr = "Particles: " + Cast::string(particles.len())
+    raylib::drawText(countStr, 10, 10, 20, (200, 200, 200))
+    raylib::drawFPS(10, 36)
+
+    // Burst on click
+    if raylib::isMousePressed("Left") {
+        spawnParticles(mx, my, 200)
+    }
+}
