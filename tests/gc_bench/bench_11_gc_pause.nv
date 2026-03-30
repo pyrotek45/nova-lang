@@ -1,0 +1,16 @@
+module bench_11_gc_pause
+// Benchmark 11: GC pause simulation
+// Uses nowSec() for sub-ms precision to measure latency spikes during heavy allocation.
+// Prints per-iteration timings (microseconds) so the harness can parse max/p99 latency.
+
+let ITERS = 500
+let ALLOCS_PER_ITER = 2000
+
+for iter in 0..ITERS {
+    let start = nowSec()
+    for j in 0..ALLOCS_PER_ITER {
+        let tmp = [j, j+1, j+2]
+    }
+    let elapsed_us = (nowSec() - start) * 1000000.0
+    println(elapsed_us)
+}

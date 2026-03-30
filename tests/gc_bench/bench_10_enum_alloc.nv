@@ -1,0 +1,9 @@
+module bench_10_enum_alloc
+// Benchmark 10: Enum/Option allocation
+// Wraps values in Some() and unwraps them in a tight loop.
+// Each Some() allocates a heap enum object.
+
+for i in 0..100000 {
+    let wrapped = Some(i)
+    let val = wrapped.unwrap()
+}

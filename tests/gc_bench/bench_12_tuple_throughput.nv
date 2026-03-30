@@ -1,0 +1,7 @@
+module bench_12_tuple_throughput
+// Benchmark 12: Tuple allocation throughput
+// Creates and immediately discards tuples.
+
+for i in 0..100000 {
+    let t = (i, i+1, i+2)
+}

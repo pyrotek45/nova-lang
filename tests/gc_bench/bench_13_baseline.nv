@@ -1,0 +1,8 @@
+module bench_13_baseline
+// Benchmark 13: Baseline – pure integer arithmetic with ZERO heap allocations.
+// Provides the "no-GC" comparison point.
+
+let sum = 0
+for i in 0..1000000 {
+    sum = sum + i
+}

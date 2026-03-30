@@ -1,0 +1,16 @@
+module bench_05_closure_capture
+// Benchmark 5: Closure capture stress
+// Creates many closures that capture a local variable.
+// Each closure is a heap-allocated object with an environment.
+
+let closures = []: fn() -> Int
+for i in 0..50000 {
+    let val = i
+    closures.push(|| val)
+}
+
+// Now call them all (validates they kept the captured value alive)
+let sum = 0
+for i in 0..closures.len() {
+    sum = sum + closures[i]()
+}

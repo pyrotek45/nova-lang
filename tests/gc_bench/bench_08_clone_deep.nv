@@ -1,0 +1,15 @@
+module bench_08_clone_deep
+// Benchmark 8: Deep clone performance
+// Creates a complex nested structure and deep-clones it many times.
+// This tests deep_clone_heap_internal performance.
+
+struct Node {
+    value: Int,
+    children: [Int]
+}
+
+let base = Node(42, [1,2,3,4,5,6,7,8,9,10])
+
+for i in 0..50000 {
+    let copy = clone(base)
+}
