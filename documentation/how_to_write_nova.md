@@ -1,5 +1,4 @@
 
->
 > Use `fn mod(ModuleName) funcName()` only when you want to force a function to be called as `ModuleName::funcName()` instead of being flattened into the importer's scope. This is useful for:
 > - Avoiding name collisions for utility functions that are too generic (like `init`, `run`, `main`, or `config`)
 > - Creating APIs where you want to make it clear a function is part of a specific module
