@@ -1,30 +1,5 @@
 
-> Use `fn mod(ModuleName) funcName()` only when you want to force a function to be called as `ModuleName::funcName()` instead of being flattened into the importer's scope. This is useful for:
-> - Avoiding name collisions for utility functions that are too generic (like `init`, `run`, `main`, or `config`)
-> - Creating APIs where you want to make it clear a function is part of a specific module
-> - Exposing only a few namespaced entry points from a large module, while keeping helpers private
->
-> **Example:**
->
-> ```nova
-> module logger
->
-> fn mod(logger) init() { ... }
-> fn mod(logger) log(msg: String) { ... }
->
-> // Usage (after import logger):
-> logger::init()
-> logger::log("hello")
-> ```
->
-> For most standard library and application code, you do **not** need `mod`—just use regular functions and `extends` patterns. Use `mod` only when you want to enforce explicit namespacing for clarity or to prevent accidental shadowing.
-# How to Write Nova
 
-Nova is a statically typed, expression-oriented programming language with garbage collection,
-universal function call syntax (UFCS), first-class functions, and a structural dynamic-dispatch
-system called Dyn types. This guide covers every major feature with working examples.
-
----
 
 ## Table of Contents
 
@@ -73,6 +48,8 @@ module my_module
 
 There is no way to have code at the top level without a `module` declaration — the parser
 will reject the file.
+
+
 
 ### Importing modules
 
@@ -130,6 +107,33 @@ in any file that (transitively) imports it.
 This is why the standard library module is named `core` rather than having `core.nv`
 import separate `result.nv` and `maybe.nv` files — a module named `result` would prevent
 the extremely common `let result = ...` pattern everywhere.
+
+> Use `fn mod(ModuleName) funcName()` only when you want to force a function to be called as `ModuleName::funcName()` instead of being flattened into the importer's scope. This is useful for:
+> - Avoiding name collisions for utility functions that are too generic (like `init`, `run`, `main`, or `config`)
+> - Creating APIs where you want to make it clear a function is part of a specific module
+> - Exposing only a few namespaced entry points from a large module, while keeping helpers private
+>
+> **Example:**
+>
+> ```nova
+> module logger
+>
+> fn mod(logger) init() { ... }
+> fn mod(logger) log(msg: String) { ... }
+>
+> // Usage (after import logger):
+> logger::init()
+> logger::log("hello")
+> ```
+>
+> For most standard library and application code, you do **not** need `mod`—just use regular functions and `extends` patterns. Use `mod` only when you want to enforce explicit namespacing for clarity or to prevent accidental shadowing.
+# How to Write Nova
+
+Nova is a statically typed, expression-oriented programming language with garbage collection,
+universal function call syntax (UFCS), first-class functions, and a structural dynamic-dispatch
+system called Dyn types. This guide covers every major feature with working examples.
+
+---
 
 **Tip:** Choose module names that won't collide with common variable names. Prefer
 descriptive names like `string_utils`, `game_state`, or `my_module` over generic words
