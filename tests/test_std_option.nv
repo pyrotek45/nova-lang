@@ -1,0 +1,93 @@
+module test_std_option
+
+import super.std.option
+
+// ── isNone ───────────────────────────────────────────────────────
+assert(None(Int).isNone(), "None isNone")
+assert(!Some(5).isNone(), "Some isNone false")
+assert(Some(5).isSome(), "Some isSome")
+
+// ── orDefault ────────────────────────────────────────────────────
+assert(Some(42).orDefault(0) == 42, "orDefault Some")
+assert(None(Int).orDefault(99) == 99, "orDefault None")
+
+// ── orDoFn ───────────────────────────────────────────────────────
+assert(Some(7).orDoFn(fn() -> Int { return 100 }) == 7, "orDoFn Some")
+assert(None(Int).orDoFn(fn() -> Int { return 100 }) == 100, "orDoFn None")
+
+// ── map ──────────────────────────────────────────────────────────
+let m1 = Some(5).map(fn(x: Int) -> Int { return x * 3 })
+assert(m1.isSome(), "map Some isSome")
+assert(m1.unwrap() == 15, "map Some value")
+
+let m2 = None(Int).map(fn(x: Int) -> Int { return x * 3 })
+assert(m2.isNone(), "map None isNone")
+
+// ── flatMap ──────────────────────────────────────────────────────
+let fm1 = Some(4).flatMap(fn(x: Int) -> Option(Int) {
+    if x > 2 { return Some(x * 10) }
+    return None(Int)
+})
+assert(fm1.unwrap() == 40, "flatMap Some")
+
+let fm2 = Some(1).flatMap(fn(x: Int) -> Option(Int) {
+    if x > 2 { return Some(x * 10) }
+    return None(Int)
+})
+assert(fm2.isNone(), "flatMap None from pred")
+
+let fm3 = None(Int).flatMap(fn(x: Int) -> Option(Int) { return Some(x) })
+assert(fm3.isNone(), "flatMap None passthrough")
+
+// ── filter ───────────────────────────────────────────────────────
+assert(Some(10).filter(fn(x: Int) -> Bool { return x > 5 }).isSome(), "filter pass")
+assert(Some(3).filter(fn(x: Int) -> Bool { return x > 5 }).isNone(), "filter fail")
+assert(None(Int).filter(fn(x: Int) -> Bool { return x > 5 }).isNone(), "filter None")
+
+// ── zip ──────────────────────────────────────────────────────────
+let z1 = Some(1).zip(Some("hello"))
+assert(z1.isSome(), "zip both Some")
+let zv = z1.unwrap()
+assert(zv[0] == 1, "zip val 0")
+assert(zv[1] == "hello", "zip val 1")
+
+let z2 = Some(1).zip(None(String))
+assert(z2.isNone(), "zip with None")
+
+let z3 = None(Int).zip(Some("x"))
+assert(z3.isNone(), "None zip Some")
+
+// ── toList ───────────────────────────────────────────────────────
+let tl1 = Some(99).toList()
+assert(tl1.len() == 1, "toList Some len")
+assert(tl1[0] == 99, "toList Some value")
+
+let tl2 = None(Int).toList()
+assert(tl2.len() == 0, "toList None len")
+
+// ── inspect (side-effect, pass-through) ──────────────────────────
+import super.std.core
+let touched = Box(false)
+let r = Some(42).inspect(fn(x: Int) { touched.value = true })
+assert(touched.value, "inspect ran side-effect")
+assert(r.unwrap() == 42, "inspect returns same Some")
+
+let touched2 = Box(false)
+let r2 = None(Int).inspect(fn(x: Int) { touched2.value = true })
+assert(!touched2.value, "inspect None skips")
+assert(r2.isNone(), "inspect None returns None")
+
+// ── chained combinators ───────────────────────────────────────────
+let chain = Some(2)
+    .map(fn(x: Int) -> Int { return x + 3 })
+    .filter(fn(x: Int) -> Bool { return x > 4 })
+    .map(fn(x: Int) -> Int { return x * 2 })
+assert(chain.unwrap() == 10, "chain map->filter->map")
+
+let chainFail = Some(2)
+    .map(fn(x: Int) -> Int { return x + 1 })
+    .filter(fn(x: Int) -> Bool { return x > 10 })
+    .map(fn(x: Int) -> Int { return x * 2 })
+assert(chainFail.isNone(), "chain with filter removing")
+
+println("PASS: test_std_option")

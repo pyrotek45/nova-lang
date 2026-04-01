@@ -1,0 +1,564 @@
+module survive
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  S U R V I V E
+//
+//  Top-down survival game — no weapons, just your legs and your wits.
+//
+//  Rules:
+//    • Enemies (red circles) chase you relentlessly. Avoid them.
+//    • A glowing TARGET appears somewhere on the large world map.
+//    • A compass arrow in the corner always points toward the target.
+//    • Reach the target to score points and spawn a new one.
+//    • Each new target is worth more points; enemies multiply over time.
+//    • Taking damage drains HP. Reaching 0 ends the game.
+//    • High-score table saved across rounds in a Box.
+//
+//  Controls:
+//    WASD — move        Q — quit
+//    Gamepad left-stick also works via InputMap.
+//
+//  Std modules used:
+//    scene   — Menu / Playing / GameOver state machine
+//    entity  — player + enemies as EntityWorld
+//    timer   — wave spawn repeating timer, invincibility cooldown
+//    tween   — compass pulse, score-pop, screen-flash
+//    vec2    — directional math for compass, enemy AI, dash
+//    input   — WASD + quit bindings
+//    camera  — 2D camera that follows the player
+//    color   — lerpColor for health bar gradient
+// ─────────────────────────────────────────────────────────────────────────────
+
+import super.super.std.scene
+import super.super.std.entity
+import super.super.std.timer
+import super.super.std.tween
+import super.super.std.vec2
+import super.super.std.input
+import super.super.std.camera
+import super.super.std.color
+
+// ── Window / World ────────────────────────────────────────────────────────────
+let SW = 800
+let SH = 600
+let WW = 3200
+let WH = 3200
+
+raylib::init("Survive", SW, SH, 60)
+
+// ── Palette ───────────────────────────────────────────────────────────────────
+let BG_COLOR      = (14, 18, 14)
+let GRID_COLOR    = (25, 35, 25)
+let PLAYER_COLOR  = (80, 220, 255)
+let PLAYER_RING   = (130, 240, 255)
+let ENEMY_COLOR   = (220, 55, 55)
+let ENEMY_RING    = (255, 100, 80)
+let TARGET_COLOR  = (255, 210, 50)
+let TARGET_GLOW   = (255, 240, 120)
+let COMPASS_COLOR = (80, 255, 160)
+let COMPASS_RING  = (40, 180, 100)
+let HUD_COLOR     = (220, 220, 220)
+let HUD_DIM       = (140, 140, 140)
+let FLASH_COLOR   = (200, 20, 20)
+let SCORE_COLOR   = (255, 220, 60)
+let WALL_COLOR    = (50, 60, 50)
+
+// ── Tuning ────────────────────────────────────────────────────────────────────
+let PLAYER_SPEED     = 220.0
+let ENEMY_SPEED_BASE = 70.0
+let ENEMY_RADIUS     = 15
+let PLAYER_RADIUS    = 13
+let TARGET_RADIUS    = 20
+let PLAYER_HP_MAX    = 5
+let INVINCIBLE_SECS  = 1.5    // grace period after taking damage
+let WAVE_INTERVAL    = 5.0    // seconds between enemy waves
+let ENEMIES_PER_WAVE = 3
+
+// ── Shared mutable state ──────────────────────────────────────────────────────
+let world   = EntityWorld::new()
+let cam     = Camera2D::new(SW, SH)
+let keys    = InputMap::new()
+
+let score      = Box(0)
+let hiScore    = Box(0)
+let wave       = Box(0)
+let playerHp   = Box(PLAYER_HP_MAX)
+let targetX    = Box(800)
+let targetY    = Box(600)
+let targetsHit = Box(0)       // current run's target counter (for scoring)
+
+let waveTimer  = Timer::repeating(WAVE_INTERVAL)
+let invTimer   = Timer::cooldown(INVINCIBLE_SECS)
+let hitFlash   = Tween::linear(160.0, 0.0, 0.4)
+let compassPulse = Tween::smooth(0.8, 1.4, 0.7)
+
+keys.bindKey("up",    "KEY_W")
+keys.bindKey("down",  "KEY_S")
+keys.bindKey("left",  "KEY_A")
+keys.bindKey("right", "KEY_D")
+keys.bindKey("quit",  "KEY_Q")
+
+// ── SceneManager ──────────────────────────────────────────────────────────────
+let mgr = SceneManager::empty()
+
+// ── Forward declarations (scenes call each other) ─────────────────────────────
+fn makeMenuScene() -> Scene
+fn makePlayScene() -> Scene
+fn makeGameOverScene() -> Scene
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+fn drawCentered(text: String, y: Int, size: Int, col: (Int, Int, Int)) {
+    let tw = raylib::measureText(text, size)
+    raylib::drawText(text, (SW - tw) / 2, y, size, col)
+}
+
+fn drawGrid(ox: Int, oy: Int) {
+    let step = 96
+    let sx = -(ox % step)
+    let sy = -(oy % step)
+    let col = 0
+    while col <= SW / step + 2 {
+        let x = sx + col * step
+        raylib::drawLine(x, 0, x, SH, GRID_COLOR)
+        col += 1
+    }
+    let row = 0
+    while row <= SH / step + 2 {
+        let y = sy + row * step
+        raylib::drawLine(0, y, SW, y, GRID_COLOR)
+        row += 1
+    }
+}
+
+// Place a new random target somewhere in the world, not too close to the player
+fn placeTarget(px: Float, py: Float) {
+    let tx = random(200, WW - 200)
+    let ty = random(200, WH - 200)
+    // Ensure it's at least 400 units away from the player
+    let dx = Cast::float(tx).unwrap() - px
+    let dy = Cast::float(ty).unwrap() - py
+    let distSq = dx * dx + dy * dy
+    if distSq < 400.0 * 400.0 {
+        tx = (tx + 800) % (WW - 200)
+        ty = (ty + 600) % (WH - 200)
+    }
+    targetX.value = tx
+    targetY.value = ty
+}
+
+// Spawn a wave of enemies at the world edges, chasing the player spawn
+fn spawnEnemyWave(px: Float, py: Float) {
+    for let i = 0; i < ENEMIES_PER_WAVE + wave.value; i += 1 {
+        let edge = random(0, 3)
+        let ex = 0.0
+        let ey = 0.0
+        if edge == 0 {
+            ex = Cast::float(random(0, WW)).unwrap()
+            ey = Cast::float(random(0, 80)).unwrap()
+        } elif edge == 1 {
+            ex = Cast::float(random(0, WW)).unwrap()
+            ey = Cast::float(random(WH - 80, WH)).unwrap()
+        } elif edge == 2 {
+            ex = Cast::float(random(0, 80)).unwrap()
+            ey = Cast::float(random(0, WH)).unwrap()
+        } else {
+            ex = Cast::float(random(WW - 80, WW)).unwrap()
+            ey = Cast::float(random(0, WH)).unwrap()
+        }
+        let er = Cast::float(ENEMY_RADIUS).unwrap()
+        let _e = world.spawnFull(ex, ey, 0.0, 0.0, er, er, "enemy", 0.0)
+        let _ = _e
+    }
+}
+
+// Reset game state for a fresh run
+fn resetGame() {
+    world.killAll("enemy")
+    world.killAll("player")
+    score.value = 0
+    wave.value = 0
+    playerHp.value = PLAYER_HP_MAX
+    targetsHit.value = 0
+
+    let px = Cast::float(WW / 2).unwrap()
+    let py = Cast::float(WH / 2).unwrap()
+    let pr = Cast::float(PLAYER_RADIUS).unwrap()
+
+    let _p = world.spawnFull(px, py, 0.0, 0.0, pr, pr, "player", 0.0)
+    let _ = _p
+
+    placeTarget(px, py)
+    waveTimer.reset()
+    invTimer.reset()
+    hitFlash.reset()
+    compassPulse.reset()
+    spawnEnemyWave(px, py)
+}
+
+// ── Menu Scene ────────────────────────────────────────────────────────────────
+fn makeMenuScene() -> Scene {
+    let titleTween = Tween::smooth(0.0, 1.0, 1.2)
+    let subtitleTween = Tween::smooth(0.0, 1.0, 1.8)
+
+    return Scene::new(
+        fn(dt: Float) {
+            titleTween.update(dt)
+            subtitleTween.update(dt)
+            if keys.isReleased("up") || keys.isReleased("down") ||
+               keys.isReleased("left") || keys.isReleased("right") {
+                resetGame()
+                mgr.switch(makePlayScene())
+            }
+        },
+        fn() {
+            raylib::clear(BG_COLOR)
+
+            // Animated grid
+            drawGrid(WW / 4, WH / 4)
+
+            let ta = Cast::int(titleTween.tweenValue() * 255.0).unwrap()
+            let sa = Cast::int(subtitleTween.tweenValue() * 200.0).unwrap()
+
+            drawCentered("S U R V I V E", SH / 2 - 90, 72, (ta, Cast::int(Cast::float(ta).unwrap() * 0.86).unwrap(), 40))
+            drawCentered("Reach the targets. Avoid the enemies.", SH / 2, 22, (sa, sa, sa))
+            drawCentered("WASD to start", SH / 2 + 48, 20, (40, Cast::int(Cast::float(sa).unwrap() * 0.9).unwrap(), 80))
+
+            if hiScore.value > 0 {
+                let hs = "Best: " + Cast::string(hiScore.value)
+                drawCentered(hs, SH / 2 + 100, 24, SCORE_COLOR)
+            }
+
+            drawCentered("Q — Quit", SH - 36, 16, HUD_DIM)
+        }
+    )
+}
+
+// ── Play Scene ────────────────────────────────────────────────────────────────
+fn makePlayScene() -> Scene {
+    return Scene::new(
+        fn(dt: Float) {
+            // ── Timers ────────────────────────────────────────────────────────
+            waveTimer.update(dt)
+            invTimer.update(dt)
+            hitFlash.update(dt)
+            compassPulse.update(dt)
+
+            if compassPulse.isDone() {
+                compassPulse.ping()
+            }
+
+            // ── Player movement ───────────────────────────────────────────────
+            let dx = 0.0
+            let dy = 0.0
+            if keys.isHeld("up")    { dy -= 1.0 }
+            if keys.isHeld("down")  { dy += 1.0 }
+            if keys.isHeld("left")  { dx -= 1.0 }
+            if keys.isHeld("right") { dx += 1.0 }
+
+            // Get player entity
+            let players = world.query("player")
+            if players.len() == 0 {
+                return
+            }
+            let p = players[0]
+
+            // Normalize diagonal movement
+            let moveLen = dx * dx + dy * dy
+            if moveLen > 0.001 {
+                let inv = 1.0 / moveLen.sqrt()
+                dx = dx * inv
+                dy = dy * inv
+            }
+
+            p.vel = Vec2::new(dx * PLAYER_SPEED, dy * PLAYER_SPEED)
+            p.pos = p.pos.add(p.vel.scale(dt))
+
+            // World boundary clamp
+            if p.pos.x < Cast::float(PLAYER_RADIUS).unwrap() {
+                p.pos.x = Cast::float(PLAYER_RADIUS).unwrap()
+            }
+            if p.pos.x > Cast::float(WW - PLAYER_RADIUS).unwrap() {
+                p.pos.x = Cast::float(WW - PLAYER_RADIUS).unwrap()
+            }
+            if p.pos.y < Cast::float(PLAYER_RADIUS).unwrap() {
+                p.pos.y = Cast::float(PLAYER_RADIUS).unwrap()
+            }
+            if p.pos.y > Cast::float(WH - PLAYER_RADIUS).unwrap() {
+                p.pos.y = Cast::float(WH - PLAYER_RADIUS).unwrap()
+            }
+
+            // ── Camera follows player ────────────────────────────────────────
+            cam.follow(p.pos, 8.0, dt)
+
+            // ── Enemy wave spawn ──────────────────────────────────────────────
+            if waveTimer.isDone() {
+                wave.value += 1
+                spawnEnemyWave(p.pos.x, p.pos.y)
+            }
+
+            // ── Enemy AI ──────────────────────────────────────────────────────
+            let enemySpeed = ENEMY_SPEED_BASE + Cast::float(wave.value * 4).unwrap()
+            world.forEachTagged("enemy", fn(e: Entity) {
+                let dir = p.pos.sub(e.pos)
+                let dlen = dir.length()
+                if dlen > 0.5 {
+                    e.vel = dir.normalized().scale(enemySpeed)
+                }
+                e.pos = e.pos.add(e.vel.scale(dt))
+            })
+
+            // ── Target pickup ─────────────────────────────────────────────────
+            let tx = Cast::float(targetX.value).unwrap()
+            let ty = Cast::float(targetY.value).unwrap()
+            let tdx = tx - p.pos.x
+            let tdy = ty - p.pos.y
+            let tdist = (tdx * tdx + tdy * tdy).sqrt()
+
+            if tdist < Cast::float(TARGET_RADIUS + PLAYER_RADIUS).unwrap() {
+                targetsHit.value += 1
+                let pts = 100 + targetsHit.value * 50
+                score.value += pts
+                if score.value > hiScore.value {
+                    hiScore.value = score.value
+                }
+                placeTarget(p.pos.x, p.pos.y)
+                compassPulse.reset()
+            }
+
+            // ── Collision: player vs enemies ──────────────────────────────────
+            if invTimer.isDone() {
+                world.forEachTagged("enemy", fn(e: Entity) {
+                    if p.overlapsAABB(e) {
+                        playerHp.value -= 1
+                        invTimer.reset()
+                        hitFlash.reset()
+                        if playerHp.value <= 0 {
+                            mgr.switch(makeGameOverScene())
+                        }
+                    }
+                })
+            }
+
+            // ── Quit ──────────────────────────────────────────────────────────
+            if keys.isReleased("quit") {
+                mgr.switch(makeMenuScene())
+            }
+        },
+
+        fn() {
+            raylib::clear(BG_COLOR)
+
+            let players = world.query("player")
+            if players.len() == 0 { return }
+            let p = players[0]
+
+            let ox = Cast::int(cam.pos.x).unwrap()
+            let oy = Cast::int(cam.pos.y).unwrap()
+            drawGrid(ox, oy)
+
+            // ── World border ─────────────────────────────────────────────────
+            let bx0 = -ox
+            let by0 = -oy
+            raylib::drawRectangleLines(bx0, by0, WW, WH, WALL_COLOR)
+
+            // ── Target ───────────────────────────────────────────────────────
+            let txS = Cast::int(Cast::float(targetX.value).unwrap() - Cast::float(ox).unwrap()).unwrap()
+            let tyS = Cast::int(Cast::float(targetY.value).unwrap() - Cast::float(oy).unwrap()).unwrap()
+            raylib::drawCircle(txS, tyS, TARGET_RADIUS + 4, (60, 50, 10))
+            raylib::drawCircle(txS, tyS, TARGET_RADIUS, TARGET_COLOR)
+            raylib::drawCircleLines(txS, tyS, TARGET_RADIUS + 6, TARGET_GLOW)
+            // Crosshair lines on target
+            raylib::drawLine(txS - 28, tyS, txS - 10, tyS, TARGET_GLOW)
+            raylib::drawLine(txS + 10, tyS, txS + 28, tyS, TARGET_GLOW)
+            raylib::drawLine(txS, tyS - 28, txS, tyS - 10, TARGET_GLOW)
+            raylib::drawLine(txS, tyS + 10, txS, tyS + 28, TARGET_GLOW)
+
+            // ── Enemies ──────────────────────────────────────────────────────
+            world.forEachTagged("enemy", fn(e: Entity) {
+                let sp = cam.worldToScreen(e.pos)
+                let ex = Cast::int(sp.x).unwrap()
+                let ey = Cast::int(sp.y).unwrap()
+                raylib::drawCircle(ex, ey, ENEMY_RADIUS + 2, (80, 15, 15))
+                raylib::drawCircle(ex, ey, ENEMY_RADIUS, ENEMY_COLOR)
+                raylib::drawCircleLines(ex, ey, ENEMY_RADIUS + 3, ENEMY_RING)
+            })
+
+            // ── Player ───────────────────────────────────────────────────────
+            let pSp = cam.worldToScreen(p.pos)
+            let psx = Cast::int(pSp.x).unwrap()
+            let psy = Cast::int(pSp.y).unwrap()
+
+            // Invincibility pulse ring
+            if !invTimer.isDone() {
+                let pulse = Cast::int(invTimer.progress() * 255.0).unwrap()
+                raylib::drawCircleLines(psx, psy, PLAYER_RADIUS + 8, (pulse, pulse, 255))
+            }
+
+            raylib::drawCircle(psx, psy, PLAYER_RADIUS + 2, (20, 60, 80))
+            raylib::drawCircle(psx, psy, PLAYER_RADIUS, PLAYER_COLOR)
+            raylib::drawCircleLines(psx, psy, PLAYER_RADIUS + 3, PLAYER_RING)
+
+            // ── Screen flash on hit ───────────────────────────────────────────
+            let flashAlpha = Cast::int(hitFlash.tweenValue()).unwrap()
+            if flashAlpha > 4 {
+                raylib::drawRectangle(0, 0, SW, SH, FLASH_COLOR)
+            }
+
+            // ── Compass Arrow ─────────────────────────────────────────────────
+            // Always points from the compass center toward the target
+            let cx = 64
+            let cy = SH - 64
+            let compassR = 28
+
+            let dtxF = Cast::float(targetX.value).unwrap() - p.pos.x
+            let dtyF = Cast::float(targetY.value).unwrap() - p.pos.y
+            let targetDir = Vec2::new(dtxF, dtyF)
+            let tdistF = targetDir.length()
+
+            let scale = compassPulse.tweenValue()
+            let arrowLen = Cast::int(Cast::float(compassR).unwrap() * scale).unwrap()
+
+            // Compass background
+            raylib::drawCircle(cx, cy, compassR + 4, (10, 30, 20))
+            raylib::drawCircleLines(cx, cy, compassR + 4, COMPASS_RING)
+
+            // Arrow pointing at target
+            if tdistF > 1.0 {
+                let normDir = targetDir.normalized()
+                let ax = cx + Cast::int(normDir.x * Cast::float(arrowLen).unwrap()).unwrap()
+                let ay = cy + Cast::int(normDir.y * Cast::float(arrowLen).unwrap()).unwrap()
+                let bx = cx - Cast::int(normDir.x * Cast::float(arrowLen / 3).unwrap()).unwrap()
+                let by2 = cy - Cast::int(normDir.y * Cast::float(arrowLen / 3).unwrap()).unwrap()
+                // Arrowhead perpendicular
+                let perpX = -normDir.y
+                let perpY = normDir.x
+                let pw = arrowLen / 4
+                let lx = bx + Cast::int(perpX * Cast::float(pw).unwrap()).unwrap()
+                let ly = by2 + Cast::int(perpY * Cast::float(pw).unwrap()).unwrap()
+                let rx = bx - Cast::int(perpX * Cast::float(pw).unwrap()).unwrap()
+                let ry = by2 - Cast::int(perpY * Cast::float(pw).unwrap()).unwrap()
+
+                // Shaft
+                raylib::drawLine(bx, by2, ax, ay, COMPASS_COLOR)
+                // Arrow wings
+                raylib::drawLine(ax, ay, lx, ly, COMPASS_COLOR)
+                raylib::drawLine(ax, ay, rx, ry, COMPASS_COLOR)
+            } else {
+                // On top of target: show checkmark dot
+                raylib::drawCircle(cx, cy, 6, TARGET_GLOW)
+            }
+
+            // Distance to target label
+            let distLabel = Cast::int(tdistF).unwrap()
+            let dlStr = Cast::string(distLabel) + "m"
+            let dlw = raylib::measureText(dlStr, 14)
+            raylib::drawText(dlStr, cx - dlw / 2, cy + compassR + 8, 14, COMPASS_RING)
+
+            // ── HUD ───────────────────────────────────────────────────────────
+            // Score top-left
+            let scoreTxt = "Score: " + Cast::string(score.value)
+            raylib::drawText(scoreTxt, 10, 8, 24, SCORE_COLOR)
+
+            // Best top-left below score
+            if hiScore.value > 0 {
+                let hsTxt = "Best:  " + Cast::string(hiScore.value)
+                raylib::drawText(hsTxt, 10, 36, 18, HUD_DIM)
+            }
+
+            // Wave top-right
+            let waveTxt = "Wave " + Cast::string(wave.value)
+            let ww2 = raylib::measureText(waveTxt, 22)
+            raylib::drawText(waveTxt, SW - ww2 - 10, 8, 22, HUD_COLOR)
+
+            // Enemy count
+            let ec = world.countAlive("enemy")
+            let ecTxt = Cast::string(ec) + " enemies"
+            let ecw = raylib::measureText(ecTxt, 18)
+            raylib::drawText(ecTxt, SW - ecw - 10, 36, 18, (200, 100, 100))
+
+            // HP bar (bottom-center)
+            let barW = 28
+            let barH = 16
+            let barGap = 6
+            let totalW = PLAYER_HP_MAX * (barW + barGap) - barGap
+            let barX0 = SW / 2 - totalW / 2
+            let barY0 = SH - 36
+
+            for i in 0..PLAYER_HP_MAX {
+                let bx = barX0 + i * (barW + barGap)
+                if i < playerHp.value {
+                    let frac = Cast::float(playerHp.value).unwrap() / Cast::float(PLAYER_HP_MAX).unwrap()
+                    let hpCol = lerpColor(red(), green(), frac)
+                    raylib::drawRectangle(bx, barY0, barW, barH, hpCol)
+                } else {
+                    raylib::drawRectangle(bx, barY0, barW, barH, (40, 20, 20))
+                }
+                raylib::drawRectangleLines(bx, barY0, barW, barH, (100, 60, 60))
+            }
+
+            // Targets hit counter (just above HP bar)
+            let hitsTxt = "Targets: " + Cast::string(targetsHit.value)
+            let htw = raylib::measureText(hitsTxt, 16)
+            raylib::drawText(hitsTxt, SW / 2 - htw / 2, SH - 58, 16, HUD_DIM)
+        }
+    )
+}
+
+// ── Game Over Scene ────────────────────────────────────────────────────────────
+fn makeGameOverScene() -> Scene {
+    let fadeIn = Tween::smooth(0.0, 1.0, 0.8)
+    let finalScore = score.value
+    let finalWave  = wave.value
+    let finalHits  = targetsHit.value
+    let isNewHigh  = finalScore >= hiScore.value
+
+    return Scene::new(
+        fn(dt: Float) {
+            fadeIn.update(dt)
+            if keys.isReleased("up") || keys.isReleased("down") ||
+               keys.isReleased("left") || keys.isReleased("right") {
+                mgr.switch(makeMenuScene())
+            }
+            if keys.isReleased("quit") {
+                mgr.switch(makeMenuScene())
+            }
+        },
+        fn() {
+            raylib::clear((8, 4, 4))
+
+            let a = Cast::int(fadeIn.tweenValue() * 255.0).unwrap()
+            let dim = Cast::int(fadeIn.tweenValue() * 160.0).unwrap()
+
+            drawCentered("GAME OVER", SH / 2 - 100, 68, (a, 30, 30))
+
+            if isNewHigh {
+                drawCentered("NEW BEST!", SH / 2 - 30, 28, (a, Cast::int(Cast::float(a).unwrap() * 0.85).unwrap(), 20))
+            }
+
+            let sc = "Score: " + Cast::string(finalScore)
+            drawCentered(sc, SH / 2 + 10, 30, (a, a, Cast::int(Cast::float(a).unwrap() * 0.24).unwrap()))
+
+            let wv = "Survived " + Cast::string(finalWave) + " waves"
+            drawCentered(wv, SH / 2 + 52, 22, (dim, dim, dim))
+
+            let ht = "Targets hit: " + Cast::string(finalHits)
+            drawCentered(ht, SH / 2 + 84, 22, (dim, dim, dim))
+
+            drawCentered("WASD to restart", SH - 60, 20, (40, 180, 80))
+        }
+    )
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+mgr.switch(makeMenuScene())
+
+// ── Main Loop ─────────────────────────────────────────────────────────────────
+while raylib::rendering() {
+    if keys.isReleased("quit") {
+        break
+    }
+
+    let dt = raylib::getFrameTime()
+    mgr.update(dt)
+    mgr.draw()
+}

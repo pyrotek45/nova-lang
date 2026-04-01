@@ -45,20 +45,26 @@
 
 module ansi
 
+// ESC character (ASCII 27) — Nova's lexer doesn't support \x hex escapes,
+// so we build it at runtime using the built-in chr() function.
+fn _esc() -> String {
+    return Cast::string(chr(27))
+}
+
 // Internal: wrap s between an open and reset escape sequence
 fn _wrap(open: String, s: String) -> String {
-    return "\x1b[" + open + "m" + s + "\x1b[0m"
+    return _esc() + "[" + open + "m" + s + _esc() + "[0m"
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 
+struct Ansi {}
+
 fn extends(Ansi) reset() -> String {
-    return "\x1b[0m"
+    return _esc() + "[0m"
 }
 
 // ── Text styles ───────────────────────────────────────────────────────────────
-
-struct Ansi {}
 
 fn extends(Ansi) bold(s: String) -> String         { return _wrap("1", s) }
 fn extends(Ansi) dim(s: String) -> String          { return _wrap("2", s) }
@@ -111,39 +117,39 @@ fn extends(Ansi) bgBrightWhite(s: String) -> String   { return _wrap("107", s) }
 // ── 256-color and true-color (RGB) ────────────────────────────────────────────
 
 fn extends(Ansi) color256(code: Int, s: String) -> String {
-    return "\x1b[38;5;" + Cast::string(code) + "m" + s + "\x1b[0m"
+    return _esc() + "[38;5;" + Cast::string(code) + "m" + s + _esc() + "[0m"
 }
 
 fn extends(Ansi) bgColor256(code: Int, s: String) -> String {
-    return "\x1b[48;5;" + Cast::string(code) + "m" + s + "\x1b[0m"
+    return _esc() + "[48;5;" + Cast::string(code) + "m" + s + _esc() + "[0m"
 }
 
 fn extends(Ansi) rgb(r: Int, g: Int, b: Int, s: String) -> String {
-    return "\x1b[38;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + "\x1b[0m"
+    return _esc() + "[38;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + _esc() + "[0m"
 }
 
 fn extends(Ansi) bgRgb(r: Int, g: Int, b: Int, s: String) -> String {
-    return "\x1b[48;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + "\x1b[0m"
+    return _esc() + "[48;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + _esc() + "[0m"
 }
 
 // ── Cursor and terminal control ───────────────────────────────────────────────
 
 fn extends(Ansi) clearScreen() -> String {
-    return "\x1b[2J\x1b[H"
+    return _esc() + "[2J" + _esc() + "[H"
 }
 
 fn extends(Ansi) clearLine() -> String {
-    return "\x1b[2K\r"
+    return _esc() + "[2K\r"
 }
 
 fn extends(Ansi) moveTo(row: Int, col: Int) -> String {
-    return "\x1b[" + Cast::string(row) + ";" + Cast::string(col) + "H"
+    return _esc() + "[" + Cast::string(row) + ";" + Cast::string(col) + "H"
 }
 
 fn extends(Ansi) hideCursor() -> String {
-    return "\x1b[?25l"
+    return _esc() + "[?25l"
 }
 
 fn extends(Ansi) showCursor() -> String {
-    return "\x1b[?25h"
+    return _esc() + "[?25h"
 }

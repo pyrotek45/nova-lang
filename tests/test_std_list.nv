@@ -1,0 +1,260 @@
+module test_std_list
+
+import super.std.list
+
+// ── __eq__ ───────────────────────────────────────────────────────
+assert([1, 2, 3] == [1, 2, 3], "eq same lists")
+assert(!([1, 2] == [1, 3]), "eq different")
+assert(!([1, 2] == [1, 2, 3]), "eq different lengths")
+
+// ── dropIndex ────────────────────────────────────────────────────
+let di = [10, 20, 30, 40].dropIndex(1)
+assert(di.len() == 3, "dropIndex len")
+assert(di[0] == 10, "dropIndex[0]")
+assert(di[1] == 30, "dropIndex[1]")
+
+// ── fill ─────────────────────────────────────────────────────────
+let filled = []:Int
+filled = filled.fill(7, 5)
+assert(filled.len() == 5, "fill len")
+assert(filled[0] == 7, "fill[0]")
+assert(filled[4] == 7, "fill[4]")
+
+// ── map ──────────────────────────────────────────────────────────
+let doubled = [1, 2, 3, 4].map(|x: Int| x * 2)
+assert(doubled[0] == 2, "map[0]")
+assert(doubled[3] == 8, "map[3]")
+
+// ── flatmap ──────────────────────────────────────────────────────
+// [1,2,3].flatmap(x -> [x, x*10]) = [1,10,2,20,3,30]
+let fm = [1, 2, 3].flatmap(|x: Int| [x, x * 10])
+assert(fm.len() == 6, "flatmap len")
+assert(fm[0] == 1, "flatmap[0]")
+assert(fm[1] == 10, "flatmap[1]")
+assert(fm[4] == 3, "flatmap[4]")
+
+// ── filter ───────────────────────────────────────────────────────
+let evens = [1, 2, 3, 4, 5, 6].filter(|x: Int| x % 2 == 0)
+assert(evens.len() == 3, "filter len")
+assert(evens[0] == 2, "filter[0]")
+assert(evens[2] == 6, "filter[2]")
+
+// ── indexOf ──────────────────────────────────────────────────────
+assert([10, 20, 30].indexOf(20) == 1, "indexOf found")
+assert([10, 20, 30].indexOf(99) == -1, "indexOf missing")
+
+// ── flatten ──────────────────────────────────────────────────────
+let flat = [[1, 2], [3, 4], [5]].flatten()
+assert(flat.len() == 5, "flatten len")
+assert(flat[0] == 1 && flat[4] == 5, "flatten values")
+
+// ── reduce ───────────────────────────────────────────────────────
+let sumR = [1, 2, 3, 4].reduce(fn(acc: Int, x: Int, i: Int) -> Int { return acc + x }, 0)
+assert(sumR == 10, "reduce sum")
+
+// ── split ────────────────────────────────────────────────────────
+let parts = [1, 0, 2, 0, 3].split(0)
+assert(parts.len() == 3, "split len")
+assert(parts[0][0] == 1, "split[0][0]")
+assert(parts[2][0] == 3, "split[2][0]")
+
+// ── sortWith ─────────────────────────────────────────────────────
+let sorted = [3, 1, 4, 1, 5].sortWith(fn(a: Int, b: Int) -> Bool { return a > b })
+assert(sorted[0] == 1, "sortWith ascending first")
+assert(sorted[4] == 5, "sortWith ascending last")
+
+// ── bubblesort ───────────────────────────────────────────────────
+let bs = [5, 3, 8, 1, 9, 2].bubblesort()
+assert(bs[0] == 1, "bubblesort first")
+assert(bs[5] == 9, "bubblesort last")
+
+// ── append / concat ──────────────────────────────────────────────
+let app = [1, 2].append([3, 4])
+assert(app.len() == 4, "append len")
+assert(app[2] == 3, "append[2]")
+
+let cat = [1, 2].concat([3, 4])
+assert(cat.len() == 4, "concat len")
+
+// ── quicksort ────────────────────────────────────────────────────
+let qs = [9, 3, 7, 1, 5].quicksort()
+assert(qs[0] == 1, "quicksort first")
+assert(qs[4] == 9, "quicksort last")
+
+// ── foldl / foldr ────────────────────────────────────────────────
+let fl = [1, 2, 3].foldl(fn(a: Int, b: Int) -> Int { return a - b })
+assert(fl == -4, "foldl 1-2-3 = -4")
+
+let fr = [1, 2, 3].foldr(fn(a: Int, b: Int) -> Int { return a - b })
+assert(fr == 2, "foldr 1-(2-3)=2")
+
+// ── slice ────────────────────────────────────────────────────────
+let sl = [0, 1, 2, 3, 4].slice(1, 4)
+assert(sl.len() == 3, "slice len")
+assert(sl[0] == 1, "slice[0]")
+assert(sl[2] == 3, "slice[2]")
+
+// ── chunk ────────────────────────────────────────────────────────
+let ch = [1, 2, 3, 4, 5, 6].chunk(2)
+assert(ch.len() == 3, "chunk len")
+assert(ch[0][0] == 1 && ch[0][1] == 2, "chunk[0]")
+assert(ch[2][0] == 5 && ch[2][1] == 6, "chunk[2]")
+
+// ── sum / product ────────────────────────────────────────────────
+assert([1, 2, 3, 4].sum() == 10, "sum Int")
+assert([1, 2, 3, 4].product() == 24, "product")
+
+// ── max / min ────────────────────────────────────────────────────
+assert([3, 1, 4, 1, 5, 9, 2].max() == 9, "max")
+assert([3, 1, 4, 1, 5, 9, 2].min() == 1, "min")
+
+// ── all / any (Bool list) ────────────────────────────────────────
+assert([true, true, true].all(), "all true")
+assert(![true, false, true].all(), "all with false")
+assert([false, true, false].any(), "any true")
+assert(![false, false].any(), "any all false")
+
+// ── zip / unzip ──────────────────────────────────────────────────
+let zipped = [1, 2, 3].zip(["a", "b", "c"])
+assert(zipped.len() == 3, "zip len")
+assert(zipped[0][0] == 1, "zip[0].0")
+assert(zipped[0][1] == "a", "zip[0].1")
+
+let uz = zipped.unzip()
+assert(uz[0][0] == 1, "unzip first[0]")
+assert(uz[1][0] == "a", "unzip second[0]")
+
+// ── reverse ──────────────────────────────────────────────────────
+let rev = [1, 2, 3, 4].reverse()
+assert(rev[0] == 4, "reverse first")
+assert(rev[3] == 1, "reverse last")
+
+// ── unique ───────────────────────────────────────────────────────
+let u = [1, 2, 2, 3, 1, 4].unique()
+assert(u.len() == 4, "unique len")
+
+// ── contains ─────────────────────────────────────────────────────
+assert([1, 2, 3].contains(2), "contains true")
+assert(![1, 2, 3].contains(9), "contains false")
+
+// ── windows ──────────────────────────────────────────────────────
+let wins = [1, 2, 3, 4, 5].windows(3)
+assert(wins.len() == 3, "windows len")
+assert(wins[0][0] == 1 && wins[0][2] == 3, "windows[0]")
+assert(wins[2][0] == 3 && wins[2][2] == 5, "windows[2]")
+
+// ── find ─────────────────────────────────────────────────────────
+let f = [10, 20, 30].find(fn(x: Int) -> Bool { return x > 15 })
+assert(f.isSome(), "find Some")
+assert(f.unwrap() == 20, "find value")
+let fn2 = [10, 20, 30].find(fn(x: Int) -> Bool { return x > 100 })
+assert(fn2.isNone(), "find None")
+
+// ── filterMap ────────────────────────────────────────────────────
+let fmap = [1, 2, 3, 4].filterMap(fn(x: Int) -> Option(Int) {
+    if x % 2 == 0 { return Some(x * 10) }
+    return None(Int)
+})
+assert(fmap.len() == 2, "filterMap len")
+assert(fmap[0] == 20, "filterMap[0]")
+
+// ── count ────────────────────────────────────────────────────────
+let cnt = [1, 2, 3, 4, 5].count(fn(x: Int) -> Bool { return x > 2 })
+assert(cnt == 3, "count pred")
+
+// ── isEmpty ──────────────────────────────────────────────────────
+assert(([]:Int).isEmpty(), "isEmpty true")
+assert(![1, 2].isEmpty(), "isEmpty false")
+
+// ── take / drop ──────────────────────────────────────────────────
+let tk = [1, 2, 3, 4, 5].take(3)
+assert(tk.len() == 3, "take len")
+assert(tk[2] == 3, "take[2]")
+
+let dr = [1, 2, 3, 4, 5].drop(2)
+assert(dr.len() == 3, "drop len")
+assert(dr[0] == 3, "drop first")
+
+// ── takeWhile / dropWhile ─────────────────────────────────────────
+let tw = [1, 2, 3, 4, 5].takeWhile(fn(x: Int) -> Bool { return x < 4 })
+assert(tw.len() == 3, "takeWhile len")
+
+let dw = [1, 2, 3, 4, 5].dropWhile(fn(x: Int) -> Bool { return x < 3 })
+assert(dw.len() == 3, "dropWhile len")
+assert(dw[0] == 3, "dropWhile first")
+
+// ── partition ────────────────────────────────────────────────────
+let p = [1, 2, 3, 4, 5, 6].partition(fn(x: Int) -> Bool { return x % 2 == 0 })
+assert(p[0].len() == 3, "partition evens len")
+assert(p[1].len() == 3, "partition odds len")
+assert(p[0][0] == 2, "partition even first")
+assert(p[1][0] == 1, "partition odd first")
+
+// ── groupBy ──────────────────────────────────────────────────────
+let gb = [1, 2, 3, 4, 5, 6].groupBy(fn(x: Int) -> Int { return x % 3 })
+assert(gb.len() == 3, "groupBy 3 groups")
+
+// ── group ────────────────────────────────────────────────────────
+let g = [1, 2, 2, 3, 3, 3].group()
+assert(g.len() == 3, "group len")
+
+// ── zipWith ──────────────────────────────────────────────────────
+let zw = [1, 2, 3].zipWith([10, 20, 30], fn(a: Int, b: Int) -> Int { return a + b })
+assert(zw[0] == 11, "zipWith[0]")
+assert(zw[2] == 33, "zipWith[2]")
+
+// ── truncate ─────────────────────────────────────────────────────
+let tr = [1, 2, 3, 4, 5].truncate(2)
+assert(tr.len() == 3, "truncate len")
+assert(tr[2] == 3, "truncate last")
+
+// ── intersperse ───────────────────────────────────────────────────
+let is = [1, 2, 3].intersperse(0)
+assert(is.len() == 5, "intersperse len")
+assert(is[1] == 0, "intersperse sep[1]")
+assert(is[3] == 0, "intersperse sep[3]")
+assert(is[0] == 1 && is[2] == 2 && is[4] == 3, "intersperse values")
+
+// ── last ─────────────────────────────────────────────────────────
+let lv = [10, 20, 30].last()
+assert(lv.isSome(), "last Some")
+assert(lv.unwrap() == 30, "last value")
+assert(([]:Int).last().isNone(), "last empty None")
+
+// ── anyWith / allWith ─────────────────────────────────────────────
+assert([1, 2, 3].anyWith(fn(x: Int) -> Bool { return x == 2 }), "anyWith true")
+assert(![1, 2, 3].anyWith(fn(x: Int) -> Bool { return x == 9 }), "anyWith false")
+assert([2, 4, 6].allWith(fn(x: Int) -> Bool { return x % 2 == 0 }), "allWith true")
+assert(![2, 4, 5].allWith(fn(x: Int) -> Bool { return x % 2 == 0 }), "allWith false")
+
+// ── indices ──────────────────────────────────────────────────────
+let idx = [100, 200, 300].indices()
+assert(idx.len() == 3, "indices len")
+assert(idx[0] == 0 && idx[2] == 2, "indices values")
+
+// ── get ──────────────────────────────────────────────────────────
+assert([5, 10, 15].get(1).unwrap() == 10, "get Some")
+assert([5, 10, 15].get(99).isNone(), "get out-of-bounds None")
+
+// ── enumerate ────────────────────────────────────────────────────
+let en = [100, 200, 300].enumerate()
+assert(en.len() == 3, "enumerate len")
+assert(en[0][1] == 0, "enumerate index[0]")
+assert(en[1][0] == 200, "enumerate value[1]")
+
+// ── Bitmask ──────────────────────────────────────────────────────
+let bm = [1, 2, 3, 4, 5].bitmask(fn(x: Int) -> Bool { return x % 2 == 0 })
+assert(bm.data[0] == 0, "bitmask odd=0")
+assert(bm.data[1] == 1, "bitmask even=1")
+assert(bm.data[3] == 1, "bitmask even=1 [3]")
+
+let inv = bm.inverse()
+assert(inv.data[0] == 1, "inverse odd->1")
+assert(inv.data[1] == 0, "inverse even->0")
+
+let sel = [10, 20, 30, 40, 50].selection(bm)
+assert(sel.len() == 2, "selection len")
+assert(sel[0] == 20, "selection[0]")
+assert(sel[1] == 40, "selection[1]")
+
+println("PASS: test_std_list")
