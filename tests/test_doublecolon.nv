@@ -37,4 +37,4 @@ let it = Iter::fromRange(0, 5)
 let collected = it.collect()
 println("TEST DC6 - Iter::fromRange: " + Cast::string(collected))
 
-println("ALL DOUBLECOLON TESTS PASSED")
+println("PASS: test_doublecolon")

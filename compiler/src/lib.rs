@@ -744,12 +744,24 @@ impl Compiler {
                             let endp = self.gen.generate();
                             self.breaks.push(endp);
 
+                            // If the loop variable already exists as a real variable
+                            // (from a prior loop), we must also store the unrolled
+                            // value into the variable slot so inner code that reads
+                            // from variables (checked before unrolled_index) sees the
+                            // correct value for this iteration.
+                            let existing_var_index =
+                                self.variables.get_index(identifier).map(|i| i as u32);
+
                             if *inclusive {
                                 for value in *start..*end {
                                     let nextp = self.gen.generate();
                                     self.continues.push(nextp);
                                     self.unrolled_index
                                         .insert(identifier.clone(), value as usize);
+                                    if let Some(idx) = existing_var_index {
+                                        self.asm.push(Asm::INTEGER(value));
+                                        self.asm.push(Asm::STORE(idx));
+                                    }
                                     let whilebody = Ast {
                                         program: body.clone(),
                                     };
@@ -772,6 +784,10 @@ impl Compiler {
                                     self.continues.push(nextp);
                                     self.unrolled_index
                                         .insert(identifier.clone(), value as usize);
+                                    if let Some(idx) = existing_var_index {
+                                        self.asm.push(Asm::INTEGER(value));
+                                        self.asm.push(Asm::STORE(idx));
+                                    }
                                     let whilebody = Ast {
                                         program: body.clone(),
                                     };

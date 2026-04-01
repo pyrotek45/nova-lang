@@ -1,0 +1,322 @@
+module test_perf_regression
+
+// ============================================================
+// Performance Regression Detection
+// ============================================================
+// PURPOSE: Catch catastrophic performance regressions.
+//
+// Each benchmark has a generous time limit (10-20x typical).
+// If a benchmark exceeds its limit, something is very wrong:
+//   - An optimization was accidentally removed
+//   - A hot path now allocates when it shouldn't
+//   - The GC is thrashing
+//   - Loop unrolling broke
+//
+// IMPORTANT: These limits are deliberately generous so they
+// don't flake on slow CI machines. They only fail when there
+// is a real, severe regression.
+// ============================================================
+
+import super.std.list
+import super.std.core
+import super.std.iter
+import super.std.hashmap
+import super.std.set
+
+let all_ok = true
+let test_count = 0
+
+// ============================================================
+// REG 1: Integer arithmetic — must stay under 200ms
+// Typical: ~8ms. Limit: 200ms.
+// ============================================================
+let t1s = now()
+let sum1 = 0
+for i in 0..100000 {
+    sum1 = sum1 + i
+}
+let t1e = now()
+let t1d = t1e - t1s
+assert(sum1 == 4999950000, "REG1: int_arithmetic correctness")
+test_count = test_count + 1
+if t1d > 200 {
+    println("  FAIL REG1 [int_arithmetic] " + Cast::string(t1d) + "ms > 200ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG1 [int_arithmetic] " + Cast::string(t1d) + "ms (limit 200ms)")
+}
+
+// ============================================================
+// REG 2: Recursive fib(25) — must stay under 500ms
+// Typical: ~26ms. Limit: 500ms.
+// ============================================================
+fn fib_reg(n: Int) -> Int {
+    if n <= 1 { return n }
+    return fib_reg(n - 1) + fib_reg(n - 2)
+}
+
+let t2s = now()
+let fib_r = fib_reg(25)
+let t2e = now()
+let t2d = t2e - t2s
+assert(fib_r == 75025, "REG2: recursive_fib correctness")
+test_count = test_count + 1
+if t2d > 500 {
+    println("  FAIL REG2 [recursive_fib] " + Cast::string(t2d) + "ms > 500ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG2 [recursive_fib] " + Cast::string(t2d) + "ms (limit 500ms)")
+}
+
+// ============================================================
+// REG 3: List push + iterate — must stay under 200ms
+// Typical: ~4ms. Limit: 200ms.
+// ============================================================
+let t3s = now()
+let nums3 = []: Int
+for i in 0..20000 {
+    nums3.push(i)
+}
+let lsum3 = 0
+for i in 0..nums3.len() {
+    lsum3 = lsum3 + nums3[i]
+}
+let t3e = now()
+let t3d = t3e - t3s
+assert(lsum3 == 199990000, "REG3: list_ops correctness")
+test_count = test_count + 1
+if t3d > 200 {
+    println("  FAIL REG3 [list_ops] " + Cast::string(t3d) + "ms > 200ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG3 [list_ops] " + Cast::string(t3d) + "ms (limit 200ms)")
+}
+
+// ============================================================
+// REG 4: Function call overhead — must stay under 200ms
+// Typical: ~10ms. Limit: 200ms.
+// ============================================================
+fn inc_reg(x: Int) -> Int { return x + 1 }
+
+let t4s = now()
+let val4 = 0
+for i in 0..100000 {
+    val4 = inc_reg(val4)
+}
+let t4e = now()
+let t4d = t4e - t4s
+assert(val4 == 100000, "REG4: function_calls correctness")
+test_count = test_count + 1
+if t4d > 200 {
+    println("  FAIL REG4 [function_calls] " + Cast::string(t4d) + "ms > 200ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG4 [function_calls] " + Cast::string(t4d) + "ms (limit 200ms)")
+}
+
+// ============================================================
+// REG 5: Closure invoke — must stay under 200ms
+// Typical: ~8ms. Limit: 200ms.
+// ============================================================
+fn make_adder_reg(base: Int) -> fn(Int) -> Int {
+    return fn (x: Int) -> Int { return base + x }
+}
+
+let t5s = now()
+let add5 = make_adder_reg(5)
+let cl_sum = 0
+for i in 0..50000 {
+    cl_sum = cl_sum + add5(i)
+}
+let t5e = now()
+let t5d = t5e - t5s
+assert(cl_sum == 1250225000, "REG5: closure_invoke correctness")
+test_count = test_count + 1
+if t5d > 200 {
+    println("  FAIL REG5 [closure_invoke] " + Cast::string(t5d) + "ms > 200ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG5 [closure_invoke] " + Cast::string(t5d) + "ms (limit 200ms)")
+}
+
+// ============================================================
+// REG 6: HashMap ops — must stay under 500ms
+// Typical: ~16ms. Limit: 500ms.
+// ============================================================
+let t6s = now()
+let hm6 = HashMap::default() @[K: String, V: Int]
+for i in 0..5000 {
+    hm6.insert(Cast::string(i), i)
+}
+let hm6_sum = 0
+for i in 0..5000 {
+    let v = hm6.get(Cast::string(i))
+    if v.isSome() {
+        hm6_sum = hm6_sum + v.unwrap()
+    }
+}
+let t6e = now()
+let t6d = t6e - t6s
+assert(hm6_sum == 12497500, "REG6: hashmap correctness")
+test_count = test_count + 1
+if t6d > 500 {
+    println("  FAIL REG6 [hashmap_ops] " + Cast::string(t6d) + "ms > 500ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG6 [hashmap_ops] " + Cast::string(t6d) + "ms (limit 500ms)")
+}
+
+// ============================================================
+// REG 7: Nested loops — must stay under 400ms
+// Typical: ~19ms. Limit: 400ms.
+// ============================================================
+let t7s = now()
+let nl_sum = 0
+for i in 0..500 {
+    for j in 0..500 {
+        nl_sum = nl_sum + 1
+    }
+}
+let t7e = now()
+let t7d = t7e - t7s
+assert(nl_sum == 250000, "REG7: nested_loops correctness")
+test_count = test_count + 1
+if t7d > 400 {
+    println("  FAIL REG7 [nested_loops] " + Cast::string(t7d) + "ms > 400ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG7 [nested_loops] " + Cast::string(t7d) + "ms (limit 400ms)")
+}
+
+// ============================================================
+// REG 8: GC stress — must stay under 300ms
+// Typical: ~8ms. Limit: 300ms.
+// ============================================================
+let t8s = now()
+let gc_check = 0
+for i in 0..5000 {
+    let tmp = []: Int
+    for j in 0..20 {
+        tmp.push(j)
+    }
+    gc_check = gc_check + tmp.len()
+}
+let t8e = now()
+let t8d = t8e - t8s
+assert(gc_check == 100000, "REG8: gc_stress correctness")
+test_count = test_count + 1
+if t8d > 300 {
+    println("  FAIL REG8 [gc_stress] " + Cast::string(t8d) + "ms > 300ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG8 [gc_stress] " + Cast::string(t8d) + "ms (limit 300ms)")
+}
+
+// ============================================================
+// REG 9: Struct creation & method — must stay under 500ms
+// Typical: ~21ms. Limit: 500ms.
+// ============================================================
+struct RegVec2 { x: Int, y: Int }
+fn extends addRegVec(self: RegVec2, other: RegVec2) -> RegVec2 {
+    return RegVec2 { x: self.x + other.x, y: self.y + other.y }
+}
+
+let t9s = now()
+let acc9 = RegVec2 { x: 0, y: 0 }
+for i in 0..20000 {
+    let v = RegVec2 { x: i, y: i * 2 }
+    acc9 = acc9.addRegVec(v)
+}
+let t9e = now()
+let t9d = t9e - t9s
+assert(acc9.x == 199990000, "REG9: struct_ops correctness x")
+assert(acc9.y == 399980000, "REG9: struct_ops correctness y")
+test_count = test_count + 1
+if t9d > 500 {
+    println("  FAIL REG9 [struct_ops] " + Cast::string(t9d) + "ms > 500ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG9 [struct_ops] " + Cast::string(t9d) + "ms (limit 500ms)")
+}
+
+// ============================================================
+// REG 10: Iterator pipeline — must stay under 300ms
+// Typical: ~7ms. Limit: 300ms.
+// ============================================================
+let t10s = now()
+let ip_sum = 0
+for round in 0..100 {
+    let collected = Iter::fromRange(0, 100)
+        .map(fn (x: Int) -> Int { return x * x })
+        .filter(fn (x: Int) -> Bool { return x % 2 == 0 })
+        .collect()
+    let rsum = collected.reduce(fn (a: Int, b: Int, idx: Int) -> Int { return a + b }, 0)
+    ip_sum = ip_sum + rsum
+}
+let t10e = now()
+let t10d = t10e - t10s
+assert(ip_sum == 16170000, "REG10: iter_pipeline correctness")
+test_count = test_count + 1
+if t10d > 300 {
+    println("  FAIL REG10 [iter_pipeline] " + Cast::string(t10d) + "ms > 300ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG10 [iter_pipeline] " + Cast::string(t10d) + "ms (limit 300ms)")
+}
+
+// ============================================================
+// REG 11: Set operations — must stay under 500ms
+// Typical: ~29ms. Limit: 500ms.
+// ============================================================
+let t11s = now()
+let set11a = Set::empty() @[T: Int]
+let set11b = Set::empty() @[T: Int]
+for i in 0..3000 {
+    set11a.add(i)
+}
+for i in 1500..4500 {
+    set11b.add(i)
+}
+let s11_union = set11a.union(set11b)
+let s11_inter = set11a.intersection(set11b)
+let t11e = now()
+let t11d = t11e - t11s
+assert(s11_union.size() == 4500, "REG11: set_ops union")
+assert(s11_inter.size() == 1500, "REG11: set_ops intersection")
+test_count = test_count + 1
+if t11d > 500 {
+    println("  FAIL REG11 [set_ops] " + Cast::string(t11d) + "ms > 500ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG11 [set_ops] " + Cast::string(t11d) + "ms (limit 500ms)")
+}
+
+// ============================================================
+// REG 12: LEN opcode — must stay under 200ms
+// Typical: ~9ms. Limit: 200ms.
+// ============================================================
+let t12s = now()
+let len_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let len_sum = 0
+for i in 0..100000 {
+    len_sum = len_sum + len_list.len()
+}
+let t12e = now()
+let t12d = t12e - t12s
+assert(len_sum == 1000000, "REG12: len_opcode correctness")
+test_count = test_count + 1
+if t12d > 200 {
+    println("  FAIL REG12 [len_opcode] " + Cast::string(t12d) + "ms > 200ms limit")
+    all_ok = false
+} else {
+    println("  OK   REG12 [len_opcode] " + Cast::string(t12d) + "ms (limit 200ms)")
+}
+
+// ============================================================
+// Summary
+// ============================================================
+println("")
+println("Regression checks: " + Cast::string(test_count) + " benchmarks evaluated")
+
+assert(all_ok == true, "PERFORMANCE REGRESSION DETECTED — see FAIL lines above")
+println("PASS: test_perf_regression")
