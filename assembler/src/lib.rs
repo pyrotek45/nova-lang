@@ -242,11 +242,14 @@ impl Assembler {
                 Asm::AND => self.output.push(Code::AND),
                 Asm::OR => self.output.push(Code::OR),
                 Asm::NATIVE(index, pos) => {
+                    self.output.push(Code::NATIVE);
                     if let Some(file_position) = pos {
+                        // Insert AFTER the opcode byte — same convention as UNWRAP/GETF/ERROR.
+                        // The VM reads the opcode with next_instruction() (+1), so
+                        // current_instruction == opcode_offset+1 when the error fires.
                         self.runtime_error_table
                             .insert(self.output.len(), file_position);
                     }
-                    self.output.push(Code::NATIVE);
                     let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }

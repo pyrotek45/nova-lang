@@ -242,6 +242,10 @@ pub struct MemoryManager {
     last_gc: Option<Instant>,
     /// Reusable mark-bit buffer — avoids allocating a new Vec every GC cycle.
     mark_bits: Vec<bool>,
+    /// When > 0, `allocate` will NOT trigger `collect_cycles`.
+    /// Used to protect raw-popped values that are temporarily off the stack
+    /// (e.g., during native function calls or multi-step VM opcodes).
+    gc_lock: usize,
 }
 
 impl MemoryManager {
@@ -255,6 +259,7 @@ impl MemoryManager {
             next_gc: base_threshold,
             last_gc: None,
             mark_bits: Vec::new(),
+            gc_lock: 0,
         }
     }
 
@@ -346,9 +351,22 @@ impl MemoryManager {
         self.heap.len() - self.free_list.len()
     }
 
+    /// Prevent `allocate` from triggering `collect_cycles`.
+    /// Must be paired with a matching `gc_release`.
+    #[inline]
+    pub fn gc_inhibit(&mut self) {
+        self.gc_lock += 1;
+    }
+
+    /// Re-enable GC after a matching `gc_inhibit`.
+    #[inline]
+    pub fn gc_release(&mut self) {
+        self.gc_lock = self.gc_lock.saturating_sub(1);
+    }
+
     /// Allocate a new heap object.
     pub fn allocate(&mut self, object: Object) -> usize {
-        if self.live_count() >= self.next_gc {
+        if self.gc_lock == 0 && self.live_count() >= self.next_gc {
             let now = Instant::now();
             if let Some(last) = self.last_gc {
                 let delta = now.duration_since(last).as_millis();
