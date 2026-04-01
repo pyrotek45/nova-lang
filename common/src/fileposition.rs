@@ -11,10 +11,7 @@ pub struct FilePosition {
 
 impl fmt::Display for FilePosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let file = self
-            .filepath
-            .as_deref()
-            .unwrap_or(Path::new("repl"));
+        let file = self.filepath.as_deref().unwrap_or(Path::new("repl"));
         write!(f, "{}:{}:{}", file.display(), self.line, self.col)
     }
 }

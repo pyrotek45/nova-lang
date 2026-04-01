@@ -1,0 +1,338 @@
+module test_gc_lifetimes
+
+import super.std.core
+import super.std.list
+
+// ============================================================================
+// Complex GC Lifetime Tests
+//
+// These tests exercise the garbage collector in scenarios where object
+// lifetimes are non-trivial: objects that outlive their creator scope,
+// objects passed into and out of multiple functions, closures that keep
+// environments alive, and shared mutable state that changes owners.
+//
+// Each test is annotated with the expected lifetime behaviour.
+// ============================================================================
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+struct Record {
+    id:   Int,
+    data: [Int],
+    tag:  String,
+}
+
+fn make_record(id: Int) -> Record {
+    return Record { id: id, data: [id, id * 2, id * 3], tag: "r" + Cast::string(id) }
+}
+
+// ── 1. Object outlives the scope that created it (returned upward) ────────────
+fn create_long_lived() -> [Record] {
+    let local = []: Record
+    for let i = 0; i < 10; i += 1 {
+        local.push(make_record(i))
+    }
+    return local   // local's ref-count stays ≥1 because it's returned
+}
+
+let long_lived = create_long_lived()
+assert(long_lived.len() == 10,       "lt1: returned list length")
+assert(long_lived[5].id == 5,        "lt1: record id correct")
+assert(long_lived[5].data[2] == 15,  "lt1: record data correct")
+
+// ── 2. Object passed through multiple function layers ─────────────────────────
+fn add_item(lst: [Int], v: Int) {
+    lst.push(v)
+}
+
+fn fill_three(lst: [Int]) {
+    add_item(lst, 1)
+    add_item(lst, 2)
+    add_item(lst, 3)
+}
+
+fn fill_via_two(lst: [Int]) {
+    fill_three(lst)
+    add_item(lst, 99)
+}
+
+let deep_pass = []: Int
+fill_via_two(deep_pass)
+assert(deep_pass.len() == 4,  "lt2: four items after 3-level pass")
+assert(deep_pass[3] == 99,    "lt2: final item correct")
+
+// ── 3. Closure that outlives the local variables it captures ──────────────────
+// The Box `state` is created inside `make_pipeline`; the returned closures
+// keep it alive even after `make_pipeline` returns.
+fn make_pipeline() -> (fn(Int), fn() -> [Int], fn()) {
+    let state = Box([]: Int)
+    let push  = fn(v: Int) { state.value.push(v) }
+    let get   = fn() -> [Int] { return clone(state.value) }
+    let reset = fn() { state.value = []: Int }
+    return (push, get, reset)
+}
+
+let pipe = make_pipeline()
+let pipe_push  = pipe[0]
+let pipe_get   = pipe[1]
+let pipe_reset = pipe[2]
+
+pipe_push(10)
+pipe_push(20)
+pipe_push(30)
+assert(pipe_get().len() == 3,   "lt3: 3 items pushed")
+assert(pipe_get()[1] == 20,     "lt3: second item correct")
+
+pipe_reset()
+assert(pipe_get().len() == 0,   "lt3: reset clears list")
+
+pipe_push(99)
+assert(pipe_get()[0] == 99,     "lt3: push after reset")
+
+// ── 4. Object transferred between two closures sharing a Box ──────────────────
+fn make_transfer_pair() -> (fn([Int]), fn() -> [Int]) {
+    let inbox = Box([]: [Int])
+    let send    = fn(item: [Int]) { inbox.value.push(item) }
+    let receive = fn() -> [Int] {
+        if inbox.value.len() == 0 {
+            return []: Int
+        }
+        let msg = inbox.value[0]
+        inbox.value.remove(0)
+        return msg
+    }
+    return (send, receive)
+}
+
+let pair  = make_transfer_pair()
+let send  = pair[0]
+let recv  = pair[1]
+
+send([1, 2, 3])
+send([4, 5, 6])
+let first = recv()
+assert(first.len() == 3, "lt4: first message received")
+assert(first[0] == 1,    "lt4: first message element 0")
+let second = recv()
+assert(second[0] == 4,   "lt4: second message element 0")
+let empty = recv()
+assert(empty.len() == 0, "lt4: inbox empty after two receives")
+
+// ── 5. Struct holding closures that reference the struct's own Box ─────────────
+struct EventBus {
+    handlers: [fn(String)],
+    log:      Box([String]),
+}
+
+fn make_event_bus() -> EventBus {
+    let bus_log = Box([]: String)
+    let bus = EventBus {
+        handlers: []: fn(String),
+        log: bus_log,
+    }
+    return bus
+}
+
+let bus = make_event_bus()
+// Register two handlers, each captures bus.log
+bus.handlers.push(fn(e: String) { bus.log.value.push("A:" + e) })
+bus.handlers.push(fn(e: String) { bus.log.value.push("B:" + e) })
+
+// Fire an event through all handlers
+fn fire(b: EventBus, event: String) {
+    for let i = 0; i < b.handlers.len(); i += 1 {
+        b.handlers[i](event)
+    }
+}
+
+fire(bus, "click")
+fire(bus, "hover")
+assert(bus.log.value.len() == 4,      "lt5: 4 log entries (2 handlers x 2 events)")
+assert(bus.log.value[0] == "A:click", "lt5: first entry")
+assert(bus.log.value[3] == "B:hover", "lt5: last entry")
+
+// ── 6. Recursive function builds deeply nested live objects ───────────────────
+struct TreeNode {
+    val:      Int,
+    children: [TreeNode],
+}
+
+fn build_full_tree(depth: Int, v: Int) -> TreeNode {
+    if depth == 0 {
+        return TreeNode { val: v, children: []: TreeNode }
+    }
+    let node = TreeNode { val: v, children: []: TreeNode }
+    node.children.push(build_full_tree(depth - 1, v * 2))
+    node.children.push(build_full_tree(depth - 1, v * 2 + 1))
+    return node
+}
+
+fn count_nodes(t: TreeNode) -> Int {
+    if t.children.len() == 0 {
+        return 1
+    }
+    let total = 1
+    for let i = 0; i < t.children.len(); i += 1 {
+        total = total + count_nodes(t.children[i])
+    }
+    return total
+}
+
+let full_tree = build_full_tree(5, 1)
+// Full binary tree of depth 5 has 2^6 - 1 = 63 nodes
+assert(count_nodes(full_tree) == 63, "lt6: full binary tree has 63 nodes")
+assert(full_tree.val == 1,            "lt6: root value")
+assert(full_tree.children[0].val == 2, "lt6: left child value")
+assert(full_tree.children[1].val == 3, "lt6: right child value")
+
+// Release the tree — all 63 nodes should be collected
+full_tree.children = []: TreeNode
+assert(full_tree.children.len() == 0, "lt6: tree children released")
+
+// ── 7. Object survives many re-bindings at the same name ──────────────────────
+// Each iteration reassigns `live`; the old value's refcount drops but the
+// initial object is kept alive via `anchor`.
+let anchor = [1, 2, 3]
+let live = anchor
+for let i = 0; i < 100; i += 1 {
+    live = [i, i + 1, i + 2]
+}
+assert(anchor[0] == 1,   "lt7: anchor unaffected by loop rebinding")
+assert(anchor.len() == 3,"lt7: anchor length unchanged")
+assert(live[0] == 99,    "lt7: live is last iteration value")
+
+// ── 8. Mixed lifetime scopes — inner scope closes, outer survives ─────────────
+fn inner_scope_test() -> [String] {
+    let outer_log = []: String
+    outer_log.push("outer_start")
+
+    // Simulate inner scope with an immediately-called closure
+    let inner = fn() {
+        let temp = []: Int
+        for let i = 0; i < 20; i += 1 {
+            temp.push(i)
+        }
+        // temp goes out of scope here; outer_log is captured by ref and stays live
+        outer_log.push("inner_done_" + Cast::string(temp.len()))
+    }
+    inner()
+
+    outer_log.push("outer_end")
+    return outer_log
+}
+
+let scope_log = inner_scope_test()
+assert(scope_log.len() == 3,              "lt8: 3 log entries")
+assert(scope_log[0] == "outer_start",     "lt8: outer_start")
+assert(scope_log[1] == "inner_done_20",   "lt8: inner_done_20")
+assert(scope_log[2] == "outer_end",       "lt8: outer_end")
+
+// ── 9. Closures stored in a list, executed in reverse order ───────────────────
+// Each closure captures a unique Box; reversing execution order must still
+// read the Box values correctly.
+let tasks = []: fn() -> Int
+for let i = 0; i < 10; i += 1 {
+    let b = Box(i * i)
+    tasks.push(fn() -> Int { return b.value })
+}
+// Execute in reverse
+let task_results = []: Int
+for let i = tasks.len() - 1; i >= 0; i -= 1 {
+    task_results.push(tasks[i]())
+}
+// task_results[0] = tasks[9]() = 81, ..., task_results[9] = tasks[0]() = 0
+assert(task_results[0] == 81, "lt9: task 9 = 9² = 81")
+assert(task_results[9] == 0,  "lt9: task 0 = 0² = 0")
+assert(task_results[5] == 16, "lt9: task 4 (idx 5) = 4² = 16")
+
+// ── 10. Long-lived accumulator collects results from many short-lived fns ──────
+let accumulator = Box(0)
+
+fn run_job(acc: Box(Int), job_id: Int) {
+    let work = []: Int
+    for let i = 0; i < job_id; i += 1 {
+        work.push(i)
+    }
+    // work is short-lived; acc is the only long-lived thing
+    acc.value = acc.value + work.len()
+}
+
+for let j = 0; j < 20; j += 1 {
+    run_job(accumulator, j)
+}
+// sum of 0..19 = 190
+assert(accumulator.value == 190, "lt10: accumulator = 190")
+
+// ── 11. Generator that yields closures, each with an independent state ─────────
+fn make_gen_series(count: Int) -> [fn() -> Int] {
+    let generators = []: fn() -> Int
+    for let i = 0; i < count; i += 1 {
+        let counter = Box(i * 10)
+        generators.push(fn() -> Int {
+            let v = counter.value
+            counter.value = counter.value + 1
+            return v
+        })
+    }
+    return generators
+}
+
+let gens = make_gen_series(5)
+// Each generator starts at i*10
+assert(gens[0]() == 0,  "lt11: gen0 first call = 0")
+assert(gens[0]() == 1,  "lt11: gen0 second call = 1")
+assert(gens[2]() == 20, "lt11: gen2 first call = 20")
+assert(gens[2]() == 21, "lt11: gen2 second call = 21")
+assert(gens[4]() == 40, "lt11: gen4 first call = 40")
+
+// ── 12. Struct fields replaced repeatedly — old heap objects freed ─────────────
+struct Bucket {
+    items: [String],
+    count: Int,
+}
+
+fn rotate_bucket(b: Bucket, new_items: [String]) -> Bucket {
+    b.items = new_items
+    b.count = new_items.len()
+    return b
+}
+
+let bucket = Bucket { items: ["a", "b", "c"], count: 3 }
+for let i = 0; i < 50; i += 1 {
+    let fresh = [Cast::string(i), Cast::string(i + 1)]
+    bucket.items = fresh
+    bucket.count = 2
+}
+assert(bucket.count == 2,       "lt12: final count after 50 rotations")
+assert(bucket.items.len() == 2, "lt12: final items length")
+assert(bucket.items[0] == "49", "lt12: final items[0] = 49")
+
+// ── 13. Closure capturing a struct that is also aliased externally ─────────────
+let shared_rec = Record { id: 42, data: [1, 2, 3], tag: "shared" }
+let alias_rec  = shared_rec  // alias; same object
+
+let capture_fn = fn() -> Int {
+    return shared_rec.id
+}
+
+// Mutate via alias
+alias_rec.id = 99
+
+assert(shared_rec.id == 99,   "lt13: mutation via alias visible in original")
+assert(capture_fn() == 99,    "lt13: closure sees mutated value")
+
+// ── 14. Stress: 500 closures, each capturing a unique list, called once ────────
+let stress_closures = []: fn() -> Int
+for let i = 0; i < 500; i += 1 {
+    let data = [i, i + 1, i + 2]
+    stress_closures.push(fn() -> Int { return data[0] + data[1] + data[2] })
+}
+
+let stress_total = 0
+for let i = 0; i < stress_closures.len(); i += 1 {
+    stress_total = stress_total + stress_closures[i]()
+}
+// data[0]+data[1]+data[2] for closure i = i + (i+1) + (i+2) = 3i+3
+// sum for i=0..499 = 3*(0+1+..+499) + 3*500 = 3*124750 + 1500 = 374250 + 1500 = 375750
+assert(stress_total == 375750, "lt14: stress 500 closures total = 375750")
+
+println("PASS: test_gc_lifetimes")

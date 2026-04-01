@@ -94,8 +94,7 @@ pub fn rawread(state: &mut state::State) -> NovaResult<()> {
         let ready = event::poll(Duration::from_millis(ms))
             .map_err(|e| runtime_err(format!("rawread poll failed: {e}")))?;
         if ready {
-            let ev = event::read()
-                .map_err(|e| runtime_err(format!("rawread read failed: {e}")))?;
+            let ev = event::read().map_err(|e| runtime_err(format!("rawread read failed: {e}")))?;
             if let Event::Key(KeyEvent {
                 code: KeyCode::Char(character),
                 modifiers: event::KeyModifiers::NONE,

@@ -83,7 +83,10 @@ impl Environment {
                         );
                     }
                 } else {
-                    debug_assert!(false, "insert_symbol(Function) called with non-function type");
+                    debug_assert!(
+                        false,
+                        "insert_symbol(Function) called with non-function type"
+                    );
                 }
             }
             _ => {
@@ -110,7 +113,7 @@ impl Environment {
         }
         self.values
             .last()
-            .map_or(false, |scope| scope.contains_key(symbol))
+            .is_some_and(|scope| scope.contains_key(symbol))
     }
 
     pub fn get(&mut self, symbol: &str) -> Option<Symbol> {
@@ -118,10 +121,7 @@ impl Environment {
     }
 
     pub fn get_type(&mut self, symbol: &str) -> Option<TType> {
-        self.values
-            .last()?
-            .get(symbol)
-            .map(|s| s.ttype.clone())
+        self.values.last()?.get(symbol).map(|s| s.ttype.clone())
     }
 
     pub fn get_type_capture(&mut self, symbol: &str) -> Option<(TType, Rc<str>, SymbolKind)> {
@@ -180,9 +180,7 @@ impl Environment {
             } else {
                 None
             }
-        } else if let Some(s) =
-            scope.get(generate_unique_string(symbol, arguments).as_str())
-        {
+        } else if let Some(s) = scope.get(generate_unique_string(symbol, arguments).as_str()) {
             if let TType::Function { .. } = s.ttype {
                 Some((s.ttype.clone(), s.id.clone(), s.kind.clone()))
             } else {
@@ -201,7 +199,9 @@ impl Environment {
         if let Some(last) = self.values.last() {
             for (id, sym) in last.iter() {
                 match sym.kind {
-                    SymbolKind::Function | SymbolKind::GenericFunction | SymbolKind::Constructor => {
+                    SymbolKind::Function
+                    | SymbolKind::GenericFunction
+                    | SymbolKind::Constructor => {
                         scope.insert(id.clone(), sym.clone());
                     }
                     _ => {}

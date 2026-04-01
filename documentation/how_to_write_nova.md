@@ -1,6 +1,14 @@
 
 
 
+# How to Write Nova
+
+Nova is a statically typed, expression-oriented programming language with garbage collection,
+universal function call syntax (UFCS), first-class functions, and a structural dynamic-dispatch
+system called Dyn types. This guide covers every major feature with working examples.
+
+---
+
 ## Table of Contents
 
 1. [Module System](#1-module-system)

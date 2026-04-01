@@ -107,9 +107,12 @@ impl Vm {
             }
 
             Code::DUP => {
-                let top = self.state.memory.stack.last().ok_or_else(|| {
-                    self.runtime_error("DUP: stack is empty")
-                })?;
+                let top = self
+                    .state
+                    .memory
+                    .stack
+                    .last()
+                    .ok_or_else(|| self.runtime_error("DUP: stack is empty"))?;
                 self.state.memory.stack.push(*top);
             }
 
@@ -169,9 +172,12 @@ impl Vm {
 
             // i think you can figure this one out
             Code::PRINT => {
-                let item = self.state.memory.stack.pop().ok_or_else(|| {
-                    self.runtime_error("PRINT: stack is empty")
-                })?;
+                let item = self
+                    .state
+                    .memory
+                    .stack
+                    .pop()
+                    .ok_or_else(|| self.runtime_error("PRINT: stack is empty"))?;
                 match item {
                     VmData::Int(i) => print!("{}", i),
                     VmData::Float(f) => print!("{}", f),
@@ -335,9 +341,12 @@ impl Vm {
 
             Code::STOREGLOBAL => {
                 let index = u32::from_le_bytes(self.state.next_arr());
-                let item = self.state.memory.stack.pop().ok_or_else(|| {
-                    self.runtime_error("STOREGLOBAL: stack is empty")
-                })?;
+                let item = self
+                    .state
+                    .memory
+                    .stack
+                    .pop()
+                    .ok_or_else(|| self.runtime_error("STOREGLOBAL: stack is empty"))?;
                 self.state.memory.stack[index as usize] = item;
             }
 
@@ -401,9 +410,9 @@ impl Vm {
                         }
                     }
                     _ => {
-                        return Err(self.runtime_error(
-                            format!("DIRECTCALL: cannot call value {}", callee),
-                        ));
+                        return Err(
+                            self.runtime_error(format!("DIRECTCALL: cannot call value {}", callee))
+                        );
                     }
                 }
             }
@@ -434,9 +443,7 @@ impl Vm {
                         self.state.goto(target);
                     }
                     a => {
-                        return Err(self.runtime_error(
-                            format!("CALL: cannot call value {}", a),
-                        ));
+                        return Err(self.runtime_error(format!("CALL: cannot call value {}", a)));
                     }
                 }
             }
@@ -463,9 +470,11 @@ impl Vm {
                     self.state.memory.stack.push(VmData::Bool(result))
                 }
                 (a, b) => {
-                    return Err(self.runtime_error(
-                        format!("IGTR: expected two integers, got {} and {}", a.unwrap_or(VmData::None), b.unwrap_or(VmData::None)),
-                    ));
+                    return Err(self.runtime_error(format!(
+                        "IGTR: expected two integers, got {} and {}",
+                        a.unwrap_or(VmData::None),
+                        b.unwrap_or(VmData::None)
+                    )));
                 }
             },
 
@@ -511,17 +520,20 @@ impl Vm {
             }
             Code::JUMPIFFALSE => {
                 let jump = u32::from_le_bytes(self.state.next_arr());
-                let value = self.state.memory.stack.pop().ok_or_else(|| {
-                    self.runtime_error("JUMPIFFALSE: stack is empty")
-                })?;
+                let value = self
+                    .state
+                    .memory
+                    .stack
+                    .pop()
+                    .ok_or_else(|| self.runtime_error("JUMPIFFALSE: stack is empty"))?;
                 if let VmData::Bool(test) = value {
                     if !test {
                         self.state.current_instruction += jump as usize;
                     }
                 } else {
-                    return Err(self.runtime_error(
-                        format!("JUMPIFFALSE: expected Bool, got {}", value),
-                    ));
+                    return Err(
+                        self.runtime_error(format!("JUMPIFFALSE: expected Bool, got {}", value))
+                    );
                 }
             }
 
@@ -638,9 +650,10 @@ impl Vm {
                 let size = u64::from_le_bytes(self.state.next_arr());
                 let mut myarray = vec![];
                 for _ in 0..size {
-                    let value = self.state.memory.stack.pop().ok_or_else(|| {
-                        self.runtime_error("NEWLIST: not enough values on stack")
-                    })?;
+                    let value =
+                        self.state.memory.stack.pop().ok_or_else(|| {
+                            self.runtime_error("NEWLIST: not enough values on stack")
+                        })?;
                     myarray.push(value);
                 }
                 myarray.reverse();
@@ -666,9 +679,9 @@ impl Vm {
                 let string = match String::from_utf8(string) {
                     Ok(ok) => ok,
                     Err(e) => {
-                        return Err(self.runtime_error(
-                            format!("STRING: invalid UTF-8 bytes: {}", e),
-                        ));
+                        return Err(
+                            self.runtime_error(format!("STRING: invalid UTF-8 bytes: {}", e))
+                        );
                     }
                 };
 
@@ -691,14 +704,16 @@ impl Vm {
             Code::CONCAT => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                 (Some(VmData::Object(index1)), Some(VmData::Object(index2))) => {
                     let (new_object_type, new_data) = {
-                        let object1 = self.state.memory.ref_from_heap(index2)
-                            .ok_or_else(|| Box::new(NovaError::Runtime {
+                        let object1 = self.state.memory.ref_from_heap(index2).ok_or_else(|| {
+                            Box::new(NovaError::Runtime {
                                 msg: "CONCAT: invalid heap reference".into(),
-                            }))?;
-                        let object2 = self.state.memory.ref_from_heap(index1)
-                            .ok_or_else(|| Box::new(NovaError::Runtime {
+                            })
+                        })?;
+                        let object2 = self.state.memory.ref_from_heap(index1).ok_or_else(|| {
+                            Box::new(NovaError::Runtime {
                                 msg: "CONCAT: invalid heap reference".into(),
-                            }))?;
+                            })
+                        })?;
                         let total_len = object1.data.len() + object2.data.len();
                         let mut combined = Vec::with_capacity(total_len);
                         combined.extend_from_slice(&object1.data);
@@ -712,7 +727,9 @@ impl Vm {
                     self.state.memory.stack.push(VmData::Object(result));
                 }
                 _ => {
-                    return Err(self.runtime_error("CONCAT: expected two list/tuple/string objects"));
+                    return Err(
+                        self.runtime_error("CONCAT: expected two list/tuple/string objects")
+                    );
                 }
             },
 
@@ -726,10 +743,12 @@ impl Vm {
                     (VmData::Object(object), VmData::Int(index)) => {
                         // Gather what we need while the borrow is active
                         let (len, type_name, item) = {
-                            let heap_object = self.state.memory.ref_from_heap(object)
-                                .ok_or_else(|| Box::new(NovaError::Runtime {
-                                    msg: "Index: invalid heap reference".into(),
-                                }))?;
+                            let heap_object =
+                                self.state.memory.ref_from_heap(object).ok_or_else(|| {
+                                    Box::new(NovaError::Runtime {
+                                        msg: "Index: invalid heap reference".into(),
+                                    })
+                                })?;
                             let type_name = match &heap_object.object_type {
                                 ObjectType::List => "List",
                                 ObjectType::Tuple => "Tuple",
@@ -742,12 +761,10 @@ impl Vm {
                         };
                         let uindex = index as usize;
                         if uindex >= len {
-                            return Err(self.runtime_error(
-                                format!(
-                                    "Index out of bounds: index is {} but {} length is {}",
-                                    index, type_name, len
-                                ),
-                            ));
+                            return Err(self.runtime_error(format!(
+                                "Index out of bounds: index is {} but {} length is {}",
+                                index, type_name, len
+                            )));
                         }
                         if let Some(item) = item {
                             self.state.memory.push(item);
@@ -755,9 +772,10 @@ impl Vm {
                         self.state.memory.dec(object);
                     }
                     (a, b) => {
-                        return Err(self.runtime_error(
-                            format!("Index: expected (Object, Int), got ({}, {})", a, b),
-                        ));
+                        return Err(self.runtime_error(format!(
+                            "Index: expected (Object, Int), got ({}, {})",
+                            a, b
+                        )));
                     }
                 }
             }
@@ -775,22 +793,22 @@ impl Vm {
                     (VmData::Object(object), VmData::Int(index), value) => {
                         // First check bounds
                         let (len, old_value) = {
-                            let heap_object = self.state.memory.ref_from_heap(object)
-                                .ok_or_else(|| Box::new(NovaError::Runtime {
-                                    msg: "PINDEX: invalid heap reference".into(),
-                                }))?;
+                            let heap_object =
+                                self.state.memory.ref_from_heap(object).ok_or_else(|| {
+                                    Box::new(NovaError::Runtime {
+                                        msg: "PINDEX: invalid heap reference".into(),
+                                    })
+                                })?;
                             let len = heap_object.data.len();
                             let old = heap_object.data.get(index as usize).cloned();
                             (len, old)
                         };
                         let uindex = index as usize;
                         if uindex >= len {
-                            return Err(self.runtime_error(
-                                format!(
-                                    "Index out of bounds: index is {} but length is {}",
-                                    index, len
-                                ),
-                            ));
+                            return Err(self.runtime_error(format!(
+                                "Index out of bounds: index is {} but length is {}",
+                                index, len
+                            )));
                         }
                         if let Some(old) = old_value {
                             self.state.memory.dec_value(old);
@@ -803,9 +821,10 @@ impl Vm {
                         self.state.memory.dec(object);
                     }
                     (a, b, c) => {
-                        return Err(self.runtime_error(
-                            format!("PINDEX: expected (Object, Int, value), got ({}, {}, {})", a, b, c),
-                        ));
+                        return Err(self.runtime_error(format!(
+                            "PINDEX: expected (Object, Int, value), got ({}, {}, {})",
+                            a, b, c
+                        )));
                     }
                 }
             }
@@ -852,7 +871,10 @@ impl Vm {
                 // Pop the struct name string
                 let struct_name = match self.state.memory.stack.pop() {
                     Some(VmData::Object(idx)) => {
-                        let name = self.state.memory.ref_from_heap(idx)
+                        let name = self
+                            .state
+                            .memory
+                            .ref_from_heap(idx)
                             .and_then(|o| o.as_string())
                             .unwrap_or_default();
                         self.state.memory.dec(idx);
@@ -866,7 +888,10 @@ impl Vm {
                 for _ in 0..num_fields {
                     match self.state.memory.stack.pop() {
                         Some(VmData::Object(idx)) => {
-                            let name = self.state.memory.ref_from_heap(idx)
+                            let name = self
+                                .state
+                                .memory
+                                .ref_from_heap(idx)
                                 .and_then(|o| o.as_string())
                                 .unwrap_or_default();
                             self.state.memory.dec(idx);
@@ -920,7 +945,10 @@ impl Vm {
                 // Get field name string
                 let field_name = match field_name_val {
                     VmData::Object(idx) => {
-                        let name = self.state.memory.ref_from_heap(idx)
+                        let name = self
+                            .state
+                            .memory
+                            .ref_from_heap(idx)
                             .and_then(|o| o.as_string())
                             .unwrap_or_default();
                         self.state.memory.dec(idx);
@@ -933,15 +961,17 @@ impl Vm {
 
                 match object_val {
                     VmData::Object(obj_idx) => {
-                        let heap_obj = self.state.memory.ref_from_heap(obj_idx).ok_or_else(|| {
-                            self.runtime_error("GETF: invalid heap reference")
-                        })?;
+                        let heap_obj =
+                            self.state.memory.ref_from_heap(obj_idx).ok_or_else(|| {
+                                self.runtime_error("GETF: invalid heap reference")
+                            })?;
                         if let Some(value) = heap_obj.get(&field_name) {
                             self.state.memory.push(value);
                         } else {
-                            return Err(self.runtime_error(
-                                format!("Field '{}' not found on object", field_name),
-                            ));
+                            return Err(self.runtime_error(format!(
+                                "Field '{}' not found on object",
+                                field_name
+                            )));
                         }
                         self.state.memory.dec(obj_idx);
                     }
@@ -964,7 +994,10 @@ impl Vm {
                 // Get field name string
                 let field_name = match field_name_val {
                     VmData::Object(idx) => {
-                        let name = self.state.memory.ref_from_heap(idx)
+                        let name = self
+                            .state
+                            .memory
+                            .ref_from_heap(idx)
                             .and_then(|o| o.as_string())
                             .unwrap_or_default();
                         self.state.memory.dec(idx);
@@ -993,9 +1026,10 @@ impl Vm {
                             };
                             self.state.memory.dec_value(old_value);
                         } else {
-                            return Err(self.runtime_error(
-                                format!("Field '{}' not found for assignment", field_name),
-                            ));
+                            return Err(self.runtime_error(format!(
+                                "Field '{}' not found for assignment",
+                                field_name
+                            )));
                         }
                         self.state.memory.dec(obj_idx);
                     }
@@ -1006,9 +1040,7 @@ impl Vm {
             }
 
             error => {
-                return Err(self.runtime_error(
-                    format!("Unknown VM opcode: {}", error),
-                ));
+                return Err(self.runtime_error(format!("Unknown VM opcode: {}", error)));
             }
         }
 
