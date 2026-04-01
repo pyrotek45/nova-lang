@@ -1,0 +1,104 @@
+module test_std_iter
+
+import super.std.iter
+import super.std.core
+
+// ── fromRange ─────────────────────────────────────────────────────
+let it1 = Iter::fromRange(0, 5)
+let c1 = it1.collect()
+assert(c1.len() == 5, "fromRange len")
+assert(c1[0] == 0, "fromRange first")
+assert(c1[4] == 4, "fromRange last")
+
+// ── fromVec ───────────────────────────────────────────────────────
+let it2 = Iter::fromVec([10, 20, 30])
+let c2 = it2.collect()
+assert(c2.len() == 3, "fromVec len")
+assert(c2[0] == 10, "fromVec[0]")
+assert(c2[2] == 30, "fromVec[2]")
+
+// ── map ───────────────────────────────────────────────────────────
+let it3 = Iter::fromRange(1, 4).map(fn(x: Int) -> Int { return x * 2 })
+let c3 = it3.collect()
+assert(c3.len() == 3, "map len")
+assert(c3[0] == 2, "map[0]")
+assert(c3[2] == 6, "map[2]")
+
+// ── filter ────────────────────────────────────────────────────────
+let it4 = Iter::fromRange(0, 6).filter(fn(x: Int) -> Bool { return x % 2 == 0 })
+let c4 = it4.collect()
+assert(c4.len() == 3, "filter len")
+assert(c4[0] == 0, "filter[0]")
+assert(c4[1] == 2, "filter[1]")
+
+// ── take ─────────────────────────────────────────────────────────
+let it5 = Iter::fromRange(0, 100).take(4)
+let c5 = it5.collect()
+assert(c5.len() == 4, "take len")
+assert(c5[3] == 3, "take last")
+
+// ── drop ─────────────────────────────────────────────────────────
+let it6 = Iter::fromRange(0, 5).drop(2)
+let c6 = it6.collect()
+assert(c6.len() == 3, "drop len")
+assert(c6[0] == 2, "drop first")
+
+// ── count ────────────────────────────────────────────────────────
+let cnt = Iter::fromRange(0, 7).count()
+assert(cnt == 7, "count")
+
+// ── sum ──────────────────────────────────────────────────────────
+let s = Iter::fromRange(1, 5).sum()
+assert(s == 10, "sum 1..4")
+
+// ── reduce ───────────────────────────────────────────────────────
+let prod = Iter::fromRange(1, 5).reduce(fn(acc: Int, x: Int) -> Int { return acc * x }, 1)
+assert(prod == 24, "reduce product")
+
+// ── any / all ────────────────────────────────────────────────────
+assert(Iter::fromRange(0, 5).any(fn(x: Int) -> Bool { return x == 3 }), "any true")
+assert(!Iter::fromRange(0, 5).any(fn(x: Int) -> Bool { return x == 10 }), "any false")
+assert(Iter::fromRange(0, 5).all(fn(x: Int) -> Bool { return x < 10 }), "all true")
+assert(!Iter::fromRange(0, 5).all(fn(x: Int) -> Bool { return x < 3 }), "all false")
+
+// ── find ─────────────────────────────────────────────────────────
+let found = Iter::fromRange(0, 10).find(fn(x: Int) -> Bool { return x == 5 })
+assert(found.isSome(), "find Some")
+assert(found.unwrap() == 5, "find value")
+
+let notFound = Iter::fromRange(0, 5).find(fn(x: Int) -> Bool { return x == 99 })
+assert(notFound.isNone(), "find None")
+
+// ── nth ───────────────────────────────────────────────────────────
+let nth = Iter::fromRange(10, 20).nth(3)
+assert(nth.isSome(), "nth Some")
+assert(nth.unwrap() == 13, "nth value")
+
+// ── last ─────────────────────────────────────────────────────────
+let last = Iter::fromRange(0, 5).last()
+assert(last.isSome(), "last Some")
+assert(last.unwrap() == 4, "last value")
+
+// ── chain ────────────────────────────────────────────────────────
+let chained = Iter::fromVec([1, 2]).chain(Iter::fromVec([3, 4])).collect()
+assert(chained.len() == 4, "chain len")
+assert(chained[2] == 3, "chain[2]")
+
+// ── zip ──────────────────────────────────────────────────────────
+let zipped = Iter::fromRange(0, 3).zip(Iter::fromVec(["a", "b", "c"])).collect()
+assert(zipped.len() == 3, "zip len")
+
+// ── takeWhile / dropWhile ─────────────────────────────────────────
+let tw = Iter::fromRange(0, 10).takeWhile(fn(x: Int) -> Bool { return x < 4 }).collect()
+assert(tw.len() == 4, "takeWhile len")
+
+let dw = Iter::fromRange(0, 6).dropWhile(fn(x: Int) -> Bool { return x < 3 }).collect()
+assert(dw.len() == 3, "dropWhile len")
+assert(dw[0] == 3, "dropWhile first")
+
+// ── forEach ──────────────────────────────────────────────────────
+let acc = Box(0)
+Iter::fromRange(1, 4).forEach(fn(x: Int) { acc.value += x })
+assert(acc.value == 6, "forEach sum 1+2+3")
+
+println("PASS: test_std_iter")

@@ -45,65 +45,48 @@ module input
 import hashmap
 
 struct InputMap {
-    _keys:   HashMap,   // action -> key name string
-    _mouse:  HashMap,   // action -> mouse button name string
+    _keys:   HashMap(String, String),   // action -> key name string
+    _mouse:  HashMap(String, String),   // action -> mouse button name string
 }
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 fn extends(InputMap) new() -> InputMap {
     return InputMap {
-        _keys:  HashMap::new(),
-        _mouse: HashMap::new(),
+        _keys:  HashMap::default() @[K: String, V: String],
+        _mouse: HashMap::default() @[K: String, V: String],
     }
 }
 
 // ── Binding ───────────────────────────────────────────────────────────────────
 
-// Bind an action name to a raylib key name (e.g. "Space", "W", "Up")
+// Bind an action name to a raylib key name (e.g. "KEY_SPACE", "KEY_W", "KEY_UP")
 fn extends bindKey(self: InputMap, action: String, key: String) {
-    self._keys.set(action, key)
+    self._keys.insert(action, key)
 }
 
 // Bind an action name to a raylib mouse button ("Left", "Right", "Middle")
 fn extends bindMouse(self: InputMap, action: String, button: String) {
-    self._mouse.set(action, button)
+    self._mouse.insert(action, button)
 }
 
 // Remove all bindings for an action
 fn extends unbind(self: InputMap, action: String) {
-    self._keys.remove(action)
-    self._mouse.remove(action)
+    self._keys.delete(action)
+    self._mouse.delete(action)
 }
 
 // ── Querying ──────────────────────────────────────────────────────────────────
 
-// True only on the first frame the action is triggered (just pressed)
-fn extends isPressed(self: InputMap, action: String) -> Bool {
-    if self._keys.containsKey(action) {
+// True every frame while the key action is held down (isKeyPressed = held in Nova)
+fn extends isHeld(self: InputMap, action: String) -> Bool {
+    if self._keys.has(action) {
         let key = self._keys.get(action)
         if key.isSome() {
             return raylib::isKeyPressed(key.unwrap())
         }
     }
-    if self._mouse.containsKey(action) {
-        let btn = self._mouse.get(action)
-        if btn.isSome() {
-            return raylib::isMousePressed(btn.unwrap())
-        }
-    }
-    return false
-}
-
-// True every frame while the action is held down
-fn extends isHeld(self: InputMap, action: String) -> Bool {
-    if self._keys.containsKey(action) {
-        let key = self._keys.get(action)
-        if key.isSome() {
-            return !raylib::isKeyUp(key.unwrap())
-        }
-    }
-    if self._mouse.containsKey(action) {
+    if self._mouse.has(action) {
         let btn = self._mouse.get(action)
         if btn.isSome() {
             return raylib::isMousePressed(btn.unwrap())
@@ -114,13 +97,30 @@ fn extends isHeld(self: InputMap, action: String) -> Bool {
 
 // True only on the frame the action is released
 fn extends isReleased(self: InputMap, action: String) -> Bool {
-    if self._keys.containsKey(action) {
+    if self._keys.has(action) {
         let key = self._keys.get(action)
         if key.isSome() {
             return raylib::isKeyReleased(key.unwrap())
         }
     }
+    if self._mouse.has(action) {
+        let btn = self._mouse.get(action)
+        if btn.isSome() {
+            return raylib::isMouseReleased(btn.unwrap())
+        }
+    }
     return false
+}
+
+// True when the action key is NOT pressed
+fn extends isUp(self: InputMap, action: String) -> Bool {
+    if self._keys.has(action) {
+        let key = self._keys.get(action)
+        if key.isSome() {
+            return raylib::isKeyUp(key.unwrap())
+        }
+    }
+    return true
 }
 
 // Directional axis: returns -1.0 if negAction held, 1.0 if posAction held, 0.0 otherwise
@@ -130,21 +130,16 @@ fn extends axis(self: InputMap, negAction: String, posAction: String) -> Float {
     return pos - neg
 }
 
-// 2D axis as a pair
-fn extends axis2D(self: InputMap, left: String, right: String, up: String, down: String) -> (Float, Float) {
-    return (self.axis(left, right), self.axis(up, down))
-}
-
 // ── Mouse pass-throughs ───────────────────────────────────────────────────────
 
 fn extends(InputMap) mouseX() -> Int {
-    let (x, _) = raylib::mousePosition()
-    return x
+    let m = raylib::mousePosition()
+    return m[0]
 }
 
 fn extends(InputMap) mouseY() -> Int {
-    let (_, y) = raylib::mousePosition()
-    return y
+    let m = raylib::mousePosition()
+    return m[1]
 }
 
 fn extends(InputMap) mousePos() -> (Int, Int) {

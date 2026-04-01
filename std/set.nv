@@ -45,20 +45,6 @@ fn extends(Set) empty() -> Set($T) {
     return Set { data: HashMap::default() @[K: $T, V: Bool] }
 }
 
-fn extends(Set) singleton(v: $T) -> Set($T) {
-    let s: Set($T) = Set::empty() @[T: $T]
-    s.add(v)
-    return s
-}
-
-fn extends(Set) fromList(list: [$T]) -> Set($T) {
-    let s: Set($T) = Set::empty() @[T: $T]
-    for v in list {
-        s.add(v)
-    }
-    return s
-}
-
 // ── Core operations ───────────────────────────────────────────────────────────
 
 fn extends add(self: Set($T), v: $T) {
@@ -83,6 +69,20 @@ fn extends isEmpty(self: Set($T)) -> Bool {
 
 fn extends toList(self: Set($T)) -> [$T] {
     return self.data.keys()
+}
+
+fn extends(Set) singleton(v: $T) -> Set($T) {
+    let s: Set($T) = Set::empty() @[T: $T]
+    s.add(v)
+    return s
+}
+
+fn extends(Set) fromList(list: [$T]) -> Set($T) {
+    let s: Set($T) = Set::empty() @[T: $T]
+    for v in list {
+        s.add(v)
+    }
+    return s
 }
 
 fn extends toString(self: Set($T)) -> String {

@@ -1,0 +1,71 @@
+module test_std_maybe
+
+import super.std.core
+
+// ── Constructors / isJust / isNothing ────────────────────────────
+let just = Maybe::Just(42)
+assert(just.isJust(), "Just isJust")
+assert(!just.isNothing(), "Just not isNothing")
+
+let nothing = Maybe::Nothing() @[A: Int]
+assert(nothing.isNothing(), "Nothing isNothing")
+assert(!nothing.isJust(), "Nothing not isJust")
+
+// ── unwrap ────────────────────────────────────────────────────────
+assert(just.unwrap() == 42, "unwrap Just")
+
+// ── orDefault ────────────────────────────────────────────────────
+assert(just.orDefault(0) == 42, "orDefault Just uses value")
+assert(nothing.orDefault(-1) == -1, "orDefault Nothing uses default")
+
+// ── orDoFn ───────────────────────────────────────────────────────
+assert(just.orDoFn(fn() -> Int { return 99 }) == 42, "orDoFn Just skips fn")
+assert(nothing.orDoFn(fn() -> Int { return 99 }) == 99, "orDoFn Nothing calls fn")
+
+// ── map ──────────────────────────────────────────────────────────
+let doubled = just.map(fn(x: Int) -> Int { return x * 2 })
+assert(doubled.isJust(), "map Just stays Just")
+assert(doubled.unwrap() == 84, "map transforms value")
+
+let mappedNothing = nothing.map(fn(x: Int) -> Int { return x * 2 })
+assert(mappedNothing.isNothing(), "map Nothing stays Nothing")
+
+// ── map type change ───────────────────────────────────────────────
+let strMaybe = just.map(fn(x: Int) -> String { return Cast::string(x) })
+assert(strMaybe.isJust(), "map to String isJust")
+assert(strMaybe.unwrap() == "42", "map to String value")
+
+// ── toString ─────────────────────────────────────────────────────
+assert(just.toString() == "Just(42)", "toString Just")
+assert(nothing.toString() == "Nothing", "toString Nothing")
+
+// ── toOption ─────────────────────────────────────────────────────
+let opt = just.toOption()
+assert(opt.isSome(), "toOption Just → Some")
+assert(opt.unwrap() == 42, "toOption Just value")
+
+let optNone = nothing.toOption()
+assert(optNone.isNone(), "toOption Nothing → None")
+
+// ── match ────────────────────────────────────────────────────────
+let matched = Box(0)
+match just {
+    Just(v) => { matched.value = if v == 42 { 1 } else { 0 } }
+    Nothing() => { matched.value = 0 }
+}
+assert(matched.value == 1, "match Just arm")
+
+let matchedN = Box(0)
+match nothing {
+    Just(v) => { matchedN.value = 0 }
+    Nothing() => { matchedN.value = 1 }
+}
+assert(matchedN.value == 1, "match Nothing arm")
+
+// ── chained maps ─────────────────────────────────────────────────
+let chained = Maybe::Just(3)
+    .map(fn(x: Int) -> Int { return x + 1 })
+    .map(fn(x: Int) -> Int { return x * 10 })
+assert(chained.unwrap() == 40, "chained maps")
+
+println("PASS: test_std_maybe")

@@ -98,8 +98,8 @@ fn extends update(self: Camera2D, dt: Float) {
     if self._shakeTimer > 0.0 {
         self._shakeTimer = self._shakeTimer - dt
         let mag = self._shakeMag * (self._shakeTimer / (self._shakeTimer + dt + 0.001))
-        self._shakeOffX = (random::range(-100, 100) as Float) / 100.0 * mag
-        self._shakeOffY = (random::range(-100, 100) as Float) / 100.0 * mag
+        self._shakeOffX = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
+        self._shakeOffY = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
         if self._shakeTimer <= 0.0 {
             self._shakeTimer = 0.0
             self._shakeOffX  = 0.0
@@ -203,7 +203,11 @@ fn extends worldBounds(self: Camera2D) -> (Float, Float, Float, Float) {
 
 // Return true if a world-space point is inside the view (with an optional margin)
 fn extends isVisible(self: Camera2D, wx: Float, wy: Float, margin: Float) -> Bool {
-    let (x0, y0, x1, y1) = self.worldBounds()
+    let bounds = self.worldBounds()
+    let x0 = bounds[0]
+    let y0 = bounds[1]
+    let x1 = bounds[2]
+    let y1 = bounds[3]
     return wx >= x0 - margin && wx <= x1 + margin &&
            wy >= y0 - margin && wy <= y1 + margin
 }

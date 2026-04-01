@@ -56,7 +56,7 @@ struct Grid {
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 fn extends(Grid) new(cols: Int, rows: Int, default: Any) -> Grid {
-    let cells = []
+    let cells = []:Any
     for let i = 0; i < cols * rows; i += 1 {
         cells.push(default)
     }
@@ -108,7 +108,7 @@ fn extends fillRect(self: Grid, x: Int, y: Int, w: Int, h: Int, value: Any) {
 
 // 4-connected neighbors (N, S, E, W)
 fn extends neighbors4(self: Grid, col: Int, row: Int) -> [(Int, Int)] {
-    let out = []
+    let out = []:(Int, Int)
     let dirs = [(0, -1), (0, 1), (1, 0), (-1, 0)]
     for d in dirs {
         let nc = col + d[0]
@@ -120,7 +120,7 @@ fn extends neighbors4(self: Grid, col: Int, row: Int) -> [(Int, Int)] {
 
 // 8-connected neighbors (includes diagonals)
 fn extends neighbors8(self: Grid, col: Int, row: Int) -> [(Int, Int)] {
-    let out = []
+    let out = []:(Int, Int)
     for let dr = -1; dr <= 1; dr += 1 {
         for let dc = -1; dc <= 1; dc += 1 {
             if dc == 0 && dr == 0 { continue }
@@ -151,12 +151,12 @@ fn extends bfs(self: Grid,
                goalCol: Int, goalRow: Int,
                passable: fn(Any) -> Bool) -> [(Int, Int)] {
     if !self.inBounds(startCol, startRow) || !self.inBounds(goalCol, goalRow) {
-        return []
+        return []:(Int, Int)
     }
     // visited: encoded as col + row*cols -> true/false
-    let visited = []
+    let visited = []:Bool
     for let i = 0; i < self._cols * self._rows; i += 1 { visited.push(false) }
-    let parent = []
+    let parent = []:Int
     for let i = 0; i < self._cols * self._rows; i += 1 { parent.push(-1) }
 
     let startIdx = gridIdx(self, startCol, startRow)
@@ -167,7 +167,7 @@ fn extends bfs(self: Grid,
 
     while queue.len() > 0 {
         let cur = queue[0]
-        queue = queue.slice(1, queue.len())
+        queue.remove(0)
         if cur == goalIdx { found = true; break }
         let row = cur / self._cols
         let col = cur - row * self._cols
@@ -184,10 +184,10 @@ fn extends bfs(self: Grid,
         }
     }
 
-    if !found { return [] }
+    if !found { return []:(Int, Int) }
 
     // reconstruct path
-    let path = []
+    let path = []:(Int, Int)
     let cur = goalIdx
     while cur != -1 {
         let row = cur / self._cols
@@ -196,7 +196,7 @@ fn extends bfs(self: Grid,
         cur = parent[cur]
     }
     // reverse path
-    let result = []
+    let result = []:(Int, Int)
     for let i = path.len() - 1; i >= 0; i -= 1 {
         result.push(path[i])
     }

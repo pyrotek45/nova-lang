@@ -1,0 +1,65 @@
+module test_std_result
+
+import super.std.result
+
+// ── Constructors / isOk / isErr ───────────────────────────────────
+let ok = Result::Ok(42) @[A: Int, B: String]
+assert(ok.isOk(), "Ok isOk")
+assert(!ok.isErr(), "Ok not isErr")
+
+let err = Result::Err("oops") @[A: Int, B: String]
+assert(err.isErr(), "Err isErr")
+assert(!err.isOk(), "Err not isOk")
+
+// ── unwrap ────────────────────────────────────────────────────────
+assert(ok.unwrap() == 42, "unwrap Ok")
+
+// ── unwrapErr ────────────────────────────────────────────────────
+let errStr = Result::Err("bad") @[A: Int, B: String]
+assert(errStr.unwrapErr() == "bad", "unwrapErr")
+
+// ── orDefault ────────────────────────────────────────────────────
+assert(ok.orDefault(0) == 42, "orDefault Ok uses value")
+let err2 = Result::Err("x") @[A: Int, B: String]
+assert(err2.orDefault(-1) == -1, "orDefault Err uses default")
+
+// ── orDoFn ───────────────────────────────────────────────────────
+assert(ok.orDoFn(fn() -> Int { return 99 }) == 42, "orDoFn Ok skips fn")
+assert(err2.orDoFn(fn() -> Int { return 99 }) == 99, "orDoFn Err calls fn")
+
+// ── map ──────────────────────────────────────────────────────────
+let mapped = ok.map(fn(x: Int) -> Int { return x * 2 })
+assert(mapped.isOk(), "map Ok stays Ok")
+assert(mapped.unwrap() == 84, "map transforms value")
+
+let mappedErr = err2.map(fn(x: Int) -> Int { return x * 2 })
+assert(mappedErr.isErr(), "map Err propagates")
+
+// ── mapErr ───────────────────────────────────────────────────────
+let mappedErrF = err2.mapErr(fn(e: String) -> String { return "wrapped: " + e })
+assert(mappedErrF.isErr(), "mapErr stays Err")
+assert(mappedErrF.unwrapErr() == "wrapped: x", "mapErr transforms error")
+
+let okMappedErr = ok.mapErr(fn(e: String) -> String { return "wrapped" })
+assert(okMappedErr.isOk(), "mapErr on Ok propagates Ok")
+assert(okMappedErr.unwrap() == 42, "mapErr on Ok preserves value")
+
+// ── toString ─────────────────────────────────────────────────────
+assert(ok.toString() == "Ok(42)", "toString Ok")
+assert(err2.toString() == "Err(x)", "toString Err")
+
+// ── toOption ─────────────────────────────────────────────────────
+let opt = ok.toOption()
+assert(opt.isSome(), "toOption Ok → Some")
+assert(opt.unwrap() == 42, "toOption Ok value")
+
+let optErr = err2.toOption()
+assert(!optErr.isSome(), "toOption Err → None")
+
+// ── chaining map ─────────────────────────────────────────────────
+let chained = Result::Ok(3) @[A: Int, B: String]
+    .map(fn(x: Int) -> Int { return x + 1 })
+    .map(fn(x: Int) -> Int { return x * 10 })
+assert(chained.unwrap() == 40, "chained maps")
+
+println("PASS: test_std_result")

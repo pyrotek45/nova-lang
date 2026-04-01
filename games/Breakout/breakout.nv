@@ -1,0 +1,482 @@
+module breakout
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Breakout  —  a feature-complete Brick Breaker showcasing the Nova std lib
+//
+//  Std modules used:
+//    scene   — SceneManager drives the Menu / Playing / GameOver / Win states
+//    entity  — EntityWorld manages the ball and bricks as tagged Entity objects
+//    timer   — cooldown timer gates the ball speed-up milestones
+//    tween   — Tween animates the score flash and screen entry effects
+//    vec2    — Vec2 wraps the ball velocity for normalised reflects
+//    input   — InputMap decouples game logic from raw key names
+//
+//  Controls:
+//    LEFT / RIGHT  — move paddle
+//    SPACE         — launch ball / confirm menus
+//    Q             — quit
+//
+//  Note on mutable closure capture in Nova:
+//    Plain scalars (Int, Float, Bool) are captured by VALUE in closures.
+//    To share mutable scalars across closures (scene update/draw) you must
+//    wrap them in Box so all closures share the same heap object.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import super.super.std.scene
+import super.super.std.entity
+import super.super.std.timer
+import super.super.std.tween
+import super.super.std.vec2
+import super.super.std.input
+
+// ── Window ───────────────────────────────────────────────────────────────────
+let W = 800
+let H = 600
+raylib::init("Breakout", W, H, 60)
+
+// ── Layout constants (read-only, safe as plain scalars) ───────────────────────
+let BRICK_COLS   = 10
+let BRICK_ROWS   = 6
+let BRICK_W      = 70
+let BRICK_H      = 24
+let BRICK_PAD    = 4
+let BRICK_OFF_X  = 15
+let BRICK_OFF_Y  = 58
+
+let PADDLE_W     = 100
+let PADDLE_H     = 14
+let PADDLE_SPEED = 7
+let PADDLE_Y     = H - 50
+
+let BALL_RADIUS  = 7
+let BALL_INIT_VX = 4
+let BALL_INIT_VY = -5
+
+let MAX_LIVES    = 3
+
+// ── Colors ────────────────────────────────────────────────────────────────────
+let BG_COLOR     = (12, 10, 22)
+let PADDLE_COLOR = (80, 180, 255)
+let BALL_COLOR   = (240, 230, 200)
+let HUD_COLOR    = (200, 200, 200)
+let LIVES_COLOR  = (255, 80, 80)
+
+fn rowColor(row: Int) -> (Int, Int, Int) {
+    if row == 0 { return (255, 80,  80)  }
+    if row == 1 { return (255, 160, 40)  }
+    if row == 2 { return (255, 220, 50)  }
+    if row == 3 { return (80,  200, 80)  }
+    if row == 4 { return (60,  160, 255) }
+    return (160, 80, 220)
+}
+
+fn rowPoints(row: Int) -> Int {
+    if row == 0 { return 50 }
+    if row == 1 { return 40 }
+    if row == 2 { return 30 }
+    if row == 3 { return 20 }
+    if row == 4 { return 10 }
+    return 5
+}
+
+// ── Mutable shared state — Box-wrapped so closures mutate the real value ──────
+let paddleX     = Box(W / 2 - PADDLE_W / 2)   // paddle left edge
+let score       = Box(0)
+let lives       = Box(MAX_LIVES)
+let hitCount    = Box(0)
+let ballOnBoard = Box(true)   // true = ball resting on paddle, waiting for launch
+
+// Ball velocity — Vec2 is a heap struct, captured by reference automatically
+let ballVel = Vec2::new(Cast::float(BALL_INIT_VX).unwrap(),
+                         Cast::float(BALL_INIT_VY).unwrap())
+
+// EntityWorld — heap object, captured by reference
+let world = EntityWorld::new()
+
+// Tween for score flash — heap object, captured by reference
+let scoreFlash = Tween::linear(255.0, 0.0, 0.4)
+
+// InputMap — heap object, captured by reference
+let keys = InputMap::new()
+keys.bindKey("left",   "KEY_LEFT")
+keys.bindKey("right",  "KEY_RIGHT")
+keys.bindKey("launch", "KEY_SPACE")
+keys.bindKey("quit",   "KEY_Q")
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn buildBricks() {
+    world.killAll("brick")
+    for row in 0..BRICK_ROWS {
+        for col in 0..BRICK_COLS {
+            let bx = Cast::float(BRICK_OFF_X + col * (BRICK_W + BRICK_PAD)).unwrap()
+            let by = Cast::float(BRICK_OFF_Y + row * (BRICK_H + BRICK_PAD)).unwrap()
+            let b = world.spawnFull(bx, by, 0.0, 0.0,
+                                    Cast::float(BRICK_W).unwrap(),
+                                    Cast::float(BRICK_H).unwrap(),
+                                    "brick",
+                                    Cast::float(row).unwrap())
+            let _ = b
+        }
+    }
+}
+
+fn getBall() -> Entity {
+    let bs = world.query("ball")
+    return bs[0]
+}
+
+fn resetBall() {
+    world.killAll("ball")
+    let startX = Cast::float(paddleX.value + PADDLE_W / 2 - BALL_RADIUS).unwrap()
+    let startY = Cast::float(PADDLE_Y - BALL_RADIUS * 2 - 2).unwrap()
+    let b = world.spawnFull(startX, startY, 0.0, 0.0,
+                            Cast::float(BALL_RADIUS).unwrap(),
+                            Cast::float(BALL_RADIUS).unwrap(),
+                            "ball", 0.0)
+    let _ = b
+    ballVel.x = Cast::float(BALL_INIT_VX).unwrap()
+    ballVel.y = Cast::float(BALL_INIT_VY).unwrap()
+    ballOnBoard.value = true
+}
+
+fn resetGame() {
+    score.value    = 0
+    lives.value    = MAX_LIVES
+    hitCount.value = 0
+    paddleX.value  = W / 2 - PADDLE_W / 2
+    buildBricks()
+    resetBall()
+}
+
+fn drawCentered(text: String, y: Int, size: Int, color: (Int, Int, Int)) {
+    let tw = raylib::measureText(text, size)
+    raylib::drawText(text, (W - tw) / 2, y, size, color)
+}
+
+fn drawHUD() {
+    let scoreTxt = "Score: " + Cast::string(score.value)
+    raylib::drawText(scoreTxt, 10, 8, 22, HUD_COLOR)
+    let lv = lives.value
+    for i in 0..lv {
+        let cx = W - 14 - (lv - i - 1) * 22
+        raylib::drawCircle(cx, 18, 7, LIVES_COLOR)
+    }
+}
+
+fn drawBricks() {
+    world.forEachTagged("brick", fn(b: Entity) {
+        let row = Cast::int(b.data).unwrap()
+        let c   = rowColor(row)
+        let bx  = Cast::int(b.pos.x).unwrap()
+        let by  = Cast::int(b.pos.y).unwrap()
+        let bw  = Cast::int(b.size.x).unwrap()
+        let bh  = Cast::int(b.size.y).unwrap()
+        raylib::drawRectangle(bx, by, bw, bh, c)
+        raylib::drawRectangleLines(bx, by, bw, bh, (0, 0, 0))
+    })
+}
+
+// ── SceneManager ──────────────────────────────────────────────────────────────
+let mgr = SceneManager::empty()
+
+// ── Forward declarations ──────────────────────────────────────────────────────
+fn makeMenuScene() -> Scene
+fn makePlayScene() -> Scene
+fn makeGameOverScene() -> Scene
+fn makeWinScene() -> Scene
+
+// ── Menu scene ────────────────────────────────────────────────────────────────
+fn makeMenuScene() -> Scene {
+    let titleTween = Tween::smooth(0.0, 1.0, 1.2)
+
+    return Scene::new(
+        fn(dt: Float) {
+            titleTween.update(dt)
+            if keys.isReleased("launch") {
+                resetGame()
+                mgr.switch(makePlayScene())
+            }
+        },
+        fn() {
+            let scale   = titleTween.tweenValue()
+            let dropOff = Cast::int((1.0 - scale) * 80.0).unwrap()
+            let titleY  = H / 2 - 120 + dropOff
+            drawCentered("B R E A K O U T", titleY, 58, (240, 180, 60))
+            drawCentered("Clear all bricks to win  -  3 lives", H / 2 - 20, 18, (160, 160, 160))
+            drawCentered("LEFT / RIGHT  -  move paddle",         H / 2 + 14, 18, (160, 160, 160))
+            drawCentered("SPACE         -  launch ball",         H / 2 + 38, 18, (160, 160, 160))
+            drawCentered("Q             -  quit",                H / 2 + 62, 18, (160, 160, 160))
+            drawCentered("Press SPACE to start", H / 2 + 120, 26, (120, 220, 120))
+        }
+    )
+}
+
+// ── Play scene ────────────────────────────────────────────────────────────────
+fn makePlayScene() -> Scene {
+    let speedUp = Timer::cooldown(0.5)
+
+    return Scene::new(
+        fn(dt: Float) {
+            // ── Paddle movement ────────────────────────────────────────
+            if keys.isHeld("left") {
+                paddleX.value -= PADDLE_SPEED
+            }
+            if keys.isHeld("right") {
+                paddleX.value += PADDLE_SPEED
+            }
+            if paddleX.value < 0 { paddleX.value = 0 }
+            if paddleX.value + PADDLE_W > W { paddleX.value = W - PADDLE_W }
+
+            // ── Snap ball to paddle while waiting for launch ───────────
+            if ballOnBoard.value {
+                let b = getBall()
+                b.pos.x = Cast::float(paddleX.value + PADDLE_W / 2 - BALL_RADIUS).unwrap()
+                b.pos.y = Cast::float(PADDLE_Y - BALL_RADIUS * 2 - 2).unwrap()
+                if keys.isReleased("launch") {
+                    ballOnBoard.value = false
+                }
+            }
+
+            // ── Ball physics (only once airborne) ─────────────────────
+            if !ballOnBoard.value {
+                let b = getBall()
+
+                // Move ball by velocity (pixels-per-frame)
+                b.pos.x = b.pos.x + ballVel.x
+                b.pos.y = b.pos.y + ballVel.y
+
+                let bx = b.pos.x
+                let by = b.pos.y
+                let br = Cast::float(BALL_RADIUS * 2).unwrap()
+
+                // Wall bounces
+                if bx <= 0.0 {
+                    b.pos.x = 0.0
+                    ballVel.x = Float::abs(ballVel.x)
+                }
+                if bx + br >= Cast::float(W).unwrap() {
+                    b.pos.x = Cast::float(W).unwrap() - br
+                    ballVel.x = -(Float::abs(ballVel.x))
+                }
+                if by <= 0.0 {
+                    b.pos.y = 0.0
+                    ballVel.y = Float::abs(ballVel.y)
+                }
+
+                // Fell below screen — lose a life
+                if by > Cast::float(H + 20).unwrap() {
+                    lives.value -= 1
+                    if lives.value <= 0 {
+                        mgr.switch(makeGameOverScene())
+                    }
+                    if lives.value > 0 {
+                        resetBall()
+                    }
+                }
+
+                // ── Paddle collision ───────────────────────────────────
+                let px = Cast::float(paddleX.value).unwrap()
+                let py = Cast::float(PADDLE_Y).unwrap()
+                let pw = Cast::float(PADDLE_W).unwrap()
+                let ph = Cast::float(PADDLE_H).unwrap()
+
+                if bx + br > px {
+                    if bx < px + pw {
+                        if by + br > py {
+                            if by < py + ph {
+                                if ballVel.y > 0.0 {
+                                    b.pos.y = py - br
+                                    let centre  = px + pw / 2.0
+                                    let hitPos  = b.pos.x + br / 2.0
+                                    let diff    = hitPos - centre
+                                    let halfPW  = pw / 2.0
+                                    let curve   = diff * 3.0 / halfPW
+                                    ballVel.x   = ballVel.x + curve
+                                    if ballVel.x >  9.0 { ballVel.x =  9.0 }
+                                    if ballVel.x < -9.0 { ballVel.x = -9.0 }
+                                    if ballVel.x == 0.0 { ballVel.x =  1.0 }
+                                    ballVel.y   = -(Float::abs(ballVel.y))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Brick collisions ───────────────────────────────────
+                let bricks   = world.query("brick")
+                let hitBrick = Box(false)
+                for i in 0..bricks.len() {
+                    if hitBrick.value { continue }
+                    let brick = bricks[i]
+                    if !brick.alive { continue }
+
+                    let bl   = brick.pos.x
+                    let bt   = brick.pos.y
+                    let bww  = brick.size.x
+                    let bhh  = brick.size.y
+
+                    let bRight  = b.pos.x + br
+                    let bBottom = b.pos.y + br
+                    let ballLeft = b.pos.x
+                    let ballTop  = b.pos.y
+
+                    if bRight > bl {
+                        if ballLeft < bl + bww {
+                            if bBottom > bt {
+                                if ballTop < bt + bhh {
+                                    brick.alive    = false
+                                    hitBrick.value = true
+                                    let row = Cast::int(brick.data).unwrap()
+                                    score.value    += rowPoints(row)
+                                    hitCount.value += 1
+                                    scoreFlash.reset()
+
+                                    // Speed up every 5 hits
+                                    if hitCount.value % 5 == 0 {
+                                        speedUp.update(0.5)
+                                        let spd = ballVel.length()
+                                        if spd < 10.0 {
+                                            let nv = ballVel.normalized().scale(spd + 0.8)
+                                            ballVel.x = nv.x
+                                            ballVel.y = nv.y
+                                        }
+                                    }
+
+                                    // Reflect off the face with smallest penetration
+                                    let olL = bRight  - bl
+                                    let olR = bl + bww - ballLeft
+                                    let olT = bBottom  - bt
+                                    let olB = bt + bhh - ballTop
+
+                                    let minX = olL
+                                    if olR < minX { minX = olR }
+                                    let minY = olT
+                                    if olB < minY { minY = olB }
+
+                                    if minX < minY {
+                                        ballVel.x = -ballVel.x
+                                    } else {
+                                        ballVel.y = -ballVel.y
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Remove dead bricks
+                world.update(0.0)
+
+                // Win condition
+                if world.countAlive("brick") == 0 {
+                    mgr.switch(makeWinScene())
+                }
+            }
+
+            // ── Draw (runs every frame whether ball is in air or not) ──
+            drawBricks()
+
+            raylib::drawRoundedRectangle(paddleX.value, PADDLE_Y, PADDLE_W, PADDLE_H, 0.4, PADDLE_COLOR)
+
+            let b2 = getBall()
+            let ballDrawX = Cast::int(b2.pos.x).unwrap() + BALL_RADIUS
+            let ballDrawY = Cast::int(b2.pos.y).unwrap() + BALL_RADIUS
+            raylib::drawCircle(ballDrawX, ballDrawY, BALL_RADIUS, BALL_COLOR)
+            raylib::drawCircleLines(ballDrawX, ballDrawY, BALL_RADIUS + 2, (200, 200, 150))
+
+            drawHUD()
+
+            if ballOnBoard.value {
+                drawCentered("Press SPACE to launch", H - 28, 18, (140, 180, 140))
+            }
+
+            // Score flash driven by Tween
+            scoreFlash.update(dt)
+            let fa = Cast::int(scoreFlash.tweenValue()).unwrap()
+            if fa > 0 {
+                let txt = "+" + Cast::string(score.value)
+                let tw  = raylib::measureText(txt, 28)
+                raylib::drawText(txt, (W - tw) / 2, H / 2 - 60, 28, (255, 240, 80))
+            }
+        },
+        fn() {}
+    )
+}
+
+// ── Game Over scene ───────────────────────────────────────────────────────────
+fn makeGameOverScene() -> Scene {
+    let fadeTween = Tween::smooth(0.0, 1.0, 0.8)
+
+    return Scene::new(
+        fn(dt: Float) {
+            fadeTween.update(dt)
+            if keys.isReleased("launch") {
+                mgr.switch(makeMenuScene())
+            }
+        },
+        fn() {
+            drawCentered("GAME  OVER", H / 2 - 60, 56, (220, 50, 50))
+            let sm = "Final Score: " + Cast::string(score.value)
+            drawCentered(sm, H / 2 + 20, 30, HUD_COLOR)
+            drawCentered("Press SPACE to return to menu", H / 2 + 80, 22, (120, 220, 120))
+        }
+    )
+}
+
+// ── Win scene ─────────────────────────────────────────────────────────────────
+fn makeWinScene() -> Scene {
+    let bounceTween = Tween::new(0.0, 1.0, 1.0, fn(t: Float) -> Float {
+        let n1 = 7.5625
+        let d1 = 2.75
+        if t < 1.0 / d1 {
+            return n1 * t * t
+        }
+        if t < 2.0 / d1 {
+            let tt = t - 1.5 / d1
+            return n1 * tt * tt + 0.75
+        }
+        if t < 2.5 / d1 {
+            let tt = t - 2.25 / d1
+            return n1 * tt * tt + 0.9375
+        }
+        let tt = t - 2.625 / d1
+        return n1 * tt * tt + 0.984375
+    })
+
+    return Scene::new(
+        fn(dt: Float) {
+            bounceTween.update(dt)
+            if keys.isReleased("launch") {
+                resetGame()
+                mgr.switch(makePlayScene())
+            }
+        },
+        fn() {
+            let scale  = bounceTween.tweenValue()
+            let titleY = Cast::int(Cast::float(H / 2 - 60).unwrap() * scale).unwrap()
+            drawCentered("Y O U  W I N !", titleY, 56, (80, 240, 80))
+            let sm = "Final Score: " + Cast::string(score.value)
+            drawCentered(sm, H / 2 + 20, 30, HUD_COLOR)
+            drawCentered("Press SPACE to play again", H / 2 + 80, 22, (120, 220, 120))
+        }
+    )
+}
+
+// ── One-time init ─────────────────────────────────────────────────────────────
+buildBricks()
+resetBall()
+mgr.switch(makeMenuScene())
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear(BG_COLOR)
+
+    if keys.isReleased("quit") {
+        break
+    }
+
+    let dt = raylib::getFrameTime()
+    mgr.update(dt)
+    mgr.draw()
+}

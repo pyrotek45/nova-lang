@@ -1,0 +1,98 @@
+module test_std_vec2
+
+import super.std.vec2
+
+// ── Constructors ──────────────────────────────────────────────────
+let zero = Vec2::zero()
+assert(zero.x == 0.0, "zero x")
+assert(zero.y == 0.0, "zero y")
+
+let one = Vec2::one()
+assert(one.x == 1.0, "one x")
+assert(one.y == 1.0, "one y")
+
+let v = Vec2::new(3.0, 4.0)
+assert(v.x == 3.0, "new x")
+assert(v.y == 4.0, "new y")
+
+let r = Vec2::right()
+assert(r.x == 1.0, "right x")
+assert(r.y == 0.0, "right y")
+
+let u = Vec2::up()
+assert(u.x == 0.0, "up x")
+assert(u.y == 1.0, "up y")
+
+// ── Arithmetic ────────────────────────────────────────────────────
+let a = Vec2::new(1.0, 2.0)
+let b = Vec2::new(3.0, 4.0)
+
+let sum = a.add(b)
+assert(sum.x == 4.0, "add x")
+assert(sum.y == 6.0, "add y")
+
+let diff = b.sub(a)
+assert(diff.x == 2.0, "sub x")
+assert(diff.y == 2.0, "sub y")
+
+let sc = a.scale(3.0)
+assert(sc.x == 3.0, "scale x")
+assert(sc.y == 6.0, "scale y")
+
+let neg = a.negate()
+assert(neg.x == -1.0, "negate x")
+assert(neg.y == -2.0, "negate y")
+
+let abv = Vec2::new(-3.0, -4.0).abs()
+assert(abv.x == 3.0, "abs x")
+assert(abv.y == 4.0, "abs y")
+
+// ── Geometry ──────────────────────────────────────────────────────
+let v34 = Vec2::new(3.0, 4.0)
+assert(v34.lengthSq() == 25.0, "lengthSq")
+assert(v34.length() == 5.0, "length")
+
+let n = v34.normalized()
+assert((n.x - 0.6).abs() < 0.0001, "normalized x")
+assert((n.y - 0.8).abs() < 0.0001, "normalized y")
+
+let dot = Vec2::new(1.0, 0.0).dot(Vec2::new(0.0, 1.0))
+assert(dot == 0.0, "dot orthogonal")
+let dot2 = Vec2::new(2.0, 0.0).dot(Vec2::new(3.0, 0.0))
+assert(dot2 == 6.0, "dot parallel")
+
+let cross = Vec2::new(1.0, 0.0).cross(Vec2::new(0.0, 1.0))
+assert(cross == 1.0, "cross")
+
+let d = Vec2::new(0.0, 0.0).distance(Vec2::new(3.0, 4.0))
+assert(d == 5.0, "distance")
+
+let dsq = Vec2::new(0.0, 0.0).distanceSq(Vec2::new(3.0, 4.0))
+assert(dsq == 25.0, "distanceSq")
+
+// ── Lerp ──────────────────────────────────────────────────────────
+let l = Vec2::new(0.0, 0.0).lerp(Vec2::new(10.0, 10.0), 0.5)
+assert(l.x == 5.0, "lerp x")
+assert(l.y == 5.0, "lerp y")
+
+// ── Comparison ───────────────────────────────────────────────────
+assert(Vec2::new(1.0, 2.0).equals(Vec2::new(1.0, 2.0)), "equals true")
+assert(!Vec2::new(1.0, 2.0).equals(Vec2::new(1.0, 3.0)), "equals false")
+assert(Vec2::zero().isZero(), "isZero true")
+assert(!Vec2::new(1.0, 0.0).isZero(), "isZero false")
+
+// ── Perpendicular ─────────────────────────────────────────────────
+let p = Vec2::new(1.0, 0.0).perpendicular()
+assert(p.x == 0.0, "perp x")
+assert(p.y == -1.0, "perp y")
+
+// ── clampLength ───────────────────────────────────────────────────
+let clamped = Vec2::new(3.0, 4.0).clampLength(2.5)
+assert(clamped.length() <= 2.5001, "clampLength")
+
+// ── fromAngle ─────────────────────────────────────────────────────
+let fa = Vec2::fromAngle(0.0)
+assert((fa.x - 1.0).abs() < 0.0001, "fromAngle x")
+assert(fa.y.abs() < 0.0001, "fromAngle y")
+
+println("PASS: test_std_vec2")

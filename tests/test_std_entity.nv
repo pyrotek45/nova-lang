@@ -1,0 +1,103 @@
+module test_std_entity
+
+import super.std.entity
+import super.std.vec2
+import super.std.core
+
+// ── Spawn ─────────────────────────────────────────────────────────
+let world = EntityWorld::new()
+let e1 = world.spawn(10.0, 20.0, "player")
+assert(e1.pos.x == 10.0, "spawn x")
+assert(e1.pos.y == 20.0, "spawn y")
+assert(e1.tag == "player", "spawn tag")
+assert(e1.alive, "spawn alive")
+assert(e1.data == 0.0, "spawn data default")
+
+// ── Multiple entities ─────────────────────────────────────────────
+let e2 = world.spawn(100.0, 50.0, "enemy")
+let e3 = world.spawn(200.0, 50.0, "enemy")
+e2.data = 3.0
+e3.data = 5.0
+
+assert(world.count() == 3, "count after spawns")
+assert(world.countAlive("enemy") == 2, "countAlive enemy")
+assert(world.countAlive("player") == 1, "countAlive player")
+
+// ── query ─────────────────────────────────────────────────────────
+let players = world.query("player")
+assert(players.len() == 1, "query player len")
+assert(players[0].tag == "player", "query player tag")
+
+let enemies = world.query("enemy")
+assert(enemies.len() == 2, "query enemy len")
+
+// ── getById ───────────────────────────────────────────────────────
+let pid = e1.id
+let found = world.getById(pid)
+assert(found.isSome(), "getById found")
+assert(found.unwrap().tag == "player", "getById tag")
+
+// ── forEachTagged ─────────────────────────────────────────────────
+let sumData = Box(0)
+world.forEachTagged("enemy", fn(e: Entity) {
+    sumData.value += Cast::int(e.data).unwrap()
+})
+assert(sumData.value == 8, "forEachTagged data sum")
+
+// ── forEach ──────────────────────────────────────────────────────
+let total = Box(0)
+world.forEach(fn(e: Entity) { total.value += 1 })
+assert(total.value == 3, "forEach count")
+
+// ── all() ────────────────────────────────────────────────────────
+let allList = world.all()
+assert(allList.len() == 3, "all() length")
+
+// ── overlapsAABB ──────────────────────────────────────────────────
+let ea = world.spawn(0.0, 0.0, "box")
+ea.size = Vec2::new(10.0, 10.0)
+let eb = world.spawn(5.0, 5.0, "box")
+eb.size = Vec2::new(10.0, 10.0)
+let ec = world.spawn(20.0, 20.0, "box")
+ec.size = Vec2::new(10.0, 10.0)
+
+assert(ea.overlapsAABB(eb), "overlapsAABB overlapping")
+assert(!ea.overlapsAABB(ec), "overlapsAABB not overlapping")
+
+// ── kill / killAll ────────────────────────────────────────────────
+world.kill(e2.id)
+world.update(0.0)
+assert(world.countAlive("enemy") == 1, "kill removes one enemy")
+
+world.killAll("enemy")
+world.update(0.0)
+assert(world.countAlive("enemy") == 0, "killAll removes all enemies")
+
+// ── velocity integration ──────────────────────────────────────────
+let ev = world.spawn(0.0, 0.0, "mover")
+ev.vel.x = 10.0
+ev.vel.y = 5.0
+ev.size  = Vec2::new(5.0, 5.0)
+world.update(1.0)
+assert((ev.pos.x - 10.0).abs() < 0.01, "update integrates vel x")
+assert((ev.pos.y - 5.0).abs() < 0.01, "update integrates vel y")
+
+// ── center() ─────────────────────────────────────────────────────
+let cen = world.spawn(10.0, 10.0, "c")
+cen.size = Vec2::new(20.0, 20.0)
+let mid = cen.center()
+assert(mid.x == 20.0, "center x")
+assert(mid.y == 20.0, "center y")
+
+// ── spawnFull ─────────────────────────────────────────────────────
+let ef = world.spawnFull(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, "full", 7.0)
+assert(ef.pos.x == 1.0, "spawnFull pos.x")
+assert(ef.vel.x == 3.0, "spawnFull vel.x")
+assert(ef.size.x == 5.0, "spawnFull size.x")
+assert(ef.data == 7.0, "spawnFull data")
+
+// ── clear ─────────────────────────────────────────────────────────
+world.clear()
+assert(world.count() == 0, "clear empties world")
+
+println("PASS: test_std_entity")

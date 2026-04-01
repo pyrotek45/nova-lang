@@ -1,0 +1,82 @@
+module test_std_set
+
+import super.std.set
+import super.std.core
+
+// ── Constructors ─────────────────────────────────────────────────
+let empty = Set::empty() @[T: Int]
+assert(empty.isEmpty(), "empty is empty")
+assert(empty.size() == 0, "empty size 0")
+
+let single = Set::singleton(42)
+assert(single.size() == 1, "singleton size")
+assert(single.has(42), "singleton has 42")
+assert(!single.has(0), "singleton no 0")
+
+let fromL = Set::fromList([1, 2, 3, 2, 1])
+assert(fromL.size() == 3, "fromList deduplicates")
+assert(fromL.has(1), "fromList has 1")
+assert(fromL.has(3), "fromList has 3")
+assert(!fromL.has(99), "fromList no 99")
+
+// ── add / remove ─────────────────────────────────────────────────
+let s = Set::fromList([10, 20, 30])
+s.add(40)
+assert(s.has(40), "add 40")
+assert(s.size() == 4, "size after add")
+s.add(10)  // already present — no-op
+assert(s.size() == 4, "add duplicate no change")
+s.remove(20)
+assert(!s.has(20), "remove 20")
+assert(s.size() == 3, "size after remove")
+s.remove(99)  // absent — no-op
+assert(s.size() == 3, "remove absent no change")
+
+// ── toList ───────────────────────────────────────────────────────
+let l = Set::fromList([5, 3, 1]).toList()
+assert(l.len() == 3, "toList len")
+
+// ── union ────────────────────────────────────────────────────────
+let a = Set::fromList([1, 2, 3])
+let b = Set::fromList([3, 4, 5])
+let u = a.union(b)
+assert(u.size() == 5, "union size")
+assert(u.has(1) && u.has(5) && u.has(3), "union members")
+
+// ── intersection ─────────────────────────────────────────────────
+let inter = a.intersection(b)
+assert(inter.size() == 1, "intersection size")
+assert(inter.has(3), "intersection has 3")
+
+// ── difference ───────────────────────────────────────────────────
+let diff = a.difference(b)
+assert(diff.size() == 2, "difference size")
+assert(diff.has(1) && diff.has(2), "difference members")
+assert(!diff.has(3), "difference no 3")
+
+// ── isSubset / isSuperset / isDisjoint ──────────────────────────
+let small = Set::fromList([1, 2])
+let big   = Set::fromList([1, 2, 3, 4])
+assert(small.isSubset(big), "small ⊆ big")
+assert(!big.isSubset(small), "big not ⊆ small")
+assert(big.isSuperset(small), "big ⊇ small")
+
+let disjoint = Set::fromList([10, 11])
+assert(small.isDisjoint(disjoint), "disjoint")
+assert(!small.isDisjoint(big), "not disjoint")
+
+// ── forEach ──────────────────────────────────────────────────────
+let acc = Box(0)
+Set::fromList([1, 2, 3]).forEach(fn(x: Int) { acc.value += x })
+assert(acc.value == 6, "forEach sum")
+
+// ── filter ───────────────────────────────────────────────────────
+let evens = Set::fromList([1, 2, 3, 4, 5, 6]).filter(fn(x: Int) -> Bool { return x % 2 == 0 })
+assert(evens.size() == 3, "filter evens size")
+assert(evens.has(2) && evens.has(4) && evens.has(6), "filter evens members")
+
+// ── toString ─────────────────────────────────────────────────────
+let emptyStr = Set::empty() @[T: Int]
+assert(emptyStr.toString() == "{}", "empty toString")
+
+println("PASS: test_std_set")

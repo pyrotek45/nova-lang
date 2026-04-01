@@ -69,11 +69,13 @@ struct SceneManager {
 }
 
 fn extends(SceneManager) new(initial: Scene) -> SceneManager {
-    return SceneManager { _stack: [initial] }
+    let s = []: Scene
+    s.push(initial)
+    return SceneManager { _stack: s }
 }
 
 fn extends(SceneManager) empty() -> SceneManager {
-    return SceneManager { _stack: [] }
+    return SceneManager { _stack: []: Scene }
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -81,20 +83,24 @@ fn extends(SceneManager) empty() -> SceneManager {
 fn extends update(self: SceneManager, dt: Float) {
     if self._stack.len() == 0 { return }
     let top = self._stack[self._stack.len() - 1]
-    (top.update)(dt)
+    let f = top.update
+    f(dt)
 }
 
 fn extends draw(self: SceneManager) {
     if self._stack.len() == 0 { return }
     let top = self._stack[self._stack.len() - 1]
-    (top.draw)()
+    let f = top.draw
+    f()
 }
 
 // ── Transitions ───────────────────────────────────────────────────────────────
 
 // Replace the current scene (and clear the stack) with a new one
 fn extends switch(self: SceneManager, scene: Scene) {
-    self._stack = [scene]
+    let s = []: Scene
+    s.push(scene)
+    self._stack = s
 }
 
 // Push a new scene on top (the current one is paused but preserved)

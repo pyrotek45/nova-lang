@@ -1,0 +1,78 @@
+module test_std_noise
+
+import super.std.noise
+
+// ── noiseHash ─────────────────────────────────────────────────────
+// noiseHash returns a float in [0, 1)
+let h = noiseHash(3, 7, 42)
+assert(h >= 0.0 && h < 1.0, "noiseHash in [0,1)")
+
+// Deterministic: same inputs → same output
+let h2 = noiseHash(3, 7, 42)
+assert(h == h2, "noiseHash deterministic")
+
+// Different inputs → different outputs (with high probability)
+let h3 = noiseHash(4, 7, 42)
+assert(h != h3, "noiseHash varies with x")
+
+// ── valueNoise ────────────────────────────────────────────────────
+let vn = valueNoise(1.5, 2.3, 0)
+assert(vn >= 0.0 && vn <= 1.0, "valueNoise in [0,1]")
+let vn2 = valueNoise(1.5, 2.3, 0)
+assert(vn == vn2, "valueNoise deterministic")
+
+// ── smoothNoise ───────────────────────────────────────────────────
+let sn = smoothNoise(1.5, 2.3, 0)
+assert(sn >= 0.0 && sn <= 1.0, "smoothNoise in [0,1]")
+let sn2 = smoothNoise(1.5, 2.3, 0)
+assert(sn == sn2, "smoothNoise deterministic")
+
+// ── fbm ───────────────────────────────────────────────────────────
+let f = fbm(1.5, 2.3, 42, 4, 2.0, 0.5)
+assert(f >= 0.0 && f <= 1.0, "fbm in [0,1]")
+let f2 = fbm(1.5, 2.3, 42, 4, 2.0, 0.5)
+assert(f == f2, "fbm deterministic")
+
+// Different octaves → different results
+let f4 = fbm(1.5, 2.3, 42, 4, 2.0, 0.5)
+let f8 = fbm(1.5, 2.3, 42, 8, 2.0, 0.5)
+assert(f4 != f8, "fbm varies with octaves")
+
+// ── ridged ────────────────────────────────────────────────────────
+let r = ridged(1.5, 2.3, 42, 4)
+assert(r >= 0.0 && r <= 1.0, "ridged in [0,1]")
+let r2 = ridged(1.5, 2.3, 42, 4)
+assert(r == r2, "ridged deterministic")
+
+// ── domain ────────────────────────────────────────────────────────
+let d = domain(1.5, 2.3, 42, 1.0)
+assert(d >= 0.0 && d <= 1.0, "domain in [0,1]")
+let d2 = domain(1.5, 2.3, 42, 1.0)
+assert(d == d2, "domain deterministic")
+
+// ── noiseToColor ──────────────────────────────────────────────────
+let black = (0, 0, 0)
+let white = (255, 255, 255)
+
+let c0 = noiseToColor(0.0, black, white)
+assert(c0[0] == 0 && c0[1] == 0 && c0[2] == 0, "noiseToColor 0.0 → black")
+
+let c1 = noiseToColor(1.0, black, white)
+assert(c1[0] == 255 && c1[1] == 255 && c1[2] == 255, "noiseToColor 1.0 → white")
+
+let cmid = noiseToColor(0.5, black, white)
+assert(cmid[0] == 127 && cmid[1] == 127 && cmid[2] == 127, "noiseToColor 0.5 → mid grey")
+
+// Clamp out-of-range values
+let cLow = noiseToColor(-0.5, black, white)
+assert(cLow[0] == 0, "noiseToColor <0 clamped to 0")
+let cHigh = noiseToColor(1.5, black, white)
+assert(cHigh[0] == 255, "noiseToColor >1 clamped to 255")
+
+// Custom color range
+let blue = (0, 0, 200)
+let red  = (200, 0, 0)
+let cmix = noiseToColor(0.5, blue, red)
+assert(cmix[2] == 100, "noiseToColor custom mid blue component")
+
+println("PASS: test_std_noise")

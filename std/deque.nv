@@ -64,6 +64,14 @@ fn extends isEmpty(self: Deque($T)) -> Bool {
     return self.len() == 0
 }
 
+fn extends toList(self: Deque($T)) -> [$T] {
+    let result = []: $T
+    for let i = self.head; i < self.items.len(); i += 1 {
+        result.push(self.items[i])
+    }
+    return result
+}
+
 // ── Mutation ─────────────────────────────────────────────────────────────────
 
 fn extends pushBack(self: Deque($T), v: $T) {
@@ -115,14 +123,6 @@ fn extends peekFront(self: Deque($T)) -> Option($T) {
 fn extends peekBack(self: Deque($T)) -> Option($T) {
     if self.isEmpty() { return None($T) }
     return Some(self.items[self.items.len() - 1])
-}
-
-fn extends toList(self: Deque($T)) -> [$T] {
-    let result = []: $T
-    for let i = self.head; i < self.items.len(); i += 1 {
-        result.push(self.items[i])
-    }
-    return result
 }
 
 fn extends toString(self: Deque($T)) -> String {

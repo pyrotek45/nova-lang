@@ -1,0 +1,86 @@
+module test_std_deque
+
+import super.std.deque
+import super.std.option
+import super.std.core
+
+// ── empty / isEmpty ───────────────────────────────────────────────
+let d: Deque(Int) = Deque::empty() @[T: Int]
+assert(d.isEmpty(), "empty is empty")
+assert(d.len() == 0, "empty len 0")
+
+// ── singleton ────────────────────────────────────────────────────
+let s = Deque::singleton(42)
+assert(!s.isEmpty(), "singleton not empty")
+assert(s.len() == 1, "singleton len 1")
+
+// ── fromList ─────────────────────────────────────────────────────
+let fl = Deque::fromList([1, 2, 3])
+assert(fl.len() == 3, "fromList len")
+
+// ── pushBack / pushFront ─────────────────────────────────────────
+let q: Deque(Int) = Deque::empty() @[T: Int]
+q.pushBack(10)
+q.pushBack(20)
+q.pushFront(5)
+assert(q.len() == 3, "len after pushes")
+
+// ── peekFront / peekBack ─────────────────────────────────────────
+let pf = q.peekFront()
+assert(pf.isSome(), "peekFront is Some")
+assert(pf.unwrap() == 5, "peekFront value")
+
+let pb = q.peekBack()
+assert(pb.isSome(), "peekBack is Some")
+assert(pb.unwrap() == 20, "peekBack value")
+
+// ── popFront ─────────────────────────────────────────────────────
+let front = q.popFront()
+assert(front.isSome(), "popFront is Some")
+assert(front.unwrap() == 5, "popFront value")
+assert(q.len() == 2, "len after popFront")
+
+// ── popBack ──────────────────────────────────────────────────────
+let back = q.popBack()
+assert(back.isSome(), "popBack is Some")
+assert(back.unwrap() == 20, "popBack value")
+assert(q.len() == 1, "len after popBack")
+
+// ── toList ───────────────────────────────────────────────────────
+let q2 = Deque::fromList([1, 2, 3])
+let lst = q2.toList()
+assert(lst.len() == 3, "toList len")
+assert(lst[0] == 1, "toList[0]")
+assert(lst[2] == 3, "toList[2]")
+
+// ── peek on empty ────────────────────────────────────────────────
+let empty: Deque(Int) = Deque::empty() @[T: Int]
+assert(empty.peekFront().isNone(), "peekFront empty is None")
+assert(empty.peekBack().isNone(), "peekBack empty is None")
+assert(empty.popFront().isNone(), "popFront empty is None")
+assert(empty.popBack().isNone(), "popBack empty is None")
+
+// ── forEach ──────────────────────────────────────────────────────
+let dq = Deque::fromList([10, 20, 30])
+let acc = Box(0)
+dq.forEach(fn(x: Int) { acc.value += x })
+assert(acc.value == 60, "forEach sum")
+
+// ── map ──────────────────────────────────────────────────────────
+let dm = Deque::fromList([1, 2, 3])
+let doubled = dm.map(fn(x: Int) -> Int { return x * 2 })
+let dl = doubled.toList()
+assert(dl[0] == 2, "map[0]")
+assert(dl[2] == 6, "map[2]")
+
+// ── filter ───────────────────────────────────────────────────────
+let df = Deque::fromList([1, 2, 3, 4, 5])
+let evens = df.filter(fn(x: Int) -> Bool { return x % 2 == 0 })
+assert(evens.len() == 2, "filter len")
+
+// ── toString ─────────────────────────────────────────────────────
+let ts = Deque::fromList([1, 2, 3])
+let str = ts.toString()
+assert(str.len() > 0, "toString non-empty")
+
+println("PASS: test_std_deque")
