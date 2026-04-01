@@ -1,0 +1,249 @@
+// ============================================================
+// std/grid.nv  — Fixed-size 2D grid (tilemap, pathfinding)
+// ============================================================
+//
+// Usage:  import super.std.grid
+//         import super.std.vec2
+//
+// Grid(T) is a flat-array backed 2D grid. All values must be the
+// same type T. Coordinates are (col, row) = (x, y).
+//
+// Constructors:
+//   Grid::new(cols, rows, default: T) -> Grid(T)
+//
+// Basic access:
+//   g.get(col, row) -> T
+//   g.set(col, row, value)
+//   g.inBounds(col, row) -> Bool
+//   g.width() -> Int
+//   g.height() -> Int
+//   g.fill(value)
+//   g.fillRect(x, y, w, h, value)
+//
+// Neighbors:
+//   g.neighbors4(col, row) -> [(Int, Int)]    -- N/S/E/W
+//   g.neighbors8(col, row) -> [(Int, Int)]    -- 8-direction
+//
+// Iteration:
+//   g.forEach(fn(col, row, value))
+//   g.map(fn(col, row, value) -> T)  -- returns new Grid with mapped values
+//
+// BFS pathfinding:
+//   g.bfs(startCol, startRow, goalCol, goalRow,
+//          passable: fn(T) -> Bool) -> [(Int, Int)]
+//   Returns the path from start to goal (inclusive), or [] if no path.
+//
+// Drawing (raylib):
+//   g.draw(screenX, screenY, cellSize, colorFn: fn(T) -> (Int,Int,Int))
+//     -- draw each cell as a filled rectangle
+//   g.drawLines(screenX, screenY, cellSize, color)
+//     -- draw grid lines only
+//   g.drawLabels(screenX, screenY, cellSize, strFn, fontSize, color)
+//     -- draw a text label in each cell
+//
+// ============================================================
+
+module grid
+
+import vec2
+
+struct Grid {
+    _cells: [Any],
+    _cols:  Int,
+    _rows:  Int,
+}
+
+// ── Constructor ───────────────────────────────────────────────────────────────
+
+fn extends(Grid) new(cols: Int, rows: Int, default: Any) -> Grid {
+    let cells = []
+    for let i = 0; i < cols * rows; i += 1 {
+        cells.push(default)
+    }
+    return Grid { _cells: cells, _cols: cols, _rows: rows }
+}
+
+// ── Dimensions ────────────────────────────────────────────────────────────────
+
+fn extends width(self: Grid) -> Int  { return self._cols }
+fn extends height(self: Grid) -> Int { return self._rows }
+
+// ── Index helper (private) ───────────────────────────────────────────────────
+
+fn gridIdx(g: Grid, col: Int, row: Int) -> Int {
+    return row * g._cols + col
+}
+
+// ── Access ────────────────────────────────────────────────────────────────────
+
+fn extends inBounds(self: Grid, col: Int, row: Int) -> Bool {
+    return col >= 0 && col < self._cols && row >= 0 && row < self._rows
+}
+
+fn extends get(self: Grid, col: Int, row: Int) -> Any {
+    if !self.inBounds(col, row) { return self._cells[0] }
+    return self._cells[gridIdx(self, col, row)]
+}
+
+fn extends set(self: Grid, col: Int, row: Int, value: Any) {
+    if !self.inBounds(col, row) { return }
+    self._cells[gridIdx(self, col, row)] = value
+}
+
+fn extends fill(self: Grid, value: Any) {
+    for let i = 0; i < self._cells.len(); i += 1 {
+        self._cells[i] = value
+    }
+}
+
+fn extends fillRect(self: Grid, x: Int, y: Int, w: Int, h: Int, value: Any) {
+    for let row = y; row < y + h; row += 1 {
+        for let col = x; col < x + w; col += 1 {
+            self.set(col, row, value)
+        }
+    }
+}
+
+// ── Neighbors ─────────────────────────────────────────────────────────────────
+
+// 4-connected neighbors (N, S, E, W)
+fn extends neighbors4(self: Grid, col: Int, row: Int) -> [(Int, Int)] {
+    let out = []
+    let dirs = [(0, -1), (0, 1), (1, 0), (-1, 0)]
+    for d in dirs {
+        let nc = col + d[0]
+        let nr = row + d[1]
+        if self.inBounds(nc, nr) { out.push((nc, nr)) }
+    }
+    return out
+}
+
+// 8-connected neighbors (includes diagonals)
+fn extends neighbors8(self: Grid, col: Int, row: Int) -> [(Int, Int)] {
+    let out = []
+    for let dr = -1; dr <= 1; dr += 1 {
+        for let dc = -1; dc <= 1; dc += 1 {
+            if dc == 0 && dr == 0 { continue }
+            let nc = col + dc
+            let nr = row + dr
+            if self.inBounds(nc, nr) { out.push((nc, nr)) }
+        }
+    }
+    return out
+}
+
+// ── Iteration ─────────────────────────────────────────────────────────────────
+
+fn extends forEach(self: Grid, f: fn(Int, Int, Any)) {
+    for let row = 0; row < self._rows; row += 1 {
+        for let col = 0; col < self._cols; col += 1 {
+            f(col, row, self.get(col, row))
+        }
+    }
+}
+
+// ── BFS pathfinding ───────────────────────────────────────────────────────────
+
+// Returns shortest path (list of (col,row) pairs) from start to goal,
+// or [] if no path exists. `passable` decides if a cell can be entered.
+fn extends bfs(self: Grid,
+               startCol: Int, startRow: Int,
+               goalCol: Int, goalRow: Int,
+               passable: fn(Any) -> Bool) -> [(Int, Int)] {
+    if !self.inBounds(startCol, startRow) || !self.inBounds(goalCol, goalRow) {
+        return []
+    }
+    // visited: encoded as col + row*cols -> true/false
+    let visited = []
+    for let i = 0; i < self._cols * self._rows; i += 1 { visited.push(false) }
+    let parent = []
+    for let i = 0; i < self._cols * self._rows; i += 1 { parent.push(-1) }
+
+    let startIdx = gridIdx(self, startCol, startRow)
+    let goalIdx  = gridIdx(self, goalCol, goalRow)
+    visited[startIdx] = true
+    let queue = [startIdx]
+    let found = false
+
+    while queue.len() > 0 {
+        let cur = queue[0]
+        queue = queue.slice(1, queue.len())
+        if cur == goalIdx { found = true; break }
+        let row = cur / self._cols
+        let col = cur - row * self._cols
+        let nbrs = self.neighbors4(col, row)
+        for nb in nbrs {
+            let nc = nb[0]
+            let nr = nb[1]
+            let ni = gridIdx(self, nc, nr)
+            if !visited[ni] && passable(self.get(nc, nr)) {
+                visited[ni]  = true
+                parent[ni]   = cur
+                queue.push(ni)
+            }
+        }
+    }
+
+    if !found { return [] }
+
+    // reconstruct path
+    let path = []
+    let cur = goalIdx
+    while cur != -1 {
+        let row = cur / self._cols
+        let col = cur - row * self._cols
+        path.push((col, row))
+        cur = parent[cur]
+    }
+    // reverse path
+    let result = []
+    for let i = path.len() - 1; i >= 0; i -= 1 {
+        result.push(path[i])
+    }
+    return result
+}
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+
+// Draw each cell as a filled rectangle; colorFn maps cell value to color
+fn extends draw(self: Grid, screenX: Int, screenY: Int, cellSize: Int, colorFn: fn(Any) -> (Int, Int, Int)) {
+    for let row = 0; row < self._rows; row += 1 {
+        for let col = 0; col < self._cols; col += 1 {
+            let v = self.get(col, row)
+            let c = colorFn(v)
+            raylib::drawRectangle(
+                screenX + col * cellSize,
+                screenY + row * cellSize,
+                cellSize, cellSize, c)
+        }
+    }
+}
+
+// Draw grid lines
+fn extends drawLines(self: Grid, screenX: Int, screenY: Int, cellSize: Int, color: (Int, Int, Int)) {
+    let totalW = self._cols * cellSize
+    let totalH = self._rows * cellSize
+    for let col = 0; col <= self._cols; col += 1 {
+        let x = screenX + col * cellSize
+        raylib::drawLine(x, screenY, x, screenY + totalH, color)
+    }
+    for let row = 0; row <= self._rows; row += 1 {
+        let y = screenY + row * cellSize
+        raylib::drawLine(screenX, y, screenX + totalW, y, color)
+    }
+}
+
+// Draw a text label in each cell using a stringifier function
+fn extends drawLabels(self: Grid, screenX: Int, screenY: Int, cellSize: Int,
+                      strFn: fn(Any) -> String, fontSize: Int, color: (Int, Int, Int)) {
+    for let row = 0; row < self._rows; row += 1 {
+        for let col = 0; col < self._cols; col += 1 {
+            let v  = self.get(col, row)
+            let s  = strFn(v)
+            let tw = raylib::measureText(s, fontSize)
+            let tx = screenX + col * cellSize + (cellSize - tw) / 2
+            let ty = screenY + row * cellSize + (cellSize - fontSize) / 2
+            raylib::drawText(s, tx, ty, fontSize, color)
+        }
+    }
+}

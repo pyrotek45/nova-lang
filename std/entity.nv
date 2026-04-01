@@ -1,0 +1,233 @@
+// ============================================================
+// std/entity.nv  — Lightweight entity component system
+// ============================================================
+//
+// Usage:  import super.std.entity
+//         import super.std.vec2
+//
+// Structs:
+//   Entity      -- single game object
+//   EntityWorld -- container managing all entities
+//
+// Entity fields (all public, access directly):
+//   id:    Int
+//   pos:   Vec2
+//   vel:   Vec2
+//   size:  Vec2      -- width/height (for AABB/draw)
+//   tag:   String    -- category label (e.g. "player", "enemy", "bullet")
+//   alive: Bool      -- set to false to queue for removal
+//   data:  Float     -- generic data slot (health, timer, angle, …)
+//
+// EntityWorld constructors:
+//   EntityWorld::new()
+//
+// EntityWorld methods:
+//   world.spawn(x, y, tag) -> Entity        -- create and register entity
+//   world.spawnFull(x,y,vx,vy,w,h,tag,d)   -- full constructor
+//   world.kill(id)                          -- mark entity dead
+//   world.killAll(tag)                      -- kill all with tag
+//   world.update(dt)                        -- integrate vel, prune dead
+//   world.count() -> Int
+//   world.countAlive(tag) -> Int
+//   world.query(tag) -> [Entity]            -- live entities with tag
+//   world.all() -> [Entity]                 -- all live entities
+//   world.getById(id) -> Option(Entity)
+//   world.forEach(f: fn(Entity))
+//   world.forEachTagged(tag, f: fn(Entity))
+//   world.clear()
+//
+// Collision helpers:
+//   entity.overlapsAABB(other: Entity) -> Bool
+//   entity.overlapCircle(other: Entity) -> Bool  -- uses size.x as radius
+//
+// Drawing helpers:
+//   entity.drawRect(color)
+//   entity.drawCircle(color)
+//
+// ============================================================
+
+module entity
+
+import vec2
+
+// ── Entity ────────────────────────────────────────────────────────────────────
+
+struct Entity {
+    id:    Int,
+    pos:   Vec2,
+    vel:   Vec2,
+    size:  Vec2,
+    tag:   String,
+    alive: Bool,
+    data:  Float,
+}
+
+fn extends overlapsAABB(self: Entity, other: Entity) -> Bool {
+    return self.pos.x < other.pos.x + other.size.x &&
+           self.pos.x + self.size.x > other.pos.x &&
+           self.pos.y < other.pos.y + other.size.y &&
+           self.pos.y + self.size.y > other.pos.y
+}
+
+fn extends overlapCircle(self: Entity, other: Entity) -> Bool {
+    let dx = self.pos.x - other.pos.x
+    let dy = self.pos.y - other.pos.y
+    let dist = Float::sqrt(dx * dx + dy * dy)
+    return dist < self.size.x + other.size.x
+}
+
+fn extends entityDrawRect(self: Entity, color: (Int, Int, Int)) {
+    raylib::drawRectangle(
+        Cast::int(self.pos.x).unwrap(),
+        Cast::int(self.pos.y).unwrap(),
+        Cast::int(self.size.x).unwrap(),
+        Cast::int(self.size.y).unwrap(),
+        color
+    )
+}
+
+fn extends entityDrawCircle(self: Entity, color: (Int, Int, Int)) {
+    raylib::drawCircle(
+        Cast::int(self.pos.x + self.size.x / 2.0).unwrap(),
+        Cast::int(self.pos.y + self.size.y / 2.0).unwrap(),
+        Cast::int(self.size.x).unwrap(),
+        color
+    )
+}
+
+fn extends center(self: Entity) -> Vec2 {
+    return Vec2::new(self.pos.x + self.size.x / 2.0,
+                     self.pos.y + self.size.y / 2.0)
+}
+
+// ── EntityWorld ───────────────────────────────────────────────────────────────
+
+struct EntityWorld {
+    _entities: [Entity],
+    _nextId:   Box(Int),
+}
+
+fn extends(EntityWorld) new() -> EntityWorld {
+    return EntityWorld {
+        _entities: [],
+        _nextId:   Box::new(0),
+    }
+}
+
+// Create a new entity with default vel/size and add it to the world
+fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
+    let id = self._nextId.get()
+    self._nextId.set(id + 1)
+    let e = Entity {
+        id:    id,
+        pos:   Vec2::new(x, y),
+        vel:   Vec2::zero(),
+        size:  Vec2::new(16.0, 16.0),
+        tag:   tag,
+        alive: true,
+        data:  0.0,
+    }
+    self._entities.push(e)
+    return e
+}
+
+// Create a fully specified entity
+fn extends spawnFull(self: EntityWorld,
+                     x: Float, y: Float,
+                     vx: Float, vy: Float,
+                     w: Float, h: Float,
+                     tag: String, data: Float) -> Entity {
+    let id = self._nextId.get()
+    self._nextId.set(id + 1)
+    let e = Entity {
+        id:    id,
+        pos:   Vec2::new(x, y),
+        vel:   Vec2::new(vx, vy),
+        size:  Vec2::new(w, h),
+        tag:   tag,
+        alive: true,
+        data:  data,
+    }
+    self._entities.push(e)
+    return e
+}
+
+// Mark entity with given id as dead
+fn extends kill(self: EntityWorld, id: Int) {
+    for e in self._entities {
+        if e.id == id { e.alive = false }
+    }
+}
+
+// Kill all entities with a given tag
+fn extends killAll(self: EntityWorld, tag: String) {
+    for e in self._entities {
+        if e.tag == tag { e.alive = false }
+    }
+}
+
+// Integrate velocities and remove dead entities
+fn extends update(self: EntityWorld, dt: Float) {
+    let alive = []
+    for e in self._entities {
+        if e.alive {
+            e.pos.x = e.pos.x + e.vel.x * dt
+            e.pos.y = e.pos.y + e.vel.y * dt
+            alive.push(e)
+        }
+    }
+    self._entities = alive
+}
+
+// ── Queries ───────────────────────────────────────────────────────────────────
+
+fn extends count(self: EntityWorld) -> Int {
+    return self._entities.len()
+}
+
+fn extends countAlive(self: EntityWorld, tag: String) -> Int {
+    let n = 0
+    for e in self._entities {
+        if e.alive && e.tag == tag { n += 1 }
+    }
+    return n
+}
+
+fn extends query(self: EntityWorld, tag: String) -> [Entity] {
+    let out = []
+    for e in self._entities {
+        if e.alive && e.tag == tag { out.push(e) }
+    }
+    return out
+}
+
+fn extends all(self: EntityWorld) -> [Entity] {
+    let out = []
+    for e in self._entities {
+        if e.alive { out.push(e) }
+    }
+    return out
+}
+
+fn extends getById(self: EntityWorld, id: Int) -> Option(Entity) {
+    for e in self._entities {
+        if e.id == id { return Some(e) }
+    }
+    return None
+}
+
+fn extends forEach(self: EntityWorld, f: fn(Entity)) {
+    for e in self._entities {
+        if e.alive { f(e) }
+    }
+}
+
+fn extends forEachTagged(self: EntityWorld, tag: String, f: fn(Entity)) {
+    for e in self._entities {
+        if e.alive && e.tag == tag { f(e) }
+    }
+}
+
+fn extends clear(self: EntityWorld) {
+    self._entities = []
+}

@@ -1,0 +1,209 @@
+// ============================================================
+// std/camera.nv  — 2D camera with pan, zoom, follow, shake
+// ============================================================
+//
+// Usage:  import super.std.camera
+//         import super.std.vec2
+//
+// Struct:
+//   Camera2D { pos, target, zoom, rotation, screenW, screenH,
+//               _shakeTimer, _shakeMag }
+//
+// Constructors:
+//   Camera2D::new(screenW, screenH)             -- centered, zoom=1
+//   Camera2D::at(x, y, screenW, screenH)        -- specific position
+//
+// Transform:
+//   cam.worldToScreen(worldPos: Vec2) -> Vec2   -- world → pixels
+//   cam.screenToWorld(screenPos: Vec2) -> Vec2  -- pixels → world
+//
+// Control (call each frame with dt = raylib::getFrameTime()):
+//   cam.follow(target: Vec2, speed: Float, dt: Float)  -- lerp toward target
+//   cam.snapTo(pos: Vec2)                              -- instant move
+//   cam.pan(dx, dy)                                    -- offset by pixels
+//   cam.setZoom(z)
+//   cam.zoomBy(factor)                                 -- multiply zoom
+//   cam.setRotation(r)
+//
+// Screen shake:
+//   cam.shake(magnitude, duration)   -- start a shake effect
+//   cam.update(dt)                   -- must call each frame for shake
+//
+// Drawing helpers (apply camera transform before drawing world objects):
+//   cam.begin()    -- call before world draw calls
+//   cam.end()      -- call after world draw calls
+//   cam.drawRect(wx, wy, w, h, color)   -- draw rectangle in world space
+//   cam.drawCircle(wx, wy, r, color)    -- draw circle in world space
+//   cam.drawText(text, wx, wy, sz, c)  -- draw text in world space
+//
+// Viewport queries:
+//   cam.worldBounds() -> (Float, Float, Float, Float)  -- (xMin,yMin,xMax,yMax)
+//   cam.isVisible(wx, wy, margin) -> Bool
+//
+// ============================================================
+
+module camera
+
+import vec2
+
+struct Camera2D {
+    pos:          Vec2,    // top-left world position of the camera view
+    zoom:         Float,
+    rotation:     Float,   // degrees
+    screenW:      Int,
+    screenH:      Int,
+    _shakeTimer:  Float,
+    _shakeMag:    Float,
+    _shakeOffX:   Float,
+    _shakeOffY:   Float,
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+// Create a camera centered at world origin, filling the given screen size
+fn extends(Camera2D) new(screenW: Int, screenH: Int) -> Camera2D {
+    return Camera2D {
+        pos:         Vec2::new(-Cast::float(screenW).unwrap() / 2.0,
+                               -Cast::float(screenH).unwrap() / 2.0),
+        zoom:        1.0,
+        rotation:    0.0,
+        screenW:     screenW,
+        screenH:     screenH,
+        _shakeTimer: 0.0,
+        _shakeMag:   0.0,
+        _shakeOffX:  0.0,
+        _shakeOffY:  0.0,
+    }
+}
+
+// Create a camera with the top-left world position explicitly set
+fn extends(Camera2D) at(x: Float, y: Float, screenW: Int, screenH: Int) -> Camera2D {
+    return Camera2D {
+        pos:         Vec2::new(x, y),
+        zoom:        1.0,
+        rotation:    0.0,
+        screenW:     screenW,
+        screenH:     screenH,
+        _shakeTimer: 0.0,
+        _shakeMag:   0.0,
+        _shakeOffX:  0.0,
+        _shakeOffY:  0.0,
+    }
+}
+
+// ── Update ────────────────────────────────────────────────────────────────────
+
+// Advance the shake effect. Call once per frame before drawing.
+fn extends update(self: Camera2D, dt: Float) {
+    if self._shakeTimer > 0.0 {
+        self._shakeTimer = self._shakeTimer - dt
+        let mag = self._shakeMag * (self._shakeTimer / (self._shakeTimer + dt + 0.001))
+        self._shakeOffX = (random::range(-100, 100) as Float) / 100.0 * mag
+        self._shakeOffY = (random::range(-100, 100) as Float) / 100.0 * mag
+        if self._shakeTimer <= 0.0 {
+            self._shakeTimer = 0.0
+            self._shakeOffX  = 0.0
+            self._shakeOffY  = 0.0
+        }
+    }
+}
+
+// ── Transform ─────────────────────────────────────────────────────────────────
+
+// Convert a world-space Vec2 to screen-space pixels
+fn extends worldToScreen(self: Camera2D, wp: Vec2) -> Vec2 {
+    let sx = (wp.x - self.pos.x + self._shakeOffX) * self.zoom
+    let sy = (wp.y - self.pos.y + self._shakeOffY) * self.zoom
+    return Vec2::new(sx, sy)
+}
+
+// Convert screen-space pixels to world-space coordinates
+fn extends screenToWorld(self: Camera2D, sp: Vec2) -> Vec2 {
+    let wx = sp.x / self.zoom + self.pos.x - self._shakeOffX
+    let wy = sp.y / self.zoom + self.pos.y - self._shakeOffY
+    return Vec2::new(wx, wy)
+}
+
+// ── Control ───────────────────────────────────────────────────────────────────
+
+// Smoothly follow a target world position (lerp at `speed` per second)
+fn extends follow(self: Camera2D, target: Vec2, speed: Float, dt: Float) {
+    let hw = Cast::float(self.screenW).unwrap() / 2.0 / self.zoom
+    let hh = Cast::float(self.screenH).unwrap() / 2.0 / self.zoom
+    let goalX = target.x - hw
+    let goalY = target.y - hh
+    let t = speed * dt
+    if t > 1.0 { t = 1.0 }
+    self.pos.x = self.pos.x + (goalX - self.pos.x) * t
+    self.pos.y = self.pos.y + (goalY - self.pos.y) * t
+}
+
+// Instantly center the camera on a world position
+fn extends snapTo(self: Camera2D, target: Vec2) {
+    self.pos.x = target.x - Cast::float(self.screenW).unwrap() / 2.0 / self.zoom
+    self.pos.y = target.y - Cast::float(self.screenH).unwrap() / 2.0 / self.zoom
+}
+
+// Offset the camera by (dx, dy) in world units
+fn extends pan(self: Camera2D, dx: Float, dy: Float) {
+    self.pos.x = self.pos.x + dx
+    self.pos.y = self.pos.y + dy
+}
+
+fn extends setZoom(self: Camera2D, z: Float) {
+    if z > 0.0 { self.zoom = z }
+}
+
+fn extends zoomBy(self: Camera2D, factor: Float) {
+    if factor > 0.0 { self.zoom = self.zoom * factor }
+}
+
+fn extends setRotation(self: Camera2D, degrees: Float) {
+    self.rotation = degrees
+}
+
+// Start a screen shake effect
+fn extends shake(self: Camera2D, magnitude: Float, duration: Float) {
+    self._shakeMag   = magnitude
+    self._shakeTimer = duration
+}
+
+// ── Drawing helpers ───────────────────────────────────────────────────────────
+
+// Draw a rectangle at a world-space position
+fn extends drawRect(self: Camera2D, wx: Float, wy: Float, w: Float, h: Float, color: (Int, Int, Int)) {
+    let sp = self.worldToScreen(Vec2::new(wx, wy))
+    let sw = Cast::int(w * self.zoom).unwrap()
+    let sh = Cast::int(h * self.zoom).unwrap()
+    raylib::drawRectangle(Cast::int(sp.x).unwrap(), Cast::int(sp.y).unwrap(), sw, sh, color)
+}
+
+// Draw a circle at a world-space position
+fn extends drawCircle(self: Camera2D, wx: Float, wy: Float, radius: Float, color: (Int, Int, Int)) {
+    let sp = self.worldToScreen(Vec2::new(wx, wy))
+    let sr = Cast::int(radius * self.zoom).unwrap()
+    raylib::drawCircle(Cast::int(sp.x).unwrap(), Cast::int(sp.y).unwrap(), sr, color)
+}
+
+// Draw text at a world-space position
+fn extends drawText(self: Camera2D, text: String, wx: Float, wy: Float, fontSize: Int, color: (Int, Int, Int)) {
+    let sp = self.worldToScreen(Vec2::new(wx, wy))
+    let scaledSize = Cast::int(Cast::float(fontSize).unwrap() * self.zoom).unwrap()
+    raylib::drawText(text, Cast::int(sp.x).unwrap(), Cast::int(sp.y).unwrap(), scaledSize, color)
+}
+
+// ── Viewport queries ──────────────────────────────────────────────────────────
+
+// World-space bounding box of the current view (xMin, yMin, xMax, yMax)
+fn extends worldBounds(self: Camera2D) -> (Float, Float, Float, Float) {
+    let ww = Cast::float(self.screenW).unwrap() / self.zoom
+    let wh = Cast::float(self.screenH).unwrap() / self.zoom
+    return (self.pos.x, self.pos.y, self.pos.x + ww, self.pos.y + wh)
+}
+
+// Return true if a world-space point is inside the view (with an optional margin)
+fn extends isVisible(self: Camera2D, wx: Float, wy: Float, margin: Float) -> Bool {
+    let (x0, y0, x1, y1) = self.worldBounds()
+    return wx >= x0 - margin && wx <= x1 + margin &&
+           wy >= y0 - margin && wy <= y1 + margin
+}

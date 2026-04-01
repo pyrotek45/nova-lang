@@ -1,0 +1,120 @@
+// ============================================================
+// std/scene.nv  — Scene and scene manager for game state
+// ============================================================
+//
+// Usage:  import super.std.scene
+//
+// A Scene is a struct with two closures: update(dt) and draw().
+// Scenes own their own state via Box(T) captures.
+//
+// Structs:
+//   Scene        -- { update: fn(Float), draw: fn() }
+//   SceneManager -- manages a stack of scenes
+//
+// Scene constructor:
+//   Scene::new(updateFn: fn(Float), drawFn: fn()) -> Scene
+//
+// SceneManager constructors:
+//   SceneManager::new(initialScene) -> SceneManager
+//   SceneManager::empty()           -> SceneManager
+//
+// SceneManager methods (call each frame):
+//   mgr.update(dt)        -- call the current scene's update
+//   mgr.draw()            -- call the current scene's draw
+//   mgr.switch(scene)     -- replace current scene (clears stack)
+//   mgr.push(scene)       -- push a new scene on top (pause current)
+//   mgr.pop()             -- return to previous scene
+//   mgr.has() -> Bool     -- true if there is an active scene
+//   mgr.depth() -> Int    -- number of scenes on the stack
+//
+// Typical usage:
+//
+//   let title = Scene::new(
+//       fn(dt: Float) { /* update title */ },
+//       fn()          { /* draw title */   }
+//   )
+//
+//   let mgr = SceneManager::new(title)
+//
+//   while raylib::rendering() {
+//       mgr.update(raylib::getFrameTime())
+//       mgr.draw()
+//   }
+//
+// ============================================================
+
+module scene
+
+struct Scene {
+    update: fn(Float),
+    draw:   fn(),
+}
+
+fn extends(Scene) new(updateFn: fn(Float), drawFn: fn()) -> Scene {
+    return Scene { update: updateFn, draw: drawFn }
+}
+
+// A no-op scene (useful as placeholder)
+fn extends(Scene) empty() -> Scene {
+    return Scene {
+        update: fn(dt: Float) {},
+        draw:   fn() {},
+    }
+}
+
+// ── SceneManager ──────────────────────────────────────────────────────────────
+
+struct SceneManager {
+    _stack: [Scene],
+}
+
+fn extends(SceneManager) new(initial: Scene) -> SceneManager {
+    return SceneManager { _stack: [initial] }
+}
+
+fn extends(SceneManager) empty() -> SceneManager {
+    return SceneManager { _stack: [] }
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+fn extends update(self: SceneManager, dt: Float) {
+    if self._stack.len() == 0 { return }
+    let top = self._stack[self._stack.len() - 1]
+    (top.update)(dt)
+}
+
+fn extends draw(self: SceneManager) {
+    if self._stack.len() == 0 { return }
+    let top = self._stack[self._stack.len() - 1]
+    (top.draw)()
+}
+
+// ── Transitions ───────────────────────────────────────────────────────────────
+
+// Replace the current scene (and clear the stack) with a new one
+fn extends switch(self: SceneManager, scene: Scene) {
+    self._stack = [scene]
+}
+
+// Push a new scene on top (the current one is paused but preserved)
+fn extends push(self: SceneManager, scene: Scene) {
+    self._stack.push(scene)
+}
+
+// Pop the current scene and return to the previous one
+fn extends pop(self: SceneManager) {
+    if self._stack.len() > 0 {
+        self._stack.pop()
+    }
+}
+
+// ── Queries ───────────────────────────────────────────────────────────────────
+
+fn extends has(self: SceneManager) -> Bool {
+    return self._stack.len() > 0
+}
+
+fn extends depth(self: SceneManager) -> Int {
+    return self._stack.len()
+}

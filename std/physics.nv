@@ -1,0 +1,328 @@
+// ============================================================
+// std/physics.nv  — 2D physics primitives and collision
+// ============================================================
+//
+// Usage:  import super.std.physics
+//         import super.std.vec2
+//
+// Structs:
+//   AABB    -- axis-aligned bounding box  { pos: Vec2, size: Vec2 }
+//   Circle  -- circle collider            { pos: Vec2, radius: Float }
+//   Body2D  -- physics body               { pos, vel, acc, mass, restitution, friction }
+//   Ray2    -- ray for casting            { origin: Vec2, dir: Vec2 }
+//   HitInfo -- result of a ray cast       { hit, point, normal, t }
+//
+// AABB helpers:
+//   AABB::new(x,y,w,h)
+//   AABB::centered(cx,cy,w,h)
+//   a.center() -> Vec2
+//   a.halfSize() -> Vec2
+//   a.contains(p: Vec2) -> Bool
+//   a.overlaps(b: AABB) -> Bool
+//   a.overlapCircle(c: Circle) -> Bool
+//   a.overlap(b: AABB) -> Vec2         -- penetration vector (zero if no overlap)
+//
+// Circle helpers:
+//   Circle::new(x,y,r)
+//   c.contains(p: Vec2) -> Bool
+//   c.overlaps(other: Circle) -> Bool
+//
+// Body2D:
+//   Body2D::new(x, y, mass)
+//   b.applyForce(fx, fy)
+//   b.applyImpulse(ix, iy)
+//   b.update(dt)                       -- integrate velocity + clear acc
+//   b.applyGravity(g, dt)
+//   b.applyFriction(dt)
+//   b.aabb(w, h) -> AABB               -- build AABB around body
+//   b.circle(r) -> Circle              -- build Circle around body
+//   b.stop()
+//
+// Collision resolution:
+//   resolveAABB(a: Body2D, aSize: Vec2, b: Body2D, bSize: Vec2)
+//   resolveCircle(a: Body2D, ar: Float, b: Body2D, br: Float)
+//   pushOutAABB(body: Body2D, bodySize: Vec2, wall: AABB) -> Vec2
+//
+// Raycasting:
+//   Ray2::new(ox, oy, dx, dy)
+//   ray.castAABB(box: AABB) -> HitInfo
+//
+// ============================================================
+
+module physics
+
+import vec2
+
+// ── AABB ─────────────────────────────────────────────────────────────────────
+
+struct AABB {
+    pos:  Vec2,   // top-left corner
+    size: Vec2,   // width, height
+}
+
+fn extends(AABB) new(x: Float, y: Float, w: Float, h: Float) -> AABB {
+    return AABB { pos: Vec2::new(x, y), size: Vec2::new(w, h) }
+}
+
+fn extends(AABB) centered(cx: Float, cy: Float, w: Float, h: Float) -> AABB {
+    return AABB { pos: Vec2::new(cx - w / 2.0, cy - h / 2.0), size: Vec2::new(w, h) }
+}
+
+fn extends center(self: AABB) -> Vec2 {
+    return Vec2::new(self.pos.x + self.size.x / 2.0, self.pos.y + self.size.y / 2.0)
+}
+
+fn extends halfSize(self: AABB) -> Vec2 {
+    return Vec2::new(self.size.x / 2.0, self.size.y / 2.0)
+}
+
+fn extends containsPoint(self: AABB, p: Vec2) -> Bool {
+    return p.x >= self.pos.x && p.x <= self.pos.x + self.size.x &&
+           p.y >= self.pos.y && p.y <= self.pos.y + self.size.y
+}
+
+fn extends overlaps(self: AABB, other: AABB) -> Bool {
+    return self.pos.x < other.pos.x + other.size.x &&
+           self.pos.x + self.size.x > other.pos.x &&
+           self.pos.y < other.pos.y + other.size.y &&
+           self.pos.y + self.size.y > other.pos.y
+}
+
+// Returns the penetration depth vector (shortest way to push out); zero if no overlap
+fn extends overlap(self: AABB, other: AABB) -> Vec2 {
+    if !self.overlaps(other) { return Vec2::zero() }
+    let ac = self.center()
+    let bc = other.center()
+    let dx = ac.x - bc.x
+    let dy = ac.y - bc.y
+    let ox = (self.size.x + other.size.x) / 2.0 - Float::abs(dx)
+    let oy = (self.size.y + other.size.y) / 2.0 - Float::abs(dy)
+    if ox < oy {
+        if dx > 0.0 { return Vec2::new(ox, 0.0) }
+        return Vec2::new(-ox, 0.0)
+    } else {
+        if dy > 0.0 { return Vec2::new(0.0, oy) }
+        return Vec2::new(0.0, -oy)
+    }
+}
+
+fn extends overlapCircle(self: AABB, c: Circle) -> Bool {
+    let cx = if c.pos.x < self.pos.x { self.pos.x }
+             else if c.pos.x > self.pos.x + self.size.x { self.pos.x + self.size.x }
+             else { c.pos.x }
+    let cy = if c.pos.y < self.pos.y { self.pos.y }
+             else if c.pos.y > self.pos.y + self.size.y { self.pos.y + self.size.y }
+             else { c.pos.y }
+    let dx = c.pos.x - cx
+    let dy = c.pos.y - cy
+    return dx * dx + dy * dy < c.radius * c.radius
+}
+
+// ── Circle ────────────────────────────────────────────────────────────────────
+
+struct Circle {
+    pos:    Vec2,
+    radius: Float,
+}
+
+fn extends(Circle) new(x: Float, y: Float, r: Float) -> Circle {
+    return Circle { pos: Vec2::new(x, y), radius: r }
+}
+
+fn extends circleContains(self: Circle, p: Vec2) -> Bool {
+    return self.pos.distTo(p) <= self.radius
+}
+
+fn extends circleOverlaps(self: Circle, other: Circle) -> Bool {
+    return self.pos.distTo(other.pos) < self.radius + other.radius
+}
+
+// ── Body2D ────────────────────────────────────────────────────────────────────
+
+struct Body2D {
+    pos:         Vec2,
+    vel:         Vec2,
+    acc:         Vec2,
+    mass:        Float,
+    restitution: Float,   // bounciness 0.0 = none, 1.0 = perfectly elastic
+    friction:    Float,   // velocity damping per second (0.0 = none)
+}
+
+fn extends(Body2D) new(x: Float, y: Float, mass: Float) -> Body2D {
+    return Body2D {
+        pos:         Vec2::new(x, y),
+        vel:         Vec2::zero(),
+        acc:         Vec2::zero(),
+        mass:        mass,
+        restitution: 0.5,
+        friction:    0.0,
+    }
+}
+
+// Add a continuous force (F = ma → acc += F / mass)
+fn extends applyForce(self: Body2D, fx: Float, fy: Float) {
+    if self.mass <= 0.0 { return }
+    self.acc.x = self.acc.x + fx / self.mass
+    self.acc.y = self.acc.y + fy / self.mass
+}
+
+// Add an instantaneous velocity change (impulse = change in momentum / mass)
+fn extends applyImpulse(self: Body2D, ix: Float, iy: Float) {
+    if self.mass <= 0.0 { return }
+    self.vel.x = self.vel.x + ix / self.mass
+    self.vel.y = self.vel.y + iy / self.mass
+}
+
+// Integrate: pos += vel*dt, vel += acc*dt, clear acc
+fn extends update(self: Body2D, dt: Float) {
+    self.vel.x = self.vel.x + self.acc.x * dt
+    self.vel.y = self.vel.y + self.acc.y * dt
+    self.pos.x = self.pos.x + self.vel.x * dt
+    self.pos.y = self.pos.y + self.vel.y * dt
+    // apply friction damping
+    if self.friction > 0.0 {
+        let damp = 1.0 - self.friction * dt
+        if damp < 0.0 { damp = 0.0 }
+        self.vel.x = self.vel.x * damp
+        self.vel.y = self.vel.y * damp
+    }
+    self.acc.x = 0.0
+    self.acc.y = 0.0
+}
+
+// Apply downward gravity (g positive = downward in screen space)
+fn extends applyGravity(self: Body2D, g: Float, dt: Float) {
+    self.vel.y = self.vel.y + g * dt
+}
+
+// Build an AABB centered on this body
+fn extends aabb(self: Body2D, w: Float, h: Float) -> AABB {
+    return AABB::centered(self.pos.x, self.pos.y, w, h)
+}
+
+// Build a Circle centered on this body
+fn extends circle(self: Body2D, r: Float) -> Circle {
+    return Circle::new(self.pos.x, self.pos.y, r)
+}
+
+// Zero out velocity
+fn extends stop(self: Body2D) {
+    self.vel.x = 0.0
+    self.vel.y = 0.0
+}
+
+// ── Collision resolution ──────────────────────────────────────────────────────
+
+// Resolve AABB vs AABB: push bodies apart and reflect velocities
+fn resolveAABB(a: Body2D, aW: Float, aH: Float, b: Body2D, bW: Float, bH: Float) {
+    let boxA = a.aabb(aW, aH)
+    let boxB = b.aabb(bW, bH)
+    let pen = boxA.overlap(boxB)
+    if pen.x == 0.0 && pen.y == 0.0 { return }
+    let totalMass = a.mass + b.mass
+    if totalMass <= 0.0 { return }
+    let ra = b.mass / totalMass
+    let rb = a.mass / totalMass
+    a.pos.x = a.pos.x + pen.x * ra
+    a.pos.y = a.pos.y + pen.y * ra
+    b.pos.x = b.pos.x - pen.x * rb
+    b.pos.y = b.pos.y - pen.y * rb
+    // reflect velocity along penetration axis
+    let e = (a.restitution + b.restitution) / 2.0
+    if pen.x != 0.0 {
+        let relVx = a.vel.x - b.vel.x
+        let j = -(1.0 + e) * relVx / (1.0 / a.mass + 1.0 / b.mass)
+        a.vel.x = a.vel.x + j / a.mass
+        b.vel.x = b.vel.x - j / b.mass
+    }
+    if pen.y != 0.0 {
+        let relVy = a.vel.y - b.vel.y
+        let j = -(1.0 + e) * relVy / (1.0 / a.mass + 1.0 / b.mass)
+        a.vel.y = a.vel.y + j / a.mass
+        b.vel.y = b.vel.y - j / b.mass
+    }
+}
+
+// Resolve circle vs circle
+fn resolveCircle(a: Body2D, ar: Float, b: Body2D, br: Float) {
+    let dist = a.pos.distTo(b.pos)
+    let minDist = ar + br
+    if dist >= minDist || dist == 0.0 { return }
+    let nx = (b.pos.x - a.pos.x) / dist
+    let ny = (b.pos.y - a.pos.y) / dist
+    let pen = minDist - dist
+    let totalMass = a.mass + b.mass
+    let ra = b.mass / totalMass
+    let rb = a.mass / totalMass
+    a.pos.x = a.pos.x - nx * pen * ra
+    a.pos.y = a.pos.y - ny * pen * ra
+    b.pos.x = b.pos.x + nx * pen * rb
+    b.pos.y = b.pos.y + ny * pen * rb
+    let e = (a.restitution + b.restitution) / 2.0
+    let relV = (a.vel.x - b.vel.x) * nx + (a.vel.y - b.vel.y) * ny
+    if relV > 0.0 { return }
+    let j = -(1.0 + e) * relV / (1.0 / a.mass + 1.0 / b.mass)
+    a.vel.x = a.vel.x + j / a.mass * nx
+    a.vel.y = a.vel.y + j / a.mass * ny
+    b.vel.x = b.vel.x - j / b.mass * nx
+    b.vel.y = b.vel.y - j / b.mass * ny
+}
+
+// Push a body out of a static AABB wall; returns the push vector applied
+fn pushOutAABB(body: Body2D, bW: Float, bH: Float, wall: AABB) -> Vec2 {
+    let bodyBox = body.aabb(bW, bH)
+    let pen = bodyBox.overlap(wall)
+    if pen.x == 0.0 && pen.y == 0.0 { return Vec2::zero() }
+    body.pos.x = body.pos.x + pen.x
+    body.pos.y = body.pos.y + pen.y
+    if pen.x != 0.0 { body.vel.x = 0.0 }
+    if pen.y != 0.0 { body.vel.y = 0.0 }
+    return pen
+}
+
+// ── Raycasting ────────────────────────────────────────────────────────────────
+
+struct HitInfo {
+    hit:    Bool,
+    point:  Vec2,
+    normal: Vec2,
+    t:      Float,    // parametric distance along ray (0 = origin, 1 = tip)
+}
+
+struct Ray2 {
+    origin: Vec2,
+    dir:    Vec2,     // should be normalized
+}
+
+fn extends(Ray2) new(ox: Float, oy: Float, dx: Float, dy: Float) -> Ray2 {
+    return Ray2 { origin: Vec2::new(ox, oy), dir: Vec2::new(dx, dy) }
+}
+
+// Slab-method ray vs AABB cast
+fn extends castAABB(self: Ray2, box: AABB) -> HitInfo {
+    let miss = HitInfo { hit: false, point: Vec2::zero(), normal: Vec2::zero(), t: 0.0 }
+    let dx = self.dir.x
+    let dy = self.dir.y
+    // avoid division by zero
+    let invDx = if Float::abs(dx) > 0.0001 { 1.0 / dx } else { 1e30 }
+    let invDy = if Float::abs(dy) > 0.0001 { 1.0 / dy } else { 1e30 }
+    let tx1 = (box.pos.x - self.origin.x) * invDx
+    let tx2 = (box.pos.x + box.size.x - self.origin.x) * invDx
+    let ty1 = (box.pos.y - self.origin.y) * invDy
+    let ty2 = (box.pos.y + box.size.y - self.origin.y) * invDy
+    let tMin = Float::max(Float::min(tx1, tx2), Float::min(ty1, ty2))
+    let tMax = Float::min(Float::max(tx1, tx2), Float::max(ty1, ty2))
+    if tMax < 0.0 || tMin > tMax { return miss }
+    let t = if tMin >= 0.0 { tMin } else { tMax }
+    let px = self.origin.x + self.dir.x * t
+    let py = self.origin.y + self.dir.y * t
+    // compute surface normal
+    let nx = 0.0
+    let ny = 0.0
+    if Float::abs(tMin - Float::min(tx1, tx2)) < 0.0001 {
+        nx = if dx < 0.0 { 1.0 } else { -1.0 }
+    } else {
+        ny = if dy < 0.0 { 1.0 } else { -1.0 }
+    }
+    return HitInfo { hit: true, point: Vec2::new(px, py), normal: Vec2::new(nx, ny), t: t }
+}

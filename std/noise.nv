@@ -1,0 +1,155 @@
+// ============================================================
+// std/noise.nv  — Procedural noise functions (pure math)
+// ============================================================
+//
+// Usage:  import super.std.noise
+//
+// No dependencies — all functions are pure Float math.
+//
+// Functions:
+//
+//   hash(x, y, seed) -> Float           -- deterministic hash [0.0, 1.0)
+//   valueNoise(x, y, seed) -> Float     -- bilinear-interpolated value noise
+//   smoothNoise(x, y, seed) -> Float    -- smoothstep-interpolated value noise
+//   fbm(x, y, seed, octaves, lacunarity, gain) -> Float
+//                                       -- fractal Brownian motion (layered noise)
+//   ridged(x, y, seed, octaves) -> Float -- ridged multifractal noise (terrain ridges)
+//   domain(x, y, seed, strength) -> Float
+//                                       -- domain-warped fbm (swirling noise)
+//
+// Utility:
+//   noiseToColor(n: Float, lo: (Int,Int,Int), hi: (Int,Int,Int)) -> (Int,Int,Int)
+//     -- lerp between two colors based on noise value in [0,1]
+//
+// Typical terrain usage:
+//
+//   import super.std.noise
+//
+//   let h = fbm(x * 0.01, y * 0.01, 42, 6, 2.0, 0.5)
+//   let color = if h > 0.6 { (255,255,255) }   // snow
+//               else if h > 0.4 { (100,180,80) } // grass
+//               else { (80,120,200) }             // water
+//
+// ============================================================
+
+module noise
+
+// ── Hash function ─────────────────────────────────────────────────────────────
+
+// Deterministic pseudo-random hash. Returns a value in [0.0, 1.0).
+fn hash(ix: Int, iy: Int, seed: Int) -> Float {
+    let h = ix * 374761393 + iy * 668265263 + seed * 2654435761
+    h = h ^ (h >> 13)
+    h = h * 1274126177
+    h = h ^ (h >> 16)
+    // map to [0, 1)
+    let f = Cast::float(h & 0x7FFFFFFF).unwrap() / Cast::float(0x7FFFFFFF).unwrap()
+    if f < 0.0 { f = -f }
+    return f
+}
+
+fn hashF(x: Float, y: Float, seed: Int) -> Float {
+    let ix = Cast::int(x).unwrap()
+    let iy = Cast::int(y).unwrap()
+    return hash(ix, iy, seed)
+}
+
+// ── Interpolation helpers ─────────────────────────────────────────────────────
+
+fn noiseLerp(a: Float, b: Float, t: Float) -> Float {
+    return a + (b - a) * t
+}
+
+fn smoothstepN(t: Float) -> Float {
+    return t * t * (3.0 - 2.0 * t)
+}
+
+// ── Value noise ───────────────────────────────────────────────────────────────
+
+// Bilinear value noise — simple and fast
+fn valueNoise(x: Float, y: Float, seed: Int) -> Float {
+    let ix = Cast::int(Float::floor(x)).unwrap()
+    let iy = Cast::int(Float::floor(y)).unwrap()
+    let fx = x - Float::floor(x)
+    let fy = y - Float::floor(y)
+    let a = hash(ix,     iy,     seed)
+    let b = hash(ix + 1, iy,     seed)
+    let c = hash(ix,     iy + 1, seed)
+    let d = hash(ix + 1, iy + 1, seed)
+    let top    = noiseLerp(a, b, fx)
+    let bottom = noiseLerp(c, d, fx)
+    return noiseLerp(top, bottom, fy)
+}
+
+// Smoothstep-interpolated value noise (smoother than valueNoise)
+fn smoothNoise(x: Float, y: Float, seed: Int) -> Float {
+    let ix = Cast::int(Float::floor(x)).unwrap()
+    let iy = Cast::int(Float::floor(y)).unwrap()
+    let fx = x - Float::floor(x)
+    let fy = y - Float::floor(y)
+    let ux = smoothstepN(fx)
+    let uy = smoothstepN(fy)
+    let a = hash(ix,     iy,     seed)
+    let b = hash(ix + 1, iy,     seed)
+    let c = hash(ix,     iy + 1, seed)
+    let d = hash(ix + 1, iy + 1, seed)
+    let top    = noiseLerp(a, b, ux)
+    let bottom = noiseLerp(c, d, ux)
+    return noiseLerp(top, bottom, uy)
+}
+
+// ── Fractal Brownian Motion ───────────────────────────────────────────────────
+
+// Layer `octaves` of smoothNoise at increasing frequencies and decreasing amplitudes.
+//   lacunarity — frequency multiplier per octave (usually 2.0)
+//   gain       — amplitude multiplier per octave (usually 0.5)
+// Result is in approximately [0.0, 1.0].
+fn fbm(x: Float, y: Float, seed: Int, octaves: Int, lacunarity: Float, gain: Float) -> Float {
+    let value = 0.0
+    let amplitude = 0.5
+    let frequency = 1.0
+    for let i = 0; i < octaves; i += 1 {
+        value = value + smoothNoise(x * frequency, y * frequency, seed + i) * amplitude
+        amplitude = amplitude * gain
+        frequency = frequency * lacunarity
+    }
+    return value
+}
+
+// ── Ridged multifractal noise ─────────────────────────────────────────────────
+
+// Good for mountain ridges and terrain highlights.
+fn ridged(x: Float, y: Float, seed: Int, octaves: Int) -> Float {
+    let value = 0.0
+    let amplitude = 0.5
+    let frequency = 1.0
+    for let i = 0; i < octaves; i += 1 {
+        let n = smoothNoise(x * frequency, y * frequency, seed + i)
+        let ridge = 1.0 - Float::abs(2.0 * n - 1.0)
+        value = value + ridge * amplitude
+        amplitude = amplitude * 0.5
+        frequency = frequency * 2.0
+    }
+    return value
+}
+
+// ── Domain warping ────────────────────────────────────────────────────────────
+
+// fbm applied with input coordinates warped by another layer of fbm.
+// Produces swirling, organic-looking patterns.
+fn domain(x: Float, y: Float, seed: Int, strength: Float) -> Float {
+    let wx = x + strength * fbm(x, y, seed,         4, 2.0, 0.5)
+    let wy = y + strength * fbm(x, y, seed + 31337, 4, 2.0, 0.5)
+    return fbm(wx, wy, seed + 99999, 4, 2.0, 0.5)
+}
+
+// ── Color utility ─────────────────────────────────────────────────────────────
+
+// Linearly interpolate between two colors based on a noise value in [0, 1].
+fn noiseToColor(n: Float, lo: (Int, Int, Int), hi: (Int, Int, Int)) -> (Int, Int, Int) {
+    let t = if n < 0.0 { 0.0 } else if n > 1.0 { 1.0 } else { n }
+    let r = Cast::int(Cast::float(lo[0]).unwrap() + Cast::float(hi[0] - lo[0]).unwrap() * t).unwrap()
+    let g = Cast::int(Cast::float(lo[1]).unwrap() + Cast::float(hi[1] - lo[1]).unwrap() * t).unwrap()
+    let b = Cast::int(Cast::float(lo[2]).unwrap() + Cast::float(hi[2] - lo[2]).unwrap() * t).unwrap()
+    return (r, g, b)
+}
