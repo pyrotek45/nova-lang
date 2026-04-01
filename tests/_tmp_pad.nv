@@ -1,0 +1,8 @@
+module tmp_pad
+import super.std.string
+
+let s = "42".padLeft(7, ' ')
+println("|" + s + "|")
+let n = 12345
+let ns = Cast::string(n).padLeft(7, ' ')
+println("|" + ns + "|")

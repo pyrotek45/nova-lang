@@ -118,7 +118,7 @@ impl Compiler {
                         let jump = self.gen.generate();
                         self.asm.push(Asm::FUNCTION(jump));
                         self.asm.push(Asm::OFFSET(parameters.len() as u32, 0));
-                        self.asm.push(Asm::NATIVE(index as u64));
+                        self.asm.push(Asm::NATIVE(index as u64, None));
                         if **return_type != TType::Void {
                             self.asm.push(Asm::RET(true));
                         } else {
@@ -200,7 +200,7 @@ impl Compiler {
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     } else {
                         todo!()
                     }
@@ -215,7 +215,7 @@ impl Compiler {
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     }
                     self.asm.push(Asm::EQUALS);
 
@@ -533,7 +533,7 @@ impl Compiler {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     if let Some(index) = self.native_functions.get_index("Option::isSome") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     }
                     self.asm.push(Asm::ISSOME);
                     self.asm.push(Asm::JUMPIFFALSE(skip));
@@ -572,7 +572,7 @@ impl Compiler {
                     let end = self.gen.generate();
                     self.compile_expr(expr)?;
                     if let Some(index) = self.native_functions.get_index("Option::isSome") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     }
                     self.asm.push(Asm::DUP);
                     self.asm.push(Asm::ISSOME);
@@ -907,7 +907,7 @@ impl Compiler {
                         self.asm.push(Asm::GET(index as u32))
                     }
                     if let Some(index) = self.native_functions.get_index("Option::isSome") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     }
                     self.asm.push(Asm::ISSOME);
                     self.asm.push(Asm::JUMPIFFALSE(end));
@@ -988,7 +988,7 @@ impl Compiler {
                 // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
                 // self.asm.push(Asm::GET(array_index as u32));
                 // if let Some(index) = self.native_functions.get_index("List::len") {
-                //     self.asm.push(Asm::NATIVE(index as u64))
+                //     self.asm.push(Asm::NATIVE(index as u64, None))
                 // } else {
                 //     todo!()
                 // }
@@ -1136,7 +1136,7 @@ impl Compiler {
                 // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
                 // self.asm.push(Asm::GET(array_index as u32));
                 // if let Some(index) = self.native_functions.get_index("List::len") {
-                //     self.asm.push(Asm::NATIVE(index as u64))
+                //     self.asm.push(Asm::NATIVE(index as u64, None))
                 // } else {
                 //     todo!()
                 // }
@@ -1643,7 +1643,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     } else {
                         todo!()
                     }
@@ -1660,7 +1660,7 @@ impl Compiler {
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
                 if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64))
+                    self.asm.push(Asm::NATIVE(index as u64, None))
                 } else {
                     todo!()
                 }
@@ -1675,7 +1675,7 @@ impl Compiler {
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
                 if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64))
+                    self.asm.push(Asm::NATIVE(index as u64, None))
                 }
                 self.asm.push(Asm::EQUALS);
 
@@ -1694,7 +1694,7 @@ impl Compiler {
                     self.asm.push(Asm::JUMPIFFALSE(negitive_end));
                     self.asm.push(Asm::GET(array_index as u32));
                     if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64))
+                        self.asm.push(Asm::NATIVE(index as u64, None))
                     } else {
                         todo!()
                     }
@@ -1717,7 +1717,7 @@ impl Compiler {
                 self.asm.push(Asm::GET(id_index as u32));
 
                 if let Some(index) = self.native_functions.get_index("List::push") {
-                    self.asm.push(Asm::NATIVE(index as u64))
+                    self.asm.push(Asm::NATIVE(index as u64, None))
                 } else {
                     todo!()
                 }
@@ -1874,7 +1874,7 @@ impl Compiler {
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
         if let Some(index) = self.native_functions.get_index("List::len") {
-            self.asm.push(Asm::NATIVE(index as u64))
+            self.asm.push(Asm::NATIVE(index as u64, None))
         } else {
             todo!()
         }
@@ -1886,7 +1886,7 @@ impl Compiler {
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
         if let Some(index) = self.native_functions.get_index("List::len") {
-            self.asm.push(Asm::NATIVE(index as u64))
+            self.asm.push(Asm::NATIVE(index as u64, None))
         }
         self.asm.push(Asm::EQUALS);
         self.asm.push(Asm::LABEL(step));
@@ -1920,7 +1920,7 @@ impl Compiler {
             self.asm.push(Asm::GET(list_index as u32));
             self.asm.push(Asm::GET(id_index as u32));
             if let Some(index) = self.native_functions.get_index("List::push") {
-                self.asm.push(Asm::NATIVE(index as u64))
+                self.asm.push(Asm::NATIVE(index as u64, None))
             } else {
                 todo!()
             }
@@ -2007,7 +2007,7 @@ impl Compiler {
                     identifier => {
                         //dbg!(identifier);
                         if let Some(index) = self.native_functions.get_index(identifier) {
-                            self.asm.push(Asm::NATIVE(index as u64));
+                            self.asm.push(Asm::NATIVE(index as u64, Some(position.clone())));
                         } else if let Some(index) = self.variables.get_index(identifier) {
                             self.asm.push(Asm::GET(index as u32));
                             self.asm.push(Asm::CALL);
