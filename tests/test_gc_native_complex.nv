@@ -1,0 +1,439 @@
+module test_gc_native_complex
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.hashmap
+import super.std.set
+import super.std.deque
+
+// ============================================================
+// GC + Native Function Integration Stress Tests
+//
+// These tests exercise the garbage collector under complex
+// scenarios where native functions (push, pop, remove, insert,
+// split, map, filter, etc.) are interleaved with heap
+// allocations, closures, and struct mutations.
+// ============================================================
+
+// ── 1. Native list ops interleaved with heavy allocation ─────────
+fn native_list_alloc_interleave() {
+    let lists = []: [Int]
+    for let i = 0; i < 100; i += 1 {
+        let tmp = []: Int
+        for let j = 0; j < 20; j += 1 {
+            tmp.push(j * i)  // native push inside nested loop
+        }
+        // Force GC pressure: create throwaway strings each iteration
+        let throwaway = "iter_" + Cast::string(i) + "_garbage"
+        lists.push(tmp)
+    }
+    assert(lists.len() == 100, "1: outer list has 100 sublists")
+    assert(lists[0].len() == 20, "1: first sublist has 20 items")
+    assert(lists[99][19] == 99 * 19, "1: last value correct")
+}
+native_list_alloc_interleave()
+
+// ── 2. String split + map chain with GC pressure ─────────────────
+fn string_chain_gc() {
+    let csv = "10,20,30,40,50,60,70,80,90,100"
+    let parts = csv.split(',')
+    assert(parts.len() == 10, "2: split into 10 parts")
+
+    // map each string part through a closure that allocates
+    let processed = []: String
+    for x in parts {
+        let padded = x.padLeft(5, '0')
+        processed.push(padded)
+    }
+    assert(processed[0] == "00010", "2: first padded")
+    assert(processed[9] == "00100", "2: last padded")
+
+    // filter to only those starting with "000"
+    let filtered = []: String
+    for s in processed {
+        if s.startsWith("000") {
+            filtered.push(s)
+        }
+    }
+    assert(filtered.len() > 0, "2: filter found some items")
+}
+string_chain_gc()
+
+// ── 3. HashMap native ops under allocation pressure ──────────────
+fn hashmap_gc_pressure() {
+    let maps = []: HashMap(String, [Int])
+    for let i = 0; i < 50; i += 1 {
+        let m = HashMap::default() @[K: String, V: [Int]]
+        let key = "key_" + Cast::string(i)
+        let vals = []: Int
+        for let j = 0; j < 10; j += 1 {
+            vals.push(i * 10 + j)
+        }
+        m.insert(key, vals)
+        maps.push(m)
+    }
+    // verify last map
+    let last_key = "key_49"
+    let last_map = maps[49]
+    assert(last_map.has(last_key), "3: last map has key")
+    let last_vals = last_map.get(last_key).unwrap()
+    assert(last_vals.len() == 10, "3: last map value list len")
+    assert(last_vals[0] == 490, "3: last map first value")
+}
+hashmap_gc_pressure()
+
+// ── 4. Closures calling native functions on captured lists ───────
+fn closure_native_capture() {
+    let data = []: Int
+    let adder = fn(v: Int) { data.push(v) }
+    let getter = fn() -> [Int] { return clone(data) }
+
+    for let i = 0; i < 200; i += 1 {
+        adder(i)
+        // Allocate throwaway lists to pressure GC
+        let junk = [i, i+1, i+2, i+3]
+    }
+
+    let snapshot = getter()
+    assert(snapshot.len() == 200, "4: closure added 200 items")
+    assert(snapshot[0] == 0, "4: first item")
+    assert(snapshot[199] == 199, "4: last item")
+
+    // pop half through native pop
+    for let i = 0; i < 100; i += 1 {
+        data.pop()
+    }
+    assert(data.len() == 100, "4: popped half")
+}
+closure_native_capture()
+
+// ── 5. Struct fields mutated via native calls + GC ───────────────
+struct Container {
+    items: [String],
+    counts: HashMap(String, Int),
+}
+
+fn make_container() -> Container {
+    return Container {
+        items: []: String,
+        counts: HashMap::default() @[K: String, V: Int],
+    }
+}
+
+fn container_stress() {
+    let c = make_container()
+    for let i = 0; i < 100; i += 1 {
+        let key = "item_" + Cast::string(i % 10)
+        c.items.push(key)
+        c.counts.increment(key)
+        // throwaway struct to pressure GC
+        let junk = Container {
+            items: ["a", "b"],
+            counts: HashMap::default() @[K: String, V: Int],
+        }
+    }
+    assert(c.items.len() == 100, "5: container has 100 items")
+    assert(c.counts.get("item_0").unwrap() == 10, "5: item_0 counted 10 times")
+    assert(c.counts.get("item_9").unwrap() == 10, "5: item_9 counted 10 times")
+}
+container_stress()
+
+// ── 6. Set operations under GC pressure ──────────────────────────
+fn set_gc_stress() {
+    let sets = []: Set(Int)
+    for let i = 0; i < 30; i += 1 {
+        let s = Set::empty() @[T: Int]
+        for let j = 0; j < 50; j += 1 {
+            s.add(i * 50 + j)
+        }
+        sets.push(s)
+    }
+    assert(sets[0].size() == 50, "6: first set has 50 elements")
+    assert(sets[29].size() == 50, "6: last set has 50 elements")
+
+    // union two sets
+    let combined = sets[0].union(sets[1])
+    assert(combined.size() == 100, "6: union of disjoint sets = 100")
+
+    // intersection of non-overlapping = empty
+    let inter = sets[0].intersection(sets[5])
+    assert(inter.size() == 0, "6: disjoint intersection is empty")
+}
+set_gc_stress()
+
+// ── 7. Deque push/pop from both ends with GC pressure ────────────
+fn deque_gc_stress() {
+    let dq = Deque::empty() @[T: Int]
+    for let i = 0; i < 500; i += 1 {
+        if i % 2 == 0 {
+            dq.pushBack(i)
+        } else {
+            dq.pushFront(i)
+        }
+        // GC pressure: throwaway string alloc
+        let s = "deque_" + Cast::string(i)
+    }
+    assert(dq.len() == 500, "7: deque has 500 elements")
+
+    // pop half from front
+    for let i = 0; i < 250; i += 1 {
+        dq.popFront()
+    }
+    assert(dq.len() == 250, "7: deque has 250 after pop front")
+}
+deque_gc_stress()
+
+// ── 8. Nested native calls: map inside filter inside loop ────────
+fn nested_native_chain() {
+    let results = []: [Int]
+    for let i = 0; i < 50; i += 1 {
+        let base = []: Int
+        for let j = 0; j < 20; j += 1 {
+            base.push(j + i)
+        }
+        // map then filter — each creates intermediate lists
+        let doubled = base.map(|x: Int| x * 2)
+        let big = doubled.filter(|x: Int| x > 50)
+        results.push(big)
+    }
+    assert(results.len() == 50, "8: 50 result lists")
+    // The last iteration: base = [49..68], doubled = [98..136]
+    // big = those > 50, which is all of them
+    assert(results[49].len() == 20, "8: last result all > 50")
+}
+nested_native_chain()
+
+// ── 9. Recursive function using native calls at each level ───────
+fn build_tree(depth: Int) -> [String] {
+    if depth == 0 {
+        return ["leaf"]
+    }
+    let left = build_tree(depth - 1)
+    let right = build_tree(depth - 1)
+    let node = []: String
+    node.push("node_" + Cast::string(depth))
+    for s in left {
+        node.push(s)
+    }
+    for s in right {
+        node.push(s)
+    }
+    return node
+}
+let tree = build_tree(8)
+assert(tree.len() > 0, "9: tree is non-empty")
+assert(tree[0] == "node_8", "9: root is node_8")
+
+// ── 10. List remove() in loop with GC pressure ──────────────────
+fn remove_in_loop() {
+    let items = []: Int
+    for let i = 0; i < 100; i += 1 {
+        items.push(i)
+    }
+    // Remove every other element from front
+    let removed = 0
+    while items.len() > 50 {
+        items.remove(0)
+        removed += 1
+        // throwaway alloc
+        let junk = [removed, removed * 2]
+    }
+    assert(items.len() == 50, "10: 50 items remain")
+    assert(removed == 50, "10: removed 50 items")
+    assert(items[0] == 50, "10: first remaining is 50")
+}
+remove_in_loop()
+
+// ── 11. String operations in tight loop with GC pressure ─────────
+fn string_ops_gc() {
+    let results = []: String
+    for let i = 0; i < 200; i += 1 {
+        let s = "hello_world_" + Cast::string(i)
+        let upper = s.toUpper()
+        let trimmed = upper.trim()
+        let sub = trimmed.substring(0, 5)
+        results.push(sub)
+    }
+    assert(results.len() == 200, "11: 200 string results")
+    assert(results[0] == "HELLO", "11: first is HELLO")
+    assert(results[199] == "HELLO", "11: last is HELLO")
+}
+string_ops_gc()
+
+// ── 12. Box mutations through closures with GC pressure ──────────
+fn box_closure_gc() {
+    let counters = []: Box(Int)
+    let incrementers = []: fn()
+    for let i = 0; i < 100; i += 1 {
+        let b = Box(0)
+        counters.push(b)
+        incrementers.push(fn() { b.value += 1 })
+    }
+    // Call each incrementer 10 times
+    for let round = 0; round < 10; round += 1 {
+        for let i = 0; i < 100; i += 1 {
+            incrementers[i]()
+            // GC pressure
+            let junk = "round_" + Cast::string(round) + "_" + Cast::string(i)
+        }
+    }
+    assert(counters[0].value == 10, "12: first counter is 10")
+    assert(counters[99].value == 10, "12: last counter is 10")
+}
+box_closure_gc()
+
+// ── 13. HashMap iteration + rebuild + GC ─────────────────────────
+fn hashmap_iterate_rebuild() {
+    let m = HashMap::default() @[K: Int, V: String]
+    for let i = 0; i < 100; i += 1 {
+        m.insert(i, "val_" + Cast::string(i))
+    }
+    assert(m.size() == 100, "13: map has 100 entries")
+
+    // Rebuild map keeping only odd keys
+    let keys = m.keys()
+    let m2 = HashMap::default() @[K: Int, V: String]
+    for k in keys {
+        if k % 2 != 0 {
+            m2.insert(k, m.get(k).unwrap())
+        }
+    }
+    assert(m2.size() == 50, "13: 50 odd-key entries in new map")
+    assert(!m2.has(0), "13: 0 not in new map")
+    assert(m2.has(1), "13: 1 in new map")
+    assert(m2.get(1).unwrap() == "val_1", "13: value intact")
+}
+hashmap_iterate_rebuild()
+
+// ── 14. List comprehension with closures and GC ──────────────────
+fn listcomp_gc() {
+    let source = []: Int
+    for let i = 0; i < 100; i += 1 {
+        source.push(i)
+    }
+    // List comprehension: squares of source
+    let squares = [x in source | x * x]
+    assert(squares.len() == 100, "14: 100 squares")
+    assert(squares[0] == 0, "14: first square")
+    assert(squares[1] == 1, "14: second square")
+    assert(squares[99] == 99 * 99, "14: last square")
+
+    // Filter evens manually with GC pressure
+    let even_squares = squares.filter(|x: Int| x % 4 == 0)
+    assert(even_squares.len() == 50, "14: 50 even squares")
+}
+listcomp_gc()
+
+// ── 15. Rapid create-use-discard of many containers ──────────────
+fn rapid_container_churn() {
+    for let i = 0; i < 200; i += 1 {
+        // Create a hashmap, fill it, use it, discard it
+        let m = HashMap::default() @[K: String, V: Int]
+        m.insert("a", i)
+        m.insert("b", i * 2)
+        let sum = m.get("a").unwrap() + m.get("b").unwrap()
+        assert(sum == i * 3, "15: map sum iteration " + Cast::string(i))
+
+        // Create a set, fill it, discard it
+        let s = Set::empty() @[T: Int]
+        s.add(i)
+        s.add(i + 1)
+
+        // Create a deque, fill it, discard it
+        let d = Deque::empty() @[T: String]
+        d.pushBack("x")
+        d.pushFront("y")
+    }
+}
+rapid_container_churn()
+assert(true, "15: rapid container churn survived")
+
+// ── 16. Mixed native ops: push, insert, remove, pop cycle ────────
+fn mixed_native_ops() {
+    let list = []: Int
+    for let i = 0; i < 100; i += 1 {
+        list.push(i)           // native push
+    }
+    assert(list.len() == 100, "16: pushed 100")
+
+    // insert at front repeatedly
+    for let i = 0; i < 20; i += 1 {
+        list.insert(0, -(i + 1))  // native insert
+    }
+    assert(list.len() == 120, "16: inserted 20 at front")
+    assert(list[0] == -20, "16: front is -20")
+
+    // remove from middle
+    for let i = 0; i < 10; i += 1 {
+        list.remove(50)        // native remove
+    }
+    assert(list.len() == 110, "16: removed 10 from middle")
+
+    // pop from back
+    for let i = 0; i < 10; i += 1 {
+        list.pop()             // native pop
+    }
+    assert(list.len() == 100, "16: popped 10 from back")
+}
+mixed_native_ops()
+
+// ── 17. Negative indexing with GC pressure ───────────────────────
+fn negative_index_gc() {
+    for let i = 0; i < 100; i += 1 {
+        let list = [10, 20, 30, 40, 50]
+        assert(list[-1] == 50, "17: last element via -1")
+        assert(list[-2] == 40, "17: second to last via -2")
+        assert(list[-5] == 10, "17: first via -5")
+        // Negative index assignment
+        let mutable = [1, 2, 3]
+        mutable[-1] = 99
+        assert(mutable[2] == 99, "17: assign via -1")
+        // GC pressure
+        let junk = [i, i+1, i+2]
+    }
+}
+negative_index_gc()
+
+// ── 18. LEN opcode stress: .len() on many object types ───────────
+fn len_stress() {
+    for let i = 0; i < 200; i += 1 {
+        let list = []: Int
+        for let j = 0; j <= i % 20; j += 1 {
+            list.push(j)
+        }
+        assert(list.len() == (i % 20) + 1, "18: list len correct")
+
+        let s = "x".repeat(i % 30 + 1)
+        assert(s.len() == i % 30 + 1, "18: string len correct")
+
+        // GC pressure
+        let junk = ["a", "b", "c"]
+    }
+}
+len_stress()
+
+// ── 19. Chained std operations: sort + map + filter + reduce ─────
+fn chained_std_ops() {
+    let data = []: Int
+    for let i = 0; i < 50; i += 1 {
+        data.push(50 - i)  // [50, 49, 48, ..., 1]
+    }
+    let sorted = data.bubblesort()
+    assert(sorted[0] == 1, "19: sorted first is 1")
+    assert(sorted[49] == 50, "19: sorted last is 50")
+
+    let doubled = sorted.map(|x: Int| x * 2)
+    assert(doubled[0] == 2, "19: doubled first")
+    assert(doubled[49] == 100, "19: doubled last")
+
+    let evens = doubled.filter(|x: Int| x % 4 == 0)
+    assert(evens.len() == 25, "19: 25 divisible by 4")
+
+    let sum = evens.reduce(fn(acc: Int, x: Int, i: Int) -> Int { return acc + x }, 0)
+    // sum of 4+8+12+...+100 = 4*(1+2+...+25) = 4*325 = 1300
+    assert(sum == 1300, "19: reduce sum = 1300")
+}
+chained_std_ops()
+
+println("PASS: test_gc_native_complex")

@@ -232,13 +232,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float addition (+): expected two Float values on the stack")
+                    );
                 };
                 let result = v1 + v2;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -248,13 +244,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float subtraction (-): expected two Float values on the stack")
+                    );
                 };
                 let result = v2 - v1;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -264,13 +256,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float multiplication (*): expected two Float values on the stack")
+                    );
                 };
                 let result = v1 * v2;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -280,13 +268,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float division (/): expected two Float values on the stack")
+                    );
                 };
                 let result = v2 / v1;
                 self.state.memory.stack.push(VmData::Float(result))
@@ -296,16 +280,12 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Integer addition (+): expected two Int values on the stack")
+                    );
                 };
-                let result = v1.checked_add(v2).ok_or_else(|| NovaError::Runtime {
-                    msg: "Integer overflow".into(),
+                let result = v1.checked_add(v2).ok_or_else(|| {
+                    self.runtime_error("Integer addition (+): overflow")
                 })?;
                 self.state.memory.stack.push(VmData::Int(result))
             }
@@ -314,16 +294,12 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Integer subtraction (-): expected two Int values on the stack")
+                    );
                 };
-                let result = v2.checked_sub(v1).ok_or_else(|| NovaError::Runtime {
-                    msg: "Integer overflow".into(),
+                let result = v2.checked_sub(v1).ok_or_else(|| {
+                    self.runtime_error("Integer subtraction (-): overflow")
                 })?;
                 self.state.memory.stack.push(VmData::Int(result))
             }
@@ -332,18 +308,12 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Integer multiplication (*): expected two Int values on the stack")
+                    );
                 };
-                // safely multi
-
-                let result = v1.checked_mul(v2).ok_or_else(|| NovaError::Runtime {
-                    msg: "Integer overflow".into(),
+                let result = v1.checked_mul(v2).ok_or_else(|| {
+                    self.runtime_error("Integer multiplication (*): overflow")
                 })?;
                 self.state.memory.stack.push(VmData::Int(result))
             }
@@ -352,16 +322,12 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Integer division (/): expected two Int values on the stack")
+                    );
                 };
-                let result = v2.checked_div(v1).ok_or_else(|| NovaError::Runtime {
-                    msg: "Integer division by zero".into(),
+                let result = v2.checked_div(v1).ok_or_else(|| {
+                    self.runtime_error("Integer division (/): division by zero")
                 })?;
                 self.state.memory.stack.push(VmData::Int(result))
             }
@@ -483,13 +449,9 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Integer less-than (<): expected two Int values on the stack")
+                    );
                 };
                 let result = v2 < v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -513,13 +475,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float less-than (<): expected two Float values on the stack")
+                    );
                 };
                 let result = v2 < v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -529,13 +487,9 @@ impl Vm {
                 let (Some(VmData::Float(v1)), Some(VmData::Float(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Float greater-than (>): expected two Float values on the stack")
+                    );
                 };
                 let result = v2 > v1;
                 self.state.memory.stack.push(VmData::Bool(result))
@@ -580,13 +534,9 @@ impl Vm {
                 let (Some(v1), Some(v2)) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Equality check (==): expected two values on the stack")
+                    );
                 };
                 let equal = self.deep_equal(&v1, &v2);
                 self.state.memory.stack.push(VmData::Bool(equal));
@@ -596,47 +546,62 @@ impl Vm {
                 Some(VmData::Bool(b)) => {
                     self.state.memory.stack.push(VmData::Bool(!b));
                 }
-                _ => {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error on Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                Some(other) => {
+                    return Err(self.runtime_error(format!(
+                        "Logical not (!): expected a Bool, got {}",
+                        other
+                    )));
+                }
+                None => {
+                    return Err(self.runtime_error("Logical not (!): stack is empty"));
                 }
             },
 
-            Code::AND => {
-                if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
-                    (self.state.memory.stack.pop(), self.state.memory.stack.pop())
-                {
+            Code::AND => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
+                (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) => {
                     self.state.memory.stack.push(VmData::Bool(v1 && v2))
                 }
-            }
+                (Some(a), Some(b)) => {
+                    return Err(self.runtime_error(format!(
+                        "Logical and (&&): expected two Bool values, got {} and {}",
+                        b, a
+                    )));
+                }
+                _ => {
+                    return Err(self.runtime_error("Logical and (&&): not enough values on the stack"));
+                }
+            },
 
-            Code::OR => {
-                if let (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) =
-                    (self.state.memory.stack.pop(), self.state.memory.stack.pop())
-                {
+            Code::OR => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
+                (Some(VmData::Bool(v1)), Some(VmData::Bool(v2))) => {
                     self.state.memory.stack.push(VmData::Bool(v1 || v2))
                 }
-            }
+                (Some(a), Some(b)) => {
+                    return Err(self.runtime_error(format!(
+                        "Logical or (||): expected two Bool values, got {} and {}",
+                        b, a
+                    )));
+                }
+                _ => {
+                    return Err(self.runtime_error("Logical or (||): not enough values on the stack"));
+                }
+            },
 
             Code::NEG => {
-                if let Some(value) = self.state.memory.stack.pop() {
-                    match value {
-                        VmData::Int(v) => self.state.memory.stack.push(VmData::Int(-v)),
-                        VmData::Float(v) => self.state.memory.stack.push(VmData::Float(-v)),
-                        _ => {
-                            return Err(Box::new(NovaError::Runtime {
-                                msg: format!(
-                                    "Error on Opcode : {}",
-                                    self.state.program[self.state.current_instruction]
-                                )
-                                .into(),
-                            }));
-                        }
+                let value = self
+                    .state
+                    .memory
+                    .stack
+                    .pop()
+                    .ok_or_else(|| self.runtime_error("Negation (-): stack is empty"))?;
+                match value {
+                    VmData::Int(v) => self.state.memory.stack.push(VmData::Int(-v)),
+                    VmData::Float(v) => self.state.memory.stack.push(VmData::Float(-v)),
+                    other => {
+                        return Err(self.runtime_error(format!(
+                            "Negation (-): expected Int or Float, got {}",
+                            other
+                        )));
                     }
                 }
             }
@@ -645,13 +610,9 @@ impl Vm {
                 let (Some(VmData::Int(v1)), Some(VmData::Int(v2))) =
                     (self.state.memory.stack.pop(), self.state.memory.stack.pop())
                 else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!(
-                            "Error Not enough arguments Opcode : {}",
-                            self.state.program[self.state.current_instruction]
-                        )
-                        .into(),
-                    }));
+                    return Err(
+                        self.runtime_error("Modulo (%): expected two Int values on the stack")
+                    );
                 };
                 let result = v2.modulo(v1);
                 self.state.memory.stack.push(VmData::Int(result))
@@ -662,18 +623,19 @@ impl Vm {
                     match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                         (Some(dest), Some(val)) => (dest, val),
                         _ => {
-                            return Err(Box::new(NovaError::Runtime {
-                                msg: "Not enough operands for assignment".into(),
-                            }))
+                            return Err(
+                                self.runtime_error("Assignment (=): not enough values on the stack")
+                            )
                         }
                     };
                 if let VmData::Int(index) = destination {
                     let target_index = self.state.offset + index as usize;
                     self.state.memory.store(target_index, value);
                 } else {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: format!("Invalid assignment destination: {}", destination).into(),
-                    }));
+                    return Err(self.runtime_error(format!(
+                        "Assignment (=): expected an Int destination, got {}",
+                        destination
+                    )));
                 }
             }
 
@@ -736,6 +698,36 @@ impl Vm {
                 self.state.memory.stack.push(VmData::None);
             }
 
+            Code::LEN => {
+                let value = self
+                    .state
+                    .memory
+                    .stack
+                    .pop()
+                    .ok_or_else(|| self.runtime_error("len: stack is empty"))?;
+                match value {
+                    VmData::Object(index) => {
+                        let len = {
+                            let obj =
+                                self.state.memory.ref_from_heap(index).ok_or_else(|| {
+                                    self.runtime_error(
+                                        "len: invalid heap reference (object was freed)",
+                                    )
+                                })?;
+                            obj.data.len() as i64
+                        };
+                        self.state.memory.dec(index);
+                        self.state.memory.stack.push(VmData::Int(len));
+                    }
+                    other => {
+                        return Err(self.runtime_error(format!(
+                            "len: expected a List, String, or Tuple, got {}",
+                            other
+                        )));
+                    }
+                }
+            }
+
             Code::CONCAT => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                 (Some(VmData::Object(index1)), Some(VmData::Object(index2))) => {
                     // Inhibit GC: both objects were raw-popped and are invisible
@@ -743,14 +735,10 @@ impl Vm {
                     self.state.memory.gc_inhibit();
                     let (new_object_type, new_data) = {
                         let object1 = self.state.memory.ref_from_heap(index2).ok_or_else(|| {
-                            Box::new(NovaError::Runtime {
-                                msg: "CONCAT: invalid heap reference".into(),
-                            })
+                            self.runtime_error("Concatenation (++): left operand is an invalid heap reference")
                         })?;
                         let object2 = self.state.memory.ref_from_heap(index1).ok_or_else(|| {
-                            Box::new(NovaError::Runtime {
-                                msg: "CONCAT: invalid heap reference".into(),
-                            })
+                            self.runtime_error("Concatenation (++): right operand is an invalid heap reference")
                         })?;
                         let total_len = object1.data.len() + object2.data.len();
                         let mut combined = Vec::with_capacity(total_len);
@@ -767,7 +755,7 @@ impl Vm {
                 }
                 _ => {
                     return Err(
-                        self.runtime_error("CONCAT: expected two list/tuple/string objects")
+                        self.runtime_error("Concatenation (++): expected two List, String, or Tuple objects")
                     );
                 }
             },
@@ -780,13 +768,12 @@ impl Vm {
                 };
                 match (array, index) {
                     (VmData::Object(object), VmData::Int(index)) => {
-                        // Gather what we need while the borrow is active
-                        let (len, type_name, item) = {
+                        let item = {
                             let heap_object =
                                 self.state.memory.ref_from_heap(object).ok_or_else(|| {
-                                    Box::new(NovaError::Runtime {
-                                        msg: "Index: invalid heap reference".into(),
-                                    })
+                                    self.runtime_error(
+                                        "Index: invalid heap reference (object was freed)",
+                                    )
                                 })?;
                             let type_name = match &heap_object.object_type {
                                 ObjectType::List => "List",
@@ -794,20 +781,18 @@ impl Vm {
                                 ObjectType::String => "String",
                                 _ => "Object",
                             };
-                            let len = heap_object.data.len();
-                            let item = heap_object.data.get(index as usize).copied();
-                            (len, type_name, item)
+                            let len = heap_object.data.len() as i64;
+                            // Python-style negative indexing: -1 → last, -2 → second-to-last, etc.
+                            let resolved = if index < 0 { index + len } else { index };
+                            if resolved < 0 || resolved >= len {
+                                return Err(self.runtime_error(format!(
+                                    "Index out of bounds: index is {} but {} length is {}",
+                                    index, type_name, len
+                                )));
+                            }
+                            heap_object.data[resolved as usize]
                         };
-                        let uindex = index as usize;
-                        if uindex >= len {
-                            return Err(self.runtime_error(format!(
-                                "Index out of bounds: index is {} but {} length is {}",
-                                index, type_name, len
-                            )));
-                        }
-                        if let Some(item) = item {
-                            self.state.memory.push(item);
-                        }
+                        self.state.memory.push(item);
                         self.state.memory.dec(object);
                     }
                     (a, b) => {
@@ -830,32 +815,28 @@ impl Vm {
 
                 match (array, index, value) {
                     (VmData::Object(object), VmData::Int(index), value) => {
-                        // First check bounds
-                        let (len, old_value) = {
+                        let (resolved, old_value) = {
                             let heap_object =
                                 self.state.memory.ref_from_heap(object).ok_or_else(|| {
-                                    Box::new(NovaError::Runtime {
-                                        msg: "PINDEX: invalid heap reference".into(),
-                                    })
+                                    self.runtime_error(
+                                        "PINDEX: invalid heap reference (object was freed)",
+                                    )
                                 })?;
-                            let len = heap_object.data.len();
-                            let old = heap_object.data.get(index as usize).cloned();
-                            (len, old)
-                        };
-                        let uindex = index as usize;
-                        if uindex >= len {
-                            return Err(self.runtime_error(format!(
-                                "Index out of bounds: index is {} but length is {}",
-                                index, len
-                            )));
-                        }
-                        if let Some(old) = old_value {
-                            self.state.memory.dec_value(old);
-                            if let Some(heap_object) = self.state.memory.ref_from_heap_mut(object) {
-                                if let Some(item) = heap_object.data.get_mut(uindex) {
-                                    *item = value;
-                                }
+                            let len = heap_object.data.len() as i64;
+                            // Python-style negative indexing
+                            let resolved = if index < 0 { index + len } else { index };
+                            if resolved < 0 || resolved >= len {
+                                return Err(self.runtime_error(format!(
+                                    "Index out of bounds: index is {} but length is {}",
+                                    index, len
+                                )));
                             }
+                            let old = heap_object.data[resolved as usize];
+                            (resolved as usize, old)
+                        };
+                        self.state.memory.dec_value(old_value);
+                        if let Some(heap_object) = self.state.memory.ref_from_heap_mut(object) {
+                            heap_object.data[resolved] = value;
                         }
                         self.state.memory.dec(object);
                     }

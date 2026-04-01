@@ -125,6 +125,9 @@ impl Code {
     pub const NEWSTRUCT: u8 = 78;
     pub const GETF: u8 = 79;
     pub const PINF: u8 = 80;
+
+    // Built-in length operation (replaces native List::len / String::len)
+    pub const LEN: u8 = 81;
 }
 
 pub fn byte_to_string(byte: u8) -> String {
@@ -210,6 +213,7 @@ pub fn byte_to_string(byte: u8) -> String {
         Code::NEWSTRUCT => "NEWSTRUCT",
         Code::GETF => "GETF",
         Code::PINF => "PINF",
+        Code::LEN => "LEN",
         _ => "Unknown", // Handle the case where the byte is not in the enum.
     }
     .to_string()
@@ -304,6 +308,9 @@ pub enum Asm {
     NEWSTRUCT(u64),
     GETF(FilePosition),
     PINF(FilePosition),
+
+    // built-in length
+    LEN,
 
     EXIT,
     ERROR(FilePosition),

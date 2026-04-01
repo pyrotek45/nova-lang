@@ -199,11 +199,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64, None))
-                    } else {
-                        todo!()
-                    }
+                    self.asm.push(Asm::LEN);
 
                     self.asm.push(Asm::IGTR);
                     self.asm.push(Asm::DUP);
@@ -214,9 +210,7 @@ impl Compiler {
 
                     self.asm.push(Asm::GET(tempcounter_index as u32));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64, None))
-                    }
+                    self.asm.push(Asm::LEN);
                     self.asm.push(Asm::EQUALS);
 
                     self.asm.push(Asm::LABEL(step));
@@ -974,29 +968,7 @@ impl Compiler {
                 container, index, ..
             } => {
                 self.compile_expr(index)?;
-
-                // let negitive_step = self.gen.generate();
-                // self.compile_expr(container)?;
-                // self.variables
-                //     .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
-                // let array_index = self.variables.len() - 1;
-                // self.asm.push(Asm::STORE(array_index as u32));
-
-                // self.asm.push(Asm::DUP);
-                // self.asm.push(Asm::INTEGER(0));
-                // self.asm.push(Asm::ILSS);
-                // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
-                // self.asm.push(Asm::GET(array_index as u32));
-                // if let Some(index) = self.native_functions.get_index("List::len") {
-                //     self.asm.push(Asm::NATIVE(index as u64, None))
-                // } else {
-                //     todo!()
-                // }
-                // self.asm.push(Asm::IADD);
-                // self.asm.push(Asm::LABEL(negitive_step));
-
                 self.compile_expr(container)?;
-                //self.asm.push(Asm::PIN(position.clone()));
             }
             Expr::Call { .. } => todo!(),
             Expr::Unary { .. } => todo!(),
@@ -1122,28 +1094,7 @@ impl Compiler {
                 ..
             } => {
                 self.compile_expr(index)?;
-                // let negitive_step = self.gen.generate();
-
                 self.compile_expr(container)?;
-                // self.variables
-                //     .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
-                // let array_index = self.variables.len() - 1;
-                // self.asm.push(Asm::STORE(array_index as u32));
-
-                // self.asm.push(Asm::DUP);
-                // self.asm.push(Asm::INTEGER(0));
-                // self.asm.push(Asm::ILSS);
-                // self.asm.push(Asm::JUMPIFFALSE(negitive_step));
-                // self.asm.push(Asm::GET(array_index as u32));
-                // if let Some(index) = self.native_functions.get_index("List::len") {
-                //     self.asm.push(Asm::NATIVE(index as u64, None))
-                // } else {
-                //     todo!()
-                // }
-                // self.asm.push(Asm::IADD);
-                // self.asm.push(Asm::LABEL(negitive_step));
-
-                // self.asm.push(Asm::GET(array_index as u32));
                 self.asm.push(Asm::LIN(position.clone()));
                 Ok(())
             }
@@ -1642,11 +1593,7 @@ impl Compiler {
                     self.asm.push(Asm::JUMPIFFALSE(negitive_start));
 
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64, None))
-                    } else {
-                        todo!()
-                    }
+                    self.asm.push(Asm::LEN);
                     self.asm.push(Asm::IADD);
                     self.asm.push(Asm::LABEL(negitive_start));
                 } else {
@@ -1659,11 +1606,7 @@ impl Compiler {
                 self.asm.push(Asm::LABEL(top));
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64, None))
-                } else {
-                    todo!()
-                }
+                self.asm.push(Asm::LEN);
 
                 self.asm.push(Asm::IGTR);
                 self.asm.push(Asm::DUP);
@@ -1674,9 +1617,7 @@ impl Compiler {
 
                 self.asm.push(Asm::GET(tempcounter_index as u32));
                 self.asm.push(Asm::GET(array_index as u32));
-                if let Some(index) = self.native_functions.get_index("List::len") {
-                    self.asm.push(Asm::NATIVE(index as u64, None))
-                }
+                self.asm.push(Asm::LEN);
                 self.asm.push(Asm::EQUALS);
 
                 self.asm.push(Asm::LABEL(step));
@@ -1693,11 +1634,7 @@ impl Compiler {
                     self.asm.push(Asm::ILSS);
                     self.asm.push(Asm::JUMPIFFALSE(negitive_end));
                     self.asm.push(Asm::GET(array_index as u32));
-                    if let Some(index) = self.native_functions.get_index("List::len") {
-                        self.asm.push(Asm::NATIVE(index as u64, None))
-                    } else {
-                        todo!()
-                    }
+                    self.asm.push(Asm::LEN);
                     self.asm.push(Asm::IADD);
                     self.asm.push(Asm::LABEL(negitive_end));
 
@@ -1873,11 +1810,7 @@ impl Compiler {
         self.asm.push(Asm::LABEL(top));
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
-        if let Some(index) = self.native_functions.get_index("List::len") {
-            self.asm.push(Asm::NATIVE(index as u64, None))
-        } else {
-            todo!()
-        }
+        self.asm.push(Asm::LEN);
         self.asm.push(Asm::IGTR);
         self.asm.push(Asm::DUP);
         self.asm.push(Asm::NOT);
@@ -1885,9 +1818,7 @@ impl Compiler {
         self.asm.push(Asm::POP);
         self.asm.push(Asm::GET(tempcounter_index as u32));
         self.asm.push(Asm::GET(array_index as u32));
-        if let Some(index) = self.native_functions.get_index("List::len") {
-            self.asm.push(Asm::NATIVE(index as u64, None))
-        }
+        self.asm.push(Asm::LEN);
         self.asm.push(Asm::EQUALS);
         self.asm.push(Asm::LABEL(step));
         self.asm.push(Asm::JUMPIFFALSE(mid));
@@ -2004,6 +1935,7 @@ impl Compiler {
                     "clone" => self.asm.push(Asm::CLONE),
                     "exit" => self.asm.push(Asm::EXIT),
                     "error" => self.asm.push(Asm::ERROR(position.clone())),
+                    "List::len" | "String::len" => self.asm.push(Asm::LEN),
                     identifier => {
                         //dbg!(identifier);
                         if let Some(index) = self.native_functions.get_index(identifier) {
