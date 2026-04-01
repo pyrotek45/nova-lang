@@ -1,17 +1,53 @@
-module string
+// ============================================================
+// std/string.nv  — Extended string utilities
+// ============================================================
+//
+// Usage:  import super.std.string
+//
+// Native String methods (no import needed):
+//   contains, startsWith, endsWith, trim, trimStart, trimEnd,
+//   toUpper, toLower, replace, substring, indexOf, repeat,
+//   reverse, isEmpty, charAt, split (by String delimiter),
+//   chars, len, string (on [Char])
+//
+// This module adds:
+//   .split(Char)          -- split by a single character
+//   .padLeft(n,c)         -- left-pad to width n with char c
+//   .padRight(n,c)        -- right-pad to width n with char c
+//   .center(n,c)          -- center with padding char c
+//   .count(sub)           -- count substring occurrences
+//   .isDigit()            -- all characters are digits
+//   .isAlpha()            -- all characters are alphabetic
+//   .isAlphanumeric()     -- all chars are letters or digits
+//   .capitalize()         -- first character uppercase
+//   .title()              -- each word capitalized
+//   .removeChar(c)        -- delete all occurrences of char c
+//   .lines()              -- split on '\n'
+//   .words()              -- split on ' ', drop empty strings
+//   .truncate(n,suffix)   -- cut to n chars with suffix
+//   .slugify()            -- lowercase, spaces→hyphens
+//   .wrap(width)          -- word-wrap to given column width
+//   .countChar(c)         -- count occurrences of a character
+//   .indexOfChar(c)       -- first index of character, or -1
+//   .replaceChar(old,new) -- replace all occurrences of a char
+//   .between(l,r)         -- extract text between two delimiters
+//   .stripPrefix(p)       -- remove prefix if present
+//   .stripSuffix(s)       -- remove suffix if present
+//   join(list,sep)        -- join list with separator
+// ============================================================
 
-// String utilities that complement the native String:: functions
-// Native functions available: contains, startsWith, endsWith, trim,
-// trimStart, trimEnd, toUpper, toLower, replace, substring, indexOf,
-// repeat, reverse, isEmpty, charAt, split (by String delimiter)
+module string
 
 import list
 
-// Split a string by a character delimiter
-// (complements native String::split which splits by string delimiter)
+// ── Splitting & joining ──────────────────────────────────────────────────────
+
+// Split by a single character delimiter
 fn extends split(x: String, y: Char) -> [String] {
     return x.chars().split(y).map(|x: [Char]| x.string())
 }
+
+// ── Padding ──────────────────────────────────────────────────────────────────
 
 // Pad a string on the left to reach a target width
 fn extends padLeft(s: String, width: Int, pad: Char) -> String {
@@ -50,6 +86,8 @@ fn extends center(s: String, width: Int, pad: Char) -> String {
     return result
 }
 
+// ── Searching & counting ─────────────────────────────────────────────────────
+
 // Count how many times a substring appears
 fn extends count(s: String, sub: String) -> Int {
     if sub.isEmpty() { return 0 }
@@ -66,13 +104,32 @@ fn extends count(s: String, sub: String) -> Int {
     return n
 }
 
+// Count occurrences of a single character
+fn extends countChar(s: String, c: Char) -> Int {
+    let n = 0
+    for ch in s.chars() {
+        if ch == c { n += 1 }
+    }
+    return n
+}
+
+// First index of a character, or -1 if not found
+fn extends indexOfChar(s: String, c: Char) -> Int {
+    let i = 0
+    for ch in s.chars() {
+        if ch == c { return i }
+        i += 1
+    }
+    return -1
+}
+
+// ── Character classification ─────────────────────────────────────────────────
+
 // Check if a string contains only digits
 fn extends isDigit(s: String) -> Bool {
     if s.isEmpty() { return false }
     for c in s.chars() {
-        if !c.isDigit() {
-            return false
-        }
+        if !c.isDigit() { return false }
     }
     return true
 }
@@ -81,9 +138,7 @@ fn extends isDigit(s: String) -> Bool {
 fn extends isAlpha(s: String) -> Bool {
     if s.isEmpty() { return false }
     for c in s.chars() {
-        if !c.isAlpha() {
-            return false
-        }
+        if !c.isAlpha() { return false }
     }
     return true
 }
@@ -92,14 +147,14 @@ fn extends isAlpha(s: String) -> Bool {
 fn extends isAlphanumeric(s: String) -> Bool {
     if s.isEmpty() { return false }
     for c in s.chars() {
-        if !c.isAlphanumeric() {
-            return false
-        }
+        if !c.isAlphanumeric() { return false }
     }
     return true
 }
 
-// Capitalize the first character of a string
+// ── Case & transformation ────────────────────────────────────────────────────
+
+// Capitalize the first character
 fn extends capitalize(s: String) -> String {
     if s.isEmpty() { return s }
     let first = s.charAt(0).unwrap().toUpper()
@@ -109,7 +164,7 @@ fn extends capitalize(s: String) -> String {
     return Cast::string(first) + s.substring(1, s.len())
 }
 
-// Convert a string to title case (capitalize each word)
+// Title-case: capitalize each word
 fn extends title(s: String) -> String {
     let words = s.split(" ")
     let result = []: String
@@ -119,23 +174,110 @@ fn extends title(s: String) -> String {
     return join(result, " ")
 }
 
-// Remove all occurrences of a character from a string
+// Remove all occurrences of a character
 fn extends removeChar(s: String, c: Char) -> String {
     let result = ""
     for ch in s.chars() {
-        if ch != c {
+        if ch != c { result = result + Cast::string(ch) }
+    }
+    return result
+}
+
+// Replace all occurrences of character `old` with character `new`
+fn extends replaceChar(s: String, old: Char, new: Char) -> String {
+    let result = ""
+    for ch in s.chars() {
+        if ch == old {
+            result = result + Cast::string(new)
+        } else {
             result = result + Cast::string(ch)
         }
     }
     return result
 }
 
-// Extract lines from a multi-line string
+// ── Splitting helpers ────────────────────────────────────────────────────────
+
+// Split on newlines
 fn extends lines(s: String) -> [String] {
-    return s.split("\n")
+    return s.split('\n')
 }
 
-// Extract words (split by whitespace)
+// Split on spaces, dropping empty tokens
 fn extends words(s: String) -> [String] {
-    return s.split(" ").filter(|w: String| !w.isEmpty())
+    return s.split(' ').filter(|w: String| !w.isEmpty())
+}
+
+// ── Advanced string operations ───────────────────────────────────────────────
+
+// Truncate to n characters; append suffix if truncated
+//   "hello world".truncate(7, "...")  // "hell..."
+fn extends truncate(s: String, n: Int, suffix: String) -> String {
+    if s.len() <= n { return s }
+    let cut = n - suffix.len()
+    if cut < 0 { return suffix.substring(0, n) }
+    return s.substring(0, cut) + suffix
+}
+
+// Lowercase and replace spaces with hyphens
+//   "Hello World".slugify()  // "hello-world"
+fn extends slugify(s: String) -> String {
+    let lower = s.toLower()
+    let result = ""
+    for ch in lower.chars() {
+        if ch == ' ' {
+            result = result + "-"
+        } else if ch.isAlphanumeric() || ch == '-' {
+            result = result + Cast::string(ch)
+        }
+    }
+    return result
+}
+
+// Word-wrap: insert '\n' so no line exceeds width characters
+fn extends wrap(s: String, width: Int) -> String {
+    let words = s.words()
+    let result = ""
+    let line_len = 0
+    for w in words {
+        if line_len == 0 {
+            result = result + w
+            line_len = w.len()
+        } else if line_len + 1 + w.len() <= width {
+            result = result + " " + w
+            line_len = line_len + 1 + w.len()
+        } else {
+            result = result + "\n" + w
+            line_len = w.len()
+        }
+    }
+    return result
+}
+
+// Extract the substring between left and right delimiters
+//   "name: [Alice]".between("[", "]")  // Some("Alice")
+fn extends between(s: String, left: String, right: String) -> Option(String) {
+    let li = s.indexOf(left)
+    if li < 0 { return None(String) }
+    let start = li + left.len()
+    let rest = s.substring(start, s.len())
+    let ri = rest.indexOf(right)
+    if ri < 0 { return None(String) }
+    return Some(rest.substring(0, ri))
+}
+
+// Remove a prefix if the string starts with it
+fn extends stripPrefix(s: String, prefix: String) -> String {
+    if s.startsWith(prefix) {
+        return s.substring(prefix.len(), s.len())
+    }
+    return s
+}
+
+// Remove a suffix if the string ends with it
+fn extends stripSuffix(s: String, suffix: String) -> String {
+    if s.endsWith(suffix) {
+        return s.substring(0, s.len() - suffix.len())
+    }
+    return s
 }

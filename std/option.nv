@@ -6,20 +6,35 @@
 //   Some(value) -- wraps a value of type T
 //   None(T)     -- represents the absence of a value
 //
-// The built-in methods are:
+// Built-in methods:
 //   .isSome()  -> Bool   -- true if the option holds a value
 //   .unwrap()  -> T      -- extracts the value (panics if None)
 //
-// This module adds ergonomic helpers so you rarely need raw .unwrap().
+// This module adds ergonomic combinators:
+//   .isNone()              -- true when holding no value
+//   .orDefault(v)          -- unwrap or fallback value
+//   .orDoFn(f)             -- unwrap or lazily compute fallback
+//   .orError(msg)          -- unwrap or print msg and exit
+//   .map(f)                -- transform inner value if Some
+//   .flatMap(f)            -- chain Option-returning function
+//   .filter(pred)          -- Some only if predicate holds
+//   .zip(other)            -- combine two Options into a pair
+//   .toList()              -- [value] or []
+//   .inspect(f)            -- run side-effect if Some, pass through
 //
 // Usage:
 //   import super.std.option
 //
 //   let x: Option(Int) = None(Int)
-//   let v = x.orDefault(0)          // 0
-//   let w = x.orDoFn(|| 99)         // 99
-//   x.orError("missing value")      // prints error and exits if None
-//   x.isNone()                      // true
+//   let v = x.orDefault(0)               // 0
+//   let w = x.orDoFn(|| 99)              // 99
+//   x.orError("missing value")           // exits if None
+//   x.isNone()                           // true
+//   Some(3).map(|n: Int| n * 2)          // Some(6)
+//   Some(3).flatMap(|n: Int| None(Int))  // None
+//   Some(3).filter(|n: Int| n > 5)       // None
+//   Some(2).zip(Some(3))                 // Some((2,3))
+//   Some(7).toList()                     // [7]
 // ============================================================
 
 module option
@@ -67,4 +82,74 @@ fn extends orDoFn(self: Option($A), f: fn() -> $A) -> $A {
 //
 fn extends isNone(self: Option($A)) -> Bool {
     return !(self.isSome())
+}
+
+// map -- transform the inner value if Some; leaves None unchanged
+//
+//   Some(3).map(|n: Int| n * 2)   // Some(6)
+//   None(Int).map(|n: Int| n * 2) // None(Int)
+//
+fn extends map(self: Option($A), f: fn($A) -> $B) -> Option($B) {
+    if self.isSome() {
+        return Some(f(self.unwrap()))
+    }
+    return None($B)
+}
+
+// flatMap -- chain an Option-returning function (monadic bind)
+//
+//   Some(4).flatMap(|n: Int| if n > 3 { Some(n) } else { None(Int) })
+//
+fn extends flatMap(self: Option($A), f: fn($A) -> Option($B)) -> Option($B) {
+    if self.isSome() {
+        return f(self.unwrap())
+    }
+    return None($B)
+}
+
+// filter -- keep Some only if the predicate holds; otherwise None
+//
+//   Some(10).filter(|n: Int| n > 5)  // Some(10)
+//   Some(3).filter(|n: Int| n > 5)   // None(Int)
+//
+fn extends filter(self: Option($A), pred: fn($A) -> Bool) -> Option($A) {
+    if self.isSome() && pred(self.unwrap()) {
+        return self
+    }
+    return None($A)
+}
+
+// zip -- combine two Options into an Option of a pair
+//
+//   Some(1).zip(Some("a"))  // Some((1,"a"))
+//   Some(1).zip(None(String))  // None
+//
+fn extends zip(self: Option($A), other: Option($B)) -> Option(($A,$B)) {
+    if self.isSome() && other.isSome() {
+        return Some((self.unwrap(), other.unwrap()))
+    }
+    return None(($A,$B))
+}
+
+// toList -- wrap value in a one-element list, or empty list if None
+//
+//   Some(7).toList()   // [7]
+//   None(Int).toList() // []
+//
+fn extends toList(self: Option($A)) -> [$A] {
+    if self.isSome() {
+        return [self.unwrap()]
+    }
+    return []: $A
+}
+
+// inspect -- run a side-effect if Some, then pass through unchanged
+//
+//   Some(42).inspect(|n: Int| println(n)).orDefault(0)
+//
+fn extends inspect(self: Option($A), f: fn($A)) -> Option($A) {
+    if self.isSome() {
+        f(self.unwrap())
+    }
+    return self
 }

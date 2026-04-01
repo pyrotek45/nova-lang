@@ -1,0 +1,164 @@
+// ============================================================
+// std/deque.nv  — Double-ended queue (Deque)
+// ============================================================
+//
+// Usage:  import super.std.deque
+//
+// A Deque(T) supports O(1) push/pop at both ends.
+// Internally backed by a resizable list; the head index avoids
+// shifting on popFront by advancing a pointer.
+//
+// Constructors:
+//   Deque::empty()       -- empty deque
+//   Deque::fromList(xs)  -- deque pre-loaded with list elements
+//   Deque::singleton(v)  -- deque with a single element
+//
+// Mutation:
+//   .pushBack(v)         -- add to the back (tail)
+//   .pushFront(v)        -- add to the front (head)
+//   .popBack()           -- remove and return the back element
+//   .popFront()          -- remove and return the front element
+//
+// Non-destructive reads:
+//   .peekBack()          -- view back element (Option)
+//   .peekFront()         -- view front element (Option)
+//   .len()               -- number of live elements
+//   .isEmpty()           -- true when empty
+//   .toList()            -- snapshot as a plain list (front→back)
+//   .toString()          -- human-readable "Deque[a, b, c]"
+//
+// Higher-order:
+//   .forEach(f)          -- visit each element front→back
+//   .map(f)              -- return a new Deque with f applied
+//   .filter(pred)        -- return a new Deque keeping matches
+// ============================================================
+
+module deque
+
+struct Deque(T) {
+    items: [$T],
+    head: Int,
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(Deque) empty() -> Deque($T) {
+    return Deque { items: []: $T, head: 0 }
+}
+
+fn extends(Deque) singleton(v: $T) -> Deque($T) {
+    return Deque { items: [v], head: 0 }
+}
+
+fn extends(Deque) fromList(xs: [$T]) -> Deque($T) {
+    return Deque { items: xs, head: 0 }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn extends len(self: Deque($T)) -> Int {
+    return self.items.len() - self.head
+}
+
+fn extends isEmpty(self: Deque($T)) -> Bool {
+    return self.len() == 0
+}
+
+// ── Mutation ─────────────────────────────────────────────────────────────────
+
+fn extends pushBack(self: Deque($T), v: $T) {
+    self.items.push(v)
+}
+
+fn extends pushFront(self: Deque($T), v: $T) {
+    // Compact if there is wasted space at the front
+    if self.head > 0 {
+        let live = self.toList()
+        self.items = live
+        self.head = 0
+    }
+    // Prepend by building a new list
+    let new = [v]
+    for x in self.items {
+        new.push(x)
+    }
+    self.items = new
+}
+
+fn extends popFront(self: Deque($T)) -> Option($T) {
+    if self.isEmpty() { return None($T) }
+    let v = Some(self.items[self.head])
+    self.head += 1
+    // Compact when more than half the buffer is dead
+    if self.head > self.items.len() / 2 {
+        self.items = self.toList()
+        self.head = 0
+    }
+    return v
+}
+
+fn extends popBack(self: Deque($T)) -> Option($T) {
+    if self.isEmpty() { return None($T) }
+    let last = self.items.len() - 1
+    let v = Some(self.items[last])
+    self.items.remove(last)
+    return v
+}
+
+// ── Non-destructive reads ─────────────────────────────────────────────────────
+
+fn extends peekFront(self: Deque($T)) -> Option($T) {
+    if self.isEmpty() { return None($T) }
+    return Some(self.items[self.head])
+}
+
+fn extends peekBack(self: Deque($T)) -> Option($T) {
+    if self.isEmpty() { return None($T) }
+    return Some(self.items[self.items.len() - 1])
+}
+
+fn extends toList(self: Deque($T)) -> [$T] {
+    let result = []: $T
+    for let i = self.head; i < self.items.len(); i += 1 {
+        result.push(self.items[i])
+    }
+    return result
+}
+
+fn extends toString(self: Deque($T)) -> String {
+    let elems = self.toList()
+    if elems.len() == 0 { return "Deque[]" }
+    let result = "Deque["
+    let first = true
+    for e in elems {
+        if !first { result += ", " }
+        result += Cast::string(e)
+        first = false
+    }
+    result += "]"
+    return result
+}
+
+// ── Higher-order ─────────────────────────────────────────────────────────────
+
+fn extends forEach(self: Deque($T), f: fn($T)) {
+    for v in self.toList() {
+        f(v)
+    }
+}
+
+fn extends map(self: Deque($T), f: fn($T) -> $U) -> Deque($U) {
+    let result: Deque($U) = Deque::empty() @[T: $U]
+    for v in self.toList() {
+        result.pushBack(f(v))
+    }
+    return result
+}
+
+fn extends filter(self: Deque($T), pred: fn($T) -> Bool) -> Deque($T) {
+    let result: Deque($T) = Deque::empty() @[T: $T]
+    for v in self.toList() {
+        if pred(v) { result.pushBack(v) }
+    }
+    return result
+}

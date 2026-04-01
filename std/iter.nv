@@ -1,3 +1,44 @@
+// ============================================================
+// std/iter.nv  — Lazy iterator library
+// ============================================================
+//
+// Usage:  import super.std.iter
+//
+// Constructors (static):
+//   Iter::fromRange(start, end)    -- integers [start, end)
+//   Iter::fromVec(list)            -- iterate over a list
+//   Iter::fromFn(fn)               -- custom pull function
+//   Iter::enumerate(iter)          -- (index, value) pairs
+//   Iter::repeat(v)                -- infinite stream of v
+//   Iter::generate(f)              -- infinite stream from f()
+//
+// Transformers (lazy, return a new Iter):
+//   .map(f)          -- apply f to each element
+//   .filter(pred)    -- keep elements where pred is true
+//   .take(n)         -- first n elements
+//   .drop(n)         -- skip first n elements
+//   .takeWhile(pred) -- take while pred holds
+//   .dropWhile(pred) -- skip while pred holds
+//   .flatMap(f)      -- map then flatten one level
+//   .zip(other)      -- pair elements from two iterators
+//   .chain(other)    -- append another iterator
+//
+// Consumers (eager, return a concrete value):
+//   .collect()       -- gather into a list
+//   .show()          -- print each element
+//   .count()         -- number of elements
+//   .sum()           -- sum of Int elements
+//   .sumF()          -- sum of Float elements
+//   .reduce(f, init) -- fold with initial accumulator
+//   .fold(f, init)   -- alias for reduce
+//   .any(pred)       -- true if any element passes
+//   .all(pred)       -- true if all elements pass
+//   .find(pred)      -- first element passing pred
+//   .last()          -- last element (consumes iterator)
+//   .nth(n)          -- nth element (0-indexed)
+//   .forEach(f)      -- run side-effect on each element
+// ============================================================
+
 module iter
 
 import core
@@ -10,38 +51,43 @@ fn extends next(it: Iter($A)) -> Option($A) {
     return it.next()
 }
 
-fn extends(Iter) fromRange(start: Int, end: Int) -> Iter(Int) {
-    let index = Box(start);  
-    return Iter(fn() -> Option(Int) {
-        if index.value >= end {
-            return None(Int)
-        } else {
-            let result = Some(index.value);
-            index.value += 1
-            return result
-        }
-    })
-}
-
 fn extends toString(it: Iter($A)) -> String {
     return "Iter"
 }
 
-fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
-    let index = Box(0)  
-    return Iter(fn() -> Option($A) {
-        if index.value >= input.len() {
-            return None($A)
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+// Iterate integers in [start, end)
+fn extends(Iter) fromRange(start: Int, end: Int) -> Iter(Int) {
+    let index = Box(start)
+    return Iter(fn() -> Option(Int) {
+        if index.value >= end {
+            return None(Int)
         } else {
-            let result = Some(input[index.value]);
+            let result = Some(index.value)
             index.value += 1
             return result
         }
     })
 }
 
+// Iterate over a list
+fn extends(Iter) fromVec(input: [$A]) -> Iter($A) {
+    let index = Box(0)
+    return Iter(fn() -> Option($A) {
+        if index.value >= input.len() {
+            return None($A)
+        } else {
+            let result = Some(input[index.value])
+            index.value += 1
+            return result
+        }
+    })
+}
+
+// Enumerate: pairs each element with its index
 fn extends(Iter) enumerate(it: Iter($A)) -> Iter((Int,$A)) {
-    let index = Box(0)  
+    let index = Box(0)
     return Iter(fn() -> Option((Int,$A)) {
         let t = it::next()
         if t.isSome() {
@@ -54,26 +100,31 @@ fn extends(Iter) enumerate(it: Iter($A)) -> Iter((Int,$A)) {
     })
 }
 
+// Build an iterator from a custom pull function
 fn extends(Iter) fromFn(input: fn() -> Option($A)) -> Iter($A) {
     return Iter(input)
 }
 
-fn extends filter(it: Iter($A), f: fn($A) -> Bool) -> Iter($A) {
+// Repeat a value infinitely
+fn extends(Iter) repeat(v: $A) -> Iter($A) {
     return Iter(fn() -> Option($A) {
-        let t = it::next()
-        while t.isSome() {
-            if f(t.unwrap()) {
-                return t
-            }
-            t = it::next() 
-        }
-        return None($A)
+        return Some(v)
     })
 }
 
+// Generate values by calling f() each time
+fn extends(Iter) generate(f: fn() -> $A) -> Iter($A) {
+    return Iter(fn() -> Option($A) {
+        return Some(f())
+    })
+}
+
+// ── Transformers ─────────────────────────────────────────────────────────────
+
+// Apply f to each element
 fn extends map(it: Iter($A), f: fn($A) -> $B) -> Iter($B) {
     return Iter(fn() -> Option($B) {
-        let t = it::next() 
+        let t = it::next()
         if t.isSome() {
             return Some(f(t.unwrap()))
         } else {
@@ -82,20 +133,260 @@ fn extends map(it: Iter($A), f: fn($A) -> $B) -> Iter($B) {
     })
 }
 
+// Keep only elements where pred returns true
+fn extends filter(it: Iter($A), f: fn($A) -> Bool) -> Iter($A) {
+    return Iter(fn() -> Option($A) {
+        let t = it::next()
+        while t.isSome() {
+            if f(t.unwrap()) {
+                return t
+            }
+            t = it::next()
+        }
+        return None($A)
+    })
+}
+
+// Take at most n elements
+fn extends take(it: Iter($A), n: Int) -> Iter($A) {
+    let count = Box(0)
+    return Iter(fn() -> Option($A) {
+        if count.value >= n {
+            return None($A)
+        }
+        let t = it::next()
+        if t.isSome() {
+            count.value += 1
+        }
+        return t
+    })
+}
+
+// Skip the first n elements
+fn extends drop(it: Iter($A), n: Int) -> Iter($A) {
+    let skipped = Box(false)
+    let remaining = Box(n)
+    return Iter(fn() -> Option($A) {
+        if !skipped.value {
+            while remaining.value > 0 {
+                let t = it::next()
+                if t.isNone() {
+                    skipped.value = true
+                    return None($A)
+                }
+                remaining.value -= 1
+            }
+            skipped.value = true
+        }
+        return it::next()
+    })
+}
+
+// Take elements while predicate holds
+fn extends takeWhile(it: Iter($A), pred: fn($A) -> Bool) -> Iter($A) {
+    let done = Box(false)
+    return Iter(fn() -> Option($A) {
+        if done.value { return None($A) }
+        let t = it::next()
+        if t.isSome() && pred(t.unwrap()) {
+            return t
+        }
+        done.value = true
+        return None($A)
+    })
+}
+
+// Skip elements while predicate holds, then yield the rest
+fn extends dropWhile(it: Iter($A), pred: fn($A) -> Bool) -> Iter($A) {
+    let dropping = Box(true)
+    return Iter(fn() -> Option($A) {
+        while dropping.value {
+            let t = it::next()
+            if t.isNone() { return None($A) }
+            if !pred(t.unwrap()) {
+                dropping.value = false
+                return t
+            }
+        }
+        return it::next()
+    })
+}
+
+// Map each element to an Iter and flatten one level
+fn extends flatMap(it: Iter($A), f: fn($A) -> Iter($B)) -> Iter($B) {
+    let inner: Box(Option(Iter($B))) = Box(None(Iter($B)))
+    return Iter(fn() -> Option($B) {
+        while true {
+            if inner.value.isSome() {
+                let t = inner.value.unwrap()::next()
+                if t.isSome() {
+                    return t
+                }
+                inner.value = None(Iter($B))
+            }
+            let outer = it::next()
+            if outer.isNone() {
+                return None($B)
+            }
+            inner.value = Some(f(outer.unwrap()))
+        }
+        return None($B)
+    })
+}
+
+// Zip two iterators into pairs; stops at the shorter one
+fn extends zip(it: Iter($A), other: Iter($B)) -> Iter(($A,$B)) {
+    return Iter(fn() -> Option(($A,$B)) {
+        let a = it::next()
+        let b = other::next()
+        if a.isSome() && b.isSome() {
+            return Some((a.unwrap(), b.unwrap()))
+        }
+        return None(($A,$B))
+    })
+}
+
+// Append another iterator after this one
+fn extends chain(it: Iter($A), other: Iter($A)) -> Iter($A) {
+    let first_done = Box(false)
+    return Iter(fn() -> Option($A) {
+        if !first_done.value {
+            let t = it::next()
+            if t.isSome() { return t }
+            first_done.value = true
+        }
+        return other::next()
+    })
+}
+
+// ── Consumers ────────────────────────────────────────────────────────────────
+
+// Collect all elements into a list
+fn extends collect(it: Iter($A)) -> [$A] {
+    let t: Option($A) = it::next()
+    let list = []: $A
+    while t.isSome() {
+        list.push(t.unwrap())
+        t = it::next()
+    }
+    return list
+}
+
+// Print each element on its own line
 fn extends show(it: Iter($A)) {
-    let t: Option($A) = it::next() 
+    let t: Option($A) = it::next()
     while t.isSome() {
         println(t.unwrap())
-        t = it::next() 
+        t = it::next()
     }
 }
 
-fn extends collect(it: Iter($A)) -> [$A] {
-    let t: Option($A) = it::next() 
-    let list = []:$A
+// Count number of elements (consumes the iterator)
+fn extends count(it: Iter($A)) -> Int {
+    let n = 0
+    let t: Option($A) = it::next()
     while t.isSome() {
-        list.push(t.unwrap())
-        t = it::next() 
+        n += 1
+        t = it::next()
     }
-    return list
+    return n
+}
+
+// Sum Int elements (consumes the iterator)
+fn extends sum(it: Iter(Int)) -> Int {
+    let acc = 0
+    let t = it::next()
+    while t.isSome() {
+        acc += t.unwrap()
+        t = it::next()
+    }
+    return acc
+}
+
+// Sum Float elements (consumes the iterator)
+fn extends sumF(it: Iter(Float)) -> Float {
+    let acc = 0.0
+    let t = it::next()
+    while t.isSome() {
+        acc += t.unwrap()
+        t = it::next()
+    }
+    return acc
+}
+
+// Fold with an initial accumulator (alias: fold)
+fn extends reduce(it: Iter($A), f: fn($B, $A) -> $B, init: $B) -> $B {
+    let acc = init
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        acc = f(acc, t.unwrap())
+        t = it::next()
+    }
+    return acc
+}
+
+fn extends fold(it: Iter($A), f: fn($B, $A) -> $B, init: $B) -> $B {
+    return it.reduce(f, init)
+}
+
+// True if any element passes pred (short-circuits)
+fn extends any(it: Iter($A), pred: fn($A) -> Bool) -> Bool {
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        if pred(t.unwrap()) { return true }
+        t = it::next()
+    }
+    return false
+}
+
+// True if all elements pass pred (short-circuits on failure)
+fn extends all(it: Iter($A), pred: fn($A) -> Bool) -> Bool {
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        if !pred(t.unwrap()) { return false }
+        t = it::next()
+    }
+    return true
+}
+
+// Return the first element passing pred
+fn extends find(it: Iter($A), pred: fn($A) -> Bool) -> Option($A) {
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        if pred(t.unwrap()) { return t }
+        t = it::next()
+    }
+    return None($A)
+}
+
+// Return the last element (consumes the iterator)
+fn extends last(it: Iter($A)) -> Option($A) {
+    let prev: Option($A) = None($A)
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        prev = t
+        t = it::next()
+    }
+    return prev
+}
+
+// Return the nth element (0-indexed); returns None if out of bounds
+fn extends nth(it: Iter($A), n: Int) -> Option($A) {
+    let i = 0
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        if i == n { return t }
+        i += 1
+        t = it::next()
+    }
+    return None($A)
+}
+
+// Run a side-effect on each element
+fn extends forEach(it: Iter($A), f: fn($A)) {
+    let t: Option($A) = it::next()
+    while t.isSome() {
+        f(t.unwrap())
+        t = it::next()
+    }
 }

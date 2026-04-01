@@ -1,0 +1,131 @@
+// ============================================================
+// std/functional.nv  — Higher-order function utilities
+// ============================================================
+//
+// Usage:  import super.std.functional
+//
+// All functions here work with Nova's first-class closures.
+//
+// Function composition:
+//   compose(f, g)        -- fn(x) -> f(g(x))  (right-to-left)
+//   pipe(f, g)           -- fn(x) -> g(f(x))  (left-to-right)
+//
+// Argument manipulation:
+//   flip(f)              -- swap the two arguments of a binary fn
+//   curry(f)             -- turn fn(A,B)->C into fn(A)->fn(B)->C
+//   const_(v)            -- fn that always returns v (ignores arg)
+//   identity(x)          -- returns x unchanged
+//
+// Application:
+//   applyN(f, n, x)      -- apply f to x exactly n times
+//   applyWhile(f, pred, x) -- apply f repeatedly while pred holds
+//
+// Memoization:
+//   memoize(f)           -- wrap f with a result cache (String keys)
+//
+// Predicates:
+//   negate(pred)         -- fn that returns !pred(x)
+//   both(p, q)           -- fn that returns p(x) && q(x)
+//   either(p, q)         -- fn that returns p(x) || q(x)
+// ============================================================
+
+module functional
+
+import hashmap
+
+// ── Composition ───────────────────────────────────────────────────────────────
+
+// compose(f, g) -- applies g first, then f
+//   let doubleAfterIncrement = compose(|x: Int| x * 2, |x: Int| x + 1)
+//   doubleAfterIncrement(3)  // 8
+fn compose(f: fn($B) -> $C, g: fn($A) -> $B) -> fn($A) -> $C {
+    return |x: $A| f(g(x))
+}
+
+// pipe(f, g) -- applies f first, then g (same as compose but reversed)
+//   let incrementThenDouble = pipe(|x: Int| x + 1, |x: Int| x * 2)
+//   incrementThenDouble(3)   // 8
+fn pipe(f: fn($A) -> $B, g: fn($B) -> $C) -> fn($A) -> $C {
+    return |x: $A| g(f(x))
+}
+
+// ── Argument manipulation ─────────────────────────────────────────────────────
+
+// flip -- swap the two arguments of a binary function
+//   let sub = flip(|a: Int, b: Int| a - b)
+//   sub(3, 10)   // 10 - 3 = 7
+fn flip(f: fn($A, $B) -> $C) -> fn($B, $A) -> $C {
+    return |b: $B, a: $A| f(a, b)
+}
+
+// const_ -- return a function that always returns v, ignoring its argument
+//   let always5 = const_(5)
+//   always5("anything")  // 5
+fn const_(v: $A) -> fn($B) -> $A {
+    return |_: $B| v
+}
+
+// identity -- return the input unchanged
+fn identity(x: $A) -> $A {
+    return x
+}
+
+// ── Application ───────────────────────────────────────────────────────────────
+
+// applyN -- apply f to x exactly n times
+//   applyN(|x: Int| x * 2, 3, 1)  // 8  (1 → 2 → 4 → 8)
+fn applyN(f: fn($A) -> $A, n: Int, x: $A) -> $A {
+    let result = x
+    for let i = 0; i < n; i += 1 {
+        result = f(result)
+    }
+    return result
+}
+
+// applyWhile -- apply f while pred(result) is true
+//   applyWhile(|x: Int| x * 2, |x: Int| x < 100, 1)  // 128
+fn applyWhile(f: fn($A) -> $A, pred: fn($A) -> Bool, x: $A) -> $A {
+    let result = x
+    while pred(result) {
+        result = f(result)
+    }
+    return result
+}
+
+// ── Memoization ───────────────────────────────────────────────────────────────
+
+// memoize -- cache results by string representation of the argument
+// NOTE: only safe for pure functions (no side effects, deterministic)
+//   let fastFib = memoize(fib)
+fn memoize(f: fn($A) -> $B) -> fn($A) -> $B {
+    let cache: HashMap(String, $B) = HashMap::default() @[K: String, V: $B]
+    return |x: $A| {
+        let key = Cast::string(x)
+        if cache.has(key) {
+            return cache.get(key).unwrap()
+        }
+        let result = f(x)
+        cache.insert(key, result)
+        return result
+    }
+}
+
+// ── Predicate combinators ─────────────────────────────────────────────────────
+
+// negate -- logical NOT of a predicate
+//   let notEven = negate(|x: Int| x % 2 == 0)
+fn negate(pred: fn($A) -> Bool) -> fn($A) -> Bool {
+    return |x: $A| !pred(x)
+}
+
+// both -- true when both predicates hold
+//   let between5and10 = both(|x: Int| x >= 5, |x: Int| x <= 10)
+fn both(p: fn($A) -> Bool, q: fn($A) -> Bool) -> fn($A) -> Bool {
+    return |x: $A| p(x) && q(x)
+}
+
+// either -- true when at least one predicate holds
+//   let smallOrBig = either(|x: Int| x < 5, |x: Int| x > 100)
+fn either(p: fn($A) -> Bool, q: fn($A) -> Bool) -> fn($A) -> Bool {
+    return |x: $A| p(x) || q(x)
+}

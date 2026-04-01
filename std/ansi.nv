@@ -1,0 +1,149 @@
+// ============================================================
+// std/ansi.nv  — ANSI escape code helpers
+// ============================================================
+//
+// Usage:  import super.std.ansi
+//
+// Works in any terminal that supports ANSI escape sequences.
+// Each function wraps a string in the appropriate escape codes
+// so you can use them inline with print/println.
+//
+// Text styles:
+//   Ansi::bold(s)        -- bright/bold text
+//   Ansi::dim(s)         -- dim text
+//   Ansi::italic(s)      -- italic text
+//   Ansi::underline(s)   -- underlined text
+//   Ansi::blink(s)       -- blinking text
+//   Ansi::invert(s)      -- swap fg/bg colors
+//   Ansi::strikethrough(s) -- strikethrough text
+//
+// Foreground colors:
+//   Ansi::black(s)   Ansi::red(s)     Ansi::green(s)  Ansi::yellow(s)
+//   Ansi::blue(s)    Ansi::magenta(s) Ansi::cyan(s)   Ansi::white(s)
+//   Ansi::brightBlack(s)   ...brightRed, brightGreen, ...brightWhite
+//
+// Background colors:
+//   Ansi::bgBlack(s)  Ansi::bgRed(s)  ... (same set, bg prefix)
+//
+// 256-color and RGB:
+//   Ansi::color256(code, s)       -- 256-color foreground (0-255)
+//   Ansi::rgb(r, g, b, s)         -- true-color foreground
+//   Ansi::bgColor256(code, s)     -- 256-color background
+//   Ansi::bgRgb(r, g, b, s)       -- true-color background
+//
+// Cursor / terminal:
+//   Ansi::reset()                 -- reset all attributes
+//   Ansi::clearLine()             -- erase current line
+//   Ansi::clearScreen()           -- clear the terminal
+//   Ansi::moveTo(row, col)        -- move cursor to position
+//   Ansi::hideCursor()            -- hide the cursor
+//   Ansi::showCursor()            -- show the cursor
+//
+// Combining:
+//   Ansi::bold(Ansi::red("ERROR"))  -- chaining works naturally
+// ============================================================
+
+module ansi
+
+// Internal: wrap s between an open and reset escape sequence
+fn _wrap(open: String, s: String) -> String {
+    return "\x1b[" + open + "m" + s + "\x1b[0m"
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+
+fn extends(Ansi) reset() -> String {
+    return "\x1b[0m"
+}
+
+// ── Text styles ───────────────────────────────────────────────────────────────
+
+struct Ansi {}
+
+fn extends(Ansi) bold(s: String) -> String         { return _wrap("1", s) }
+fn extends(Ansi) dim(s: String) -> String          { return _wrap("2", s) }
+fn extends(Ansi) italic(s: String) -> String       { return _wrap("3", s) }
+fn extends(Ansi) underline(s: String) -> String    { return _wrap("4", s) }
+fn extends(Ansi) blink(s: String) -> String        { return _wrap("5", s) }
+fn extends(Ansi) invert(s: String) -> String       { return _wrap("7", s) }
+fn extends(Ansi) strikethrough(s: String) -> String { return _wrap("9", s) }
+
+// ── Foreground colors ─────────────────────────────────────────────────────────
+
+fn extends(Ansi) black(s: String) -> String   { return _wrap("30", s) }
+fn extends(Ansi) red(s: String) -> String     { return _wrap("31", s) }
+fn extends(Ansi) green(s: String) -> String   { return _wrap("32", s) }
+fn extends(Ansi) yellow(s: String) -> String  { return _wrap("33", s) }
+fn extends(Ansi) blue(s: String) -> String    { return _wrap("34", s) }
+fn extends(Ansi) magenta(s: String) -> String { return _wrap("35", s) }
+fn extends(Ansi) cyan(s: String) -> String    { return _wrap("36", s) }
+fn extends(Ansi) white(s: String) -> String   { return _wrap("37", s) }
+
+fn extends(Ansi) brightBlack(s: String) -> String   { return _wrap("90", s) }
+fn extends(Ansi) brightRed(s: String) -> String     { return _wrap("91", s) }
+fn extends(Ansi) brightGreen(s: String) -> String   { return _wrap("92", s) }
+fn extends(Ansi) brightYellow(s: String) -> String  { return _wrap("93", s) }
+fn extends(Ansi) brightBlue(s: String) -> String    { return _wrap("94", s) }
+fn extends(Ansi) brightMagenta(s: String) -> String { return _wrap("95", s) }
+fn extends(Ansi) brightCyan(s: String) -> String    { return _wrap("96", s) }
+fn extends(Ansi) brightWhite(s: String) -> String   { return _wrap("97", s) }
+
+// ── Background colors ─────────────────────────────────────────────────────────
+
+fn extends(Ansi) bgBlack(s: String) -> String   { return _wrap("40", s) }
+fn extends(Ansi) bgRed(s: String) -> String     { return _wrap("41", s) }
+fn extends(Ansi) bgGreen(s: String) -> String   { return _wrap("42", s) }
+fn extends(Ansi) bgYellow(s: String) -> String  { return _wrap("43", s) }
+fn extends(Ansi) bgBlue(s: String) -> String    { return _wrap("44", s) }
+fn extends(Ansi) bgMagenta(s: String) -> String { return _wrap("45", s) }
+fn extends(Ansi) bgCyan(s: String) -> String    { return _wrap("46", s) }
+fn extends(Ansi) bgWhite(s: String) -> String   { return _wrap("47", s) }
+
+fn extends(Ansi) bgBrightBlack(s: String) -> String   { return _wrap("100", s) }
+fn extends(Ansi) bgBrightRed(s: String) -> String     { return _wrap("101", s) }
+fn extends(Ansi) bgBrightGreen(s: String) -> String   { return _wrap("102", s) }
+fn extends(Ansi) bgBrightYellow(s: String) -> String  { return _wrap("103", s) }
+fn extends(Ansi) bgBrightBlue(s: String) -> String    { return _wrap("104", s) }
+fn extends(Ansi) bgBrightMagenta(s: String) -> String { return _wrap("105", s) }
+fn extends(Ansi) bgBrightCyan(s: String) -> String    { return _wrap("106", s) }
+fn extends(Ansi) bgBrightWhite(s: String) -> String   { return _wrap("107", s) }
+
+// ── 256-color and true-color (RGB) ────────────────────────────────────────────
+
+fn extends(Ansi) color256(code: Int, s: String) -> String {
+    return "\x1b[38;5;" + Cast::string(code) + "m" + s + "\x1b[0m"
+}
+
+fn extends(Ansi) bgColor256(code: Int, s: String) -> String {
+    return "\x1b[48;5;" + Cast::string(code) + "m" + s + "\x1b[0m"
+}
+
+fn extends(Ansi) rgb(r: Int, g: Int, b: Int, s: String) -> String {
+    return "\x1b[38;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + "\x1b[0m"
+}
+
+fn extends(Ansi) bgRgb(r: Int, g: Int, b: Int, s: String) -> String {
+    return "\x1b[48;2;" + Cast::string(r) + ";" + Cast::string(g) + ";" + Cast::string(b) + "m" + s + "\x1b[0m"
+}
+
+// ── Cursor and terminal control ───────────────────────────────────────────────
+
+fn extends(Ansi) clearScreen() -> String {
+    return "\x1b[2J\x1b[H"
+}
+
+fn extends(Ansi) clearLine() -> String {
+    return "\x1b[2K\r"
+}
+
+fn extends(Ansi) moveTo(row: Int, col: Int) -> String {
+    return "\x1b[" + Cast::string(row) + ";" + Cast::string(col) + "H"
+}
+
+fn extends(Ansi) hideCursor() -> String {
+    return "\x1b[?25l"
+}
+
+fn extends(Ansi) showCursor() -> String {
+    return "\x1b[?25h"
+}
