@@ -241,9 +241,13 @@ impl Assembler {
                 }
                 Asm::AND => self.output.push(Code::AND),
                 Asm::OR => self.output.push(Code::OR),
-                Asm::NATIVE(v) => {
+                Asm::NATIVE(index, pos) => {
+                    if let Some(file_position) = pos {
+                        self.runtime_error_table
+                            .insert(self.output.len(), file_position);
+                    }
                     self.output.push(Code::NATIVE);
-                    let bytes = v.to_le_bytes();
+                    let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
                 Asm::DUP => self.output.push(Code::DUP),

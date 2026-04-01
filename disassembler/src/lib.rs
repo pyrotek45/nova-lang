@@ -70,7 +70,7 @@ impl Disassembler {
                 Asm::TCALL(v) => println!("    tcall: {v}"),
                 Asm::AND => println!("    and"),
                 Asm::OR => println!("    or"),
-                Asm::NATIVE(v) => println!("    native: {v}"),
+                Asm::NATIVE(v, _) => println!("    native: {v}"),
                 Asm::DUP => println!("    dup"),
                 Asm::POP => println!("    pop"),
                 Asm::NONE => println!("    none"),

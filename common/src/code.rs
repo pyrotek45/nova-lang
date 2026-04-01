@@ -296,7 +296,9 @@ pub enum Asm {
     // list operations
     PIN(FilePosition),
     LIN(FilePosition),
-    NATIVE(u64),
+    /// Native function call. Carries the call-site source position so the
+    /// assembler can register it in runtime_error_table at zero runtime cost.
+    NATIVE(u64, Option<FilePosition>),
 
     // struct & dynamic field access
     NEWSTRUCT(u64),
