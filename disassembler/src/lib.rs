@@ -82,6 +82,7 @@ impl Disassembler {
                 Asm::NEWSTRUCT(v) => println!("    newstruct: {v}"),
                 Asm::GETF(_) => println!("    getf"),
                 Asm::PINF(_) => println!("    pinf"),
+                Asm::LEN => println!("    len"),
             }
         }
         println!();
@@ -296,6 +297,7 @@ impl Disassembler {
                 }
                 Code::GETF => self.out("Get Field"),
                 Code::PINF => self.out("Put In Field"),
+                Code::LEN => self.out("Len"),
                 _ => {}
             }
         }

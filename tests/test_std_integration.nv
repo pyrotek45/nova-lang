@@ -1,0 +1,500 @@
+module test_std_integration
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.hashmap
+import super.std.set
+import super.std.deque
+import super.std.iter
+import super.std.functional
+
+// ============================================================
+// Standard Library Integration Tests
+//
+// Combines multiple std modules in realistic scenarios to
+// verify they work together correctly under GC pressure.
+// ============================================================
+
+// ── 1. Iter + List: collect, map, filter, reduce pipeline ────────
+fn iter_list_pipeline() {
+    let nums = Iter::fromRange(0, 100)
+        .filter(|x: Int| x % 3 == 0)
+        .map(|x: Int| x * x)
+        .collect()
+    // multiples of 3 in [0,100): 0,3,6,...,99 → 34 values
+    assert(nums.len() == 34, "1: 34 multiples of 3")
+    assert(nums[0] == 0, "1: first is 0^2")
+    assert(nums[1] == 9, "1: second is 3^2")
+    assert(nums[33] == 9801, "1: last is 99^2")
+
+    let sum = Iter::fromVec(nums).sum()
+    assert(sum > 0, "1: sum is positive")
+}
+iter_list_pipeline()
+
+// ── 2. HashMap + List: frequency counter ─────────────────────────
+fn frequency_counter() {
+    let words = "the cat sat on the mat the cat".split(' ')
+    let freq = HashMap::default() @[K: String, V: Int]
+    for w in words {
+        freq.increment(w)
+    }
+    assert(freq.get("the").unwrap() == 3, "2: 'the' appears 3 times")
+    assert(freq.get("cat").unwrap() == 2, "2: 'cat' appears 2 times")
+    assert(freq.get("sat").unwrap() == 1, "2: 'sat' appears 1 time")
+    assert(freq.get("on").unwrap() == 1, "2: 'on' appears 1 time")
+    assert(freq.get("mat").unwrap() == 1, "2: 'mat' appears 1 time")
+    assert(freq.size() == 5, "2: 5 unique words")
+}
+frequency_counter()
+
+// ── 3. Set + List: unique elements from combined lists ───────────
+fn set_from_lists() {
+    let a = [1, 2, 3, 4, 5]
+    let b = [4, 5, 6, 7, 8]
+    let c = [7, 8, 9, 10]
+
+    let all = Set::empty() @[T: Int]
+    for x in a { all.add(x) }
+    for x in b { all.add(x) }
+    for x in c { all.add(x) }
+
+    assert(all.size() == 10, "3: 10 unique elements")
+    assert(all.has(1), "3: has 1")
+    assert(all.has(10), "3: has 10")
+
+    // Intersection of a_set and b_set
+    let sa = Set::fromList(a)
+    let sb = Set::fromList(b)
+    let inter = sa.intersection(sb)
+    assert(inter.size() == 2, "3: intersection has 4,5")
+    assert(inter.has(4) && inter.has(5), "3: intersection values")
+}
+set_from_lists()
+
+// ── 4. Deque + Iter: BFS-like pattern ────────────────────────────
+fn bfs_pattern() {
+    // Simulate BFS levels: start with [0], expand each to [n*2+1, n*2+2]
+    let queue = Deque::empty() @[T: Int]
+    queue.pushBack(0)
+    let visited = []: Int
+    let limit = 31  // complete binary tree depth 4
+
+    while !queue.isEmpty() {
+        if visited.len() >= limit {
+            break
+        }
+        let current = queue.popFront().unwrap()
+        visited.push(current)
+        let left = current * 2 + 1
+        let right = current * 2 + 2
+        if left < limit {
+            queue.pushBack(left)
+        }
+        if right < limit {
+            queue.pushBack(right)
+        }
+    }
+    assert(visited.len() == 31, "4: visited 31 nodes")
+    assert(visited[0] == 0, "4: root is 0")
+    assert(visited[1] == 1, "4: first child")
+    assert(visited[2] == 2, "4: second child")
+}
+bfs_pattern()
+
+// ── 5. Functional + Iter: compose and pipe with iterators ────────
+fn functional_iter_combo() {
+    let double = |x: Int| x * 2
+    let add1 = |x: Int| x + 1
+    let transform = compose(double, add1)  // double(add1(x)) = (x+1)*2
+
+    let results = Iter::fromRange(0, 10)
+        .map(transform)
+        .collect()
+
+    assert(results.len() == 10, "5: 10 results")
+    assert(results[0] == 2, "5: (0+1)*2 = 2")
+    assert(results[5] == 12, "5: (5+1)*2 = 12")
+    assert(results[9] == 20, "5: (9+1)*2 = 20")
+}
+functional_iter_combo()
+
+// ── 6. String + List: CSV parser ─────────────────────────────────
+fn csv_parser() {
+    let csv = "name,age,city\nAlice,30,NYC\nBob,25,LA\nCarol,35,SF"
+    let lines = csv.split('\n')
+    assert(lines.len() == 4, "6: 4 lines including header")
+
+    let header = lines[0].split(',')
+    assert(header[0] == "name", "6: header field 0")
+    assert(header[1] == "age", "6: header field 1")
+    assert(header[2] == "city", "6: header field 2")
+
+    // Parse rows into a list of hashmaps
+    let records = []: HashMap(String, String)
+    for let i = 1; i < lines.len(); i += 1 {
+        let fields = lines[i].split(',')
+        let record = HashMap::default() @[K: String, V: String]
+        for let j = 0; j < header.len(); j += 1 {
+            record.insert(header[j], fields[j])
+        }
+        records.push(record)
+    }
+    assert(records.len() == 3, "6: 3 data records")
+    assert(records[0].get("name").unwrap() == "Alice", "6: first name")
+    assert(records[1].get("age").unwrap() == "25", "6: second age")
+    assert(records[2].get("city").unwrap() == "SF", "6: third city")
+}
+csv_parser()
+
+// ── 7. Result + Maybe: error handling pipeline ───────────────────
+fn error_pipeline() {
+    // Simulate parsing integers from strings
+    fn tryParse(s: String) -> Result(Int, String) {
+        if s == "42" { return Result::Ok(42) @[A: Int, B: String] }
+        if s == "0" { return Result::Ok(0) @[A: Int, B: String] }
+        if s == "99" { return Result::Ok(99) @[A: Int, B: String] }
+        return Result::Err("not a known number: " + s) @[A: Int, B: String]
+    }
+
+    let inputs = ["42", "bad", "0", "nope", "99"]
+    let successes = []: Int
+    let errors = []: String
+
+    for s in inputs {
+        let result = tryParse(s)
+        if result.isOk() {
+            successes.push(result.unwrap())
+        } else {
+            errors.push(result.unwrapErr())
+        }
+    }
+
+    assert(successes.len() == 3, "7: 3 successes")
+    assert(errors.len() == 2, "7: 2 errors")
+    assert(successes[0] == 42, "7: first success")
+    assert(errors[0] == "not a known number: bad", "7: first error")
+}
+error_pipeline()
+
+// ── 8. Box + Closure + HashMap: stateful registry ────────────────
+fn stateful_registry() {
+    let registry = Box(HashMap::default() @[K: String, V: fn() -> Int])
+    let counters = HashMap::default() @[K: String, V: Int]
+
+    // Register factories
+    fn registerCounter(reg: Box(HashMap(String, fn() -> Int)), name: String, start: Int) {
+        let state = Box(start)
+        reg.value.insert(name, fn() -> Int {
+            state.value += 1
+            return state.value - 1
+        })
+    }
+
+    registerCounter(registry, "a", 0)
+    registerCounter(registry, "b", 100)
+
+    // Use registered counters
+    let genA = registry.value.get("a").unwrap()
+    let genB = registry.value.get("b").unwrap()
+
+    assert(genA() == 0, "8: a starts at 0")
+    assert(genA() == 1, "8: a increments")
+    assert(genB() == 100, "8: b starts at 100")
+    assert(genB() == 101, "8: b increments")
+    assert(genA() == 2, "8: a independent of b")
+}
+stateful_registry()
+
+// ── 9. Iter chaining + take + drop ───────────────────────────────
+fn iter_advanced() {
+    // chain two ranges, take middle 10
+    let result = Iter::fromRange(0, 20)
+        .chain(Iter::fromRange(20, 40))
+        .drop(15)
+        .take(10)
+        .collect()
+
+    assert(result.len() == 10, "9: got 10 elements")
+    assert(result[0] == 15, "9: starts at 15")
+    assert(result[9] == 24, "9: ends at 24")
+
+    // zip two iterators
+    let zipped = Iter::fromRange(1, 6)
+        .zip(Iter::fromRange(10, 15))
+        .collect()
+    assert(zipped.len() == 5, "9: 5 zipped pairs")
+    assert(zipped[0] == (1, 10), "9: first pair")
+    assert(zipped[4] == (5, 14), "9: last pair")
+}
+iter_advanced()
+
+// ── 10. List sort + slice + append ───────────────────────────────
+fn list_advanced_ops() {
+    let data = [9, 3, 7, 1, 5, 8, 2, 6, 4, 10]
+    let sorted = data.quicksort()
+    assert(sorted[0] == 1, "10: sorted first")
+    assert(sorted[9] == 10, "10: sorted last")
+
+    let mid = sorted.slice(3, 7)
+    assert(mid.len() == 4, "10: slice len")
+    assert(mid[0] == 4, "10: slice starts at 4")
+    assert(mid[3] == 7, "10: slice ends at 7")
+
+    let combined = [1, 2].append([3, 4])
+    assert(combined.len() == 4, "10: append len")
+    assert(combined[2] == 3, "10: append value")
+}
+list_advanced_ops()
+
+// ── 11. String methods comprehensive ─────────────────────────────
+fn string_comprehensive() {
+    let s = "  Hello, World!  "
+    let trimmed = s.trim()
+    assert(trimmed == "Hello, World!", "11: trim")
+
+    let lower = trimmed.toLower()
+    assert(lower == "hello, world!", "11: toLower")
+
+    let upper = trimmed.toUpper()
+    assert(upper == "HELLO, WORLD!", "11: toUpper")
+
+    assert(trimmed.startsWith("Hello"), "11: startsWith")
+    assert(trimmed.endsWith("!"), "11: endsWith")
+    assert(trimmed.contains("World"), "11: contains")
+
+    let replaced = trimmed.replace("World", "Nova")
+    assert(replaced == "Hello, Nova!", "11: replace")
+
+    let rev = "abcdef".reverse()
+    assert(rev == "fedcba", "11: reverse")
+
+    let rep = "ab".repeat(4)
+    assert(rep == "abababab", "11: repeat")
+    assert(rep.len() == 8, "11: repeat len")
+}
+string_comprehensive()
+
+// ── 12. Maybe + Option interop ───────────────────────────────────
+fn maybe_option_interop() {
+    // Option -> Maybe
+    let opt_some: Option(Int) = Some(42)
+    let maybe_some = opt_some.toMaybe()
+    assert(maybe_some.isJust(), "12: Some -> Just")
+    assert(maybe_some.unwrap() == 42, "12: Just value")
+
+    let opt_none: Option(Int) = None(Int)
+    let maybe_none = opt_none.toMaybe()
+    assert(maybe_none.isNothing(), "12: None -> Nothing")
+
+    // Maybe -> Option
+    let j = Maybe::Just(99)
+    let back = j.toOption()
+    assert(back.isSome(), "12: Just -> Some")
+    assert(back.unwrap() == 99, "12: Some value from Just")
+
+    let n = Maybe::Nothing() @[A: Int]
+    let back_none = n.toOption()
+    assert(back_none.isNone(), "12: Nothing -> None")
+}
+maybe_option_interop()
+
+// ── 13. Gen + Iter: generate sequence with Gen ───────────────────
+fn gen_iter_combo() {
+    let g = Gen(10)
+    let vals = []: Int
+    for let i = 0; i < 20; i += 1 {
+        vals.push(g())
+    }
+    assert(vals[0] == 10, "13: Gen starts at 10")
+    assert(vals[19] == 29, "13: Gen at 19th call")
+
+    // Use range + reduce for sum
+    let total = range(1, 101).reduce(fn(acc: Int, x: Int, i: Int) -> Int { return acc + x }, 0)
+    assert(total == 5050, "13: sum 1..100 = 5050")
+}
+gen_iter_combo()
+
+// ── 14. Deque as stack and queue ─────────────────────────────────
+fn deque_modes() {
+    // Use as LIFO stack (push/pop back)
+    let stack = Deque::empty() @[T: String]
+    stack.pushBack("a")
+    stack.pushBack("b")
+    stack.pushBack("c")
+    assert(stack.popBack().unwrap() == "c", "14: stack LIFO c")
+    assert(stack.popBack().unwrap() == "b", "14: stack LIFO b")
+    assert(stack.popBack().unwrap() == "a", "14: stack LIFO a")
+    assert(stack.isEmpty(), "14: stack empty")
+
+    // Use as FIFO queue (push back, pop front)
+    let queue = Deque::empty() @[T: Int]
+    queue.pushBack(1)
+    queue.pushBack(2)
+    queue.pushBack(3)
+    assert(queue.popFront().unwrap() == 1, "14: queue FIFO 1")
+    assert(queue.popFront().unwrap() == 2, "14: queue FIFO 2")
+    assert(queue.popFront().unwrap() == 3, "14: queue FIFO 3")
+    assert(queue.isEmpty(), "14: queue empty")
+}
+deque_modes()
+
+// ── 15. Functional: applyN and compose chains ────────────────────
+fn functional_advanced() {
+    // applyN: apply double 4 times to 1 → 1*2*2*2*2 = 16
+    let double = |x: Int| x * 2
+    let result = applyN(double, 4, 1)
+    assert(result == 16, "15: applyN double 4 times")
+
+    // negate a predicate
+    let isPositive = |x: Int| x > 0
+    let isNonPositive = negate(isPositive)
+    assert(isNonPositive(-1), "15: negate true for -1")
+    assert(!isNonPositive(5), "15: negate false for 5")
+
+    // const_ always returns the same value
+    let always42 = const_(42) @[A: Int, B: Int]
+    assert(always42(999) == 42, "15: const_ returns 42")
+
+    // identity returns input unchanged
+    assert(identity(77) == 77, "15: identity")
+}
+functional_advanced()
+
+// ── 16. Stress: many std modules in one tight loop ───────────────
+fn multi_module_stress() {
+    for let i = 0; i < 50; i += 1 {
+        // List operations
+        let nums = range(i, i + 10)
+        let doubled = nums.map(|x: Int| x * 2)
+        let sum = doubled.reduce(fn(acc: Int, x: Int, idx: Int) -> Int { return acc + x }, 0)
+
+        // String operations
+        let label = "iter_" + Cast::string(i)
+        let upper = label.toUpper()
+
+        // HashMap
+        let m = HashMap::default() @[K: String, V: Int]
+        m.insert(label, sum)
+
+        // Set
+        let s = Set::fromList(nums)
+        assert(s.size() == 10, "16: set size at iter " + Cast::string(i))
+
+        // Iter
+        let iter_sum = Iter::fromVec(nums).sum()
+        assert(iter_sum == sum / 2, "16: iter sum matches")
+    }
+}
+multi_module_stress()
+
+// ── 17. Nested closures with std collections ─────────────────────
+fn nested_closure_collections() {
+    let outer_data = []: [Int]
+
+    fn make_appender(target: [[Int]]) -> fn([Int]) {
+        return fn(items: [Int]) {
+            let processed = items.map(|x: Int| x + 1)
+            target.push(processed)
+        }
+    }
+
+    let appender = make_appender(outer_data)
+    for let i = 0; i < 30; i += 1 {
+        appender([i, i * 2, i * 3])
+    }
+    assert(outer_data.len() == 30, "17: 30 appended sublists")
+    assert(outer_data[0][0] == 1, "17: first processed is 0+1")
+    assert(outer_data[29][2] == 88, "17: last processed is 29*3+1=88")
+}
+nested_closure_collections()
+
+// ── 18. Result chaining ──────────────────────────────────────────
+fn result_chaining() {
+    let ok = Result::Ok(10) @[A: Int, B: String]
+    let mapped = ok.map(|x: Int| x * 5)
+    assert(mapped.isOk(), "18: mapped is Ok")
+    assert(mapped.unwrap() == 50, "18: mapped value is 50")
+
+    let err = Result::Err("fail") @[A: Int, B: String]
+    let mapped_err = err.map(|x: Int| x * 5)
+    assert(mapped_err.isErr(), "18: mapped err stays Err")
+    assert(mapped_err.unwrapErr() == "fail", "18: err message preserved")
+
+    // orDefault
+    let defaulted = err.orDefault(999)
+    assert(defaulted == 999, "18: orDefault on Err")
+    let not_defaulted = ok.orDefault(999)
+    assert(not_defaulted == 10, "18: orDefault on Ok returns value")
+}
+result_chaining()
+
+// ── 19. Iter reduce/fold/any/all/find ────────────────────────────
+fn iter_consumers() {
+    let nums = Iter::fromRange(1, 11)  // 1..10
+    let sum = nums.sum()
+    assert(sum == 55, "19: sum 1..10 = 55")
+
+    let has_five = Iter::fromRange(1, 11).any(|x: Int| x == 5)
+    assert(has_five, "19: any finds 5")
+
+    let all_pos = Iter::fromRange(1, 11).all(|x: Int| x > 0)
+    assert(all_pos, "19: all positive")
+
+    let not_all_big = Iter::fromRange(1, 11).all(|x: Int| x > 5)
+    assert(!not_all_big, "19: not all > 5")
+
+    let found = Iter::fromRange(1, 100).find(|x: Int| x * x > 50)
+    assert(found.isSome(), "19: find found something")
+    assert(found.unwrap() == 8, "19: 8^2=64 > 50")
+
+    let count = Iter::fromRange(0, 100).count()
+    assert(count == 100, "19: count is 100")
+}
+iter_consumers()
+
+// ── 20. Large integration: word histogram ────────────────────────
+fn word_histogram() {
+    // Build a "document" by repeating patterns
+    let doc = []: String
+    for let i = 0; i < 100; i += 1 {
+        doc.push("alpha")
+        doc.push("beta")
+        doc.push("gamma")
+        if i % 2 == 0 {
+            doc.push("alpha")
+        }
+        if i % 3 == 0 {
+            doc.push("delta")
+        }
+    }
+
+    // Count frequencies
+    let freq = HashMap::default() @[K: String, V: Int]
+    for w in doc {
+        freq.increment(w)
+    }
+
+    assert(freq.get("alpha").unwrap() == 150, "20: alpha = 100 + 50 = 150")
+    assert(freq.get("beta").unwrap() == 100, "20: beta = 100")
+    assert(freq.get("gamma").unwrap() == 100, "20: gamma = 100")
+    assert(freq.get("delta").unwrap() == 34, "20: delta = ceil(100/3) = 34")
+
+    // Find most frequent using keys + values
+    let keys = freq.keys()
+    let max_word = Box("") 
+    let max_count = Box(0)
+    for k in keys {
+        let v = freq.get(k).unwrap()
+        if v > max_count.value {
+            max_count.value = v
+            max_word.value = k
+        }
+    }
+    assert(max_word.value == "alpha", "20: most frequent is alpha")
+    assert(max_count.value == 150, "20: max count is 150")
+}
+word_histogram()
+
+println("PASS: test_std_integration")

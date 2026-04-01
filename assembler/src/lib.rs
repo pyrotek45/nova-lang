@@ -239,6 +239,7 @@ impl Assembler {
                     let bytes = index.to_le_bytes();
                     self.output.extend_from_slice(&bytes);
                 }
+                Asm::LEN => self.output.push(Code::LEN),
                 Asm::AND => self.output.push(Code::AND),
                 Asm::OR => self.output.push(Code::OR),
                 Asm::NATIVE(index, pos) => {
