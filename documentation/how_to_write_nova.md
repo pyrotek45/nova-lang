@@ -2928,27 +2928,82 @@ registration, just define the function and the UFCS call syntax makes it look bu
 
 ### 30.4 Dyn Types for Runtime Polymorphism Without Inheritance
 
-When you need a heterogeneous list (e.g. a mix of `Circle`, `Rect`, `Triangle` that
-all respond to `draw()`), Nova uses `Dyn` — dynamic dispatch via vtable:
+Nova's `Dyn` type is **structural** — it matches any struct that has the required
+fields. This lets you write functions that accept multiple unrelated struct types,
+and store them together in a list. The `type` keyword creates an alias to keep
+long Dyn signatures short.
+
+The vtable pattern: put a function **field** (like `draw: fn($T)`) on each struct,
+define a `type` alias for the required shape, then use `->` to dispatch:
 
 ```nova
-struct Circle { x: Float, y: Float, r: Float }
-struct Rect   { x: Float, y: Float, w: Float, h: Float }
+// Each struct carries its own draw function
+struct Circle {
+    x: Float, y: Float, r: Float,
+    draw: fn(Circle),
+}
+struct Rect {
+    x: Float, y: Float, w: Float, h: Float,
+    draw: fn(Rect),
+}
 
-fn extends draw(c: Circle) { raylib::drawCircle(c.x, c.y, c.r, WHITE) }
-fn extends draw(r: Rect)   { raylib::drawRectangle(r.x, r.y, r.w, r.h, WHITE) }
+// Type alias: any struct with a draw: fn($T) field
+type drawable = Dyn(T = draw: fn($T))
 
-// Mix different shape types in one list
-let shapes: [Dyn] = [Circle { x: 100.0, y: 100.0, r: 30.0 },
-                     Rect   { x: 0.0, y: 0.0, w: 50.0, h: 50.0 }]
+let c = Circle {
+    x: 100.0, y: 100.0, r: 30.0,
+    draw: fn(self: Circle) {
+        raylib::drawCircle(Cast::int(self.x).unwrap(),
+                           Cast::int(self.y).unwrap(),
+                           Cast::int(self.r).unwrap(), (255, 255, 255))
+    }
+}
+let r = Rect {
+    x: 0.0, y: 0.0, w: 50.0, h: 40.0,
+    draw: fn(self: Rect) {
+        raylib::drawRectangle(Cast::int(self.x).unwrap(), Cast::int(self.y).unwrap(),
+                              Cast::int(self.w).unwrap(), Cast::int(self.h).unwrap(),
+                              (200, 100, 50))
+    }
+}
+
+// Both types fit in [drawable] — no common base class needed
+let shapes = []: drawable
+shapes.push(c)
+shapes.push(r)
 
 for s in shapes {
-    s->draw()   // dispatches to the right draw() at runtime
+    s->draw()   // calls the right draw fn stored in each struct
 }
 ```
 
-**The `->` operator** calls a method on a `Dyn` value by name. Nova resolves which
-concrete function to call at runtime based on the stored type.
+You can also use `Dyn` for **structural field access** without any vtable — just
+describe the fields you need:
+
+```nova
+// Accept any struct with a `name: String` field
+type named = Dyn(T = name: String)
+
+fn greet(thing: named) -> String {
+    return "Hello, " + thing.name + "!"
+}
+
+struct Player { name: String, score: Int }
+struct Enemy  { name: String, speed: Float }
+
+let p = Player { name: "Alice", score: 100 }
+let e = Enemy  { name: "Shadow", speed: 2.5 }
+
+greet(p)   // "Hello, Alice!"
+greet(e)   // "Hello, Shadow!"
+```
+
+Multi-field Dyn combines requirements with `+`:
+```nova
+fn info(x: Dyn(T = name: String + age: Int)) -> String {
+    return x.name + " age " + Cast::string(x.age)
+}
+```
 
 Use `Dyn` when you genuinely need open extensibility. Prefer specific types or enums
 when the set of variants is fixed — they give you exhaustiveness checking.
@@ -2962,31 +3017,34 @@ they make state machines where the compiler verifies you handle every case:
 
 ```nova
 enum AppState {
-    Loading { progress: Float },
-    Playing { level: Int, score: Int },
-    Paused  { resumeLevel: Int },
-    Dead    { finalScore: Int },
+    Loading: Float,
+    Playing: (Int, Int),
+    Paused: Int,
+    Dead: Int,
 }
 
 fn tickState(state: AppState, dt: Float) -> AppState {
     match state {
-        AppState::Loading { progress } -> {
+        Loading(progress) => {
             let next = progress + dt * 0.5
-            if next >= 1.0 { return AppState::Playing { level: 1, score: 0 } }
-            return AppState::Loading { progress: next }
-        },
-        AppState::Playing { level, score } -> {
-            return AppState::Playing { level: level, score: score + 1 }
-        },
-        AppState::Paused  { resumeLevel } -> state,
-        AppState::Dead    { finalScore }  -> state,
+            if next >= 1.0 { return AppState::Playing((1, 0)) }
+            return AppState::Loading(next)
+        }
+        Playing(data) => {
+            return AppState::Playing((data[0], data[1] + 1))
+        }
+        Paused(lvl) => { return state }
+        Dead(sc)     => { return state }
     }
+    return state
 }
 ```
 
 This eliminates mutable booleans like `isLoading`, `isDead`, `isPaused`. The state is
 encoded in the *type*, so you can't be in two states at once and the compiler enforces
-you handle every transition.
+you handle every transition. Variants carry data via `Variant: Type` syntax, and `match`
+uses `Variant(binding) => { ... }` — no need for the full `EnumName::Variant` prefix
+inside match arms.
 
 ---
 
@@ -2995,7 +3053,7 @@ you handle every transition.
 Nova generics let you build strongly typed containers:
 
 ```nova
-struct Stack { _data: [$T] }
+struct Stack(T) { _data: [$T] }
 
 fn extends(Stack) new() -> Stack($T) {
     return Stack { _data: []:$T }
@@ -3090,10 +3148,12 @@ explains the philosophy behind the differences.
 | `None` can appear anywhere | `Option(T)` must be explicitly handled |
 | `list` — dynamic, mixed types | `[T]` — all elements same type |
 | `dict` with any keys | `HashMap(K, V)` — key/value types fixed |
-| Decorators | No decorators; `fn extends` for method-like augmentation |
-| Generators / `yield` | `Iter(T)` — library type, not a language keyword |
+| `[x for x in xs if p]` | `[x in xs \| x \| p]` (list comprehension) |
+| `xs[1:3]`, `xs[-2:]` | `xs[1:3]`, `xs[-2:]` (same slicing syntax) |
+| `f"hello {x}"` | `format("hello {}", [x])` |
 | `lambda x: x+1` | `\|x: Int\| x + 1` (short lambda syntax) |
 | `try / except` | `Option(T)` / `Result(T, E)` — errors are values |
+| Interactive REPL | `nova repl` — full session-based REPL |
 
 ---
 
@@ -3194,7 +3254,9 @@ counts.update(word, 0, fn(v: Int) -> Int { return v + 1 })
 
 ---
 
-### 31.5 From List Comprehensions to Functional Pipelines
+### 31.5 From List Comprehensions to List Comprehensions
+
+Nova has **real list comprehensions** — the syntax is just different from Python's:
 
 **Python:**
 ```python
@@ -3203,6 +3265,32 @@ result = [x * 2 for x in range(10) if x % 2 == 0]
 
 **Nova:**
 ```nova
+// List comprehension: [var in list | expr | guard]
+let result = [x in 0.to(10) | x * 2 | x % 2 == 0]
+```
+
+The `|` separates the loop variable, the output expression, and optional guard clauses.
+Multiple guards are separated by additional `|` pipes:
+
+```nova
+// Multiple guards: even, > 5, < 15
+let filtered = [x in 1.to(21) | x | x % 2 == 0 | x > 5 | x < 15]
+// filtered == [6, 8, 10, 12, 14]
+```
+
+**Python nested comprehension:**
+```python
+flat = [x + y for x in [1, 2, 3] for y in [10, 20]]
+```
+
+**Nova nested comprehension:**
+```nova
+let flat = [x in [1, 2, 3], y in [10, 20] | x + y]
+// flat == [11, 21, 12, 22, 13, 23]
+```
+
+You can also use UFCS functional pipelines for the same result:
+```nova
 import super.std.list
 
 let result = [0,1,2,3,4,5,6,7,8,9]
@@ -3210,16 +3298,16 @@ let result = [0,1,2,3,4,5,6,7,8,9]
     .map(|x: Int| x * 2)
 ```
 
-**Python nested comprehension:**
-```python
-flat = [y for row in matrix for y in row]
-```
+> **Tip:** Use list comprehensions for concise transformations. Use `.filter().map()`
+> chains when you want UFCS readability or need to chain many operations.
 
-**Nova:**
+Nova also has **Python-style slicing**:
 ```nova
-let flat = matrix.flatten()
-// or
-let flat = matrix.flatmap(|row: [Int]| row)
+let xs = [10, 20, 30, 40, 50]
+let mid   = xs[1:4]       // [20, 30, 40]
+let last2 = xs[-2:]       // [40, 50]
+let evens = xs[:$2]       // [10, 30, 50] — step by 2
+let rev   = xs[-3:-1]     // [30, 40] — negative range
 ```
 
 ---
@@ -3252,8 +3340,12 @@ value won't change underneath you — something Python can never guarantee.
 
 | Python | Nova |
 |--------|------|
-| `[f(x) for x in xs]` | `xs.map(\|x: T\| f(x))` |
-| `[x for x in xs if p(x)]` | `xs.filter(\|x: T\| p(x))` |
+| `[f(x) for x in xs]` | `[x in xs \| f(x)]` (list comprehension) |
+| `[x for x in xs if p(x)]` | `[x in xs \| x \| p(x)]` (comp + guard) |
+| `xs[1:4]` | `xs[1:4]` (identical slicing syntax) |
+| `xs[-2:]` | `xs[-2:]` (negative indices work) |
+| `xs[::2]` | `xs[:$2]` (step uses `$` instead of `:`) |
+| `f"Hello, {name}"` | `format("Hello, {}", [name])` |
 | `dict.get(k, default)` | `map.get(k).orDefault(default)` |
 | `x if cond else y` | `if cond { x } else { y }` (expression) |
 | `@dataclass` | `struct` — fields only, methods via `extends` |
@@ -3267,15 +3359,18 @@ value won't change underneath you — something Python can never guarantee.
 | `functools.lru_cache` | `memoize(f)` from `std/functional` |
 | `itertools.takewhile(p, xs)` | `xs.takeWhile(\|x: T\| p(x))` |
 | `itertools.chain(a, b)` | `a.concat(b)` from `std/list` |
+| `x \|> f \|> g` (shell pipe) | `x \|> f() \|> g()` (pipe operator) |
+| `val := expr; use(val)` | `expr ~> val { use(val) }` (bind operator) |
 
 ---
 
 ### 31.8 Things Python Developers Miss (and Workarounds)
 
-**No string interpolation** — use concatenation or `Cast::string`:
+**No f-strings** — but `format` and `printf` use `{}` placeholders:
 ```nova
 // Python: f"Hello, {name}! Age: {age}"
-let msg = "Hello, " + name + "! Age: " + Cast::string(age)
+let msg = format("Hello, {}! Age: {}", [name, Cast::string(age)])
+printf("Score: {} / {}\n", [Cast::string(score), Cast::string(max)])
 ```
 
 **No `*args` / `**kwargs`** — use a list or hashmap parameter:
@@ -3302,7 +3397,72 @@ fn extends speak(d: Dog) -> String {
 }
 ```
 
-**No REPL** — write small `nova run` scripts to test ideas quickly.
+---
+
+### 31.9 Syntax Sugars Python Developers Will Love
+
+Nova has several syntax features that may surprise you — some go *beyond* Python:
+
+**List comprehensions with guards:**
+```nova
+// Python: [x*x for x in range(10) if x % 2 == 0]
+let even_sq = [x in 0.to(10) | x * x | x % 2 == 0]
+```
+
+**Python-style slicing (including negative indices and step):**
+```nova
+let xs = [1, 2, 3, 4, 5]
+xs[1:3]      // [2, 3]
+xs[-2:]      // [4, 5]
+xs[:$2]      // [1, 3, 5] — step by 2
+xs[1:-1]     // [2, 3, 4] — drop first and last
+```
+
+**Pipe operator for left-to-right data flow:**
+```nova
+fn add1(x: Int) -> Int { return x + 1 }
+fn square(x: Int) -> Int { return x * x }
+
+let result = 4 |> add1() |> square()   // 25
+```
+
+**Bind operator for inline naming:**
+```nova
+let area = (3.0 + 4.0) ~> side { side * side }   // 49.0
+```
+
+**Trailing closures (like Swift):**
+```nova
+fn apply(x: Int, f: fn(Int) -> Int) -> Int { return f(x) }
+let r = apply(5): |x: Int| x * 3   // 15
+```
+
+**Empty parameter closures:**
+```nova
+let get42 = || 42
+get42()   // 42
+```
+
+**Range-based for loops:**
+```nova
+for i in 0..10 { ... }      // exclusive: 0,1,...,9
+for i in 0..=10 { ... }     // inclusive: 0,1,...,10
+```
+
+**`if let` for safe unwrapping:**
+```nova
+if let val = someOption {
+    println(val)   // only runs if someOption is Some
+}
+```
+
+**REPL for interactive exploration:**
+```bash
+nova repl
+```
+
+Nova ships with a full interactive REPL with session history, tab completion,
+`show` to view current code, `save` to export, and `back` to undo.
 
 ---
 
@@ -3360,3 +3520,13 @@ Nova's reference-counting GC frees objects immediately when they go out of scope
 There are no stop-the-world pauses during a game loop — a major difference from
 CPython's cyclic GC. For data-intensive pipelines, Nova's typed arrays avoid Python's
 per-element boxing overhead.
+
+### Familiar Syntax Sugars That Go Further
+
+Nova doesn't sacrifice ergonomics for type safety. It has list comprehensions
+(`[x in xs | x*x | x > 0]`), Python-style slicing with negative indices and step
+(`xs[1:-1]`, `xs[:$2]`), range loops (`for i in 0..10`), `if let` unwrapping,
+a pipe operator (`x |> f() |> g()`), a bind operator (`expr ~> name { body }`),
+trailing closures (`apply(5): |x: Int| x * 2`), empty closures (`|| 42`), and
+`format` / `printf` for string formatting. Plus a full interactive REPL (`nova repl`)
+with session management, history, and tab completion.

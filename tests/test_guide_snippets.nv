@@ -1,0 +1,206 @@
+module test_guide_snippets
+
+import super.std.list
+import super.std.core
+import super.std.hashmap
+import super.std.option
+
+// ============================================================
+// Test all code snippets from sections 30–32 of the guide
+// ============================================================
+
+// ── 30.1 UFCS Pipeline ───────────────────────────────────────
+let data = [1, 2, 3, 4, 5, 6, 7, 8]
+let result301 = data
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * 2)
+assert(result301.len() == 4, "30.1 ufcs pipeline len")
+assert(result301[0] == 4, "30.1 ufcs pipeline first")
+assert(result301[3] == 16, "30.1 ufcs pipeline last")
+
+// ── 30.2 Box shared state ────────────────────────────────────
+let counter = Box(0)
+let inc   = fn() { counter.value += 1 }
+let get   = fn() -> Int { return counter.value }
+let reset302 = fn() { counter.value = 0 }
+
+inc()
+inc()
+inc()
+assert(get() == 3, "30.2 box counter 3")
+reset302()
+assert(get() == 0, "30.2 box counter reset")
+
+// Box a struct
+struct Config { debug: Bool, volume: Int }
+let cfg = Box(Config { debug: false, volume: 80 })
+let toggleDebug = fn() { cfg.value.debug = !cfg.value.debug }
+let setVolume   = fn(v: Int) { cfg.value.volume = v }
+toggleDebug()
+assert(cfg.value.debug == true, "30.2 box struct toggle")
+setVolume(50)
+assert(cfg.value.volume == 50, "30.2 box struct setVolume")
+
+// ── 30.3 extends on built-in types ───────────────────────────
+fn extends clamp302(n: Int, lo: Int, hi: Int) -> Int {
+    if n < lo { return lo }
+    if n > hi { return hi }
+    return n
+}
+assert((-5).clamp302(0, 100) == 0, "30.3 clamp lo")
+assert(200.clamp302(0, 100) == 100, "30.3 clamp hi")
+assert(42.clamp302(0, 100) == 42, "30.3 clamp mid")
+
+// ── 30.5 enum state machine ──────────────────────────────────
+// Nova enums: Variant or Variant: PayloadType
+enum AppState {
+    Loading: Float,
+    Playing: (Int, Int),
+    Paused: Int,
+    Dead: Int,
+}
+
+fn tickState(state: AppState, dt: Float) -> AppState {
+    match state {
+        Loading(progress) => {
+            let next = progress + dt * 0.5
+            if next >= 1.0 { return AppState::Playing((1, 0)) }
+            return AppState::Loading(next)
+        }
+        Playing(data) => {
+            return AppState::Playing((data[0], data[1] + 1))
+        }
+        Paused(lvl) => { return state }
+        Dead(sc) => { return state }
+    }
+    return state
+}
+
+let s1 = AppState::Loading(0.5)
+let s2 = tickState(s1, 0.4)
+match s2 {
+    Loading(p) => { assert(true, "30.5 still loading") }
+    _ => { assert(false, "30.5 should still be loading") }
+}
+let s3 = tickState(s2, 2.0)
+match s3 {
+    Playing(data) => {
+        assert(data[0] == 1, "30.5 entered playing")
+        assert(data[1] == 0, "30.5 score 0")
+    }
+    _ => { assert(false, "30.5 should be playing") }
+}
+
+// ── 30.6 Generic Stack ───────────────────────────────────────
+struct Stack305(T) { _data: [$T] }
+
+fn extends(Stack305) new305() -> Stack305($T) {
+    return Stack305 { _data: []:$T }
+}
+
+fn extends push305(self: Stack305($T), v: $T) {
+    self._data.push(v)
+}
+
+fn extends pop305(self: Stack305($T)) -> Option($T) {
+    if self._data.len() == 0 { return None($T) }
+    let v = self._data[self._data.len() - 1]
+    self._data.remove(self._data.len() - 1)
+    return Some(v)
+}
+
+let stk = Stack305::new305() @[T: Int]
+stk.push305(10)
+stk.push305(20)
+let popped = stk.pop305()
+assert(popped.isSome(), "30.6 stack pop some")
+assert(popped.unwrap() == 20, "30.6 stack pop 20")
+
+// ── 31.2 Point struct + extends ──────────────────────────────
+struct Point { x: Float, y: Float }
+
+fn extends distance(self: Point, other: Point) -> Float {
+    let dx = self.x - other.x
+    let dy = self.y - other.y
+    return (dx * dx + dy * dy).sqrt()
+}
+
+fn extends __add__(a: Point, b: Point) -> Point {
+    return Point { x: a.x + b.x, y: a.y + b.y }
+}
+
+let p1 = Point { x: 3.0, y: 0.0 }
+let p2 = Point { x: 0.0, y: 4.0 }
+let d = p1.distance(p2)
+assert(d > 4.99 && d < 5.01, "31.2 point distance")
+let p3 = p1 + p2
+assert(p3.x == 3.0 && p3.y == 4.0, "31.2 point add")
+
+// ── 31.5 List comprehensions (the REAL Nova way) ─────────────
+// Nova actually has list comprehensions!
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+assert(squares[0] == 1, "31.5 comp squares 0")
+assert(squares[4] == 25, "31.5 comp squares 4")
+
+// With guard
+let even_sq = [x in [1, 2, 3, 4, 5, 6] | x * x | x % 2 == 0]
+assert(even_sq.len() == 3, "31.5 comp guard len")
+assert(even_sq[0] == 4, "31.5 comp guard 0")
+
+// Nested
+let pairs = [x in [1, 2], y in [10, 20] | x + y]
+assert(pairs.len() == 4, "31.5 nested comp len")
+assert(pairs[0] == 11, "31.5 nested comp 0")
+
+// ── 31.5 ALSO: functional pipelines work too ─────────────────
+let result315 = [0,1,2,3,4,5,6,7,8,9]
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * 2)
+assert(result315[0] == 0, "31.5 pipeline 0")
+assert(result315[4] == 16, "31.5 pipeline 4")
+
+// ── Slicing works like Python ────────────────────────────────
+let xs = [10, 20, 30, 40, 50]
+let sl = xs[1:4]
+assert(sl.len() == 3, "slicing [1:4]")
+assert(sl[0] == 20, "slicing first")
+let last2 = xs[-2:]
+assert(last2[0] == 40, "negative slice")
+
+// ── Pipe operator ────────────────────────────────────────────
+fn add1(x: Int) -> Int { return x + 1 }
+fn square(x: Int) -> Int { return x * x }
+let piped = 4 |> add1() |> square()
+assert(piped == 25, "pipe operator")
+
+// ── Bind operator ────────────────────────────────────────────
+let bound = 42 ~> x { x + 8 }
+assert(bound == 50, "bind operator")
+
+// ── Trailing closure ─────────────────────────────────────────
+fn applyFn(x: Int, f: fn(Int) -> Int) -> Int { return f(x) }
+let trail = applyFn(5): |x: Int| x * 3
+assert(trail == 15, "trailing closure")
+
+// ── Format for string interpolation ──────────────────────────
+let msg = format("Hello, {}! Age: {}", ["World", Cast::string(42)])
+assert(msg == "Hello, World! Age: 42", "format string")
+
+// ── Empty closure || ─────────────────────────────────────────
+let get42 = || 42
+assert(get42() == 42, "empty closure")
+
+// ── 31.7 table: list comp row ────────────────────────────────
+// [f(x) for x in xs] → [x in xs | f(x)]
+fn cube(n: Int) -> Int { return n * n * n }
+let cubed = [x in [1, 2, 3] | cube(x)]
+assert(cubed[0] == 1, "table comp 0")
+assert(cubed[1] == 8, "table comp 1")
+assert(cubed[2] == 27, "table comp 2")
+
+// [x for x in xs if p(x)] → [x in xs | x | p(x)]
+let evens = [x in [1, 2, 3, 4, 5, 6] | x | x % 2 == 0]
+assert(evens.len() == 3, "table filter comp len")
+assert(evens[0] == 2, "table filter comp 0")
+
+println("PASS: test_guide_snippets")

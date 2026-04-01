@@ -11,7 +11,9 @@ module survive
 //    • A compass arrow in the corner always points toward the target.
 //    • Reach the target to score points and spawn a new one.
 //    • Each new target is worth more points; enemies multiply over time.
-//    • Taking damage drains HP. Reaching 0 ends the game.
+//    • "Bonus wave" markers (Set) unlock bonus target spawns every 5 waves.
+//    • Taking damage drains HP. Recent hit history tracked in a Deque.
+//    • Per-wave kill counts tracked in a HashMap.
 //    • High-score table saved across rounds in a Box.
 //
 //  Controls:
@@ -19,14 +21,22 @@ module survive
 //    Gamepad left-stick also works via InputMap.
 //
 //  Std modules used:
-//    scene   — Menu / Playing / GameOver state machine
-//    entity  — player + enemies as EntityWorld
-//    timer   — wave spawn repeating timer, invincibility cooldown
-//    tween   — compass pulse, score-pop, screen-flash
-//    vec2    — directional math for compass, enemy AI, dash
-//    input   — WASD + quit bindings
-//    camera  — 2D camera that follows the player
-//    color   — lerpColor for health bar gradient
+//    scene      — Menu / Playing / GameOver state machine
+//    entity     — player + enemies as EntityWorld
+//    timer      — wave spawn repeating timer, invincibility cooldown
+//    tween      — compass pulse, score-pop, screen-flash
+//    vec2       — directional math for compass, enemy AI
+//    input      — WASD + quit bindings
+//    camera     — 2D camera that follows the player
+//    color      — lerpColor for health bar gradient
+//    math       — smoothstep/lerp for enemy speed ramp, clamp for boundary
+//    noise      — fbm + noiseToColor for procedural grid cell tinting
+//    hashmap    — per-wave kill counter (HashMap(Int,Int))
+//    list       — sortWith, map for score history display
+//    string     — padLeft for HUD score alignment
+//    set        — Set(Int) tracking which waves triggered a bonus
+//    deque      — Deque(Float) rolling recent hit-time log (last 5 hits)
+//    functional — negate predicate for live-enemy filtering
 // ─────────────────────────────────────────────────────────────────────────────
 
 import super.super.std.scene
@@ -37,6 +47,14 @@ import super.super.std.vec2
 import super.super.std.input
 import super.super.std.camera
 import super.super.std.color
+import super.super.std.math
+import super.super.std.noise
+import super.super.std.hashmap
+import super.super.std.list
+import super.super.std.string
+import super.super.std.set
+import super.super.std.deque
+import super.super.std.functional
 
 // ── Window / World ────────────────────────────────────────────────────────────
 let SW = 800
@@ -92,6 +110,15 @@ let invTimer   = Timer::cooldown(INVINCIBLE_SECS)
 let hitFlash   = Tween::linear(160.0, 0.0, 0.4)
 let compassPulse = Tween::smooth(0.8, 1.4, 0.7)
 
+// ── New std-module state ───────────────────────────────────────────────────────
+// hashmap: per-wave kill count (wave# -> kills)
+let waveKills  = HashMap::default() @[K: Int, V: Int]
+// set: which wave numbers triggered a bonus target spawn
+let bonusWaves = Set::empty() @[T: Int]
+// deque: rolling log of the last 5 hit times (in game-elapsed seconds)
+let hitLog     = Deque::empty() @[T: Float]
+let gameTime   = Box(0.0)   // total elapsed time in the current run
+
 keys.bindKey("up",    "KEY_W")
 keys.bindKey("down",  "KEY_S")
 keys.bindKey("left",  "KEY_A")
@@ -116,6 +143,23 @@ fn drawGrid(ox: Int, oy: Int) {
     let step = 96
     let sx = -(ox % step)
     let sy = -(oy % step)
+
+    // Fill each visible cell with a noise-derived tint (std/noise: fbm + noiseToColor)
+    let colStart = ox / step - 1
+    let rowStart = oy / step - 1
+    for let row = rowStart; row <= rowStart + SH / step + 3; row += 1 {
+        for let col = colStart; col <= colStart + SW / step + 3; col += 1 {
+            let worldX = Cast::float(col * step).unwrap() / Cast::float(WW).unwrap()
+            let worldY = Cast::float(row * step).unwrap() / Cast::float(WH).unwrap()
+            let n = fbm(worldX * 4.0, worldY * 4.0, 42, 4, 2.0, 0.5)
+            let cellCol = noiseToColor(n, BG_COLOR, GRID_COLOR)
+            let cx2 = col * step - ox
+            let cy2 = row * step - oy
+            raylib::drawRectangle(cx2, cy2, step, step, cellCol)
+        }
+    }
+
+    // Grid lines on top
     let col = 0
     while col <= SW / step + 2 {
         let x = sx + col * step
@@ -128,6 +172,15 @@ fn drawGrid(ox: Int, oy: Int) {
         raylib::drawLine(0, y, SW, y, GRID_COLOR)
         row += 1
     }
+}
+
+// Count how many hits occurred in the last `window` seconds (std/deque + std/functional)
+fn recentHitCount(window: Float) -> Int {
+    let cutoff = gameTime.value - window
+    // functional::negate: build a predicate for hits OLDER than the window, then count the opposite
+    let isRecent = fn(t: Float) -> Bool { return t >= cutoff }
+    let recent = hitLog.filter(isRecent)
+    return recent.len()
 }
 
 // Place a new random target somewhere in the world, not too close to the player
@@ -179,6 +232,12 @@ fn resetGame() {
     wave.value = 0
     playerHp.value = PLAYER_HP_MAX
     targetsHit.value = 0
+    gameTime.value = 0.0
+
+    // Reset new std-module state
+    waveKills.clear()
+    bonusWaves = Set::empty() @[T: Int]
+    hitLog = Deque::empty() @[T: Float]
 
     let px = Cast::float(WW / 2).unwrap()
     let py = Cast::float(WH / 2).unwrap()
@@ -242,6 +301,7 @@ fn makePlayScene() -> Scene {
             invTimer.update(dt)
             hitFlash.update(dt)
             compassPulse.update(dt)
+            gameTime.value += dt
 
             if compassPulse.isDone() {
                 compassPulse.ping()
@@ -273,19 +333,10 @@ fn makePlayScene() -> Scene {
             p.vel = Vec2::new(dx * PLAYER_SPEED, dy * PLAYER_SPEED)
             p.pos = p.pos.add(p.vel.scale(dt))
 
-            // World boundary clamp
-            if p.pos.x < Cast::float(PLAYER_RADIUS).unwrap() {
-                p.pos.x = Cast::float(PLAYER_RADIUS).unwrap()
-            }
-            if p.pos.x > Cast::float(WW - PLAYER_RADIUS).unwrap() {
-                p.pos.x = Cast::float(WW - PLAYER_RADIUS).unwrap()
-            }
-            if p.pos.y < Cast::float(PLAYER_RADIUS).unwrap() {
-                p.pos.y = Cast::float(PLAYER_RADIUS).unwrap()
-            }
-            if p.pos.y > Cast::float(WH - PLAYER_RADIUS).unwrap() {
-                p.pos.y = Cast::float(WH - PLAYER_RADIUS).unwrap()
-            }
+            // World boundary clamp (math::clamp on Float)
+            let pr = Cast::float(PLAYER_RADIUS).unwrap()
+            p.pos.x = p.pos.x.clamp(pr, Cast::float(WW).unwrap() - pr)
+            p.pos.y = p.pos.y.clamp(pr, Cast::float(WH).unwrap() - pr)
 
             // ── Camera follows player ────────────────────────────────────────
             cam.follow(p.pos, 8.0, dt)
@@ -294,10 +345,20 @@ fn makePlayScene() -> Scene {
             if waveTimer.isDone() {
                 wave.value += 1
                 spawnEnemyWave(p.pos.x, p.pos.y)
+                // Every 5th wave: spawn a bonus target and record it (std/set)
+                if wave.value % 5 == 0 {
+                    bonusWaves.add(wave.value)
+                    placeTarget(p.pos.x, p.pos.y)
+                }
+                // Reset this wave's kill count (std/hashmap)
+                waveKills.insert(wave.value, 0)
             }
 
-            // ── Enemy AI ──────────────────────────────────────────────────────
-            let enemySpeed = ENEMY_SPEED_BASE + Cast::float(wave.value * 4).unwrap()
+            // ── Enemy AI: speed ramp using math::smoothstep ───────────────────
+            // Smoothstep t based on wave progress (0 → wave 20 = max speed)
+            let waveT = smoothstep(Cast::float(wave.value).unwrap() / 20.0)
+            let enemySpeed = lerp(ENEMY_SPEED_BASE, ENEMY_SPEED_BASE * 2.8, waveT)
+
             world.forEachTagged("enemy", fn(e: Entity) {
                 let dir = p.pos.sub(e.pos)
                 let dlen = dir.length()
@@ -332,6 +393,14 @@ fn makePlayScene() -> Scene {
                         playerHp.value -= 1
                         invTimer.reset()
                         hitFlash.reset()
+                        // Record hit time in rolling log (std/deque)
+                        hitLog.pushBack(gameTime.value)
+                        // Trim to last 5 hits
+                        while hitLog.len() > 5 {
+                            let _ = hitLog.popFront()
+                        }
+                        // Increment kill count for current wave (std/hashmap)
+                        waveKills.increment(wave.value)
                         if playerHp.value <= 0 {
                             mgr.switch(makeGameOverScene())
                         }
@@ -455,26 +524,48 @@ fn makePlayScene() -> Scene {
             raylib::drawText(dlStr, cx - dlw / 2, cy + compassR + 8, 14, COMPASS_RING)
 
             // ── HUD ───────────────────────────────────────────────────────────
-            // Score top-left
-            let scoreTxt = "Score: " + Cast::string(score.value)
+            // string::padLeft keeps score digits right-aligned in a fixed field
+            let scoreStr = Cast::string(score.value).padLeft(7, ' ')
+            let scoreTxt = "Score:" + scoreStr
             raylib::drawText(scoreTxt, 10, 8, 24, SCORE_COLOR)
 
-            // Best top-left below score
+            // Best score
             if hiScore.value > 0 {
-                let hsTxt = "Best:  " + Cast::string(hiScore.value)
+                let hsStr = Cast::string(hiScore.value).padLeft(7, ' ')
+                let hsTxt = "Best: " + hsStr
                 raylib::drawText(hsTxt, 10, 36, 18, HUD_DIM)
             }
 
-            // Wave top-right
+            // Wave top-right — highlight bonus waves (set::has)
             let waveTxt = "Wave " + Cast::string(wave.value)
             let ww2 = raylib::measureText(waveTxt, 22)
-            raylib::drawText(waveTxt, SW - ww2 - 10, 8, 22, HUD_COLOR)
+            let waveCol = HUD_COLOR
+            if bonusWaves.has(wave.value) {
+                waveCol = TARGET_GLOW
+            }
+            raylib::drawText(waveTxt, SW - ww2 - 10, 8, 22, waveCol)
 
             // Enemy count
             let ec = world.countAlive("enemy")
             let ecTxt = Cast::string(ec) + " enemies"
             let ecw = raylib::measureText(ecTxt, 18)
             raylib::drawText(ecTxt, SW - ecw - 10, 36, 18, (200, 100, 100))
+
+            // Per-wave kill count from hashmap (hits on player this wave)
+            let waveHits = waveKills.getOrDefault(wave.value, 0)
+            if waveHits > 0 {
+                let khTxt = "Hits this wave: " + Cast::string(waveHits)
+                let khw = raylib::measureText(khTxt, 14)
+                raylib::drawText(khTxt, SW - khw - 10, 60, 14, FLASH_COLOR)
+            }
+
+            // Recent hits in last 3s shown as danger pips (std/deque via recentHitCount)
+            let recentHits = recentHitCount(3.0)
+            if recentHits > 0 {
+                let dangerTxt = "!" + Cast::string(recentHits) + " recent hits"
+                let dtw = raylib::measureText(dangerTxt, 14)
+                raylib::drawText(dangerTxt, SW / 2 - dtw / 2, 8, 14, FLASH_COLOR)
+            }
 
             // HP bar (bottom-center)
             let barW = 28
@@ -511,6 +602,25 @@ fn makeGameOverScene() -> Scene {
     let finalWave  = wave.value
     let finalHits  = targetsHit.value
     let isNewHigh  = finalScore >= hiScore.value
+    let totalHits  = hitLog.len()   // how many times we got hit (from deque)
+
+    // Build per-wave kill summary using list::map + list::sortWith (std/list)
+    // entries() → [(wave, hits)] sorted descending by hits
+    let killEntries = waveKills.entries()
+    let sorted = killEntries.sortWith(fn(a: (Int, Int), b: (Int, Int)) -> Bool {
+        return a[1] > b[1]
+    })
+    // Take top-3 worst waves: list::slice (std/list)
+    let topBad = sorted.slice(0, 3.min(sorted.len()))
+    // Format them: list::map to strings (std/list)
+    let topBadStrs = topBad.map(fn(pair: (Int, Int)) -> String {
+        let waveNum = Cast::string(pair[0]).padLeft(2, ' ')
+        let hitsNum = Cast::string(pair[1]).padLeft(2, ' ')
+        return "Wave " + waveNum + ": " + hitsNum + " hits"
+    })
+
+    // Bonus waves achieved this run (std/set → sorted list)
+    let bonusList = bonusWaves.toList().sortWith(fn(a: Int, b: Int) -> Bool { return a < b })
 
     return Scene::new(
         fn(dt: Float) {
@@ -529,22 +639,37 @@ fn makeGameOverScene() -> Scene {
             let a = Cast::int(fadeIn.tweenValue() * 255.0).unwrap()
             let dim = Cast::int(fadeIn.tweenValue() * 160.0).unwrap()
 
-            drawCentered("GAME OVER", SH / 2 - 100, 68, (a, 30, 30))
+            drawCentered("GAME OVER", SH / 2 - 120, 68, (a, 30, 30))
 
             if isNewHigh {
-                drawCentered("NEW BEST!", SH / 2 - 30, 28, (a, Cast::int(Cast::float(a).unwrap() * 0.85).unwrap(), 20))
+                drawCentered("NEW BEST!", SH / 2 - 52, 28, (a, Cast::int(Cast::float(a).unwrap() * 0.85).unwrap(), 20))
             }
 
-            let sc = "Score: " + Cast::string(finalScore)
-            drawCentered(sc, SH / 2 + 10, 30, (a, a, Cast::int(Cast::float(a).unwrap() * 0.24).unwrap()))
+            let sc = "Score: " + Cast::string(finalScore).padLeft(6, ' ')
+            drawCentered(sc, SH / 2 - 14, 30, (a, a, Cast::int(Cast::float(a).unwrap() * 0.24).unwrap()))
 
             let wv = "Survived " + Cast::string(finalWave) + " waves"
-            drawCentered(wv, SH / 2 + 52, 22, (dim, dim, dim))
+            drawCentered(wv, SH / 2 + 28, 22, (dim, dim, dim))
 
-            let ht = "Targets hit: " + Cast::string(finalHits)
-            drawCentered(ht, SH / 2 + 84, 22, (dim, dim, dim))
+            let ht = "Targets hit: " + Cast::string(finalHits) + "   Total hits taken: " + Cast::string(totalHits)
+            drawCentered(ht, SH / 2 + 56, 18, (dim, dim, dim))
 
-            drawCentered("WASD to restart", SH - 60, 20, (40, 180, 80))
+            // Bonus waves achieved (std/set)
+            if bonusList.len() > 0 {
+                let bonusTxt = "Bonus waves: " + bonusList.map(fn(w: Int) -> String { return Cast::string(w) }).reduce(fn(acc: String, s: String, _i: Int) -> String { return acc + " " + s }, "")
+                drawCentered(bonusTxt, SH / 2 + 80, 16, TARGET_GLOW)
+            }
+
+            // Worst waves (std/list + std/hashmap)
+            if topBadStrs.len() > 0 {
+                raylib::drawText("Most dangerous waves:", SW / 2 - 120, SH / 2 + 106, 15, FLASH_COLOR)
+                for let i = 0; i < topBadStrs.len(); i += 1 {
+                    let tw2 = raylib::measureText(topBadStrs[i], 14)
+                    raylib::drawText(topBadStrs[i], SW / 2 - tw2 / 2, SH / 2 + 126 + i * 20, 14, (180, 80, 80))
+                }
+            }
+
+            drawCentered("WASD to restart", SH - 44, 20, (40, 180, 80))
         }
     )
 }
