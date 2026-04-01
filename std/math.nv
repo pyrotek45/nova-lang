@@ -1,11 +1,28 @@
+// ============================================================
+// std/math.nv  — Extended mathematics library
+// ============================================================
+//
+// Usage:  import super.std.math
+//
+// Native Float functions (no import needed):
+//   floor, ceil, round, abs, sqrt, sin, cos, tan, atan2,
+//   log, log10, pow, exp, min, max, clamp,
+//   isNan, isInfinite, Float::pi(), Float::e()
+//
+// This module adds:
+//   Int extensions  — min, max, abs, pow, sqrt, exp, clamp,
+//                     factorial, gcd, lcm, isEven, isOdd, sign,
+//                     modpow, isPrime, digitSum, digits
+//   Float extensions — degrees, radians, normalize, mapRange
+//   Standalone fns  — fib, fibSeq, bin, hex, oct, divmod,
+//                     toRadians, toDegrees, lerp, lerpF, remap,
+//                     round, smoothstep, sign, isPrime,
+//                     fibonacci, primes, collatz
+// ============================================================
+
 module math
 
-// Integer math utilities that complement native Float:: functions
-// Native Float functions available: floor, ceil, round, abs, sqrt,
-// sin, cos, tan, atan2, log, log10, pow, exp, min, max, clamp,
-// isNan, isInfinite, Float::pi(), Float::e()
-
-// --- Int extensions ---
+// ── Int extensions ───────────────────────────────────────────────────────────
 
 fn extends min(self: Int, other: Int) -> Int {
     if self < other {
@@ -100,7 +117,7 @@ fn extends sign(self: Int) -> Int {
     return 0
 }
 
-// Modular exponentiation: (base^exp) % mod
+// Modular exponentiation: (base^exp) % mod — fast, avoids overflow
 fn extends modpow(self: Int, exp: Int, mod: Int) -> Int {
     let result = 1
     let base = self % mod
@@ -115,7 +132,73 @@ fn extends modpow(self: Int, exp: Int, mod: Int) -> Int {
     return result
 }
 
-// Fibonacci number at position n
+// True if n is a prime number (trial division)
+fn extends isPrime(self: Int) -> Bool {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    let i = 3
+    while i * i <= self {
+        if self % i == 0 { return false }
+        i += 2
+    }
+    return true
+}
+
+// Sum of all decimal digits of the absolute value
+fn extends digitSum(self: Int) -> Int {
+    let n = self.abs()
+    let s = 0
+    while n > 0 {
+        s += n % 10
+        n = n / 10
+    }
+    return s
+}
+
+// List of decimal digits (most-significant first)
+fn extends digits(self: Int) -> [Int] {
+    if self == 0 { return [0] }
+    let n = self.abs()
+    let d = []: Int
+    while n > 0 {
+        d.push(n % 10)
+        n = n / 10
+    }
+    // d is least-significant first — reverse it
+    let result = []: Int
+    for let i = d.len() - 1; i >= 0; i -= 1 {
+        result.push(d[i])
+    }
+    return result
+}
+
+// ── Float extensions ─────────────────────────────────────────────────────────
+
+// Convert degrees to radians (UFCS: 90.0.radians())
+fn extends radians(self: Float) -> Float {
+    return self * Float::pi() / 180.0
+}
+
+// Convert radians to degrees (UFCS: Float::pi().degrees())
+fn extends degrees(self: Float) -> Float {
+    return self * 180.0 / Float::pi()
+}
+
+// Normalize a float to the range [0.0, 1.0] given a known min/max
+fn extends normalize(self: Float, lo: Float, hi: Float) -> Float {
+    if hi == lo { return 0.0 }
+    return (self - lo) / (hi - lo)
+}
+
+// Map a float from one range to another (UFCS version of remap)
+fn extends mapRange(self: Float, fromLo: Float, fromHi: Float, toLo: Float, toHi: Float) -> Float {
+    return toLo + (self - fromLo) * (toHi - toLo) / (fromHi - fromLo)
+}
+
+// ── Standalone functions ─────────────────────────────────────────────────────
+
+// Fibonacci number at position n (iterative, O(n))
 fn fib(n: Int) -> Int {
     if n <= 1 { return n }
     let a = 0
@@ -128,14 +211,24 @@ fn fib(n: Int) -> Int {
     return b
 }
 
-// --- Standalone utility functions ---
+// First n Fibonacci numbers as a list
+fn fibSeq(n: Int) -> [Int] {
+    let result = []: Int
+    let a = 0
+    let b = 1
+    for let i = 0; i < n; i += 1 {
+        result.push(a)
+        let temp = a + b
+        a = b
+        b = temp
+    }
+    return result
+}
 
-// Convert an integer to binary string
+// Convert integer to binary string (e.g. 10 -> "1010")
 fn bin(n: Int) -> String {
     if n == 0 { return "0" }
-    if n < 0 {
-        return "-" + bin(-n)
-    }
+    if n < 0 { return "-" + bin(-n) }
     let result = ""
     let i = n
     while i > 0 {
@@ -145,12 +238,10 @@ fn bin(n: Int) -> String {
     return result
 }
 
-// Convert an integer to hexadecimal string
+// Convert integer to hexadecimal string (e.g. 255 -> "ff")
 fn hex(n: Int) -> String {
     if n == 0 { return "0" }
-    if n < 0 {
-        return "-" + hex(-n)
-    }
+    if n < 0 { return "-" + hex(-n) }
     let digits = "0123456789abcdef"
     let result = ""
     let i = n
@@ -162,24 +253,41 @@ fn hex(n: Int) -> String {
     return result
 }
 
-// Integer division and modulo (returns a tuple)
+// Convert integer to octal string (e.g. 8 -> "10")
+fn oct(n: Int) -> String {
+    if n == 0 { return "0" }
+    if n < 0 { return "-" + oct(-n) }
+    let result = ""
+    let i = n
+    while i > 0 {
+        result = Cast::string(i % 8) + result
+        i = i / 8
+    }
+    return result
+}
+
+// Integer division and remainder as a tuple: (quotient, remainder)
 fn divmod(n: Int, d: Int) -> (Int, Int) {
     return (n / d, n % d)
 }
 
-// Degrees to radians
+// Degrees ↔ radians (standalone versions)
 fn toRadians(degrees: Float) -> Float {
     return degrees * Float::pi() / 180.0
 }
 
-// Radians to degrees
 fn toDegrees(radians: Float) -> Float {
     return radians * 180.0 / Float::pi()
 }
 
-// Linear interpolation between two values
+// Linear interpolation: a + (b - a) * t  (t ∈ [0, 1])
 fn lerp(a: Float, b: Float, t: Float) -> Float {
     return a + (b - a) * t
+}
+
+// Integer linear interpolation (floors result)
+fn lerpF(a: Int, b: Int, t: Float) -> Int {
+    return Cast::int(Cast::float(a).unwrap() + (Cast::float(b).unwrap() - Cast::float(a).unwrap()) * t).unwrap()
 }
 
 // Map a value from one range to another
@@ -187,7 +295,69 @@ fn remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Fl
     return toLow + (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow)
 }
 
-// Round a float to the nearest integer (convenience wrapper)
+// Round float to nearest integer
 fn round(n: Float) -> Int {
     return Cast::int(n + 0.5).unwrap()
+}
+
+// Smooth Hermite interpolation (3t² - 2t³)
+fn smoothstep(t: Float) -> Float {
+    let tc = t.clamp(0.0, 1.0)
+    return tc * tc * (3.0 - 2.0 * tc)
+}
+
+// Sign of a float: -1.0, 0.0, or 1.0
+fn sign(x: Float) -> Float {
+    if x > 0.0 { return 1.0 }
+    if x < 0.0 { return -1.0 }
+    return 0.0
+}
+
+// Check primality (standalone version for use without UFCS)
+fn isPrime(n: Int) -> Bool {
+    return n.isPrime()
+}
+
+// All primes up to (and including) n using the Sieve of Eratosthenes
+fn primes(n: Int) -> [Int] {
+    if n < 2 { return []: Int }
+    let sieve = []: Bool
+    for let i = 0; i <= n; i += 1 {
+        sieve.push(true)
+    }
+    sieve.set(0, false)
+    sieve.set(1, false)
+    let i = 2
+    while i * i <= n {
+        if sieve[i] {
+            let j = i * i
+            while j <= n {
+                sieve.set(j, false)
+                j += i
+            }
+        }
+        i += 1
+    }
+    let result = []: Int
+    for let k = 2; k <= n; k += 1 {
+        if sieve[k] {
+            result.push(k)
+        }
+    }
+    return result
+}
+
+// Collatz sequence starting at n (ends at 1)
+fn collatz(n: Int) -> [Int] {
+    let seq = [n]
+    let cur = n
+    while cur != 1 {
+        if cur % 2 == 0 {
+            cur = cur / 2
+        } else {
+            cur = cur * 3 + 1
+        }
+        seq.push(cur)
+    }
+    return seq
 }

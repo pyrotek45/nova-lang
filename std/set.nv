@@ -1,0 +1,176 @@
+// ============================================================
+// std/set.nv  — Generic set type backed by HashMap
+// ============================================================
+//
+// Usage:  import super.std.set
+//
+// A Set(T) holds unique values of type T.
+// T must be hashable (Int, String, Char, Bool, and tuples thereof).
+//
+// Constructors:
+//   Set::empty()           -- empty set
+//   Set::fromList(list)    -- build from a list (deduplicates)
+//   Set::singleton(v)      -- set containing exactly one value
+//
+// Instance methods:
+//   .add(v)                -- insert a value (no-op if present)
+//   .remove(v)             -- delete a value (no-op if absent)
+//   .has(v)                -- true if value is present
+//   .size()                -- number of unique elements
+//   .isEmpty()             -- true when empty
+//   .toList()              -- collect all elements as a list
+//   .union(other)          -- new set with all elements from both
+//   .intersection(other)   -- new set with elements in both
+//   .difference(other)     -- new set with elements only in self
+//   .isSubset(other)       -- true if self ⊆ other
+//   .isSuperset(other)     -- true if self ⊇ other
+//   .isDisjoint(other)     -- true if self ∩ other == ∅
+//   .forEach(f)            -- run f on each element
+//   .filter(pred)          -- new set keeping elements where pred holds
+//   .map(f)                -- transform elements (may reduce size)
+//   .toString()            -- human-readable "{a, b, c}"
+// ============================================================
+
+module set
+
+import hashmap
+
+struct Set(T) {
+    data: HashMap($T, Bool),
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(Set) empty() -> Set($T) {
+    return Set { data: HashMap::default() @[K: $T, V: Bool] }
+}
+
+fn extends(Set) singleton(v: $T) -> Set($T) {
+    let s: Set($T) = Set::empty() @[T: $T]
+    s.add(v)
+    return s
+}
+
+fn extends(Set) fromList(list: [$T]) -> Set($T) {
+    let s: Set($T) = Set::empty() @[T: $T]
+    for v in list {
+        s.add(v)
+    }
+    return s
+}
+
+// ── Core operations ───────────────────────────────────────────────────────────
+
+fn extends add(self: Set($T), v: $T) {
+    self.data.insert(v, true)
+}
+
+fn extends remove(self: Set($T), v: $T) {
+    self.data.delete(v)
+}
+
+fn extends has(self: Set($T), v: $T) -> Bool {
+    return self.data.has(v)
+}
+
+fn extends size(self: Set($T)) -> Int {
+    return self.data.size()
+}
+
+fn extends isEmpty(self: Set($T)) -> Bool {
+    return self.data.isEmpty()
+}
+
+fn extends toList(self: Set($T)) -> [$T] {
+    return self.data.keys()
+}
+
+fn extends toString(self: Set($T)) -> String {
+    let elems = self.data.keys()
+    if elems.len() == 0 { return "{}" }
+    let result = "{"
+    let first = true
+    for e in elems {
+        if !first { result += ", " }
+        result += Cast::string(e)
+        first = false
+    }
+    result += "}"
+    return result
+}
+
+// ── Set-theoretic operations ─────────────────────────────────────────────────
+
+// Union: all elements from either set
+fn extends union(self: Set($T), other: Set($T)) -> Set($T) {
+    let result: Set($T) = Set::fromList(self.toList()) @[T: $T]
+    for v in other.toList() {
+        result.add(v)
+    }
+    return result
+}
+
+// Intersection: only elements present in both
+fn extends intersection(self: Set($T), other: Set($T)) -> Set($T) {
+    let result: Set($T) = Set::empty() @[T: $T]
+    for v in self.toList() {
+        if other.has(v) { result.add(v) }
+    }
+    return result
+}
+
+// Difference: elements in self but not in other
+fn extends difference(self: Set($T), other: Set($T)) -> Set($T) {
+    let result: Set($T) = Set::empty() @[T: $T]
+    for v in self.toList() {
+        if !other.has(v) { result.add(v) }
+    }
+    return result
+}
+
+// True if every element of self is also in other
+fn extends isSubset(self: Set($T), other: Set($T)) -> Bool {
+    for v in self.toList() {
+        if !other.has(v) { return false }
+    }
+    return true
+}
+
+// True if every element of other is also in self
+fn extends isSuperset(self: Set($T), other: Set($T)) -> Bool {
+    return other.isSubset(self)
+}
+
+// True if self and other share no elements
+fn extends isDisjoint(self: Set($T), other: Set($T)) -> Bool {
+    for v in self.toList() {
+        if other.has(v) { return false }
+    }
+    return true
+}
+
+// ── Higher-order ─────────────────────────────────────────────────────────────
+
+fn extends forEach(self: Set($T), f: fn($T)) {
+    for v in self.toList() {
+        f(v)
+    }
+}
+
+// Keep only elements where pred holds
+fn extends filter(self: Set($T), pred: fn($T) -> Bool) -> Set($T) {
+    let result: Set($T) = Set::empty() @[T: $T]
+    for v in self.toList() {
+        if pred(v) { result.add(v) }
+    }
+    return result
+}
+
+// Transform all elements (values that collide after mapping are deduplicated)
+fn extends map(self: Set($T), f: fn($T) -> $U) -> Set($U) {
+    let result: Set($U) = Set::empty() @[T: $U]
+    for v in self.toList() {
+        result.add(f(v))
+    }
+    return result
+}

@@ -198,3 +198,71 @@ fn extends forEach(self: HashMap($K,$V), f: fn($K,$V)) {
         }
     }
 }
+
+// ── New combinators ──────────────────────────────────────────────────────────
+
+// Merge another HashMap into this one (other's values win on collision)
+fn extends merge(self: HashMap($K,$V), other: HashMap($K,$V)) {
+    other.forEach(|k: $K, v: $V| self.insert(k, v))
+}
+
+// Return a new HashMap with values transformed by f
+fn extends mapValues(self: HashMap($K,$V), f: fn($V) -> $W) -> HashMap($K,$W) {
+    let result: HashMap($K,$W) = HashMap::default() @[K: $K, V: $W]
+    self.forEach(|k: $K, v: $V| result.insert(k, f(v)))
+    return result
+}
+
+// Return a new HashMap keeping only entries whose key passes pred
+fn extends filterKeys(self: HashMap($K,$V), pred: fn($K) -> Bool) -> HashMap($K,$V) {
+    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    self.forEach(|k: $K, v: $V| {
+        if pred(k) { result.insert(k, v) }
+    })
+    return result
+}
+
+// Return a new HashMap keeping only entries whose value passes pred
+fn extends filterValues(self: HashMap($K,$V), pred: fn($V) -> Bool) -> HashMap($K,$V) {
+    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    self.forEach(|k: $K, v: $V| {
+        if pred(v) { result.insert(k, v) }
+    })
+    return result
+}
+
+// Build a HashMap from a list of (key, value) pairs
+fn extends(HashMap) fromPairs(pairs: [($K,$V)]) -> HashMap($K,$V) {
+    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    for p in pairs {
+        result.insert(p[0], p[1])
+    }
+    return result
+}
+
+// Increment the integer value for a key, or set it to 1 if absent
+// Useful for frequency/count maps
+fn extends increment(self: HashMap($K,Int), k: $K) {
+    self.insert(k, self.getOrDefault(k, 0) + 1)
+}
+
+// Update the value for a key using a function; inserts default if missing
+fn extends update(self: HashMap($K,$V), k: $K, default: $V, f: fn($V) -> $V) {
+    self.insert(k, f(self.getOrDefault(k, default)))
+}
+
+// Collect all entries as list of (key,value) pairs sorted by key string
+fn extends toSortedPairs(self: HashMap($K,$V)) -> [($K,$V)] {
+    let result = self.entries()
+    // Insertion sort by string representation of key
+    for let i = 1; i < result.len(); i += 1 {
+        let cur = result[i]
+        let j = i - 1
+        while j >= 0 && Cast::string(result[j][0]) > Cast::string(cur[0]) {
+            result.set(j + 1, result[j])
+            j -= 1
+        }
+        result.set(j + 1, cur)
+    }
+    return result
+}

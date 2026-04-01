@@ -1,0 +1,186 @@
+// ============================================================
+// std/vec2.nv  — 2D floating-point vector math
+// ============================================================
+//
+// Usage:  import super.std.vec2
+//
+// A Vec2 represents a 2D point or direction with x and y coordinates.
+// All methods use UFCS so they read naturally: v.length(), v.normalized()
+//
+// Constructors:
+//   Vec2::new(x, y)       -- from two floats
+//   Vec2::zero()          -- (0, 0)
+//   Vec2::one()           -- (1, 1)
+//   Vec2::up()            -- (0, 1)
+//   Vec2::right()         -- (1, 0)
+//   Vec2::fromAngle(rad)  -- unit vector at angle (radians)
+//
+// Arithmetic:
+//   .add(other)           -- component-wise addition
+//   .sub(other)           -- component-wise subtraction
+//   .scale(s)             -- multiply both components by scalar
+//   .negate()             -- (-x, -y)
+//   .abs()                -- (|x|, |y|)
+//
+// Geometry:
+//   .dot(other)           -- dot product
+//   .cross(other)         -- 2D cross product (scalar)
+//   .length()             -- Euclidean magnitude
+//   .lengthSq()           -- squared magnitude (faster, no sqrt)
+//   .normalized()         -- unit vector in same direction
+//   .distance(other)      -- Euclidean distance to other
+//   .distanceSq(other)    -- squared distance
+//   .angle()              -- angle of vector in radians (atan2)
+//   .angleTo(other)       -- angle between two vectors (radians)
+//   .rotate(rad)          -- rotate by angle in radians
+//   .lerp(other, t)       -- linear interpolation
+//   .reflect(normal)      -- reflect across a normal vector
+//   .perpendicular()      -- 90° clockwise rotation
+//   .clampLength(max)     -- scale down if length exceeds max
+//
+// Comparison:
+//   .equals(other)        -- component-wise equality
+//   .isZero()             -- both components are 0
+//   .toString()           -- "(x, y)"
+// ============================================================
+
+module vec2
+
+struct Vec2 {
+    x: Float,
+    y: Float,
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(Vec2) new(x: Float, y: Float) -> Vec2 {
+    return Vec2 { x: x, y: y }
+}
+
+fn extends(Vec2) zero() -> Vec2 {
+    return Vec2 { x: 0.0, y: 0.0 }
+}
+
+fn extends(Vec2) one() -> Vec2 {
+    return Vec2 { x: 1.0, y: 1.0 }
+}
+
+fn extends(Vec2) up() -> Vec2 {
+    return Vec2 { x: 0.0, y: 1.0 }
+}
+
+fn extends(Vec2) right() -> Vec2 {
+    return Vec2 { x: 1.0, y: 0.0 }
+}
+
+fn extends(Vec2) fromAngle(rad: Float) -> Vec2 {
+    return Vec2 { x: rad.cos(), y: rad.sin() }
+}
+
+// ── Arithmetic ───────────────────────────────────────────────────────────────
+
+fn extends add(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x + other.x, y: self.y + other.y }
+}
+
+fn extends sub(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x - other.x, y: self.y - other.y }
+}
+
+fn extends scale(self: Vec2, s: Float) -> Vec2 {
+    return Vec2 { x: self.x * s, y: self.y * s }
+}
+
+fn extends negate(self: Vec2) -> Vec2 {
+    return Vec2 { x: -self.x, y: -self.y }
+}
+
+fn extends abs(self: Vec2) -> Vec2 {
+    return Vec2 { x: self.x.abs(), y: self.y.abs() }
+}
+
+// ── Geometry ─────────────────────────────────────────────────────────────────
+
+fn extends dot(self: Vec2, other: Vec2) -> Float {
+    return self.x * other.x + self.y * other.y
+}
+
+// 2D cross product: magnitude of the z-component of the 3D cross product
+fn extends cross(self: Vec2, other: Vec2) -> Float {
+    return self.x * other.y - self.y * other.x
+}
+
+fn extends lengthSq(self: Vec2) -> Float {
+    return self.x * self.x + self.y * self.y
+}
+
+fn extends length(self: Vec2) -> Float {
+    return self.lengthSq().sqrt()
+}
+
+fn extends normalized(self: Vec2) -> Vec2 {
+    let len = self.length()
+    if len == 0.0 { return Vec2::zero() }
+    return Vec2 { x: self.x / len, y: self.y / len }
+}
+
+fn extends distanceSq(self: Vec2, other: Vec2) -> Float {
+    return self.sub(other).lengthSq()
+}
+
+fn extends distance(self: Vec2, other: Vec2) -> Float {
+    return self.sub(other).length()
+}
+
+fn extends angle(self: Vec2) -> Float {
+    return self.y.atan2(self.x)
+}
+
+fn extends angleTo(self: Vec2, other: Vec2) -> Float {
+    return other.angle() - self.angle()
+}
+
+fn extends rotate(self: Vec2, rad: Float) -> Vec2 {
+    let c = rad.cos()
+    let s = rad.sin()
+    return Vec2 { x: self.x * c - self.y * s, y: self.x * s + self.y * c }
+}
+
+fn extends lerp(self: Vec2, other: Vec2, t: Float) -> Vec2 {
+    return Vec2 {
+        x: self.x + (other.x - self.x) * t,
+        y: self.y + (other.y - self.y) * t,
+    }
+}
+
+// Reflect self across a unit normal vector
+fn extends reflect(self: Vec2, normal: Vec2) -> Vec2 {
+    let d = 2.0 * self.dot(normal)
+    return Vec2 { x: self.x - d * normal.x, y: self.y - d * normal.y }
+}
+
+// 90° clockwise perpendicular
+fn extends perpendicular(self: Vec2) -> Vec2 {
+    return Vec2 { x: self.y, y: -self.x }
+}
+
+// Scale down if the vector's length exceeds max; otherwise unchanged
+fn extends clampLength(self: Vec2, maxLen: Float) -> Vec2 {
+    let len = self.length()
+    if len <= maxLen { return self }
+    return self.normalized().scale(maxLen)
+}
+
+// ── Comparison & display ─────────────────────────────────────────────────────
+
+fn extends equals(self: Vec2, other: Vec2) -> Bool {
+    return self.x == other.x && self.y == other.y
+}
+
+fn extends isZero(self: Vec2) -> Bool {
+    return self.x == 0.0 && self.y == 0.0
+}
+
+fn extends toString(self: Vec2) -> String {
+    return "(" + Cast::string(self.x) + ", " + Cast::string(self.y) + ")"
+}

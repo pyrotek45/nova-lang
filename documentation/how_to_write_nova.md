@@ -2353,3 +2353,461 @@ if let val = maybe_val {
 | `Color::Red` (no parens) | Must write `Color::Red()` even for no-data variants |
 | `Maybe::Nothing()` without type | Use `Maybe::Nothing() @[A: Int]` for generic no-data |
 | `\|\| true && false` precedence | `\|\|` binds tighter than `&&` in Nova — use parens |
+
+---
+
+## 30. Standard Library Reference
+
+All standard library modules live in `nova-lang/std/`. Import them with:
+
+```nova
+import super.std.<module_name>
+```
+
+---
+
+### `std/core` — Foundation types
+
+```nova
+import super.std.core
+```
+
+| Type / Function | Description |
+|---|---|
+| `Box(T)` | Mutable shared heap cell. `box.value` to read/write. Essential for closures that mutate state. |
+| `Gen(start)` | Stateful integer counter. `gen.next()` → next Int. |
+| `Maybe(A)` | Generic tagged union: `Maybe::Just(v)` / `Maybe::Nothing() @[A: T]`. Methods: `.isJust()`, `.isNothing()`, `.unwrapJust()`, `.orElse(v)`, `.map(f)`, `.flatMap(f)`. |
+| `Result(A,B)` | Success/failure union: `Result::Ok(v)` / `Result::Err(e)`. Methods: `.isOk()`, `.isErr()`, `.unwrapOk()`, `.unwrapErr()`, `.map(f)`, `.mapErr(f)`, `.orElse(v)`, `.andThen(f)`. |
+| `range(start, end, step)` | Produce a `[Int]` from start to end by step. |
+| `toMaybe(opt)` | Convert `Option(T)` → `Maybe(T)`. |
+| `toResult(opt, err)` | Convert `Option(T)` → `Result(T,E)`. |
+
+---
+
+### `std/math` — Extended mathematics
+
+```nova
+import super.std.math
+```
+
+**Int extensions (UFCS: `n.func()`):**
+
+| Method | Description |
+|---|---|
+| `n.min(other)` | Smaller of n and other |
+| `n.max(other)` | Larger of n and other |
+| `n.abs()` | Absolute value |
+| `n.pow(exp)` | Integer exponentiation |
+| `n.sqrt()` → Float | Square root |
+| `n.clamp(lo, hi)` | Clamp into range |
+| `n.factorial()` | n! |
+| `n.gcd(other)` | Greatest common divisor |
+| `n.lcm(other)` | Least common multiple |
+| `n.isEven()` | True when n % 2 == 0 |
+| `n.isOdd()` | True when n % 2 != 0 |
+| `n.sign()` | -1, 0, or 1 |
+| `n.modpow(exp, mod)` | Fast modular exponentiation |
+| `n.isPrime()` | Primality test (trial division) |
+| `n.digitSum()` | Sum of decimal digits |
+| `n.digits()` | `[Int]` of decimal digits, MSB first |
+
+**Float extensions (UFCS: `f.func()`):**
+
+| Method | Description |
+|---|---|
+| `f.degrees()` | Radians → degrees |
+| `f.radians()` | Degrees → radians |
+| `f.normalize(lo, hi)` | Map to [0.0, 1.0] given lo/hi bounds |
+| `f.mapRange(flo,fhi,tlo,thi)` | Map one range to another |
+
+**Standalone functions:**
+
+| Function | Description |
+|---|---|
+| `fib(n)` | nth Fibonacci number |
+| `fibSeq(n)` | First n Fibonacci numbers as `[Int]` |
+| `bin(n)` | Int → binary string (`"1010"`) |
+| `hex(n)` | Int → hex string (`"ff"`) |
+| `oct(n)` | Int → octal string |
+| `divmod(n, d)` | `(quotient, remainder)` |
+| `toRadians(deg)` | Float degrees → radians |
+| `toDegrees(rad)` | Float radians → degrees |
+| `lerp(a, b, t)` | Float linear interpolation |
+| `lerpF(a, b, t)` | Int linear interpolation |
+| `remap(v,fl,fh,tl,th)` | Map a value between ranges |
+| `round(f)` | Float → nearest Int |
+| `smoothstep(t)` | Smooth Hermite curve (3t²-2t³) |
+| `sign(x)` | Float sign: -1.0, 0.0, or 1.0 |
+| `isPrime(n)` | Standalone primality test |
+| `primes(n)` | All primes ≤ n (Sieve of Eratosthenes) |
+| `collatz(n)` | Collatz sequence from n to 1 |
+
+---
+
+### `std/string` — String utilities
+
+```nova
+import super.std.string
+```
+
+| Method | Description |
+|---|---|
+| `s.split(Char)` | Split by a single character |
+| `s.padLeft(n, c)` | Left-pad to width n with char c |
+| `s.padRight(n, c)` | Right-pad to width n with char c |
+| `s.center(n, c)` | Center with char c padding |
+| `s.count(sub)` | Count substring occurrences |
+| `s.countChar(c)` | Count occurrences of a character |
+| `s.indexOfChar(c)` | First index of char, or -1 |
+| `s.isDigit()` | All chars are `0-9` |
+| `s.isAlpha()` | All chars are alphabetic |
+| `s.isAlphanumeric()` | All chars are letters or digits |
+| `s.capitalize()` | First character uppercased |
+| `s.title()` | Each word capitalized |
+| `s.removeChar(c)` | Delete all occurrences of c |
+| `s.replaceChar(old, new)` | Replace char old with char new |
+| `s.lines()` | Split on newlines |
+| `s.words()` | Split on spaces, drops empty strings |
+| `s.truncate(n, suffix)` | Cut to n chars, append suffix if cut |
+| `s.slugify()` | Lowercase, spaces→hyphens, strip specials |
+| `s.wrap(width)` | Word-wrap at column width |
+| `s.between(left, right)` | Extract text between two delimiters |
+| `s.stripPrefix(p)` | Remove prefix if present |
+| `s.stripSuffix(s)` | Remove suffix if present |
+
+---
+
+### `std/option` — Option combinators
+
+```nova
+import super.std.option
+```
+
+Extends the built-in `Option(T)` (which has `.isSome()` and `.unwrap()`):
+
+| Method | Description |
+|---|---|
+| `opt.isNone()` | True when holding no value |
+| `opt.orDefault(v)` | Unwrap or return fallback |
+| `opt.orDoFn(f)` | Unwrap or lazily compute fallback |
+| `opt.orError(msg)` | Unwrap or print msg and exit |
+| `opt.map(f)` | Transform inner value: `Some(f(v))` or `None` |
+| `opt.flatMap(f)` | Chain an Option-returning function |
+| `opt.filter(pred)` | Keep Some only if pred holds |
+| `opt.zip(other)` | Combine two Options into `Option((A,B))` |
+| `opt.toList()` | `[v]` if Some, else `[]` |
+| `opt.inspect(f)` | Run side-effect if Some, pass through |
+
+---
+
+### `std/iter` — Lazy iterator
+
+```nova
+import super.std.iter
+```
+
+**Constructors:**
+
+| Constructor | Description |
+|---|---|
+| `Iter::fromRange(start, end)` | Integers `[start, end)` |
+| `Iter::fromVec(list)` | Iterate over a list |
+| `Iter::fromFn(fn)` | Custom pull function |
+| `Iter::enumerate(iter)` | Pairs `(index, value)` |
+| `Iter::repeat(v)` | Infinite stream of v |
+| `Iter::generate(f)` | Infinite stream from `f()` |
+
+**Transformers (lazy):**
+
+| Method | Description |
+|---|---|
+| `.map(f)` | Apply f to each element |
+| `.filter(pred)` | Keep elements where pred is true |
+| `.take(n)` | First n elements |
+| `.drop(n)` | Skip first n elements |
+| `.takeWhile(pred)` | Take while pred holds |
+| `.dropWhile(pred)` | Skip while pred holds, then yield rest |
+| `.flatMap(f)` | Map then flatten one level |
+| `.zip(other)` | Pair elements from two iterators |
+| `.chain(other)` | Append another iterator |
+
+**Consumers (eager):**
+
+| Method | Description |
+|---|---|
+| `.collect()` | Gather into a list |
+| `.show()` | Print each element |
+| `.count()` | Number of elements |
+| `.sum()` | Sum of Int elements |
+| `.sumF()` | Sum of Float elements |
+| `.reduce(f, init)` | Fold with accumulator |
+| `.fold(f, init)` | Alias for reduce |
+| `.any(pred)` | True if any element passes |
+| `.all(pred)` | True if all elements pass |
+| `.find(pred)` | First element passing pred |
+| `.last()` | Last element |
+| `.nth(n)` | nth element (0-indexed) |
+| `.forEach(f)` | Side-effect on each element |
+
+---
+
+### `std/hashmap` — Generic hash map
+
+```nova
+import super.std.hashmap
+```
+
+| Method | Description |
+|---|---|
+| `HashMap::default()` | Empty map with 16-bucket initial capacity |
+| `HashMap::fromPairs(list)` | Build from `[(K,V)]` |
+| `.insert(k, v)` | Insert or update |
+| `.get(k)` → `Option(V)` | Look up by key |
+| `.delete(k)` | Remove by key |
+| `.has(k)` | Check membership |
+| `.size()` | Entry count |
+| `.isEmpty()` | True when empty |
+| `.clear()` | Remove all entries |
+| `.getOrDefault(k, v)` | Look up with fallback |
+| `.entries()` | `[(K,V)]` list |
+| `.keys()` | `[K]` list |
+| `.values()` | `[V]` list |
+| `.forEach(f)` | Side-effect on each `(k,v)` |
+| `.merge(other)` | Insert all entries from other |
+| `.mapValues(f)` | New map with values transformed |
+| `.filterKeys(pred)` | New map keeping matching keys |
+| `.filterValues(pred)` | New map keeping matching values |
+| `.increment(k)` | Increment Int value (count map helper) |
+| `.update(k, default, f)` | Update value with function |
+| `.toSortedPairs()` | Entries sorted by key string |
+
+---
+
+### `std/set` — Generic set
+
+```nova
+import super.std.set
+```
+
+| Method | Description |
+|---|---|
+| `Set::empty()` | Empty set |
+| `Set::singleton(v)` | Set with one element |
+| `Set::fromList(list)` | Build from list (deduplicates) |
+| `.add(v)` | Insert a value |
+| `.remove(v)` | Remove a value |
+| `.has(v)` | Check membership |
+| `.size()` | Number of elements |
+| `.isEmpty()` | True when empty |
+| `.toList()` | All elements as a list |
+| `.union(other)` | A ∪ B |
+| `.intersection(other)` | A ∩ B |
+| `.difference(other)` | A \ B |
+| `.isSubset(other)` | True if self ⊆ other |
+| `.isSuperset(other)` | True if self ⊇ other |
+| `.isDisjoint(other)` | True if self ∩ other == ∅ |
+| `.forEach(f)` | Side-effect on each element |
+| `.filter(pred)` | New set keeping matches |
+| `.map(f)` | Transform elements (may reduce size) |
+
+---
+
+### `std/vec2` — 2D vector math
+
+```nova
+import super.std.vec2
+```
+
+| Constructor | Description |
+|---|---|
+| `Vec2::new(x, y)` | From two Floats |
+| `Vec2::zero()` | (0.0, 0.0) |
+| `Vec2::one()` | (1.0, 1.0) |
+| `Vec2::up()` | (0.0, 1.0) |
+| `Vec2::right()` | (1.0, 0.0) |
+| `Vec2::fromAngle(rad)` | Unit vector at angle (radians) |
+
+| Method | Description |
+|---|---|
+| `.add(v)`, `.sub(v)` | Component-wise add/subtract |
+| `.scale(s)` | Multiply by scalar |
+| `.negate()` | (-x, -y) |
+| `.dot(v)` | Dot product |
+| `.cross(v)` | 2D cross product (scalar) |
+| `.length()` | Euclidean magnitude |
+| `.lengthSq()` | Squared magnitude (avoids sqrt) |
+| `.normalized()` | Unit vector |
+| `.distance(v)` | Distance to other vector |
+| `.distanceSq(v)` | Squared distance |
+| `.angle()` | Angle of vector (radians) |
+| `.angleTo(v)` | Angle between vectors |
+| `.rotate(rad)` | Rotate by radians |
+| `.lerp(v, t)` | Linear interpolation |
+| `.reflect(normal)` | Reflect across a unit normal |
+| `.perpendicular()` | 90° clockwise rotation |
+| `.clampLength(max)` | Scale down if length exceeds max |
+| `.equals(v)` | Component-wise equality |
+| `.isZero()` | True if both components are 0.0 |
+
+---
+
+### `std/deque` — Double-ended queue
+
+```nova
+import super.std.deque
+```
+
+| Method | Description |
+|---|---|
+| `Deque::empty()` | Empty deque |
+| `Deque::singleton(v)` | Deque with one element |
+| `Deque::fromList(xs)` | Build from list |
+| `.pushBack(v)` | Add to back (tail) |
+| `.pushFront(v)` | Add to front (head) |
+| `.popBack()` → `Option(T)` | Remove and return back element |
+| `.popFront()` → `Option(T)` | Remove and return front element |
+| `.peekBack()` → `Option(T)` | View back element |
+| `.peekFront()` → `Option(T)` | View front element |
+| `.len()` | Number of elements |
+| `.isEmpty()` | True when empty |
+| `.toList()` | Snapshot as list (front→back) |
+| `.forEach(f)` | Side-effect on each element |
+| `.map(f)` | New deque with f applied |
+| `.filter(pred)` | New deque keeping matches |
+
+---
+
+### `std/tuple` — Pair and triple utilities
+
+```nova
+import super.std.tuple
+```
+
+| Method / Function | Description |
+|---|---|
+| `t.swap()` | Reverse the pair: (b,a) |
+| `t.fst()` | First element |
+| `t.snd()` | Second element |
+| `t.mapFirst(f)` | Apply f to first, keep second |
+| `t.mapSecond(f)` | Apply f to second, keep first |
+| `t.both(f)` | Apply same f to both (requires A==B) |
+| `t.toStrings()` | Both elements as `[String]` |
+| `t.toList()` | `[a, b]` (requires A==B) |
+| `pairs.unzip()` | `[(A,B)]` → `([A],[B])` |
+| `pair(a, b)` | Convenience constructor |
+| `triple(a, b, c)` | Convenience constructor |
+| `fst(t)` | Standalone first element |
+| `snd(t)` | Standalone second element |
+
+---
+
+### `std/io` — Input / output utilities
+
+```nova
+import super.std.io
+```
+
+| Function | Description |
+|---|---|
+| `prompt(msg)` | Print msg, return input line |
+| `promptInt(msg)` | Prompt and parse Int → `Option(Int)` |
+| `promptFloat(msg)` | Prompt and parse Float → `Option(Float)` |
+| `promptYN(msg)` | Prompt for yes/no → Bool |
+| `printSep(values, sep)` | Println values joined with separator |
+| `eprintln(msg)` | Print `[error] msg` (stderr simulation) |
+| `readLines(path)` | File → `[String]` |
+| `writeLines(path, lines)` | `[String]` → file |
+| `appendLine(path, line)` | Append one line to file |
+| `linesOf(text)` | Split string on newlines |
+
+---
+
+### `std/functional` — Higher-order utilities
+
+```nova
+import super.std.functional
+```
+
+| Function | Description |
+|---|---|
+| `compose(f, g)` | `fn(x) -> f(g(x))` (right-to-left) |
+| `pipe(f, g)` | `fn(x) -> g(f(x))` (left-to-right) |
+| `flip(f)` | Swap the two arguments of a binary fn |
+| `const_(v)` | Always return v, ignoring argument |
+| `identity(x)` | Return x unchanged |
+| `applyN(f, n, x)` | Apply f to x exactly n times |
+| `applyWhile(f, pred, x)` | Apply f while pred(result) holds |
+| `memoize(f)` | Cache results keyed by string of argument |
+| `negate(pred)` | Logical NOT of a predicate |
+| `both(p, q)` | True when both predicates hold |
+| `either(p, q)` | True when at least one predicate holds |
+
+---
+
+### `std/ansi` — ANSI terminal colors
+
+```nova
+import super.std.ansi
+```
+
+Returns decorated strings for use with `print`/`println`:
+
+```nova
+println(Ansi::bold(Ansi::red("ERROR: something went wrong")))
+println(Ansi::green("OK") + " test passed")
+println(Ansi::rgb(255, 128, 0, "orange text"))
+print(Ansi::moveTo(1, 1))
+```
+
+| Category | Functions |
+|---|---|
+| Styles | `bold`, `dim`, `italic`, `underline`, `blink`, `invert`, `strikethrough` |
+| Foreground | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
+| Bright FG | `brightBlack` … `brightWhite` (same set, `bright` prefix) |
+| Background | `bgBlack`, `bgRed`, `bgGreen`, `bgYellow`, `bgBlue`, `bgMagenta`, `bgCyan`, `bgWhite` |
+| Bright BG | `bgBrightBlack` … `bgBrightWhite` |
+| 256 / RGB | `color256(code, s)`, `bgColor256(code, s)`, `rgb(r,g,b,s)`, `bgRgb(r,g,b,s)` |
+| Control | `reset()`, `clearScreen()`, `clearLine()`, `moveTo(row,col)`, `hideCursor()`, `showCursor()` |
+
+---
+
+### `std/color` — Named color tuples
+
+```nova
+import super.std.color
+```
+
+Provides `(Int,Int,Int)` RGB tuples for Raylib/TUI:
+`red`, `green`, `blue`, `white`, `black`, `yellow`, `cyan`, `magenta`, and many more.
+Helpers: `rgb(r,g,b)`, `lerpColor(a,b,t)`, `invert(c)`, `darken(c,f)`, `lighten(c,f)`.
+
+---
+
+### `std/tui` — Terminal UI
+
+```nova
+import super.std.tui
+```
+
+Raw-mode terminal rendering: `run(fn)`, `printAt(x,y,s)`, `clear()`, `flush()`, `size()`,
+`fg(r,g,b)`, `bg(r,g,b)`, `resetColor()`, `drawBox(x,y,w,h)`, `getch()`, `poll()`.
+
+---
+
+### `std/widget` — TUI widget toolkit
+
+```nova
+import super.std.widget
+```
+
+Composable TUI widgets: `Button`, `Label`, `Panel`, `ProgressBar`, `Toggle`.
+Each has `.draw()`, and interactive widgets have `.isClicked()` / `.isHovered()`.
+
+---
+
+### `std/list` — List utilities (auto-imported)
+
+`list` is imported automatically by many std modules. Key additions:
+`join(list, sep)`, `flatten(list)`, `zip(a, b)`, `unzip(pairs)`, `range(n)`,
+and UFCS: `.filter(pred)`, `.map(f)`, `.sort()`, `.sortWith(cmp)`,
+`.reduce(f, init)`, `.any(pred)`, `.all(pred)`, `.find(pred)`.

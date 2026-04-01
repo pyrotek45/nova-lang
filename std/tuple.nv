@@ -1,28 +1,108 @@
+// ============================================================
+// std/tuple.nv  — Pair and triple utilities
+// ============================================================
+//
+// Usage:  import super.std.tuple
+//
+// Pair functions (($A,$B)):
+//   .swap()              -- (b,a)
+//   .fst()              -- first element
+//   .snd()              -- second element
+//   .mapFirst(f)        -- apply f to first element
+//   .mapSecond(f)       -- apply f to second element
+//   .both(f)            -- apply same f to both (when A==B==C)
+//   .toStrings()        -- [Cast::string(a), Cast::string(b)]
+//   .toList()           -- [a, b] (when A==B)
+//
+// List-of-pairs utilities:
+//   .unzip()            -- ([a...],[b...]) from [(a,b)...]
+//
+// Standalone:
+//   pair(a,b)           -- convenience constructor
+//   triple(a,b,c)       -- convenience constructor
+//   fst(t)              -- first element of pair
+//   snd(t)              -- second element of pair
+// ============================================================
+
 module tuple
 
-// Tuple utilities
+// ── Pair operations ──────────────────────────────────────────────────────────
 
-// Map a pair-of-lists to a list using a function
-fn extends map(input: ([$A],[$B]), f: fn(([$A],[$B])) -> $C) -> [$C] {
-    return [f((input[0],input[1]))]
-}
-
-// Swap the elements of a two-element tuple
+// Swap the two elements
 fn extends swap(t: ($A,$B)) -> ($B,$A) {
-    return (t[1],t[0])
+    return (t[1], t[0])
 }
 
-// Apply a function to the first element
+// Extract the first element
+fn extends fst(t: ($A,$B)) -> $A {
+    return t[0]
+}
+
+// Extract the second element
+fn extends snd(t: ($A,$B)) -> $B {
+    return t[1]
+}
+
+// Apply a function to the first element, keep the second
 fn extends mapFirst(t: ($A,$B), f: fn($A) -> $C) -> ($C,$B) {
-    return (f(t[0]),t[1])
+    return (f(t[0]), t[1])
 }
 
-// Apply a function to the second element
+// Apply a function to the second element, keep the first
 fn extends mapSecond(t: ($A,$B), f: fn($B) -> $C) -> ($A,$C) {
-    return (t[0],f(t[1]))
+    return (t[0], f(t[1]))
 }
 
-// Convert a pair to a list of strings
+// Apply the same function to both elements (requires A == B)
+fn extends both(t: ($A,$A), f: fn($A) -> $B) -> ($B,$B) {
+    return (f(t[0]), f(t[1]))
+}
+
+// Convert both elements to strings
 fn extends toStrings(t: ($A,$B)) -> [String] {
-    return [Cast::string(t[0]),Cast::string(t[1])]
+    return [Cast::string(t[0]), Cast::string(t[1])]
+}
+
+// Convert a homogeneous pair to a list
+fn extends toList(t: ($A,$A)) -> [$A] {
+    return [t[0], t[1]]
+}
+
+// ── List-of-pairs operations ─────────────────────────────────────────────────
+
+// Map a pair-of-lists with a function (kept for backward compat)
+fn extends map(input: ([$A],[$B]), f: fn(([$A],[$B])) -> $C) -> [$C] {
+    return [f((input[0], input[1]))]
+}
+
+// Unzip a list of pairs into a pair of lists
+fn extends unzip(pairs: [($A,$B)]) -> ([$A],[$B]) {
+    let as = []: $A
+    let bs = []: $B
+    for p in pairs {
+        as.push(p[0])
+        bs.push(p[1])
+    }
+    return (as, bs)
+}
+
+// ── Standalone constructors ──────────────────────────────────────────────────
+
+// Convenience pair constructor
+fn pair(a: $A, b: $B) -> ($A,$B) {
+    return (a, b)
+}
+
+// Convenience triple constructor
+fn triple(a: $A, b: $B, c: $C) -> ($A,$B,$C) {
+    return (a, b, c)
+}
+
+// Standalone fst/snd
+fn fst(t: ($A,$B)) -> $A {
+    return t[0]
+}
+
+fn snd(t: ($A,$B)) -> $B {
+    return t[1]
 }

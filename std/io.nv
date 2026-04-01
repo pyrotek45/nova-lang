@@ -1,8 +1,27 @@
-module io
+// ============================================================
+// std/io.nv  — Input / output utilities
+// ============================================================
+//
+// Usage:  import super.std.io
+//
+// Native functions (no import needed):
+//   readln, readFile, writeFile, appendFile, fileExists,
+//   print, println, printf, format
+//
+// This module adds:
+//   prompt(msg)             -- print msg, return input line
+//   promptInt(msg)          -- prompt and parse Int
+//   promptFloat(msg)        -- prompt and parse Float
+//   promptYN(msg)           -- prompt for yes/no → Bool
+//   printSep(values, sep)   -- println joined with separator
+//   eprintln(msg)           -- print to stderr (via println prefix)
+//   readLines(path)         -- file → [String]
+//   writeLines(path, lines) -- [String] → file
+//   appendLine(path, line)  -- append one line to file
+//   linesOf(text)           -- split a string into lines
+// ============================================================
 
-// IO utilities that complement native functions
-// Native functions available: readln, readFile, writeFile,
-// appendFile, fileExists, print, println, printf, format
+module io
 
 // Prompt the user with a message and return their input
 fn prompt(msg: String) -> String {
@@ -22,9 +41,21 @@ fn promptFloat(msg: String) -> Option(Float) {
     return Cast::float(readln())
 }
 
-// Print multiple values separated by a delimiter
+// Prompt for a yes/no answer; returns true for "y" or "yes" (case-insensitive)
+fn promptYN(msg: String) -> Bool {
+    print(msg)
+    let answer = readln().trim().toLower()
+    return answer == "y" || answer == "yes"
+}
+
+// Print multiple string values separated by a delimiter
 fn printSep(values: [String], sep: String) {
     println(join(values, sep))
+}
+
+// Print a message prefixed with "[error]" (stderr simulation)
+fn eprintln(msg: String) {
+    println("[error] " + msg)
 }
 
 // Read all lines from a file into a list
@@ -32,7 +63,17 @@ fn readLines(path: String) -> [String] {
     return readFile(path).split("\n")
 }
 
-// Write lines to a file
+// Write a list of lines to a file (joined by newlines)
 fn writeLines(path: String, lines: [String]) -> Bool {
     return writeFile(path, join(lines, "\n"))
+}
+
+// Append a single line (with trailing newline) to a file
+fn appendLine(path: String, line: String) -> Bool {
+    return appendFile(path, line + "\n")
+}
+
+// Split a multi-line string into a list of lines
+fn linesOf(text: String) -> [String] {
+    return text.split("\n")
 }
