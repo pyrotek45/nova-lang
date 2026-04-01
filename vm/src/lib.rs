@@ -121,11 +121,38 @@ impl Vm {
             }
 
             Code::NATIVE => {
+                // Save current_instruction AFTER the opcode byte (+1 from next_instruction)
+                // but BEFORE reading the 8-byte index — this matches the offset stored in
+                // runtime_errors_table by the assembler (same convention as UNWRAP/GETF/ERROR).
+                let native_ip = self.state.current_instruction;
                 let index = u64::from_le_bytes(self.state.next_arr());
 
-                match self.native_functions[index as usize](&mut self.state) {
-                    Ok(_) => {}
-                    Err(error) => return Err(error),
+                // Inhibit GC while the native function runs.  Native helpers
+                // use raw stack.pop() (no dec), so their arguments are temporarily
+                // off the stack and invisible to collect_cycles.  Without this
+                // guard an allocation inside the native could trigger a sweep
+                // that frees the very objects the native is working with.
+                self.state.memory.gc_inhibit();
+                let result = self.native_functions[index as usize](&mut self.state);
+                self.state.memory.gc_release();
+
+                if let Err(error) = result {
+                    // If the native error is already positioned, forward it as-is.
+                    // Otherwise try to attach a source position from the table.
+                    if matches!(*error, NovaError::RuntimeWithPos { .. }) {
+                        return Err(error);
+                    }
+                    if let Some(pos) = self.runtime_errors_table.get(&native_ip) {
+                        let msg = match *error {
+                            NovaError::Runtime { ref msg } => msg.clone(),
+                            _ => std::borrow::Cow::Borrowed("native function error"),
+                        };
+                        return Err(Box::new(NovaError::RuntimeWithPos {
+                            msg,
+                            position: pos.clone(),
+                        }));
+                    }
+                    return Err(error);
                 }
             }
 
@@ -376,12 +403,16 @@ impl Vm {
 
                 myarray.reverse();
 
+                // Inhibit GC: captured values are off the stack but still
+                // referenced by myarray — protect them during allocate.
+                self.state.memory.gc_inhibit();
                 let closure = self
                     .state
                     .memory
                     .allocate(Object::closure(self.state.current_instruction + 4, myarray));
 
                 self.state.memory.stack.push(VmData::Object(closure));
+                self.state.memory.gc_release();
                 let jump = u32::from_le_bytes(self.state.next_arr());
                 self.state.current_instruction += jump as usize;
             }
@@ -657,7 +688,11 @@ impl Vm {
                     myarray.push(value);
                 }
                 myarray.reverse();
+                // Inhibit GC: the popped items are off the stack but still
+                // referenced by myarray — protect them during allocate.
+                self.state.memory.gc_inhibit();
                 self.state.memory.push_list(myarray);
+                self.state.memory.gc_release();
             }
 
             Code::FLOAT => {
@@ -703,6 +738,9 @@ impl Vm {
 
             Code::CONCAT => match (self.state.memory.stack.pop(), self.state.memory.stack.pop()) {
                 (Some(VmData::Object(index1)), Some(VmData::Object(index2))) => {
+                    // Inhibit GC: both objects were raw-popped and are invisible
+                    // to collect_cycles until we finish allocating the result.
+                    self.state.memory.gc_inhibit();
                     let (new_object_type, new_data) = {
                         let object1 = self.state.memory.ref_from_heap(index2).ok_or_else(|| {
                             Box::new(NovaError::Runtime {
@@ -725,6 +763,7 @@ impl Vm {
                     self.state.memory.dec(index1);
                     self.state.memory.dec(index2);
                     self.state.memory.stack.push(VmData::Object(result));
+                    self.state.memory.gc_release();
                 }
                 _ => {
                     return Err(
@@ -917,6 +956,10 @@ impl Vm {
                     table.insert(name.clone(), i);
                 }
 
+                // Inhibit GC: field_values may contain heap Objects that were
+                // raw-popped and are invisible to collect_cycles.
+                self.state.memory.gc_inhibit();
+
                 // Add the "type" field: allocate a string object with the struct name
                 let type_str_obj = Object::string(struct_name.clone());
                 let type_str_idx = self.state.memory.allocate(type_str_obj);
@@ -932,6 +975,7 @@ impl Vm {
                 };
                 let idx = self.state.memory.allocate(obj);
                 self.state.memory.stack.push(VmData::Object(idx));
+                self.state.memory.gc_release();
             }
 
             // GETF: pop field_name (string), pop object -> push object.data[table[field_name]]

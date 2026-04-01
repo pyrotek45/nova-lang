@@ -51,20 +51,18 @@ fn extends split(x: String, y: Char) -> [String] {
 
 // Pad a string on the left to reach a target width
 fn extends padLeft(s: String, width: Int, pad: Char) -> String {
-    let result = s
-    while result.len() < width {
-        result = Cast::string(pad) + result
-    }
-    return result
+    let needed = width - s.len()
+    if needed <= 0 { return s }
+    let padding = Cast::string(pad).repeat(needed)
+    return padding + s
 }
 
 // Pad a string on the right to reach a target width
 fn extends padRight(s: String, width: Int, pad: Char) -> String {
-    let result = s
-    while result.len() < width {
-        result = result + Cast::string(pad)
-    }
-    return result
+    let needed = width - s.len()
+    if needed <= 0 { return s }
+    let padding = Cast::string(pad).repeat(needed)
+    return s + padding
 }
 
 // Center a string with padding on both sides
