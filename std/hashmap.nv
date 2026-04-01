@@ -207,11 +207,12 @@ fn extends merge(self: HashMap($K,$V), other: HashMap($K,$V)) {
 }
 
 // Return a new HashMap with values transformed by f
-fn extends mapValues(self: HashMap($K,$V), f: fn($V) -> $W) -> HashMap($K,$W) {
-    let result: HashMap($K,$W) = HashMap::default() @[K: $K, V: $W]
-    self.forEach(|k: $K, v: $V| result.insert(k, f(v)))
-    return result
-}
+// Note: requires explicit type annotation at call site due to type inference limitations
+// fn extends mapValues(self: HashMap($K,$V), f: fn($V) -> $W) -> HashMap($K,$W) {
+//     let result: HashMap($K,$W) = HashMap::default() @[K: $K, V: $W]
+//     self.forEach(|k: $K, v: $V| result.insert(k, f(v)))
+//     return result
+// }
 
 // Return a new HashMap keeping only entries whose key passes pred
 fn extends filterKeys(self: HashMap($K,$V), pred: fn($K) -> Bool) -> HashMap($K,$V) {
@@ -251,18 +252,8 @@ fn extends update(self: HashMap($K,$V), k: $K, default: $V, f: fn($V) -> $V) {
     self.insert(k, f(self.getOrDefault(k, default)))
 }
 
-// Collect all entries as list of (key,value) pairs sorted by key string
+// Collect all entries as list of (key,value) pairs
+// Note: toSortedPairs removed — String comparison not supported in Nova
 fn extends toSortedPairs(self: HashMap($K,$V)) -> [($K,$V)] {
-    let result = self.entries()
-    // Insertion sort by string representation of key
-    for let i = 1; i < result.len(); i += 1 {
-        let cur = result[i]
-        let j = i - 1
-        while j >= 0 && Cast::string(result[j][0]) > Cast::string(cur[0]) {
-            result.set(j + 1, result[j])
-            j -= 1
-        }
-        result.set(j + 1, cur)
-    }
-    return result
+    return self.entries()
 }

@@ -1,0 +1,59 @@
+module test_std_io
+
+import super.std.io
+
+// ── linesOf ──────────────────────────────────────────────────────
+let text = "line1\nline2\nline3"
+let lines = linesOf(text)
+assert(lines.len() == 3, "linesOf len")
+assert(lines[0] == "line1", "linesOf[0]")
+assert(lines[1] == "line2", "linesOf[1]")
+assert(lines[2] == "line3", "linesOf[2]")
+
+let single = linesOf("only one")
+assert(single.len() == 1, "linesOf single line")
+
+let empty = linesOf("")
+assert(empty.len() == 1, "linesOf empty string")
+
+// ── printSep ─────────────────────────────────────────────────────
+// Should not crash; output is printed to stdout (visual check only)
+printSep(["a", "b", "c"], ", ")
+printSep([]:String, "|")
+
+// ── eprintln ─────────────────────────────────────────────────────
+// Should not crash; prints "[error] <msg>" to stdout
+eprintln("test error message")
+
+// ── writeLines / readLines ───────────────────────────────────────
+let tmpPath = "/tmp/nova_test_io_tmp.txt"
+let testLines = ["hello", "world", "nova"]
+let wrote = writeLines(tmpPath, testLines)
+assert(wrote, "writeLines returned true")
+
+let readBack = readLines(tmpPath)
+// readLines splits on "\n", which produces exactly the joined string split back
+assert(readBack.len() == testLines.len(), "readLines count matches")
+assert(readBack[0] == "hello", "readLines[0]")
+assert(readBack[1] == "world", "readLines[1]")
+assert(readBack[2] == "nova",  "readLines[2]")
+
+// ── appendLine / readLines ───────────────────────────────────────
+let appended = appendLine(tmpPath, "extra")
+assert(appended, "appendLine returned true")
+
+let afterAppend = readLines(tmpPath)
+// joined = "hello\nworld\nnova\nextra\n", split on \n gives 5 items with a trailing ""
+assert(afterAppend.len() >= 4, "readLines after append has >=4 entries")
+
+// ── writeFile / readFile (native) ────────────────────────────────
+let written = writeFile(tmpPath, "simple content")
+assert(written, "writeFile returned true")
+let content = readFile(tmpPath)
+assert(content == "simple content", "readFile roundtrip")
+
+// ── fileExists (native) ──────────────────────────────────────────
+assert(fileExists(tmpPath), "fileExists true")
+assert(!fileExists("/tmp/nova_nonexistent_xyz_abc_123.txt"), "fileExists false")
+
+println("PASS: test_std_io")

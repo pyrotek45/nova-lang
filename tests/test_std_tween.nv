@@ -1,0 +1,82 @@
+module test_std_tween
+
+import super.std.tween
+
+// ── Ease functions ─────────────────────────────────────────────────
+assert(Ease::linear(0.0) == 0.0, "linear(0)")
+assert(Ease::linear(1.0) == 1.0, "linear(1)")
+assert(Ease::linear(0.5) == 0.5, "linear(0.5)")
+
+assert(Ease::easeIn(0.0) == 0.0, "easeIn(0)")
+assert(Ease::easeIn(1.0) == 1.0, "easeIn(1)")
+assert(Ease::easeIn(0.5) < 0.5, "easeIn starts slow")
+
+assert(Ease::easeOut(0.0) == 0.0, "easeOut(0)")
+assert(Ease::easeOut(1.0) == 1.0, "easeOut(1)")
+assert(Ease::easeOut(0.5) > 0.5, "easeOut starts fast")
+
+assert(Ease::easeInOut(0.0) == 0.0, "easeInOut(0)")
+assert(Ease::easeInOut(1.0) == 1.0, "easeInOut(1)")
+
+assert(Ease::easeOutBounce(0.0) == 0.0, "bounce(0)")
+assert(Ease::easeOutBounce(1.0) == 1.0, "bounce(1)")
+
+assert(Ease::sineIn(0.0) < 0.01, "sineIn(0) near 0")
+assert(Ease::sineOut(1.0) > 0.99, "sineOut(1) near 1")
+
+// ── Tween::linear ─────────────────────────────────────────────────
+let tw = Tween::linear(0.0, 10.0, 1.0)
+assert(!tw.isDone(), "not done at start")
+assert((tw.progress() - 0.0).abs() < 0.001, "progress 0 at start")
+
+let v1 = tw.update(0.5)
+assert((v1 - 5.0).abs() < 0.01, "linear mid value")
+assert((tw.progress() - 0.5).abs() < 0.001, "progress 0.5")
+
+let v2 = tw.update(0.5)
+assert(tw.isDone(), "done after full duration")
+assert((v2 - 10.0).abs() < 0.01, "linear end value")
+
+// ── tweenValue() ──────────────────────────────────────────────────
+let tw2 = Tween::linear(2.0, 6.0, 2.0)
+tw2.update(1.0)
+let cur = tw2.tweenValue()
+assert((cur - 4.0).abs() < 0.01, "tweenValue at midpoint")
+
+// ── reset ─────────────────────────────────────────────────────────
+tw.reset()
+assert(!tw.isDone(), "reset clears done")
+assert((tw.progress() - 0.0).abs() < 0.001, "reset progress 0")
+
+// ── ping (reverse) ────────────────────────────────────────────────
+let twp = Tween::linear(0.0, 10.0, 1.0)
+twp.update(1.0)          // reach end
+twp.ping()               // reverse: now 10 → 0
+let pv = twp.update(0.5)
+assert(pv < 6.0, "ping reversed direction")
+
+// ── restart ───────────────────────────────────────────────────────
+let twr = Tween::linear(0.0, 5.0, 1.0)
+twr.update(1.0)
+twr.restart(100.0, 200.0)
+let rv = twr.update(0.5)
+assert((rv - 150.0).abs() < 0.5, "restart with new endpoints")
+
+// ── easeIn tween ─────────────────────────────────────────────────
+let tei = Tween::new(0.0, 100.0, 1.0, fn(t: Float) -> Float { return Ease::easeIn(t) })
+let mid = tei.update(0.5)
+assert(mid < 50.0, "easeIn tween midpoint < 50")
+
+// ── remaining ─────────────────────────────────────────────────────
+let trm = Tween::linear(0.0, 1.0, 2.0)
+trm.update(0.5)
+assert((trm.remaining() - 1.5).abs() < 0.01, "remaining")
+
+// ── lerpF / lerpI helpers ─────────────────────────────────────────
+let lf = lerpF(0.0, 10.0, 0.3)
+assert((lf - 3.0).abs() < 0.01, "lerpF")
+
+let li = lerpI(0, 10, 0.5)
+assert(li == 5, "lerpI")
+
+println("PASS: test_std_tween")

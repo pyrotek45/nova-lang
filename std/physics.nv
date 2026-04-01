@@ -106,18 +106,6 @@ fn extends overlap(self: AABB, other: AABB) -> Vec2 {
     }
 }
 
-fn extends overlapCircle(self: AABB, c: Circle) -> Bool {
-    let cx = if c.pos.x < self.pos.x { self.pos.x }
-             else if c.pos.x > self.pos.x + self.size.x { self.pos.x + self.size.x }
-             else { c.pos.x }
-    let cy = if c.pos.y < self.pos.y { self.pos.y }
-             else if c.pos.y > self.pos.y + self.size.y { self.pos.y + self.size.y }
-             else { c.pos.y }
-    let dx = c.pos.x - cx
-    let dy = c.pos.y - cy
-    return dx * dx + dy * dy < c.radius * c.radius
-}
-
 // ── Circle ────────────────────────────────────────────────────────────────────
 
 struct Circle {
@@ -130,11 +118,23 @@ fn extends(Circle) new(x: Float, y: Float, r: Float) -> Circle {
 }
 
 fn extends circleContains(self: Circle, p: Vec2) -> Bool {
-    return self.pos.distTo(p) <= self.radius
+    return self.pos.distance(p) <= self.radius
 }
 
 fn extends circleOverlaps(self: Circle, other: Circle) -> Bool {
-    return self.pos.distTo(other.pos) < self.radius + other.radius
+    return self.pos.distance(other.pos) < self.radius + other.radius
+}
+
+fn extends overlapCircle(self: AABB, c: Circle) -> Bool {
+    let cx = c.pos.x
+    if cx < self.pos.x { cx = self.pos.x }
+    if cx > self.pos.x + self.size.x { cx = self.pos.x + self.size.x }
+    let cy = c.pos.y
+    if cy < self.pos.y { cy = self.pos.y }
+    if cy > self.pos.y + self.size.y { cy = self.pos.y + self.size.y }
+    let dx = c.pos.x - cx
+    let dy = c.pos.y - cy
+    return dx * dx + dy * dy < c.radius * c.radius
 }
 
 // ── Body2D ────────────────────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ fn resolveAABB(a: Body2D, aW: Float, aH: Float, b: Body2D, bW: Float, bH: Float)
 
 // Resolve circle vs circle
 fn resolveCircle(a: Body2D, ar: Float, b: Body2D, br: Float) {
-    let dist = a.pos.distTo(b.pos)
+    let dist = a.pos.distance(b.pos)
     let minDist = ar + br
     if dist >= minDist || dist == 0.0 { return }
     let nx = (b.pos.x - a.pos.x) / dist
@@ -304,8 +304,8 @@ fn extends castAABB(self: Ray2, box: AABB) -> HitInfo {
     let dx = self.dir.x
     let dy = self.dir.y
     // avoid division by zero
-    let invDx = if Float::abs(dx) > 0.0001 { 1.0 / dx } else { 1e30 }
-    let invDy = if Float::abs(dy) > 0.0001 { 1.0 / dy } else { 1e30 }
+    let invDx = if Float::abs(dx) > 0.0001 { 1.0 / dx } else { 999999999.0 }
+    let invDy = if Float::abs(dy) > 0.0001 { 1.0 / dy } else { 999999999.0 }
     let tx1 = (box.pos.x - self.origin.x) * invDx
     let tx2 = (box.pos.x + box.size.x - self.origin.x) * invDx
     let ty1 = (box.pos.y - self.origin.y) * invDy

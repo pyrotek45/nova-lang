@@ -72,7 +72,7 @@ fn extends overlapsAABB(self: Entity, other: Entity) -> Bool {
 fn extends overlapCircle(self: Entity, other: Entity) -> Bool {
     let dx = self.pos.x - other.pos.x
     let dy = self.pos.y - other.pos.y
-    let dist = Float::sqrt(dx * dx + dy * dy)
+    let dist = (dx * dx + dy * dy).sqrt()
     return dist < self.size.x + other.size.x
 }
 
@@ -104,20 +104,20 @@ fn extends center(self: Entity) -> Vec2 {
 
 struct EntityWorld {
     _entities: [Entity],
-    _nextId:   Box(Int),
+    _nextId:   Int,
 }
 
 fn extends(EntityWorld) new() -> EntityWorld {
     return EntityWorld {
-        _entities: [],
-        _nextId:   Box::new(0),
+        _entities: []: Entity,
+        _nextId:   0,
     }
 }
 
 // Create a new entity with default vel/size and add it to the world
 fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
-    let id = self._nextId.get()
-    self._nextId.set(id + 1)
+    let id = self._nextId
+    self._nextId = self._nextId + 1
     let e = Entity {
         id:    id,
         pos:   Vec2::new(x, y),
@@ -137,8 +137,8 @@ fn extends spawnFull(self: EntityWorld,
                      vx: Float, vy: Float,
                      w: Float, h: Float,
                      tag: String, data: Float) -> Entity {
-    let id = self._nextId.get()
-    self._nextId.set(id + 1)
+    let id = self._nextId
+    self._nextId = self._nextId + 1
     let e = Entity {
         id:    id,
         pos:   Vec2::new(x, y),
@@ -168,7 +168,7 @@ fn extends killAll(self: EntityWorld, tag: String) {
 
 // Integrate velocities and remove dead entities
 fn extends update(self: EntityWorld, dt: Float) {
-    let alive = []
+    let alive = []: Entity
     for e in self._entities {
         if e.alive {
             e.pos.x = e.pos.x + e.vel.x * dt
@@ -194,7 +194,7 @@ fn extends countAlive(self: EntityWorld, tag: String) -> Int {
 }
 
 fn extends query(self: EntityWorld, tag: String) -> [Entity] {
-    let out = []
+    let out = []: Entity
     for e in self._entities {
         if e.alive && e.tag == tag { out.push(e) }
     }
@@ -202,7 +202,7 @@ fn extends query(self: EntityWorld, tag: String) -> [Entity] {
 }
 
 fn extends all(self: EntityWorld) -> [Entity] {
-    let out = []
+    let out = []: Entity
     for e in self._entities {
         if e.alive { out.push(e) }
     }
@@ -213,7 +213,7 @@ fn extends getById(self: EntityWorld, id: Int) -> Option(Entity) {
     for e in self._entities {
         if e.id == id { return Some(e) }
     }
-    return None
+    return None(Entity)
 }
 
 fn extends forEach(self: EntityWorld, f: fn(Entity)) {
@@ -229,5 +229,5 @@ fn extends forEachTagged(self: EntityWorld, tag: String, f: fn(Entity)) {
 }
 
 fn extends clear(self: EntityWorld) {
-    self._entities = []
+    self._entities = []: Entity
 }

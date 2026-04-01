@@ -227,8 +227,10 @@ fn extends slugify(s: String) -> String {
     for ch in lower.chars() {
         if ch == ' ' {
             result = result + "-"
-        } else if ch.isAlphanumeric() || ch == '-' {
-            result = result + Cast::string(ch)
+        } else {
+            if ch.isAlphanumeric() || ch == '-' {
+                result = result + Cast::string(ch)
+            }
         }
     }
     return result
@@ -243,12 +245,14 @@ fn extends wrap(s: String, width: Int) -> String {
         if line_len == 0 {
             result = result + w
             line_len = w.len()
-        } else if line_len + 1 + w.len() <= width {
-            result = result + " " + w
-            line_len = line_len + 1 + w.len()
         } else {
-            result = result + "\n" + w
-            line_len = w.len()
+            if line_len + 1 + w.len() <= width {
+                result = result + " " + w
+                line_len = line_len + 1 + w.len()
+            } else {
+                result = result + "\n" + w
+                line_len = w.len()
+            }
         }
     }
     return result

@@ -1,0 +1,77 @@
+module test_std_functional
+
+import super.std.functional
+import super.std.core
+
+// ── identity ─────────────────────────────────────────────────────
+assert(identity(42) == 42, "identity int")
+assert(identity("hello") == "hello", "identity string")
+
+// ── const_ ───────────────────────────────────────────────────────
+let always5 = const_(5) @[A: Int, B: Int]
+assert(always5(0) == 5, "const_ 0")
+assert(always5(999) == 5, "const_ 999")
+
+// ── compose: f(g(x)) ─────────────────────────────────────────────
+let inc = fn(x: Int) -> Int { return x + 1 }
+let dbl = fn(x: Int) -> Int { return x * 2 }
+let dblThenInc = compose(inc, dbl)   // inc(dbl(x))
+assert(dblThenInc(3) == 7, "compose dbl then inc")
+let incThenDbl = compose(dbl, inc)   // dbl(inc(x))
+assert(incThenDbl(3) == 8, "compose inc then dbl")
+
+// ── pipe: g(f(x)) ────────────────────────────────────────────────
+let pipedIncDbl = pipe(inc, dbl)   // dbl(inc(x))
+assert(pipedIncDbl(3) == 8, "pipe inc then dbl")
+let pipedDblInc = pipe(dbl, inc)   // inc(dbl(x))
+assert(pipedDblInc(3) == 7, "pipe dbl then inc")
+
+// ── flip ─────────────────────────────────────────────────────────
+let sub = fn(a: Int, b: Int) -> Int { return a - b }
+let flippedSub = flip(sub)   // flippedSub(b, a) == sub(a, b) == a-b
+assert(flippedSub(3, 10) == 7, "flip sub(10,3)=7")
+
+// ── applyN ───────────────────────────────────────────────────────
+let addTwo = fn(x: Int) -> Int { return x + 2 }
+assert(applyN(addTwo, 0, 5) == 5, "applyN 0 times")
+assert(applyN(addTwo, 3, 1) == 7, "applyN 3 times")
+assert(applyN(dbl, 4, 1) == 16, "applyN dbl 4 times: 1→2→4→8→16")
+
+// ── applyWhile ───────────────────────────────────────────────────
+let doubled = applyWhile(dbl, fn(x: Int) -> Bool { return x < 50 }, 1)
+assert(doubled == 64, "applyWhile doubles until >=50: 1→2→4→8→16→32→64")
+
+// ── negate ───────────────────────────────────────────────────────
+let isEven = fn(x: Int) -> Bool { return x % 2 == 0 }
+let isOdd = negate(isEven)
+assert(isOdd(3), "negate: 3 is odd")
+assert(!isOdd(4), "negate: 4 is not odd")
+
+// ── both ─────────────────────────────────────────────────────────
+let gt0 = fn(x: Int) -> Bool { return x > 0 }
+let lt10 = fn(x: Int) -> Bool { return x < 10 }
+let between = both(gt0, lt10)
+assert(between(5), "both: 5 in (0,10)")
+assert(!between(0), "both: 0 not in (0,10)")
+assert(!between(10), "both: 10 not in (0,10)")
+
+// ── either ───────────────────────────────────────────────────────
+let smallOrBig = either(fn(x: Int) -> Bool { return x < 3 }, fn(x: Int) -> Bool { return x > 97 })
+assert(smallOrBig(1), "either: 1 < 3")
+assert(smallOrBig(99), "either: 99 > 97")
+assert(!smallOrBig(50), "either: 50 neither")
+
+// ── memoize ──────────────────────────────────────────────────────
+let callCount = Box(0)
+let expensiveFn = fn(x: Int) -> Int {
+    callCount.value += 1
+    return x * x
+}
+let memoFn = memoize(expensiveFn)
+assert(memoFn(5) == 25, "memoize first call")
+assert(memoFn(5) == 25, "memoize cached")
+assert(callCount.value == 1, "memoize called once")
+assert(memoFn(6) == 36, "memoize new key")
+assert(callCount.value == 2, "memoize called again for new key")
+
+println("PASS: test_std_functional")

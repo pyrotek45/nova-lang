@@ -1,0 +1,83 @@
+module test_std_hashmap
+
+import super.std.hashmap
+
+// ── keys / values ────────────────────────────────────────────────
+let m = HashMap::default() @[K: String, V: Int]
+m.insert("a", 1)
+m.insert("b", 2)
+m.insert("c", 3)
+
+let ks = m.keys()
+assert(ks.len() == 3, "keys len")
+let vs = m.values()
+assert(vs.len() == 3, "values len")
+
+// ── forEach ──────────────────────────────────────────────────────
+let sumV = Box(0)
+m.forEach(fn(k: String, v: Int) { sumV.value += v })
+assert(sumV.value == 6, "forEach sum values")
+
+// ── filterKeys ───────────────────────────────────────────────────
+let fk = m.filterKeys(fn(k: String) -> Bool { return k != "a" })
+assert(fk.size() == 2, "filterKeys excludes a")
+assert(!fk.has("a"), "filterKeys no a")
+assert(fk.has("b") && fk.has("c"), "filterKeys has b,c")
+
+// ── filterValues ─────────────────────────────────────────────────
+let fv = m.filterValues(fn(v: Int) -> Bool { return v > 1 })
+assert(fv.size() == 2, "filterValues > 1 size")
+assert(!fv.has("a"), "filterValues excludes a=1")
+
+// ── fromPairs ────────────────────────────────────────────────────
+let pairs: [(Int, String)] = [(1, "one"), (2, "two"), (3, "three")]
+let fromP = HashMap::fromPairs(pairs)
+assert(fromP.size() == 3, "fromPairs size")
+assert(fromP.get(1).unwrap() == "one", "fromPairs get 1")
+assert(fromP.get(3).unwrap() == "three", "fromPairs get 3")
+
+// ── increment ────────────────────────────────────────────────────
+let counts = HashMap::default() @[K: String, V: Int]
+counts.increment("x")
+counts.increment("x")
+counts.increment("y")
+assert(counts.get("x").unwrap() == 2, "increment x twice")
+assert(counts.get("y").unwrap() == 1, "increment y once")
+
+// ── update ───────────────────────────────────────────────────────
+let upd = HashMap::default() @[K: String, V: Int]
+upd.insert("score", 10)
+upd.update("score", 0, fn(v: Int) -> Int { return v + 5 })
+assert(upd.get("score").unwrap() == 15, "update existing value")
+upd.update("missing", 100, fn(v: Int) -> Int { return v + 1 })
+assert(upd.get("missing").unwrap() == 101, "update with default for missing key")
+
+// ── merge ────────────────────────────────────────────────────────
+let base = HashMap::default() @[K: String, V: Int]
+base.insert("a", 1)
+base.insert("b", 2)
+let other = HashMap::default() @[K: String, V: Int]
+other.insert("b", 99)  // collision — other wins
+other.insert("c", 3)
+base.merge(other)
+assert(base.size() == 3, "merge size")
+assert(base.get("b").unwrap() == 99, "merge overwrites")
+assert(base.get("c").unwrap() == 3, "merge adds new key")
+assert(base.get("a").unwrap() == 1, "merge keeps non-overlapping")
+
+// ── large insertion (resize) ──────────────────────────────────────
+let big = HashMap::default() @[K: Int, V: Int]
+for let i = 0; i < 50; i += 1 {
+    big.insert(i, i * i)
+}
+assert(big.size() == 50, "large insert size")
+assert(big.get(0).unwrap() == 0, "large get 0")
+assert(big.get(7).unwrap() == 49, "large get 7")
+assert(big.get(49).unwrap() == 2401, "large get 49")
+
+// ── entries roundtrip ────────────────────────────────────────────
+let small = HashMap::fromPairs([(10, "ten"), (20, "twenty")])
+let ents = small.entries()
+assert(ents.len() == 2, "entries roundtrip len")
+
+println("PASS: test_std_hashmap")

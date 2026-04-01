@@ -39,14 +39,14 @@ import hashmap
 //   let doubleAfterIncrement = compose(|x: Int| x * 2, |x: Int| x + 1)
 //   doubleAfterIncrement(3)  // 8
 fn compose(f: fn($B) -> $C, g: fn($A) -> $B) -> fn($A) -> $C {
-    return |x: $A| f(g(x))
+    return fn(x: $A) -> $C { return f(g(x)) }
 }
 
 // pipe(f, g) -- applies f first, then g (same as compose but reversed)
 //   let incrementThenDouble = pipe(|x: Int| x + 1, |x: Int| x * 2)
 //   incrementThenDouble(3)   // 8
 fn pipe(f: fn($A) -> $B, g: fn($B) -> $C) -> fn($A) -> $C {
-    return |x: $A| g(f(x))
+    return fn(x: $A) -> $C { return g(f(x)) }
 }
 
 // ── Argument manipulation ─────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ fn pipe(f: fn($A) -> $B, g: fn($B) -> $C) -> fn($A) -> $C {
 //   let sub = flip(|a: Int, b: Int| a - b)
 //   sub(3, 10)   // 10 - 3 = 7
 fn flip(f: fn($A, $B) -> $C) -> fn($B, $A) -> $C {
-    return |b: $B, a: $A| f(a, b)
+    return fn(b: $B, a: $A) -> $C { return f(a, b) }
 }
 
 // const_ -- return a function that always returns v, ignoring its argument
@@ -99,7 +99,7 @@ fn applyWhile(f: fn($A) -> $A, pred: fn($A) -> Bool, x: $A) -> $A {
 //   let fastFib = memoize(fib)
 fn memoize(f: fn($A) -> $B) -> fn($A) -> $B {
     let cache: HashMap(String, $B) = HashMap::default() @[K: String, V: $B]
-    return |x: $A| {
+    return fn(x: $A) -> $B {
         let key = Cast::string(x)
         if cache.has(key) {
             return cache.get(key).unwrap()

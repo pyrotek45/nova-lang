@@ -1,0 +1,72 @@
+module test_std_timer
+
+import super.std.timer
+
+// ── once timer ────────────────────────────────────────────────────
+let t1 = Timer::once(1.0)
+assert(!t1.isDone(), "once not done at start")
+assert(t1.isRunning(), "once running at start")
+assert((t1.progress() - 0.0).abs() < 0.001, "once progress 0")
+
+let fired = t1.update(0.5)
+assert(!fired, "once not fired at 0.5")
+assert(!t1.isDone(), "once not done at 0.5")
+assert((t1.progress() - 0.5).abs() < 0.001, "once progress 0.5")
+
+let fired2 = t1.update(0.6)
+assert(fired2, "once fired at 1.1")
+assert(t1.isDone(), "once done after fire")
+assert(!t1.isRunning(), "once stopped after fire")
+
+// remaining
+let tr = Timer::once(2.0)
+tr.update(0.5)
+assert((tr.remaining() - 1.5).abs() < 0.001, "remaining")
+
+// ── reset ─────────────────────────────────────────────────────────
+t1.reset()
+assert(!t1.isDone(), "reset clears done")
+assert(t1.isRunning(), "reset resumes")
+
+// ── stop / start ──────────────────────────────────────────────────
+let t2 = Timer::once(1.0)
+t2.stop()
+assert(!t2.isRunning(), "stopped")
+t2.update(2.0)
+assert(!t2.isDone(), "stopped timer does not advance")
+t2.start()
+assert(t2.isRunning(), "started again")
+t2.update(1.0)
+assert(t2.isDone(), "started timer advances to done")
+
+// ── repeating timer ────────────────────────────────────────────────
+let rep = Timer::repeating(0.5)
+let f1 = rep.update(0.5)
+assert(f1, "repeating fires at duration")
+let f2 = rep.update(0.3)
+assert(!f2, "repeating not fired at 0.3 of next cycle")
+let f3 = rep.update(0.25)
+assert(f3, "repeating fires again after full cycle")
+assert(!rep.isDone(), "repeating never isDone")
+
+// ── cooldown timer ─────────────────────────────────────────────────
+let cd = Timer::cooldown(0.3)
+// cooldown starts pre-elapsed so ready() is true on first check
+assert(cd.isDone(), "cooldown starts done")
+cd.reset()
+assert(!cd.isDone(), "cooldown reset clears done")
+cd.update(0.31)
+assert(cd.isDone(), "cooldown done after full duration")
+
+// ── elapsed ───────────────────────────────────────────────────────
+let te = Timer::once(5.0)
+te.update(1.5)
+assert((te.elapsed() - 1.5).abs() < 0.001, "elapsed")
+
+// ── setDuration ───────────────────────────────────────────────────
+let td = Timer::once(10.0)
+td.setDuration(0.1)
+td.update(0.2)
+assert(td.isDone(), "setDuration works")
+
+println("PASS: test_std_timer")

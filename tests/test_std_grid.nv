@@ -1,0 +1,57 @@
+module test_std_grid
+
+import super.std.grid
+import super.std.core
+
+// Grid stores Any values; use direct struct construction to avoid
+// Any coercion issues with Grid::new
+let g = Grid { _cells: []:Any, _cols: 5, _rows: 4 }
+assert(g.width() == 5, "width")
+assert(g.height() == 4, "height")
+
+// inBounds
+assert(g.inBounds(0, 0), "inBounds top-left")
+assert(g.inBounds(4, 3), "inBounds bottom-right")
+assert(!g.inBounds(5, 0), "inBounds out col")
+assert(!g.inBounds(0, 4), "inBounds out row")
+
+// 6x6 grid for neighbor tests
+let g2 = Grid { _cells: []:Any, _cols: 6, _rows: 6 }
+for let i = 0; i < 36; i += 1 { g2._cells.push(0) }
+
+let n4 = g2.neighbors4(2, 2)
+assert(n4.len() == 4, "neighbors4 interior count")
+let n4edge = g2.neighbors4(0, 0)
+assert(n4edge.len() == 2, "neighbors4 corner count")
+
+let n8 = g2.neighbors8(2, 2)
+assert(n8.len() == 8, "neighbors8 interior count")
+let n8edge = g2.neighbors8(0, 0)
+assert(n8edge.len() == 3, "neighbors8 corner count")
+
+// forEach
+let g3 = Grid { _cells: []:Any, _cols: 3, _rows: 3 }
+for let i = 0; i < 9; i += 1 { g3._cells.push(i) }
+let visitCount = Box(0)
+g3.forEach(fn(col: Int, row: Int, v: Any) { visitCount.value += 1 })
+assert(visitCount.value == 9, "forEach visits all 9 cells")
+
+// BFS on a flat passable grid
+let maze = Grid { _cells: []:Any, _cols: 5, _rows: 1 }
+for let i = 0; i < 5; i += 1 { maze._cells.push(1) }
+let path = maze.bfs(0, 0, 4, 0, fn(v: Any) -> Bool { return true })
+assert(path.len() == 5, "BFS path length on 5x1 open")
+assert(path[0][0] == 0 && path[0][1] == 0, "BFS start")
+assert(path[4][0] == 4 && path[4][1] == 0, "BFS end")
+
+// BFS: goal unreachable
+let blocked = Grid { _cells: []:Any, _cols: 3, _rows: 1 }
+blocked._cells.push(1)
+blocked._cells.push(0)
+blocked._cells.push(1)
+let noPath = blocked.bfs(0, 0, 2, 0, fn(v: Any) -> Bool {
+    return Cast::string(v) == "1"
+})
+assert(noPath.len() == 0, "BFS blocked returns empty path")
+
+println("PASS: test_std_grid")

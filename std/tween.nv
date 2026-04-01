@@ -26,7 +26,7 @@
 //   Tween::new(from, to, duration, easeFn) -- create a tween
 //   Tween::linear(from, to, duration)      -- shorthand for linear easing
 //   t.update(dt)   -> Float               -- advance + return current value
-//   t.value()      -> Float               -- current interpolated value
+//   t.tweenValue() -> Float               -- current interpolated value
 //   t.isDone()     -> Bool
 //   t.progress()   -> Float               -- 0.0..1.0
 //   t.reset()
@@ -114,10 +114,10 @@ fn extends(Ease) easeOutBounce(t: Float) -> Float {
     let d1 = 2.75
     if t < 1.0 / d1 {
         return n1 * t * t
-    } else if t < 2.0 / d1 {
+    } elif t < 2.0 / d1 {
         let tt = t - 1.5 / d1
         return n1 * tt * tt + 0.75
-    } else if t < 2.5 / d1 {
+    } elif t < 2.5 / d1 {
         let tt = t - 2.25 / d1
         return n1 * tt * tt + 0.9375
     } else {
@@ -195,24 +195,6 @@ fn extends(Tween) smooth(from: Float, to: Float, duration: Float) -> Tween {
 
 // ── Methods ───────────────────────────────────────────────────────────────────
 
-// Advance by dt and return the current interpolated value
-fn extends update(self: Tween, dt: Float) -> Float {
-    if self._done { return self.value() }
-    self._elapsed = self._elapsed + dt
-    if self._elapsed >= self.duration {
-        self._elapsed = self.duration
-        self._done = true
-    }
-    return self.value()
-}
-
-// Current interpolated value (does not advance time)
-fn extends value(self: Tween) -> Float {
-    let t = self.progress()
-    let et = (self._easeFn)(t)
-    return self.from + (self.to - self.from) * et
-}
-
 // Normalized progress 0.0..1.0
 fn extends progress(self: Tween) -> Float {
     if self.duration <= 0.0 { return 1.0 }
@@ -220,6 +202,25 @@ fn extends progress(self: Tween) -> Float {
     if p > 1.0 { return 1.0 }
     if p < 0.0 { return 0.0 }
     return p
+}
+
+// Current interpolated value (does not advance time)
+fn extends tweenValue(self: Tween) -> Float {
+    let t = self.progress()
+    let f = self._easeFn
+    let et = f(t)
+    return self.from + (self.to - self.from) * et
+}
+
+// Advance by dt and return the current interpolated value
+fn extends update(self: Tween, dt: Float) -> Float {
+    if self._done { return self.tweenValue() }
+    self._elapsed = self._elapsed + dt
+    if self._elapsed >= self.duration {
+        self._elapsed = self.duration
+        self._done = true
+    }
+    return self.tweenValue()
 }
 
 fn extends isDone(self: Tween) -> Bool {
