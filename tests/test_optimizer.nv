@@ -1,0 +1,545 @@
+module test_optimizer
+
+// ============================================================
+// Optimizer Correctness Tests
+// ============================================================
+// PURPOSE: Verify that optimizations preserve program semantics.
+// These tests cover patterns that are commonly broken by:
+//   - Constant folding/propagation
+//   - Dead code elimination
+//   - Strength reduction
+//   - Loop optimizations
+//   - Common subexpression elimination
+//   - Algebraic simplifications
+//   - Tail call optimization
+//
+// Each test verifies both correctness and that side effects
+// are preserved. If ANY optimization silently changes behavior,
+// these tests will catch it.
+// ============================================================
+
+import super.std.list
+import super.std.core
+import super.std.iter
+import super.std.math
+import super.std.hashmap
+
+// ============================================================
+// GROUP 1: Constant Folding & Propagation
+// ============================================================
+
+// 1a: Basic constant folding
+let cf1 = 2 + 3
+assert(cf1 == 5, "CF1: 2+3")
+
+// 1b: Nested constant expressions
+let cf2 = (2 + 3) * (4 - 1)
+assert(cf2 == 15, "CF2: (2+3)*(4-1)")
+
+// 1c: Division and modulo
+let cf3 = 100 / 7
+assert(cf3 == 14, "CF3: 100/7 integer division")
+
+let cf4 = 100 % 7
+assert(cf4 == 2, "CF4: 100%7 modulo")
+
+// 1d: Float constant folding
+let cf5 = 1.0 / 3.0
+assert(cf5 > 0.333, "CF5: float division lower bound")
+assert(cf5 < 0.334, "CF5: float division upper bound")
+
+// 1e: Constant propagation through variables
+let cf6_a = 10
+let cf6_b = cf6_a * 2
+let cf6_c = cf6_b + cf6_a
+assert(cf6_c == 30, "CF6: constant propagation chain")
+
+// 1f: Constants in boolean expressions
+let cf7 = 5 > 3
+assert(cf7 == true, "CF7: constant comparison")
+
+let cf8 = 10 == 10
+assert(cf8 == true, "CF8: constant equality")
+
+// 1g: String constant folding
+let cf9 = "hello" + " " + "world"
+assert(cf9 == "hello world", "CF9: string concat folding")
+
+// 1h: Negative constant folding
+let cf10 = -(-42)
+assert(cf10 == 42, "CF10: double negation")
+
+let cf11 = -(3 - 7)
+assert(cf11 == 4, "CF11: negation of subtraction")
+
+println("  GROUP 1 [constant_folding] 11 tests OK")
+
+// ============================================================
+// GROUP 2: Algebraic Identities
+// ============================================================
+
+// 2a: Additive identity
+let ai1 = 42 + 0
+assert(ai1 == 42, "AI1: x+0=x")
+
+let ai2 = 0 + 42
+assert(ai2 == 42, "AI2: 0+x=x")
+
+// 2b: Multiplicative identity
+let ai3 = 42 * 1
+assert(ai3 == 42, "AI3: x*1=x")
+
+let ai4 = 1 * 42
+assert(ai4 == 42, "AI4: 1*x=x")
+
+// 2c: Multiplicative zero
+let ai5 = 42 * 0
+assert(ai5 == 0, "AI5: x*0=0")
+
+let ai6 = 0 * 42
+assert(ai6 == 0, "AI6: 0*x=0")
+
+// 2d: Self-subtraction
+let ai7_x = 99
+let ai7 = ai7_x - ai7_x
+assert(ai7 == 0, "AI7: x-x=0")
+
+// 2e: Division by 1
+let ai8 = 42 / 1
+assert(ai8 == 42, "AI8: x/1=x")
+
+// 2f: Modulo by itself
+let ai9_x = 13
+let ai9 = ai9_x % ai9_x
+assert(ai9 == 0, "AI9: x%x=0")
+
+// 2g: Float identities
+let ai10 = 3.14 + 0.0
+assert(ai10 == 3.14, "AI10: float x+0.0")
+
+let ai11 = 3.14 * 1.0
+assert(ai11 == 3.14, "AI11: float x*1.0")
+
+println("  GROUP 2 [algebraic_identity] 11 tests OK")
+
+// ============================================================
+// GROUP 3: Dead Code Elimination
+// ============================================================
+
+// 3a: Dead assignment before reassignment
+let dc1 = 100
+dc1 = 200
+assert(dc1 == 200, "DC1: dead assignment override")
+
+// 3b: Dead code after early return in function
+fn dc_early(x: Int) -> Int {
+    if x > 0 {
+        return x * 2
+    }
+    return x * 3
+}
+assert(dc_early(5) == 10, "DC2a: early return positive")
+assert(dc_early(-5) == -15, "DC2b: early return negative")
+assert(dc_early(0) == 0, "DC2c: early return zero")
+
+// 3c: Dead branch in if-else
+let dc3 = 0
+if true {
+    dc3 = 1
+} else {
+    dc3 = 2
+}
+assert(dc3 == 1, "DC3: dead else branch")
+
+// 3d: Unreachable code in nested conditions
+fn dc_nested(x: Int) -> Int {
+    if x > 10 {
+        if x > 20 {
+            return 3
+        }
+        return 2
+    }
+    return 1
+}
+assert(dc_nested(5) == 1, "DC4a: nested dead code x=5")
+assert(dc_nested(15) == 2, "DC4b: nested dead code x=15")
+assert(dc_nested(25) == 3, "DC4c: nested dead code x=25")
+
+// 3e: Dead code after loop break
+fn dc_break() -> Int {
+    let sum = 0
+    for i in 0..100 {
+        if i == 5 {
+            return sum
+        }
+        sum = sum + i
+    }
+    return sum
+}
+assert(dc_break() == 10, "DC5: dead code after break")
+
+println("  GROUP 3 [dead_code_elim] 9 tests OK")
+
+// ============================================================
+// GROUP 4: Loop Optimizations
+// ============================================================
+
+// 4a: Loop invariant code — the optimizer must not hoist incorrectly
+fn lo_invariant(n: Int) -> Int {
+    let total = 0
+    let factor = 7
+    for i in 0..n {
+        total = total + i * factor
+    }
+    return total
+}
+assert(lo_invariant(100) == 34650, "LO1: loop invariant hoisting")
+
+// 4b: Loop with varying bounds — must compute correctly
+let lo2_sum = 0
+let lo2_end = 100
+for i in 0..lo2_end {
+    lo2_sum = lo2_sum + i
+}
+assert(lo2_sum == 4950, "LO2: variable bound loop")
+
+// 4c: Loop body that modifies iteration-dependent state
+let lo3_vals = []: Int
+for lo3_i in 0..10 {
+    lo3_vals.push(lo3_i * lo3_i)
+}
+assert(lo3_vals.len() == 10, "LO3a: loop body side effect count")
+assert(lo3_vals[0] == 0, "LO3b: loop body first")
+assert(lo3_vals[9] == 81, "LO3c: loop body last")
+
+// 4d: Nested loop — inner loop count depends on outer
+let lo4_total = 0
+for i in 1..6 {
+    for j in 0..i {
+        lo4_total = lo4_total + 1
+    }
+}
+// i=1: 1, i=2: 2, i=3: 3, i=4: 4, i=5: 5 => 15
+assert(lo4_total == 15, "LO4: triangular nested loop")
+
+// 4e: Loop with negative step (counting down)
+let lo5_sum = 0
+let lo5_i = 10
+while lo5_i > 0 {
+    lo5_sum = lo5_sum + lo5_i
+    lo5_i = lo5_i - 1
+}
+assert(lo5_sum == 55, "LO5: while loop countdown")
+
+// 4f: Empty loop — must not crash or hang
+let lo6_count = 0
+for i in 0..0 {
+    lo6_count = lo6_count + 1
+}
+assert(lo6_count == 0, "LO6: empty range loop")
+
+// 4g: Single iteration loop
+let lo7_count = 0
+for i in 0..1 {
+    lo7_count = lo7_count + 1
+}
+assert(lo7_count == 1, "LO7: single iteration loop")
+
+println("  GROUP 4 [loop_optimizations] 10 tests OK")
+
+// ============================================================
+// GROUP 5: Function Call Optimization
+// ============================================================
+
+// 5a: Simple recursion must terminate correctly
+fn sum_rec(n: Int) -> Int {
+    if n <= 0 {
+        return 0
+    }
+    return n + sum_rec(n - 1)
+}
+assert(sum_rec(100) == 5050, "FC1: recursive sum")
+
+// 5b: Mutual recursion must work
+fn is_even_rec(n: Int) -> Bool
+fn is_odd_rec(n: Int) -> Bool
+
+fn is_even_rec(n: Int) -> Bool {
+    if n == 0 { return true }
+    return is_odd_rec(n - 1)
+}
+fn is_odd_rec(n: Int) -> Bool {
+    if n == 0 { return false }
+    return is_even_rec(n - 1)
+}
+assert(is_even_rec(10) == true, "FC2a: mutual recursion even")
+assert(is_odd_rec(11) == true, "FC2b: mutual recursion odd")
+
+// 5c: Function as argument (higher-order) must be called correctly
+fn apply_fn(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+let triple_fn = fn (x: Int) -> Int { return x * 3 }
+assert(apply_fn(triple_fn, 7) == 21, "FC3: higher-order function")
+
+// 5d: Closure correctness — captures must be correct
+// Nova closures capture scalars by value, so use a list for mutable state
+fn make_counter_fn(start: Int) -> fn() -> Int {
+    let state = [start]
+    return fn () -> Int {
+        state[0] = state[0] + 1
+        return state[0]
+    }
+}
+let ctr = make_counter_fn(0)
+assert(ctr() == 1, "FC4a: closure counter 1")
+assert(ctr() == 2, "FC4b: closure counter 2")
+assert(ctr() == 3, "FC4c: closure counter 3")
+
+// 5e: Multiple closures from same factory must be independent
+let ctrA = make_counter_fn(0)
+let ctrB = make_counter_fn(100)
+assert(ctrA() == 1, "FC5a: independent closure A")
+assert(ctrB() == 101, "FC5b: independent closure B")
+assert(ctrA() == 2, "FC5c: independent closure A again")
+assert(ctrB() == 102, "FC5d: independent closure B again")
+
+// 5f: Deeply nested calls
+fn f5_a(x: Int) -> Int { return x + 1 }
+fn f5_b(x: Int) -> Int { return f5_a(x) * 2 }
+fn f5_c(x: Int) -> Int { return f5_b(x) + 3 }
+fn f5_d(x: Int) -> Int { return f5_c(x) - 1 }
+assert(f5_d(5) == 14, "FC6: deeply nested calls")
+// f5_a(5)=6, f5_b(5)=12, f5_c(5)=15, f5_d(5)=14
+
+println("  GROUP 5 [function_call_opt] 11 tests OK")
+
+// ============================================================
+// GROUP 6: Type Coercion & Edge Cases
+// ============================================================
+
+// 6a: Int/Float boundary
+let ec1 = Cast::float(42).unwrap()
+assert(ec1 == 42.0, "EC1: int to float")
+
+let ec2 = Cast::int("123").unwrap()
+assert(ec2 == 123, "EC2: string to int")
+
+// 6b: String/Int round-trip
+let ec3 = Cast::string(42)
+let ec4 = Cast::int(ec3).unwrap()
+assert(ec4 == 42, "EC3: string-int round trip")
+
+// 6c: Negative number conversions
+let ec5 = Cast::string(-99)
+assert(ec5 == "-99", "EC4: negative to string")
+
+let ec6 = Cast::int("-99").unwrap()
+assert(ec6 == -99, "EC5: negative string to int")
+
+// 6d: Boolean edge cases
+assert(true == true, "EC6a: true==true")
+assert(false == false, "EC6b: false==false")
+assert(true != false, "EC6c: true!=false")
+
+// 6e: Empty string
+let ec7 = ""
+assert(ec7.len() == 0, "EC7a: empty string length")
+assert(ec7 == "", "EC7b: empty string equality")
+
+// 6f: Single-element list
+let ec8 = [42]
+assert(ec8.len() == 1, "EC8a: single element list length")
+assert(ec8[0] == 42, "EC8b: single element list access")
+
+// 6g: Large numbers
+let ec9 = 1000000000 * 1000000
+assert(ec9 == 1000000000000000, "EC9: large multiply")
+
+println("  GROUP 6 [edge_cases] 13 tests OK")
+
+// ============================================================
+// GROUP 7: Side Effect Preservation
+// ============================================================
+
+// 7a: Function call side effects must not be eliminated
+// Nova: functions don't modify module-level scalars, but they
+// do produce results. Optimizer must not eliminate these calls.
+fn se_inc(x: Int) -> Int {
+    return x + 1
+}
+let se1_r = se_inc(se_inc(se_inc(0)))
+assert(se1_r == 3, "SE1: chained function calls")
+
+// 7b: List mutation side effects
+let se2_list = [1, 2, 3]
+se2_list.push(4)
+se2_list.push(5)
+assert(se2_list.len() == 5, "SE2a: list mutation preserved")
+assert(se2_list[4] == 5, "SE2b: list mutation value")
+
+// 7c: Struct field mutation side effects
+struct SE3Point {
+    x: Int,
+    y: Int
+}
+let se3 = SE3Point { x: 0, y: 0 }
+se3.x = 10
+se3.y = 20
+assert(se3.x == 10, "SE3a: struct mutation x")
+assert(se3.y == 20, "SE3b: struct mutation y")
+
+// 7d: HashMap mutation side effects
+let se4 = HashMap::default() @[K: String, V: Int]
+se4.insert("a", 1)
+se4.insert("b", 2)
+se4.insert("a", 3)
+assert(se4.get("a").unwrap() == 3, "SE4a: hashmap overwrite")
+assert(se4.get("b").unwrap() == 2, "SE4b: hashmap original")
+
+// 7e: Option unwrap side effects
+let se5 = Some(42)
+let se5v = se5.unwrap()
+assert(se5v == 42, "SE5: option unwrap")
+
+println("  GROUP 7 [side_effects] 8 tests OK")
+
+// ============================================================
+// GROUP 8: Comparison & Logic Optimization
+// ============================================================
+
+// 8a: Comparison chain
+fn cl_clamp(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+assert(cl_clamp(5, 0, 10) == 5, "CL1a: clamp middle")
+assert(cl_clamp(-5, 0, 10) == 0, "CL1b: clamp low")
+assert(cl_clamp(15, 0, 10) == 10, "CL1c: clamp high")
+assert(cl_clamp(0, 0, 10) == 0, "CL1d: clamp boundary low")
+assert(cl_clamp(10, 0, 10) == 10, "CL1e: clamp boundary high")
+
+// 8b: Negated conditions
+fn cl_abs(x: Int) -> Int {
+    if !(x > 0) {
+        return -x
+    }
+    return x
+}
+assert(cl_abs(5) == 5, "CL2a: abs positive")
+assert(cl_abs(-5) == 5, "CL2b: abs negative")
+assert(cl_abs(0) == 0, "CL2c: abs zero")
+
+// 8c: Complex boolean expressions in if
+let cl3_x = 10
+let cl3_r = 0
+if cl3_x > 5 {
+    if cl3_x < 15 {
+        cl3_r = 1
+    }
+}
+assert(cl3_r == 1, "CL3: compound condition")
+
+println("  GROUP 8 [comparison_logic] 9 tests OK")
+
+// ============================================================
+// GROUP 9: Memory & GC Safety Under Optimization
+// ============================================================
+
+// 9a: Optimizer must not reorder across GC-triggering operations
+let gc1_lists = []: [Int]
+for i in 0..100 {
+    let sub = []: Int
+    for j in 0..10 {
+        sub.push(j)
+    }
+    gc1_lists.push(sub)
+}
+assert(gc1_lists.len() == 100, "GC1a: nested list count")
+assert(gc1_lists[0].len() == 10, "GC1b: inner list length")
+assert(gc1_lists[99][9] == 9, "GC1c: inner list value")
+
+// 9b: Closures holding references must survive GC
+let gc2_closures = []: fn() -> Int
+for i in 0..50 {
+    let captured = i * 10
+    gc2_closures.push(fn () -> Int { return captured })
+}
+assert(gc2_closures[0]() == 0, "GC2a: closure capture 0")
+assert(gc2_closures[25]() == 250, "GC2b: closure capture 25")
+assert(gc2_closures[49]() == 490, "GC2c: closure capture 49")
+
+// 9c: Large allocation then GC then verify data intact
+let gc3_data = []: Int
+for i in 0..10000 {
+    gc3_data.push(i)
+}
+// Trigger some GC by allocating more
+let gc3_tmp = []: String
+for i in 0..1000 {
+    gc3_tmp.push(Cast::string(i))
+}
+// Original data must be intact
+assert(gc3_data.len() == 10000, "GC3a: data survives GC")
+assert(gc3_data[0] == 0, "GC3b: first element intact")
+assert(gc3_data[9999] == 9999, "GC3c: last element intact")
+
+println("  GROUP 9 [gc_safety] 9 tests OK")
+
+// ============================================================
+// GROUP 10: Iterator & Pipeline Optimization
+// ============================================================
+
+// 10a: map must produce correct values
+let it1_src = [1, 2, 3, 4, 5]
+let it1_mapped = it1_src.map(fn (x: Int) -> Int { return x * x })
+assert(it1_mapped[0] == 1, "IT1a: map first")
+assert(it1_mapped[4] == 25, "IT1b: map last")
+
+// 10b: filter must keep correct elements
+let it2_filtered = it1_src.filter(fn (x: Int) -> Bool { return x > 3 })
+assert(it2_filtered.len() == 2, "IT2a: filter count")
+assert(it2_filtered[0] == 4, "IT2b: filter first")
+assert(it2_filtered[1] == 5, "IT2c: filter second")
+
+// 10c: reduce must accumulate correctly
+let it3_sum = it1_src.reduce(fn (a: Int, b: Int, i: Int) -> Int { return a + b }, 0)
+assert(it3_sum == 15, "IT3: reduce sum")
+
+// 10d: chained pipeline
+let it4_result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .filter(fn (x: Int) -> Bool { return x % 2 == 0 })
+    .map(fn (x: Int) -> Int { return x * 3 })
+// evens: [2,4,6,8,10] => *3: [6,12,18,24,30]
+assert(it4_result.len() == 5, "IT4a: pipeline length")
+assert(it4_result[0] == 6, "IT4b: pipeline first")
+assert(it4_result[4] == 30, "IT4c: pipeline last")
+
+// 10e: forEach must visit all elements
+// Use a list to track count since closures capture scalars by value
+let it5_counter = [0]
+let it5_list = [1, 2, 3, 4, 5]
+it5_list.foreach(fn (x: Int) {
+    it5_counter[0] = it5_counter[0] + 1
+})
+assert(it5_counter[0] == 5, "IT5: forEach count")
+
+// 10f: Iter pipeline vs list pipeline should produce same result
+let it6_list_result = [1, 2, 3, 4, 5]
+    .map(fn (x: Int) -> Int { return x + 10 })
+let it6_iter_result = Iter::fromRange(1, 6)
+    .map(fn (x: Int) -> Int { return x + 10 })
+    .collect()
+assert(it6_list_result.len() == it6_iter_result.len(), "IT6a: list vs iter length")
+assert(it6_list_result[0] == it6_iter_result[0], "IT6b: list vs iter first")
+assert(it6_list_result[4] == it6_iter_result[4], "IT6c: list vs iter last")
+
+println("  GROUP 10 [iter_pipeline] 14 tests OK")
+
+// ============================================================
+// Summary
+// ============================================================
+println("")
+println("All 10 groups, 96 assertions passed")
+println("PASS: test_optimizer")

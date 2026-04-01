@@ -74,4 +74,4 @@ println("TEST 7d - None.toResult: " + opt2.toResult("missing").toString())
 let mj = Maybe::Just(77)
 println("TEST 8a - Maybe.toOption isSome: " + Cast::string(mj.toOption().isSome()))
 
-println("ALL MODULE TESTS PASSED")
+println("PASS: test_module_system")

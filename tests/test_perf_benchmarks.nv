@@ -1,0 +1,405 @@
+module test_perf_benchmarks
+
+// ============================================================
+// Performance Benchmarks for Nova Language
+// ============================================================
+// Each benchmark:
+//   1. Records start time with now()
+//   2. Runs a workload that exercises a specific subsystem
+//   3. Verifies correctness via assert (catches optimizer bugs)
+//   4. Reports elapsed time in ms
+//
+// Usage:
+//   nova run  tests/test_perf_benchmarks.nv   (correctness + timing)
+//   nova time tests/test_perf_benchmarks.nv   (+ total execution time)
+//
+// These benchmarks are DETERMINISTIC — same result every run —
+// so they double as regression tests for correctness.
+// ============================================================
+
+import super.std.list
+import super.std.string
+import super.std.hashmap
+import super.std.iter
+import super.std.core
+import super.std.math
+import super.std.set
+import super.std.deque
+import super.std.functional
+
+// ============================================================
+// BENCH 1: Integer arithmetic — tight loop
+// Sum 1 + 2 + ... + N using a for loop
+// Tests: IADD, ISUB, ILSS, loop overhead, IMODULO
+// ============================================================
+let t1s = now()
+let sum1 = 0
+for i in 0..100000 {
+    sum1 = sum1 + i
+}
+let t1e = now()
+assert(sum1 == 4999950000, "int_arithmetic: wrong sum")
+println("  BENCH 1 [int_arithmetic] " + Cast::string(t1e - t1s) + "ms")
+
+// ============================================================
+// BENCH 2: Float arithmetic — multiply-accumulate
+// Tests: FADD, FMUL, FDIV, float precision
+// ============================================================
+let t2s = now()
+let fsum = 0.0
+for i in 1..50001 {
+    let x = Cast::float(i).unwrap()
+    fsum = fsum + x * 0.5
+}
+let t2e = now()
+assert(fsum == 625012500.0, "float_arithmetic: wrong sum")
+println("  BENCH 2 [float_arithmetic] " + Cast::string(t2e - t2s) + "ms")
+
+// ============================================================
+// BENCH 3: Function call overhead
+// Calls a simple function N times
+// Tests: DCALL, RET, stack frame setup/teardown
+// ============================================================
+fn add_one(x: Int) -> Int {
+    return x + 1
+}
+
+let t3s = now()
+let val3 = 0
+for i in 0..100000 {
+    val3 = add_one(val3)
+}
+let t3e = now()
+assert(val3 == 100000, "function_calls: wrong count")
+println("  BENCH 3 [function_calls] " + Cast::string(t3e - t3s) + "ms")
+
+// ============================================================
+// BENCH 4: Recursive fibonacci
+// Tests: recursion depth, stack management, DCALL/RET
+// ============================================================
+fn fib_r(n: Int) -> Int {
+    if n <= 1 {
+        return n
+    }
+    return fib_r(n - 1) + fib_r(n - 2)
+}
+
+let t4s = now()
+let fib_result = fib_r(25)
+let t4e = now()
+assert(fib_result == 75025, "recursive_fib: wrong result")
+println("  BENCH 4 [recursive_fib] " + Cast::string(t4e - t4s) + "ms")
+
+// ============================================================
+// BENCH 5: List push + sum — allocation & GC pressure
+// Tests: List::push (native), LINDEX, LEN, GC during alloc
+// ============================================================
+let t5s = now()
+let nums = []: Int
+for i in 0..20000 {
+    nums.push(i)
+}
+let lsum = 0
+for i in 0..nums.len() {
+    lsum = lsum + nums[i]
+}
+let t5e = now()
+assert(lsum == 199990000, "list_push_sum: wrong sum")
+println("  BENCH 5 [list_push_sum] " + Cast::string(t5e - t5s) + "ms")
+
+// ============================================================
+// BENCH 6: List map + filter chain
+// Tests: closure creation, higher-order functions, list alloc
+// ============================================================
+let t6s = now()
+let source6 = []: Int
+for i in 0..10000 {
+    source6.push(i)
+}
+let mapped = source6.map(fn (x: Int) -> Int { return x * 2 })
+let filtered = mapped.filter(fn (x: Int) -> Bool { return x % 4 == 0 })
+let mf_sum = filtered.reduce(fn (a: Int, b: Int, idx: Int) -> Int { return a + b }, 0)
+let t6e = now()
+// mapped = [0,2,4,...,19998], filtered = [0,4,8,...,19996] (every 4th from 0)
+// filtered has 5000 elements: 0,4,8,...,19996
+// sum = 4*(0+1+2+...+4999) = 4*4999*5000/2 = 49990000
+assert(mf_sum == 49990000, "list_map_filter: wrong sum")
+println("  BENCH 6 [list_map_filter] " + Cast::string(t6e - t6s) + "ms")
+
+// ============================================================
+// BENCH 7: String concatenation
+// Tests: String::concat (native), string alloc, GC on strings
+// ============================================================
+let t7s = now()
+let s7 = ""
+for i in 0..1000 {
+    s7 = s7 + "x"
+}
+let t7e = now()
+assert(s7.len() == 1000, "string_concat: wrong length")
+println("  BENCH 7 [string_concat] " + Cast::string(t7e - t7s) + "ms")
+
+// ============================================================
+// BENCH 8: String split + join
+// Tests: String::split, String methods, list of strings
+// ============================================================
+let t8s = now()
+let csv = "a,b,c,d,e,f,g,h,i,j"
+let sj_result = 0
+for i in 0..2000 {
+    let parts = csv.split(",")
+    sj_result = sj_result + parts.len()
+}
+let t8e = now()
+assert(sj_result == 20000, "string_split_join: wrong count")
+println("  BENCH 8 [string_split_join] " + Cast::string(t8e - t8s) + "ms")
+
+// ============================================================
+// BENCH 9: HashMap insert + lookup
+// Tests: HashMap::insert, HashMap::get, hashing, GC on maps
+// ============================================================
+let t9s = now()
+let hm = HashMap::default() @[K: String, V: Int]
+for i in 0..5000 {
+    hm.insert(Cast::string(i), i)
+}
+let hm_sum = 0
+for i in 0..5000 {
+    let v = hm.get(Cast::string(i))
+    if v.isSome() {
+        hm_sum = hm_sum + v.unwrap()
+    }
+}
+let t9e = now()
+assert(hm_sum == 12497500, "hashmap_ops: wrong sum")
+println("  BENCH 9 [hashmap_ops] " + Cast::string(t9e - t9s) + "ms")
+
+// ============================================================
+// BENCH 10: Closure capture & invoke
+// Tests: closure creation with captures, invoke overhead
+// ============================================================
+fn make_adder(base: Int, mul: Int) -> fn(Int) -> Int {
+    return fn (x: Int) -> Int {
+        return base + x * mul
+    }
+}
+
+let t10s = now()
+let adder5 = make_adder(5, 3)
+let cl_sum = 0
+for i in 0..50000 {
+    cl_sum = cl_sum + adder5(i)
+}
+let t10e = now()
+// adder5(i) = 5 + i*3, sum = 50000*5 + 3*(0+1+...+49999) = 250000 + 3*49999*50000/2 = 3750175000
+assert(cl_sum == 3750175000, "closure_capture: wrong sum")
+println("  BENCH 10 [closure_capture] " + Cast::string(t10e - t10s) + "ms")
+
+// ============================================================
+// BENCH 11: Struct creation & field access
+// Tests: struct alloc, GETF, SETF, GC on structs
+// ============================================================
+struct Vec2B {
+    x: Int,
+    y: Int
+}
+
+fn extends addVec(self: Vec2B, other: Vec2B) -> Vec2B {
+    return Vec2B { x: self.x + other.x, y: self.y + other.y }
+}
+
+let t11s = now()
+let acc = Vec2B { x: 0, y: 0 }
+for i in 0..20000 {
+    let v = Vec2B { x: i, y: i * 2 }
+    acc = acc.addVec(v)
+}
+let t11e = now()
+assert(acc.x == 199990000, "struct_ops: wrong x")
+assert(acc.y == 399980000, "struct_ops: wrong y")
+println("  BENCH 11 [struct_ops] " + Cast::string(t11e - t11s) + "ms")
+
+// ============================================================
+// BENCH 12: Nested loops — tests loop optimization
+// Tests: nested for, IADD, branch prediction, ILSS
+// ============================================================
+let t12s = now()
+let nl_sum = 0
+for i in 0..500 {
+    for j in 0..500 {
+        nl_sum = nl_sum + 1
+    }
+}
+let t12e = now()
+assert(nl_sum == 250000, "nested_loops: wrong count")
+println("  BENCH 12 [nested_loops] " + Cast::string(t12e - t12s) + "ms")
+
+// ============================================================
+// BENCH 13: GC stress — rapid allocation & discard
+// Tests: garbage collector throughput under pressure
+// ============================================================
+let t13s = now()
+let gc_check = 0
+for i in 0..5000 {
+    let tmp = []: Int
+    for j in 0..20 {
+        tmp.push(j)
+    }
+    gc_check = gc_check + tmp.len()
+}
+let t13e = now()
+assert(gc_check == 100000, "gc_stress: wrong count")
+println("  BENCH 13 [gc_stress] " + Cast::string(t13e - t13s) + "ms")
+
+// ============================================================
+// BENCH 14: Iterator pipeline
+// Tests: Iter::fromRange, map, filter, reduce (lazy evaluation)
+// ============================================================
+let t14s = now()
+let ip_sum = 0
+for round in 0..100 {
+    let it = Iter::fromRange(0, 100)
+    let collected = it
+        .map(fn (x: Int) -> Int { return x * x })
+        .filter(fn (x: Int) -> Bool { return x % 2 == 0 })
+        .collect()
+    let rsum = collected.reduce(fn (a: Int, b: Int, idx: Int) -> Int { return a + b }, 0)
+    ip_sum = ip_sum + rsum
+}
+let t14e = now()
+// even squares: 0,4,16,36,...  sum of (2k)^2 for k=0..49 = 4*49*50*99/6 = 161700
+// * 100 = 16170000
+assert(ip_sum == 16170000, "iter_pipeline: wrong sum")
+println("  BENCH 14 [iter_pipeline] " + Cast::string(t14e - t14s) + "ms")
+
+// ============================================================
+// BENCH 15: Set operations
+// Tests: Set::add, Set::has, union/intersection
+// ============================================================
+let t15s = now()
+let set1 = Set::empty() @[T: Int]
+let set2 = Set::empty() @[T: Int]
+for i in 0..3000 {
+    set1.add(i)
+}
+for i in 1500..4500 {
+    set2.add(i)
+}
+let s_union = set1.union(set2)
+let s_inter = set1.intersection(set2)
+let t15e = now()
+assert(s_union.size() == 4500, "set_ops: wrong union size")
+assert(s_inter.size() == 1500, "set_ops: wrong intersection size")
+println("  BENCH 15 [set_ops] " + Cast::string(t15e - t15s) + "ms")
+
+// ============================================================
+// BENCH 16: Deque push/pop
+// Tests: Deque::pushBack, Deque::popFront, FIFO throughput
+// ============================================================
+let t16s = now()
+let dq = Deque::empty() @[T: Int]
+for i in 0..10000 {
+    dq.pushBack(i)
+}
+let dq_sum = 0
+for i in 0..10000 {
+    let v = dq.popFront()
+    if v.isSome() {
+        dq_sum = dq_sum + v.unwrap()
+    }
+}
+let t16e = now()
+assert(dq_sum == 49995000, "deque_ops: wrong sum")
+println("  BENCH 16 [deque_ops] " + Cast::string(t16e - t16s) + "ms")
+
+// ============================================================
+// BENCH 17: Pattern matching — enum dispatch
+// Tests: match performance, enum variant construction
+// ============================================================
+let t17s = now()
+let md_sum = 0
+for i in 0..20000 {
+    let r = Result::Ok(i) @[B: String]
+    match r {
+        Ok(v) => {
+            md_sum = md_sum + v
+        }
+        Err(e) => {
+            md_sum = md_sum + 0
+        }
+    }
+}
+let t17e = now()
+assert(md_sum == 199990000, "match_dispatch: wrong sum")
+println("  BENCH 17 [match_dispatch] " + Cast::string(t17e - t17s) + "ms")
+
+// ============================================================
+// BENCH 18: Negative indexing
+// Tests: Python-style negative indexing in VM
+// ============================================================
+let t18s = now()
+let ni_list = [10, 20, 30, 40, 50]
+let ni_sum = 0
+for i in 0..20000 {
+    ni_sum = ni_sum + ni_list[-1] + ni_list[-2]
+}
+let t18e = now()
+// ni_list[-1]=50, ni_list[-2]=40, per iter=90, *20000=1800000
+assert(ni_sum == 1800000, "negative_indexing: wrong sum")
+println("  BENCH 18 [negative_indexing] " + Cast::string(t18e - t18s) + "ms")
+
+// ============================================================
+// BENCH 19: LEN opcode stress
+// Tests: new LEN opcode performance vs old native call
+// ============================================================
+let t19s = now()
+let len_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let len_sum = 0
+for i in 0..100000 {
+    len_sum = len_sum + len_list.len()
+}
+let t19e = now()
+assert(len_sum == 1000000, "len_opcode: wrong sum")
+println("  BENCH 19 [len_opcode] " + Cast::string(t19e - t19s) + "ms")
+
+// ============================================================
+// BENCH 20: Mixed workload — real-world simulation
+// Combines: struct creation, list ops, math, closures
+// ============================================================
+struct Particle {
+    px: Float,
+    py: Float,
+    vx: Float,
+    vy: Float
+}
+
+fn extends updateP(self: Particle, dt: Float) -> Particle {
+    return Particle {
+        px: self.px + self.vx * dt,
+        py: self.py + self.vy * dt,
+        vx: self.vx * 0.99,
+        vy: self.vy * 0.99
+    }
+}
+
+let t20s = now()
+let particles = []: Particle
+for i in 0..200 {
+    let fi = Cast::float(i).unwrap()
+    particles.push(Particle { px: 0.0, py: 0.0, vx: fi * 0.1, vy: fi * 0.05 })
+}
+for step in 0..100 {
+    for i in 0..particles.len() {
+        particles[i] = particles[i].updateP(0.016)
+    }
+}
+let t20e = now()
+assert(particles[199].px > 0.0, "mixed_workload: particle didn't move")
+println("  BENCH 20 [mixed_workload] " + Cast::string(t20e - t20s) + "ms")
+
+// ============================================================
+// Summary
+// ============================================================
+println("")
+println("All 20 benchmarks completed — all results correct")
+println("PASS: test_perf_benchmarks")

@@ -31,4 +31,4 @@ println("TEST A5 - extension via dot: " + Cast::string(result))
 let f = fib(10)
 println("TEST A6 - fib(10): " + Cast::string(f))
 
-println("ALL ACCESS TESTS PASSED")
+println("PASS: test_module_access")

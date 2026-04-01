@@ -46,4 +46,4 @@ println("TEST MOD3 - instance method: " + p.distanceTo(p2))
 // When you import a file, all its definitions merge into caller's scope
 // The module name just registers as a known module identifier
 
-println("ALL MOD KEYWORD TESTS PASSED")
+println("PASS: test_mod_keyword")
