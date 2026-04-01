@@ -2811,3 +2811,552 @@ Each has `.draw()`, and interactive widgets have `.isClicked()` / `.isHovered()`
 `join(list, sep)`, `flatten(list)`, `zip(a, b)`, `unzip(pairs)`, `range(n)`,
 and UFCS: `.filter(pred)`, `.map(f)`, `.sort()`, `.sortWith(cmp)`,
 `.reduce(f, init)`, `.any(pred)`, `.all(pred)`, `.find(pred)`.
+
+---
+
+## 30. Nova's Unique Strengths — Getting the Most Out of the Language
+
+This section is about *thinking in Nova* — not just knowing the syntax, but exploiting
+the design choices that make Nova different. Nova's combination of UFCS, first-class
+functions, `extends`, generic structs, and `Dyn` types creates idioms that don't exist
+in most languages.
+
+---
+
+### 30.1 UFCS as a Universal Chainable Pipeline
+
+Nova's Universal Function Call Syntax means **any function can be called as a method**.
+This turns chains of transformations into left-to-right readable pipelines:
+
+```nova
+// Ordinary function calls (right-to-left reading)
+let result = sort(filter(map(data, double), isEven), asc)
+
+// UFCS — reads left to right, like a pipeline
+let result = data
+    .map(|x: Int| x * 2)
+    .filter(|x: Int| x % 2 == 0)
+    .bubblesort()
+```
+
+You can define your own "pipeline stages" as free functions and chain them onto any type:
+
+```nova
+fn extends normalize(v: [Float]) -> [Float] {
+    let max = v.max()
+    return v.map(|x: Float| x / max)
+}
+
+fn extends clampTo(v: [Float], lo: Float, hi: Float) -> [Float] {
+    return v.map(|x: Float| {
+        if x < lo { return lo }
+        if x > hi { return hi }
+        return x
+    })
+}
+
+// Now these read as a sentence:
+let processed = rawData.normalize().clampTo(0.0, 1.0)
+```
+
+**The key insight:** In Nova you don't need to be inside a `class` to add methods.
+Every `fn extends` becomes a chainable method on its first argument's type, from any file.
+
+---
+
+### 30.2 Using `Box` for Shared Mutable State Across Closures
+
+In Nova, closures capture by value for primitive scalars, but `Box(T)` is a heap
+wrapper — its `.value` field lets multiple closures share and mutate the same data:
+
+```nova
+import super.std.core
+
+let counter = Box(0)
+
+let inc   = fn() { counter.value += 1 }
+let get   = fn() -> Int { return counter.value }
+let reset = fn() { counter.value = 0 }
+
+inc()
+inc()
+inc()
+println(get())   // 3
+reset()
+println(get())   // 0
+```
+
+This pattern is the foundation of Nova's scene/game-loop idiom: scene closures share
+state through `Box`-wrapped values defined at module scope.
+
+**Advanced — Box a struct for shared mutable objects:**
+
+```nova
+struct Config { debug: Bool, volume: Int }
+
+let cfg = Box(Config { debug: false, volume: 80 })
+
+let toggleDebug = fn() { cfg.value.debug = !cfg.value.debug }
+let setVolume   = fn(v: Int) { cfg.value.volume = v }
+```
+
+---
+
+### 30.3 `extends` for Ad-Hoc Methods on Existing Types
+
+Nova doesn't have traits or interfaces, but `fn extends` is even more powerful: you can
+retroactively add methods to **built-in types**, **standard library types**, and **your
+own types** without touching the original definition — from any file.
+
+```nova
+// Add a "clamp" method to the built-in Int type
+fn extends clamp(n: Int, lo: Int, hi: Int) -> Int {
+    if n < lo { return lo }
+    if n > hi { return hi }
+    return n
+}
+
+(-5).clamp(0, 100)   // 0
+200.clamp(0, 100)    // 100
+42.clamp(0, 100)     // 42
+```
+
+This is Nova's approach to "protocol conformance" — no inheritance, no interface
+registration, just define the function and the UFCS call syntax makes it look built-in.
+
+---
+
+### 30.4 Dyn Types for Runtime Polymorphism Without Inheritance
+
+When you need a heterogeneous list (e.g. a mix of `Circle`, `Rect`, `Triangle` that
+all respond to `draw()`), Nova uses `Dyn` — dynamic dispatch via vtable:
+
+```nova
+struct Circle { x: Float, y: Float, r: Float }
+struct Rect   { x: Float, y: Float, w: Float, h: Float }
+
+fn extends draw(c: Circle) { raylib::drawCircle(c.x, c.y, c.r, WHITE) }
+fn extends draw(r: Rect)   { raylib::drawRectangle(r.x, r.y, r.w, r.h, WHITE) }
+
+// Mix different shape types in one list
+let shapes: [Dyn] = [Circle { x: 100.0, y: 100.0, r: 30.0 },
+                     Rect   { x: 0.0, y: 0.0, w: 50.0, h: 50.0 }]
+
+for s in shapes {
+    s->draw()   // dispatches to the right draw() at runtime
+}
+```
+
+**The `->` operator** calls a method on a `Dyn` value by name. Nova resolves which
+concrete function to call at runtime based on the stored type.
+
+Use `Dyn` when you genuinely need open extensibility. Prefer specific types or enums
+when the set of variants is fixed — they give you exhaustiveness checking.
+
+---
+
+### 30.5 Enum + Match as a Compile-Checked State Machine
+
+Nova enums are algebraic — each variant can carry different data. Combined with `match`,
+they make state machines where the compiler verifies you handle every case:
+
+```nova
+enum AppState {
+    Loading { progress: Float },
+    Playing { level: Int, score: Int },
+    Paused  { resumeLevel: Int },
+    Dead    { finalScore: Int },
+}
+
+fn tickState(state: AppState, dt: Float) -> AppState {
+    match state {
+        AppState::Loading { progress } -> {
+            let next = progress + dt * 0.5
+            if next >= 1.0 { return AppState::Playing { level: 1, score: 0 } }
+            return AppState::Loading { progress: next }
+        },
+        AppState::Playing { level, score } -> {
+            return AppState::Playing { level: level, score: score + 1 }
+        },
+        AppState::Paused  { resumeLevel } -> state,
+        AppState::Dead    { finalScore }  -> state,
+    }
+}
+```
+
+This eliminates mutable booleans like `isLoading`, `isDead`, `isPaused`. The state is
+encoded in the *type*, so you can't be in two states at once and the compiler enforces
+you handle every transition.
+
+---
+
+### 30.6 Generic Structs as Typed Containers
+
+Nova generics let you build strongly typed containers:
+
+```nova
+struct Stack { _data: [$T] }
+
+fn extends(Stack) new() -> Stack($T) {
+    return Stack { _data: []:$T }
+}
+
+fn extends push(self: Stack($T), v: $T) {
+    self._data.push(v)
+}
+
+fn extends pop(self: Stack($T)) -> Option($T) {
+    if self._data.len() == 0 { return None($T) }
+    let v = self._data[self._data.len() - 1]
+    self._data.remove(self._data.len() - 1)
+    return Some(v)
+}
+
+let s = Stack::new() @[T: Int]
+s.push(10)
+s.push(20)
+println(s.pop())   // Some(20)
+```
+
+---
+
+### 30.7 Pattern-Matching Options for Safe Data Access
+
+Instead of nil checks, chain Option combinators — the chain short-circuits on `None`:
+
+```nova
+// Imperative style
+let name = lookup(users, id)
+if name != None {
+    println(name.unwrap().toUpper())
+}
+
+// Nova idiomatic — no unwrap, no crash
+lookup(users, id)
+    .map(|s: String| s.toUpper())
+    .inspect(|s: String| println(s))
+
+// Or if-let for a single step
+if let name = lookup(users, id) {
+    println(name.toUpper())
+}
+```
+
+---
+
+### 30.8 Closures as First-Class Scene/Behavior Units
+
+Nova's closures are values you can store, pass, and call later. This makes them ideal
+for building plugin systems, behavior tables, and scene managers:
+
+```nova
+struct Button {
+    label: String,
+    onClick: fn() -> Void,
+}
+
+fn extends click(b: Button) { b.onClick() }
+
+let buttons = [
+    Button { label: "Play",  onClick: fn() { startGame() } },
+    Button { label: "Quit",  onClick: fn() { quit() }      },
+]
+
+for btn in buttons {
+    if isClicked(btn) { btn.click() }
+}
+```
+
+This same pattern powers the `SceneManager` in `std/scene` — each scene is a struct
+containing closures for `update`, `draw`, `enter`, and `exit`.
+
+---
+
+## 31. Nova for Python Developers
+
+If you're coming from Python, Nova will feel familiar in many ways — but it makes
+different tradeoffs. This section maps Python concepts to their Nova equivalents and
+explains the philosophy behind the differences.
+
+---
+
+### 31.1 The Mental Model Shift
+
+| Python | Nova |
+|--------|------|
+| Everything is an object | Everything is a value; heap via `Box(T)` |
+| `class` owns data + methods | `struct` owns data; `fn extends` adds methods |
+| Duck typing at runtime | Structural typing at compile time |
+| `None` can appear anywhere | `Option(T)` must be explicitly handled |
+| `list` — dynamic, mixed types | `[T]` — all elements same type |
+| `dict` with any keys | `HashMap(K, V)` — key/value types fixed |
+| Decorators | No decorators; `fn extends` for method-like augmentation |
+| Generators / `yield` | `Iter(T)` — library type, not a language keyword |
+| `lambda x: x+1` | `\|x: Int\| x + 1` (short lambda syntax) |
+| `try / except` | `Option(T)` / `Result(T, E)` — errors are values |
+
+---
+
+### 31.2 From Classes to Structs + Extends
+
+**Python:**
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def distance(self, other):
+        dx = self.x - other.x
+        dy = self.y - other.y
+        return (dx*dx + dy*dy) ** 0.5
+
+    def __add__(self, other):
+        return Point(self.x + other.x, self.y + other.y)
+```
+
+**Nova:**
+```nova
+struct Point { x: Float, y: Float }
+
+fn extends distance(self: Point, other: Point) -> Float {
+    let dx = self.x - other.x
+    let dy = self.y - other.y
+    return (dx * dx + dy * dy).sqrt()
+}
+
+fn extends __add__(a: Point, b: Point) -> Point {
+    return Point { x: a.x + b.x, y: a.y + b.y }
+}
+```
+
+Key differences:
+- No `self` parameter in the struct definition — it's just data
+- Methods are **free functions** using `extends` — not locked inside the struct file
+- Any file can add methods to any type — no monkey-patching, but the same flexibility
+- Operator overloads (`__add__`, `__eq__`, `__lt__`, etc.) also use `extends`
+
+---
+
+### 31.3 From None Checks to Option Combinators
+
+**Python:**
+```python
+user = find_user(db, 42)
+if user is not None:
+    print(user.name.upper())
+else:
+    print("not found")
+```
+
+**Nova:**
+```nova
+// Combinator style — chain short-circuits on None
+let name = findUser(db, 42)
+    .map(|u: User| u.name.toUpper())
+    .orDefault("not found")
+println(name)
+
+// Or if-let style — familiar to Python developers
+if let user = findUser(db, 42) {
+    println(user.name.toUpper())
+} else {
+    println("not found")
+}
+```
+
+Nova forces you to acknowledge absence. You can't accidentally call `.name` on `None`
+and get an `AttributeError` at runtime — the type checker prevents it.
+
+---
+
+### 31.4 From Dict to HashMap
+
+**Python:**
+```python
+counts = {}
+for word in words:
+    counts[word] = counts.get(word, 0) + 1
+```
+
+**Nova:**
+```nova
+import super.std.hashmap
+
+let counts = HashMap::default() @[K: String, V: Int]
+for word in words {
+    counts.increment(word)   // built-in: insert 0 if missing, then add 1
+}
+
+// Or manual update with a transform function
+counts.update(word, 0, fn(v: Int) -> Int { return v + 1 })
+```
+
+---
+
+### 31.5 From List Comprehensions to Functional Pipelines
+
+**Python:**
+```python
+result = [x * 2 for x in range(10) if x % 2 == 0]
+```
+
+**Nova:**
+```nova
+import super.std.list
+
+let result = [0,1,2,3,4,5,6,7,8,9]
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * 2)
+```
+
+**Python nested comprehension:**
+```python
+flat = [y for row in matrix for y in row]
+```
+
+**Nova:**
+```nova
+let flat = matrix.flatten()
+// or
+let flat = matrix.flatmap(|row: [Int]| row)
+```
+
+---
+
+### 31.6 Mutation and Shared State
+
+**Python:** mutation is implicit everywhere.
+
+**Nova:** closures capture by value for scalars; use `Box` to share mutable state:
+
+```nova
+import super.std.core
+
+let total = Box(0)
+let items = []:Int
+
+let add = fn(x: Int) {
+    total.value += x
+    items.push(x)
+}
+```
+
+This explicitness is intentional. When you see a `Box`, you *know* the value is shared
+and mutated across call sites. When you don't see a `Box`, you can reason that the
+value won't change underneath you — something Python can never guarantee.
+
+---
+
+### 31.7 Common Python Patterns Translated to Nova
+
+| Python | Nova |
+|--------|------|
+| `[f(x) for x in xs]` | `xs.map(\|x: T\| f(x))` |
+| `[x for x in xs if p(x)]` | `xs.filter(\|x: T\| p(x))` |
+| `dict.get(k, default)` | `map.get(k).orDefault(default)` |
+| `x if cond else y` | `if cond { x } else { y }` (expression) |
+| `@dataclass` | `struct` — fields only, methods via `extends` |
+| `enumerate(xs)` | `xs.enumerate()` from `std/list` |
+| `zip(a, b)` | `a.zip(b)` from `std/list` |
+| `sorted(xs, key=f)` | `xs.sortWith(\|a: T, b: T\| f(a) < f(b))` |
+| `sum(xs)` | `xs.sum()` from `std/list` |
+| `any(p(x) for x in xs)` | `xs.anyWith(\|x: T\| p(x))` |
+| `all(p(x) for x in xs)` | `xs.allWith(\|x: T\| p(x))` |
+| `functools.partial(f, x)` | Closure: `fn(y: T) -> R { return f(x, y) }` |
+| `functools.lru_cache` | `memoize(f)` from `std/functional` |
+| `itertools.takewhile(p, xs)` | `xs.takeWhile(\|x: T\| p(x))` |
+| `itertools.chain(a, b)` | `a.concat(b)` from `std/list` |
+
+---
+
+### 31.8 Things Python Developers Miss (and Workarounds)
+
+**No string interpolation** — use concatenation or `Cast::string`:
+```nova
+// Python: f"Hello, {name}! Age: {age}"
+let msg = "Hello, " + name + "! Age: " + Cast::string(age)
+```
+
+**No `*args` / `**kwargs`** — use a list or hashmap parameter:
+```nova
+fn log(level: String, parts: [String]) {
+    println("[" + level + "] " + parts.join(" "))
+}
+```
+
+**No exceptions** — return `Option(T)` or `Result(A, B)`:
+```nova
+// Instead of: try: result = int(s) except ValueError: result = 0
+let result = Cast::int(s).orDefault(0)
+```
+
+**No inheritance** — use composition and `Dyn`:
+```nova
+// Instead of: class Dog(Animal):
+struct Animal { name: String }
+struct Dog    { base: Animal, breed: String }
+
+fn extends speak(d: Dog) -> String {
+    return d.base.name + " says woof"
+}
+```
+
+**No REPL** — write small `nova run` scripts to test ideas quickly.
+
+---
+
+## 32. What Nova Offers Python Developers
+
+### Compile-Time Type Safety Without Verbosity
+
+Nova catches type errors before the program runs. Unlike Python type hints (optional,
+external-tool only), Nova's types are enforced by the compiler. But unlike Go or Java,
+type inference means you rarely write explicit types:
+
+```nova
+let x     = 42           // inferred Int
+let y     = 3.14         // inferred Float
+let words = ["hi", "ho"] // inferred [String]
+```
+
+### Game Development with Type Safety
+
+Nova's standard library ships `raylib` bindings, `scene`, `entity`, `tween`, `timer`,
+`physics`, `input`, and more — all strongly typed. You get the ergonomics of a
+game-focused scripting language (like GDScript or Lua) with compile-time correctness.
+Python game dev typically needs Pygame or Arcade; Nova's stdlib is the framework.
+
+### UFCS Makes Library Code Feel Built-In
+
+You can write `myList.filter(pred).map(f).sum()` without those being methods on a
+class. Any free function becomes chainable. This means third-party Nova code reads
+as naturally as built-in syntax — no `.apply()`, no function wrapping.
+
+### `Option` and `Result` Replace Runtime Crashes
+
+Python's `None` causes `AttributeError` and `TypeError` at runtime, often deep in
+call stacks. Nova's `Option(T)` and `Result(A, B)` make fallibility visible in
+function signatures and force the caller to handle it — all checked at compile time.
+
+### Explicit Memory Is Readable Memory
+
+Python's mutable default arguments, aliased lists, and implicit reference semantics
+cause subtle bugs. Nova makes the distinction visible:
+- Struct assignment = copy
+- `Box(T)` = shared heap reference (explicit)
+
+When you read Nova code, you can trace data flow without running it.
+
+### Operator Overloading on Any Type
+
+Nova's dunder overloads via `extends` mean you can add `__eq__`, `__add__`, `__lt__`
+to *any* type, including ones you didn't write. Sort a list of custom structs, compare
+records, format numbers — all without touching original definitions.
+
+### Predictable Performance for Real-Time Loops
+
+Nova's reference-counting GC frees objects immediately when they go out of scope.
+There are no stop-the-world pauses during a game loop — a major difference from
+CPython's cyclic GC. For data-intensive pipelines, Nova's typed arrays avoid Python's
+per-element boxing overhead.

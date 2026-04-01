@@ -1,0 +1,155 @@
+module test_std_ansi
+
+import super.std.ansi
+
+// Ansi functions wrap strings in escape sequences.
+// We test that:
+//   - the output is longer than the input (escape codes were added)
+//   - the original text is preserved inside the output
+//   - numeric ANSI codes appear in the output
+// We avoid \x1b literals (not supported in test files), checking length + content.
+
+// ── Text styles ───────────────────────────────────────────────────
+let bold_s = Ansi::bold("hello")
+assert(bold_s.len() > 5, "bold longer than input")
+assert(bold_s.contains("hello"), "bold contains text")
+
+let dim_s = Ansi::dim("hi")
+assert(dim_s.len() > 2, "dim longer than input")
+assert(dim_s.contains("hi"), "dim contains text")
+
+let italic_s = Ansi::italic("test")
+assert(italic_s.len() > 4, "italic longer than input")
+assert(italic_s.contains("test"), "italic contains text")
+
+let ul = Ansi::underline("x")
+assert(ul.len() > 1, "underline longer than input")
+assert(ul.contains("x"), "underline contains text")
+
+let blink_s = Ansi::blink("blink")
+assert(blink_s.len() > 5, "blink longer than input")
+assert(blink_s.contains("blink"), "blink contains text")
+
+let inv_s = Ansi::invert("inv")
+assert(inv_s.len() > 3, "invert longer than input")
+assert(inv_s.contains("inv"), "invert contains text")
+
+let st = Ansi::strikethrough("strike")
+assert(st.len() > 6, "strikethrough longer than input")
+assert(st.contains("strike"), "strikethrough contains text")
+
+// ── Foreground colors ─────────────────────────────────────────────
+let r = Ansi::red("error")
+assert(r.len() > 5, "red longer than input")
+assert(r.contains("error"), "red contains text")
+assert(r.contains("31"), "red uses code 31")
+
+let g = Ansi::green("ok")
+assert(g.contains("32"), "green uses code 32")
+assert(g.contains("ok"), "green contains text")
+
+let b = Ansi::blue("info")
+assert(b.contains("34"), "blue uses code 34")
+
+let y = Ansi::yellow("warn")
+assert(y.contains("33"), "yellow uses code 33")
+
+let m = Ansi::magenta("m")
+assert(m.contains("35"), "magenta uses code 35")
+
+let cy = Ansi::cyan("c")
+assert(cy.contains("36"), "cyan uses code 36")
+
+let wh = Ansi::white("w")
+assert(wh.contains("37"), "white uses code 37")
+
+let bk = Ansi::black("dark")
+assert(bk.contains("30"), "black uses code 30")
+
+// ── Bright foreground colors ──────────────────────────────────────
+let br = Ansi::brightRed("br")
+assert(br.contains("91"), "brightRed uses 91")
+
+let bg2 = Ansi::brightGreen("bg2")
+assert(bg2.contains("92"), "brightGreen uses 92")
+
+let by2 = Ansi::brightYellow("by2")
+assert(by2.contains("93"), "brightYellow uses 93")
+
+let bb2 = Ansi::brightBlue("bb2")
+assert(bb2.contains("94"), "brightBlue uses 94")
+
+let bm2 = Ansi::brightMagenta("bm")
+assert(bm2.contains("95"), "brightMagenta uses 95")
+
+let bc2 = Ansi::brightCyan("bc")
+assert(bc2.contains("96"), "brightCyan uses 96")
+
+let bw2 = Ansi::brightWhite("bw")
+assert(bw2.contains("97"), "brightWhite uses 97")
+
+// ── Background colors ─────────────────────────────────────────────
+let bgR = Ansi::bgRed("bgr")
+assert(bgR.contains("41"), "bgRed uses 41")
+
+let bgG = Ansi::bgGreen("bgg")
+assert(bgG.contains("42"), "bgGreen uses 42")
+
+let bgB = Ansi::bgBlue("bgb")
+assert(bgB.contains("44"), "bgBlue uses 44")
+
+let bgY = Ansi::bgYellow("bgy")
+assert(bgY.contains("43"), "bgYellow uses 43")
+
+let bgBk = Ansi::bgBlack("bgbk")
+assert(bgBk.contains("40"), "bgBlack uses 40")
+
+// ── 256-color ─────────────────────────────────────────────────────
+let c256 = Ansi::color256(200, "vivid")
+assert(c256.len() > 5, "color256 has escape wrapper")
+assert(c256.contains("200"), "color256 has code")
+assert(c256.contains("vivid"), "color256 has text")
+
+let bgC256 = Ansi::bgColor256(50, "bg50")
+assert(bgC256.contains("50"), "bgColor256 has code")
+assert(bgC256.contains("bg50"), "bgColor256 has text")
+
+// ── True-color RGB ────────────────────────────────────────────────
+let rgb_s = Ansi::rgb(255, 100, 0, "orange")
+assert(rgb_s.len() > 6, "rgb has escape wrapper")
+assert(rgb_s.contains("255"), "rgb has r value")
+assert(rgb_s.contains("orange"), "rgb has text")
+
+let bgRgb_s = Ansi::bgRgb(0, 128, 255, "sky")
+assert(bgRgb_s.contains("sky"), "bgRgb has text")
+assert(bgRgb_s.contains("128"), "bgRgb has g value")
+
+// ── Terminal control ──────────────────────────────────────────────
+let reset_s = Ansi::reset()
+assert(reset_s.len() > 0, "reset non-empty")
+
+let clear = Ansi::clearScreen()
+assert(clear.len() > 0, "clearScreen non-empty")
+
+let clearL = Ansi::clearLine()
+assert(clearL.len() > 0, "clearLine non-empty")
+
+let move_s = Ansi::moveTo(5, 10)
+assert(move_s.len() > 0, "moveTo non-empty")
+assert(move_s.contains("5"), "moveTo has row")
+assert(move_s.contains("10"), "moveTo has col")
+
+let hide = Ansi::hideCursor()
+assert(hide.len() > 0, "hideCursor non-empty")
+
+let show = Ansi::showCursor()
+assert(show.len() > 0, "showCursor non-empty")
+
+// ── Chaining ─────────────────────────────────────────────────────
+let chained = Ansi::bold(Ansi::red("ALERT"))
+assert(chained.len() > 7, "chained longer than input")
+assert(chained.contains("ALERT"), "chained contains text")
+assert(chained.contains("31"), "chained contains red code")
+assert(chained.contains("1"), "chained contains bold code")
+
+println("PASS: test_std_ansi")

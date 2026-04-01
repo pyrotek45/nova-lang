@@ -1,0 +1,134 @@
+module test_std_string
+
+import super.std.string
+
+// ── split by Char ─────────────────────────────────────────────────
+let parts = "a,b,c".split(',')
+assert(parts.len() == 3, "split len")
+assert(parts[0] == "a", "split[0]")
+assert(parts[1] == "b", "split[1]")
+assert(parts[2] == "c", "split[2]")
+
+let single = "hello".split(',')
+assert(single.len() == 1, "split no delim")
+assert(single[0] == "hello", "split no delim value")
+
+// ── padLeft / padRight ────────────────────────────────────────────
+let pl = "42".padLeft(6, '0')
+assert(pl == "000042", "padLeft value")
+assert(pl.len() == 6, "padLeft len")
+
+let pr = "hi".padRight(5, '-')
+assert(pr == "hi---", "padRight value")
+assert(pr.len() == 5, "padRight len")
+
+let nopad = "hello".padLeft(3, '*')
+assert(nopad == "hello", "padLeft no-op when already wide")
+
+// ── center ───────────────────────────────────────────────────────
+let cen = "x".center(5, '-')
+assert(cen.len() == 5, "center len")
+assert(cen.contains("x"), "center has text")
+assert(cen.startsWith("-"), "center has left pad")
+assert(cen.endsWith("-"), "center has right pad")
+
+// ── count ────────────────────────────────────────────────────────
+assert("banana".count("an") == 2, "count substrings")
+assert("hello".count("xyz") == 0, "count missing")
+assert("aaa".count("a") == 3, "count single char")
+
+// ── countChar ────────────────────────────────────────────────────
+assert("mississippi".countChar('s') == 4, "countChar s")
+assert("hello".countChar('z') == 0, "countChar missing")
+
+// ── indexOfChar ──────────────────────────────────────────────────
+assert("hello".indexOfChar('l') == 2, "indexOfChar found")
+assert("hello".indexOfChar('z') == -1, "indexOfChar missing")
+
+// ── isDigit / isAlpha / isAlphanumeric ───────────────────────────
+assert("12345".isDigit(), "isDigit true")
+assert(!"12a45".isDigit(), "isDigit false with letter")
+assert(!"".isDigit(), "isDigit empty")
+
+assert("abcXYZ".isAlpha(), "isAlpha true")
+assert(!"abc1".isAlpha(), "isAlpha false with digit")
+
+assert("abc123".isAlphanumeric(), "isAlphanumeric true")
+assert(!"abc!".isAlphanumeric(), "isAlphanumeric false")
+assert(!"".isAlphanumeric(), "isAlphanumeric empty is false")
+
+// ── capitalize ───────────────────────────────────────────────────
+assert("hello world".capitalize() == "Hello world", "capitalize")
+assert("".capitalize() == "", "capitalize empty")
+assert("ALREADY".capitalize() == "ALREADY", "capitalize already upper")
+
+// ── title ────────────────────────────────────────────────────────
+let t = "hello world foo".title()
+assert(t.startsWith("Hello"), "title first word")
+assert(t.contains("World"), "title second word")
+assert(t.contains("Foo"), "title third word")
+
+// ── removeChar ───────────────────────────────────────────────────
+let rc = "banana".removeChar('a')
+assert(rc == "bnn", "removeChar all a")
+assert("hello".removeChar('z') == "hello", "removeChar missing char")
+
+// ── replaceChar ──────────────────────────────────────────────────
+let rch = "hello".replaceChar('l', 'r')
+assert(rch == "herro", "replaceChar all l->r")
+assert("abc".replaceChar('z', 'x') == "abc", "replaceChar no match")
+
+// ── lines ────────────────────────────────────────────────────────
+let ls = "line1\nline2\nline3".lines()
+assert(ls.len() == 3, "lines len")
+assert(ls[0] == "line1", "lines[0]")
+assert(ls[2] == "line3", "lines[2]")
+
+// ── words ────────────────────────────────────────────────────────
+let ws = "the quick brown fox".words()
+assert(ws.len() == 4, "words len")
+assert(ws[0] == "the", "words[0]")
+assert(ws[3] == "fox", "words[3]")
+
+// ── truncate ─────────────────────────────────────────────────────
+// truncate(7, "...") → cut at 7-3=4 chars, then append "..."
+let tr = "Hello, World!".truncate(7, "...")
+assert(tr == "Hell...", "truncate with suffix")
+assert(tr.len() == 7, "truncate result len")
+
+let trShort = "Hi".truncate(10, "...")
+assert(trShort == "Hi", "truncate no-op when short")
+
+// ── slugify ───────────────────────────────────────────────────────
+let slug = "Hello World 123".slugify()
+assert(slug == "hello-world-123", "slugify spaces to hyphens")
+
+let slug2 = "Nova Lang!".slugify()
+assert(slug2.contains("nova"), "slugify lowercase")
+assert(slug2.contains("lang"), "slugify lowercase second")
+assert(!slug2.contains("!"), "slugify strips special")
+assert(!slug2.contains(" "), "slugify strips spaces")
+
+// ── between ──────────────────────────────────────────────────────
+let bw = "hello [world] bye".between("[", "]")
+assert(bw.isSome(), "between Some")
+assert(bw.unwrap() == "world", "between value")
+
+let bwMiss = "no brackets here".between("[", "]")
+assert(bwMiss.isNone(), "between None")
+
+// ── stripPrefix / stripSuffix ─────────────────────────────────────
+assert("hello world".stripPrefix("hello ") == "world", "stripPrefix found")
+assert("hello world".stripPrefix("bye") == "hello world", "stripPrefix not found")
+assert("hello world".stripSuffix(" world") == "hello", "stripSuffix found")
+assert("hello world".stripSuffix("bye") == "hello world", "stripSuffix not found")
+
+// ── wrap ─────────────────────────────────────────────────────────
+let wrapped = "The quick brown fox jumps over the lazy dog".wrap(15)
+let wlines = wrapped.lines()
+assert(wlines.len() > 1, "wrap creates multiple lines")
+for wl in wlines {
+    assert(wl.len() <= 20, "wrap each line reasonable length")
+}
+
+println("PASS: test_std_string")
