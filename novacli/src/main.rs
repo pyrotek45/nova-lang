@@ -286,9 +286,7 @@ fn repl_session() -> ! {
                     pline => {
                         if pline.starts_with("session") {
                             let parts: Vec<&str> = pline.split_whitespace().collect();
-                            let session = parts
-                                .get(1)
-                                .and_then(|s| s.parse::<usize>().ok());
+                            let session = parts.get(1).and_then(|s| s.parse::<usize>().ok());
                             match session {
                                 Some(session) if session < states.len() => {
                                     novarepl = states[session].clone();
