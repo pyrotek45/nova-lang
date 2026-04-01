@@ -1,0 +1,255 @@
+// ============================================================
+// std/tween.nv  — Interpolation and easing for animations
+// ============================================================
+//
+// Usage:  import super.std.tween
+//
+// Easing functions (all take t in [0.0, 1.0] → return [0.0, 1.0]):
+//   Ease::linear(t)
+//   Ease::easeIn(t)      -- quadratic ease in
+//   Ease::easeOut(t)     -- quadratic ease out
+//   Ease::easeInOut(t)   -- quadratic ease in-out
+//   Ease::easeInCubic(t)
+//   Ease::easeOutCubic(t)
+//   Ease::easeInOutCubic(t)
+//   Ease::easeInElastic(t)
+//   Ease::easeOutElastic(t)
+//   Ease::easeInBounce(t)
+//   Ease::easeOutBounce(t)
+//   Ease::easeInBack(t)
+//   Ease::easeOutBack(t)
+//   Ease::sineIn(t)
+//   Ease::sineOut(t)
+//   Ease::sineInOut(t)
+//
+// Tween struct:
+//   Tween::new(from, to, duration, easeFn) -- create a tween
+//   Tween::linear(from, to, duration)      -- shorthand for linear easing
+//   t.update(dt)   -> Float               -- advance + return current value
+//   t.value()      -> Float               -- current interpolated value
+//   t.isDone()     -> Bool
+//   t.progress()   -> Float               -- 0.0..1.0
+//   t.reset()
+//   t.restart(from, to)                   -- set new endpoints and restart
+//   t.ping()                              -- reverse direction (ping-pong)
+//   t.remaining()  -> Float
+//
+// lerp helpers:
+//   lerpF(a, b, t)   -> Float
+//   lerpI(a, b, t)   -> Int
+//
+// ============================================================
+
+module tween
+
+// ── Easing functions ──────────────────────────────────────────────────────────
+
+struct Ease {}
+
+fn extends(Ease) linear(t: Float) -> Float {
+    return t
+}
+
+fn extends(Ease) easeIn(t: Float) -> Float {
+    return t * t
+}
+
+fn extends(Ease) easeOut(t: Float) -> Float {
+    let u = 1.0 - t
+    return 1.0 - u * u
+}
+
+fn extends(Ease) easeInOut(t: Float) -> Float {
+    if t < 0.5 {
+        return 2.0 * t * t
+    }
+    let u = -2.0 * t + 2.0
+    return 1.0 - u * u / 2.0
+}
+
+fn extends(Ease) easeInCubic(t: Float) -> Float {
+    return t * t * t
+}
+
+fn extends(Ease) easeOutCubic(t: Float) -> Float {
+    let u = 1.0 - t
+    return 1.0 - u * u * u
+}
+
+fn extends(Ease) easeInOutCubic(t: Float) -> Float {
+    if t < 0.5 {
+        return 4.0 * t * t * t
+    }
+    let u = -2.0 * t + 2.0
+    return 1.0 - u * u * u / 2.0
+}
+
+fn extends(Ease) sineIn(t: Float) -> Float {
+    return 1.0 - Float::cos(t * 3.14159265 / 2.0)
+}
+
+fn extends(Ease) sineOut(t: Float) -> Float {
+    return Float::sin(t * 3.14159265 / 2.0)
+}
+
+fn extends(Ease) sineInOut(t: Float) -> Float {
+    return -(Float::cos(3.14159265 * t) - 1.0) / 2.0
+}
+
+fn extends(Ease) easeInBack(t: Float) -> Float {
+    let c1 = 1.70158
+    let c3 = c1 + 1.0
+    return c3 * t * t * t - c1 * t * t
+}
+
+fn extends(Ease) easeOutBack(t: Float) -> Float {
+    let c1 = 1.70158
+    let c3 = c1 + 1.0
+    let u = t - 1.0
+    return 1.0 + c3 * u * u * u + c1 * u * u
+}
+
+fn extends(Ease) easeOutBounce(t: Float) -> Float {
+    let n1 = 7.5625
+    let d1 = 2.75
+    if t < 1.0 / d1 {
+        return n1 * t * t
+    } else if t < 2.0 / d1 {
+        let tt = t - 1.5 / d1
+        return n1 * tt * tt + 0.75
+    } else if t < 2.5 / d1 {
+        let tt = t - 2.25 / d1
+        return n1 * tt * tt + 0.9375
+    } else {
+        let tt = t - 2.625 / d1
+        return n1 * tt * tt + 0.984375
+    }
+}
+
+fn extends(Ease) easeInBounce(t: Float) -> Float {
+    return 1.0 - Ease::easeOutBounce(1.0 - t)
+}
+
+fn extends(Ease) easeOutElastic(t: Float) -> Float {
+    if t == 0.0 { return 0.0 }
+    if t == 1.0 { return 1.0 }
+    let c4 = 2.0 * 3.14159265 / 3.0
+    return Float::pow(2.0, -10.0 * t) * Float::sin((t * 10.0 - 0.75) * c4) + 1.0
+}
+
+fn extends(Ease) easeInElastic(t: Float) -> Float {
+    if t == 0.0 { return 0.0 }
+    if t == 1.0 { return 1.0 }
+    let c4 = 2.0 * 3.14159265 / 3.0
+    return -(Float::pow(2.0, 10.0 * t - 10.0) * Float::sin((t * 10.0 - 10.75) * c4))
+}
+
+// ── lerp helpers ─────────────────────────────────────────────────────────────
+
+fn lerpF(a: Float, b: Float, t: Float) -> Float {
+    return a + (b - a) * t
+}
+
+fn lerpI(a: Int, b: Int, t: Float) -> Int {
+    return Cast::int(Cast::float(a).unwrap() + Cast::float(b - a).unwrap() * t).unwrap()
+}
+
+// ── Tween struct ──────────────────────────────────────────────────────────────
+
+struct Tween {
+    from:     Float,
+    to:       Float,
+    duration: Float,
+    _elapsed: Float,
+    _done:    Bool,
+    _forward: Bool,
+    _easeFn:  fn(Float) -> Float,
+}
+
+// Create a tween with a custom easing function
+fn extends(Tween) new(from: Float, to: Float, duration: Float, easeFn: fn(Float) -> Float) -> Tween {
+    return Tween {
+        from:     from,
+        to:       to,
+        duration: duration,
+        _elapsed: 0.0,
+        _done:    false,
+        _forward: true,
+        _easeFn:  easeFn,
+    }
+}
+
+// Shorthand: linear interpolation
+fn extends(Tween) linear(from: Float, to: Float, duration: Float) -> Tween {
+    return Tween::new(from, to, duration, fn(t: Float) -> Float { return t })
+}
+
+// Shorthand: ease-in-out quadratic
+fn extends(Tween) smooth(from: Float, to: Float, duration: Float) -> Tween {
+    return Tween::new(from, to, duration, fn(t: Float) -> Float {
+        if t < 0.5 { return 2.0 * t * t }
+        let u = -2.0 * t + 2.0
+        return 1.0 - u * u / 2.0
+    })
+}
+
+// ── Methods ───────────────────────────────────────────────────────────────────
+
+// Advance by dt and return the current interpolated value
+fn extends update(self: Tween, dt: Float) -> Float {
+    if self._done { return self.value() }
+    self._elapsed = self._elapsed + dt
+    if self._elapsed >= self.duration {
+        self._elapsed = self.duration
+        self._done = true
+    }
+    return self.value()
+}
+
+// Current interpolated value (does not advance time)
+fn extends value(self: Tween) -> Float {
+    let t = self.progress()
+    let et = (self._easeFn)(t)
+    return self.from + (self.to - self.from) * et
+}
+
+// Normalized progress 0.0..1.0
+fn extends progress(self: Tween) -> Float {
+    if self.duration <= 0.0 { return 1.0 }
+    let p = self._elapsed / self.duration
+    if p > 1.0 { return 1.0 }
+    if p < 0.0 { return 0.0 }
+    return p
+}
+
+fn extends isDone(self: Tween) -> Bool {
+    return self._done
+}
+
+fn extends remaining(self: Tween) -> Float {
+    let r = self.duration - self._elapsed
+    if r < 0.0 { return 0.0 }
+    return r
+}
+
+fn extends reset(self: Tween) {
+    self._elapsed = 0.0
+    self._done    = false
+}
+
+// Change endpoints and restart
+fn extends restart(self: Tween, from: Float, to: Float) {
+    self.from     = from
+    self.to       = to
+    self._elapsed = 0.0
+    self._done    = false
+}
+
+// Swap from/to so the tween plays in reverse (ping-pong)
+fn extends ping(self: Tween) {
+    let tmp   = self.from
+    self.from = self.to
+    self.to   = tmp
+    self._elapsed = 0.0
+    self._done    = false
+}

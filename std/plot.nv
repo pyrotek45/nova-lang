@@ -1,0 +1,282 @@
+// ============================================================
+// std/plot.nv  — 2D plotting and charting via raylib
+// ============================================================
+//
+// Usage:  import super.std.plot
+//
+// Requires raylib to be active (call raylib::init before using).
+// All draw functions must be called inside a raylib::rendering() loop.
+//
+// Structs:
+//   PlotArea  -- defines the screen region and data bounds for a chart
+//
+// Constructors:
+//   PlotArea::new(x,y,w,h, xMin,xMax,yMin,yMax) -- custom bounds
+//   PlotArea::auto(x,y,w,h, data)               -- auto y-bounds from data
+//   PlotArea::square(x,y,size, data)             -- square area, auto y
+//
+// Drawing (all inside raylib::rendering()):
+//   area.drawAxes(color)                   -- x/y axis lines
+//   area.drawGrid(cols, rows, color)       -- background grid
+//   area.drawXLabels(labels, fontSize, c)  -- x-axis labels
+//   area.drawYLabels(steps, fontSize, c)   -- y-axis value labels
+//   area.drawTitle(title, fontSize, c)     -- centered title above
+//   area.lineChart(data, color)            -- connected line plot
+//   area.lineChartSmooth(data, steps, c)   -- smoothed line
+//   area.barChart(data, color)             -- vertical bar chart
+//   area.barChartLabeled(data,labels,c,fc) -- bars with labels
+//   area.scatter(points, radius, color)    -- scatter plot dots
+//   area.scatterSized(points, sizes, c)    -- scatter with per-point radius
+//   area.hLine(y, color)                   -- horizontal reference line
+//   area.vLine(x, color)                   -- vertical reference line
+//   area.fillArea(data, color)             -- filled area under a line
+//
+// Coordinate helpers:
+//   area.toScreen(dataX, dataY) -> (Int, Int) -- data coords → pixels
+//   area.toData(px, py) -> (Float, Float)     -- pixels → data coords
+//
+// ============================================================
+
+module plot
+
+import vec2
+
+struct PlotArea {
+    x: Int,
+    y: Int,
+    w: Int,
+    h: Int,
+    xMin: Float,
+    xMax: Float,
+    yMin: Float,
+    yMax: Float,
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(PlotArea) new(x: Int, y: Int, w: Int, h: Int,
+                          xMin: Float, xMax: Float, yMin: Float, yMax: Float) -> PlotArea {
+    return PlotArea { x: x, y: y, w: w, h: h,
+                      xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax }
+}
+
+// Automatically compute y bounds from a data list, with 10% padding
+fn extends(PlotArea) auto(x: Int, y: Int, w: Int, h: Int, data: [Float]) -> PlotArea {
+    if data.len() == 0 {
+        return PlotArea::new(x, y, w, h, 0.0, 1.0, 0.0, 1.0)
+    }
+    let mn = data[0]
+    let mx = data[0]
+    for v in data {
+        if v < mn { mn = v }
+        if v > mx { mx = v }
+    }
+    let pad = (mx - mn) * 0.1 + 0.001
+    let n = Cast::float(data.len()).unwrap() - 1.0
+    if n < 1.0 { n = 1.0 }
+    return PlotArea::new(x, y, w, h, 0.0, n, mn - pad, mx + pad)
+}
+
+// Square plot area with auto y bounds
+fn extends(PlotArea) square(x: Int, y: Int, size: Int, data: [Float]) -> PlotArea {
+    return PlotArea::auto(x, y, size, size, data)
+}
+
+// ── Coordinate mapping ────────────────────────────────────────────────────────
+
+// Map a data coordinate to screen pixels (y is flipped: data yMax → top)
+fn extends toScreen(self: PlotArea, dx: Float, dy: Float) -> (Int, Int) {
+    let xRange = self.xMax - self.xMin
+    let yRange = self.yMax - self.yMin
+    if xRange == 0.0 { xRange = 1.0 }
+    if yRange == 0.0 { yRange = 1.0 }
+    let px = self.x + Cast::int((dx - self.xMin) / xRange * Cast::float(self.w).unwrap()).unwrap()
+    let py = self.y + self.h - Cast::int((dy - self.yMin) / yRange * Cast::float(self.h).unwrap()).unwrap()
+    return (px, py)
+}
+
+// Map screen pixels back to data coordinates
+fn extends toData(self: PlotArea, px: Int, py: Int) -> (Float, Float) {
+    let fx = Cast::float(px - self.x).unwrap() / Cast::float(self.w).unwrap()
+    let fy = 1.0 - Cast::float(py - self.y).unwrap() / Cast::float(self.h).unwrap()
+    return (self.xMin + fx * (self.xMax - self.xMin),
+            self.yMin + fy * (self.yMax - self.yMin))
+}
+
+// ── Background & axes ─────────────────────────────────────────────────────────
+
+// Draw x and y axes
+fn extends drawAxes(self: PlotArea, color: (Int, Int, Int)) {
+    // x-axis at y=0 (clamped to area)
+    let originY = self.y + self.h
+    if self.yMin <= 0.0 && self.yMax >= 0.0 {
+        let (_, sy) = self.toScreen(0.0, 0.0)
+        originY = sy
+    }
+    raylib::drawLine(self.x, originY, self.x + self.w, originY, color)
+    // y-axis at x=0 (clamped to area)
+    let originX = self.x
+    if self.xMin <= 0.0 && self.xMax >= 0.0 {
+        let (sx, _) = self.toScreen(0.0, 0.0)
+        originX = sx
+    }
+    raylib::drawLine(originX, self.y, originX, self.y + self.h, color)
+}
+
+// Draw a background grid with cols × rows cells
+fn extends drawGrid(self: PlotArea, cols: Int, rows: Int, color: (Int, Int, Int)) {
+    for let i = 0; i <= cols; i += 1 {
+        let px = self.x + i * self.w / cols
+        raylib::drawLine(px, self.y, px, self.y + self.h, color)
+    }
+    for let j = 0; j <= rows; j += 1 {
+        let py = self.y + j * self.h / rows
+        raylib::drawLine(self.x, py, self.x + self.w, py, color)
+    }
+}
+
+// Draw a border around the plot area
+fn extends drawBorder(self: PlotArea, color: (Int, Int, Int)) {
+    raylib::drawRectangleLines(self.x, self.y, self.w, self.h, color)
+}
+
+// ── Labels & title ────────────────────────────────────────────────────────────
+
+// Draw evenly spaced x-axis labels below the plot
+fn extends drawXLabels(self: PlotArea, labels: [String], fontSize: Int, color: (Int, Int, Int)) {
+    if labels.len() == 0 { return }
+    let n = labels.len()
+    for let i = 0; i < n; i += 1 {
+        let t = Cast::float(i).unwrap() / Cast::float(n - 1).unwrap()
+        if n == 1 { t = 0.5 }
+        let px = self.x + Cast::int(t * Cast::float(self.w).unwrap()).unwrap()
+        let tw = raylib::measureText(labels[i], fontSize)
+        raylib::drawText(labels[i], px - tw / 2, self.y + self.h + 4, fontSize, color)
+    }
+}
+
+// Draw value labels on the y-axis at `steps` evenly spaced intervals
+fn extends drawYLabels(self: PlotArea, steps: Int, fontSize: Int, color: (Int, Int, Int)) {
+    for let i = 0; i <= steps; i += 1 {
+        let t = Cast::float(i).unwrap() / Cast::float(steps).unwrap()
+        let val = self.yMin + t * (self.yMax - self.yMin)
+        let py = self.y + self.h - Cast::int(t * Cast::float(self.h).unwrap()).unwrap()
+        let label = Cast::string(Cast::int(val * 100.0).unwrap())
+        let label = label.substring(0, label.len() - 2) + "." + label.substring(label.len() - 2, label.len())
+        let tw = raylib::measureText(label, fontSize)
+        raylib::drawText(label, self.x - tw - 4, py - fontSize / 2, fontSize, color)
+    }
+}
+
+// Draw a centered title above the plot area
+fn extends drawTitle(self: PlotArea, title: String, fontSize: Int, color: (Int, Int, Int)) {
+    let tw = raylib::measureText(title, fontSize)
+    let tx = self.x + (self.w - tw) / 2
+    raylib::drawText(title, tx, self.y - fontSize - 4, fontSize, color)
+}
+
+// ── Chart types ───────────────────────────────────────────────────────────────
+
+// Connected line chart from a list of y values (x = 0..len-1)
+fn extends lineChart(self: PlotArea, data: [Float], color: (Int, Int, Int)) {
+    if data.len() < 2 { return }
+    for let i = 0; i < data.len() - 1; i += 1 {
+        let (x1, y1) = self.toScreen(Cast::float(i).unwrap(), data[i])
+        let (x2, y2) = self.toScreen(Cast::float(i + 1).unwrap(), data[i + 1])
+        raylib::drawLine(x1, y1, x2, y2, color)
+    }
+}
+
+// Thick connected line chart
+fn extends lineChartThick(self: PlotArea, data: [Float], thickness: Float, color: (Int, Int, Int)) {
+    if data.len() < 2 { return }
+    for let i = 0; i < data.len() - 1; i += 1 {
+        let (x1, y1) = self.toScreen(Cast::float(i).unwrap(), data[i])
+        let (x2, y2) = self.toScreen(Cast::float(i + 1).unwrap(), data[i + 1])
+        raylib::drawLineThick(x1, y1, x2, y2, thickness, color)
+    }
+}
+
+// Bar chart: one bar per data value, full height from y=0
+fn extends barChart(self: PlotArea, data: [Float], color: (Int, Int, Int)) {
+    if data.len() == 0 { return }
+    let n = data.len()
+    let barW = self.w / n
+    for let i = 0; i < n; i += 1 {
+        let (bx, by) = self.toScreen(Cast::float(i).unwrap(), data[i])
+        let (_, zero) = self.toScreen(0.0, 0.0)
+        // clamp zero to area bounds
+        if zero < self.y { zero = self.y }
+        if zero > self.y + self.h { zero = self.y + self.h }
+        let bh = zero - by
+        if bh < 0 {
+            raylib::drawRectangle(bx, zero, barW - 1, -bh, color)
+        } else {
+            raylib::drawRectangle(bx, by, barW - 1, bh, color)
+        }
+    }
+}
+
+// Bar chart with text labels below each bar
+fn extends barChartLabeled(self: PlotArea, data: [Float], labels: [String],
+                            barColor: (Int, Int, Int), labelColor: (Int, Int, Int)) {
+    self.barChart(data, barColor)
+    if labels.len() == 0 { return }
+    let n = data.len()
+    let barW = self.w / n
+    for let i = 0; i < n; i += 1 {
+        if i >= labels.len() { return }
+        let bx = self.x + i * barW
+        let tw = raylib::measureText(labels[i], 12)
+        raylib::drawText(labels[i], bx + barW / 2 - tw / 2, self.y + self.h + 4, 12, labelColor)
+    }
+}
+
+// Scatter plot: draw a circle at each (x, y) data point
+fn extends scatter(self: PlotArea, points: [(Float, Float)], radius: Int, color: (Int, Int, Int)) {
+    for p in points {
+        let (sx, sy) = self.toScreen(p[0], p[1])
+        raylib::drawCircle(sx, sy, radius, color)
+    }
+}
+
+// Scatter plot with per-point radius values
+fn extends scatterSized(self: PlotArea, points: [(Float, Float)], sizes: [Int], color: (Int, Int, Int)) {
+    for let i = 0; i < points.len(); i += 1 {
+        let (sx, sy) = self.toScreen(points[i][0], points[i][1])
+        let r = if i < sizes.len() { sizes[i] } else { 3 }
+        raylib::drawCircle(sx, sy, r, color)
+    }
+}
+
+// Horizontal reference line at data-space y value
+fn extends hLine(self: PlotArea, dataY: Float, color: (Int, Int, Int)) {
+    let (_, sy) = self.toScreen(0.0, dataY)
+    raylib::drawLine(self.x, sy, self.x + self.w, sy, color)
+}
+
+// Vertical reference line at data-space x value
+fn extends vLine(self: PlotArea, dataX: Float, color: (Int, Int, Int)) {
+    let (sx, _) = self.toScreen(dataX, 0.0)
+    raylib::drawLine(sx, self.y, sx, self.y + self.h, color)
+}
+
+// Filled area under a line chart (useful for area charts)
+fn extends fillArea(self: PlotArea, data: [Float], color: (Int, Int, Int)) {
+    if data.len() < 2 { return }
+    let n = data.len()
+    let (_, zero) = self.toScreen(0.0, 0.0)
+    if zero < self.y { zero = self.y }
+    if zero > self.y + self.h { zero = self.y + self.h }
+    for let i = 0; i < n - 1; i += 1 {
+        let (x1, y1) = self.toScreen(Cast::float(i).unwrap(), data[i])
+        let (x2, _) = self.toScreen(Cast::float(i + 1).unwrap(), data[i + 1])
+        let sliceW = x2 - x1
+        if sliceW <= 0 { sliceW = 1 }
+        // draw a thin rectangle from zero to data point
+        let top = y1
+        let bot = zero
+        if top > bot { let tmp = top; top = bot; bot = tmp }
+        raylib::drawRectangle(x1, top, sliceW, bot - top, color)
+    }
+}
