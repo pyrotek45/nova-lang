@@ -1,0 +1,5 @@
+module test_missing_return
+fn add(a: Int, b: Int) -> Int {
+    let result = a + b
+}
+println(Cast::string(add(1, 2)))

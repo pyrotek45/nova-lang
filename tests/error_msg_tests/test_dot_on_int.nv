@@ -1,0 +1,4 @@
+module test_dot_on_int
+// Should error: trying to use dot field access on an Int
+let x = 42
+let y = x.value

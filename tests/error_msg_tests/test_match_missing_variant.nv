@@ -1,0 +1,13 @@
+module test_match_missing_variant
+// Should error: variant 'Square' not found, show available variants
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float),
+    Triangle
+}
+
+let s = Shape::Circle(3.14)
+match s {
+    Circle(r) => { println("circle") }
+    Square(x) => { println("square") }
+}

@@ -1,0 +1,5 @@
+module test_field_not_found
+// Should error: trying to access a non-existent field and list available fields
+struct Person { name: String, age: Int }
+let p = Person { name: "Alice", age: 30 }
+let x = p.email

@@ -1,0 +1,3 @@
+module test_assign_type_mismatch
+let x = 42
+x = "hello"

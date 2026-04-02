@@ -1,0 +1,11 @@
+module test_match_exhaustive
+// Should error: variant Triangle not covered
+enum Shape {
+    Circle: Float,
+    Triangle
+}
+
+let s = Shape::Circle(3.14)
+match s {
+    Circle(r) => { println("circle") }
+}

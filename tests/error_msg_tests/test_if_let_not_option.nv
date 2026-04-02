@@ -1,0 +1,6 @@
+module test_if_let_not_option
+// Should error: if let expects Option type
+let x = 42
+if let val = x {
+    println("got a value")
+}

@@ -1,0 +1,2 @@
+module test_inline_if_non_bool
+let x = if 42 { 1 } else { 2 }

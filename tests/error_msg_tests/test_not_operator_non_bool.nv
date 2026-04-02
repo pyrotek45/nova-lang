@@ -1,0 +1,3 @@
+module test_not_operator_non_bool
+let x = 42
+let y = !x

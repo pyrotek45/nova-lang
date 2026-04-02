@@ -1,0 +1,2 @@
+module test_unknown_type
+let x: Intt = 42

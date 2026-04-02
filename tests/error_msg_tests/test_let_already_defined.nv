@@ -1,0 +1,3 @@
+module test_let_already_defined
+let x = 42
+let x = 99
