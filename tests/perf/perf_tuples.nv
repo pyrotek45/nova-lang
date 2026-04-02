@@ -1,0 +1,145 @@
+module perf_tuples
+
+// ============================================================
+// Tuple Benchmarks
+// ============================================================
+// Tests: tuple creation, field indexing, tuple list storage,
+//   tuple pattern matching, nested tuples, tuple in functions,
+//   swap pattern, multiple return values
+// ============================================================
+
+// ── BENCH 1: Tuple creation throughput ──────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..200000 {
+    let tp = (i, i + 1)
+    s1 = s1 + tp[0]
+}
+let t1e = now()
+assert(s1 > 0, "tuple create")
+println("  BENCH 1 [tuple_create_200k]    " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Tuple field access ─────────────────────────────
+let fixed_tp = (42, 99, 7)
+let t2 = now()
+let s2 = 0
+for i in 0..300000 {
+    s2 = s2 + fixed_tp[0] + fixed_tp[1] + fixed_tp[2]
+}
+let t2e = now()
+assert(s2 == 44400000, "tuple field access")
+println("  BENCH 2 [tuple_access_300k]    " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Tuple list build ───────────────────────────────
+let t3 = now()
+let tp_list = []: (Int, Int)
+for i in 0..50000 {
+    tp_list.push((i, i * 2))
+}
+let t3e = now()
+assert(tp_list.len() == 50000, "tuple list build")
+println("  BENCH 3 [tuple_list_50k]       " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Tuple list iterate + sum ───────────────────────
+let t4 = now()
+let s4 = 0
+for tp in tp_list {
+    s4 = s4 + tp[0] + tp[1]
+}
+let t4e = now()
+assert(s4 > 0, "tuple list iter")
+println("  BENCH 4 [tuple_iter_50k]       " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: 3-tuple operations ─────────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..100000 {
+    let tp3 = (i, i + 1, i + 2)
+    s5 = s5 + tp3[0] + tp3[1] + tp3[2]
+}
+let t5e = now()
+assert(s5 > 0, "3-tuple ops")
+println("  BENCH 5 [tuple3_100k]          " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Tuple as function return ───────────────────────
+fn minmax(a: Int, b: Int) -> (Int, Int) {
+    if a < b { return (a, b) }
+    return (b, a)
+}
+
+let t6 = now()
+let s6 = 0
+for i in 0..100000 {
+    let r = minmax(i, 100000 - i)
+    s6 = s6 + r[0]
+}
+let t6e = now()
+assert(s6 >= 0, "tuple return")
+println("  BENCH 6 [tuple_return_100k]    " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Tuple swap pattern ─────────────────────────────
+fn swap(p: (Int, Int)) -> (Int, Int) {
+    return (p[1], p[0])
+}
+
+let t7 = now()
+let s7 = 0
+for i in 0..100000 {
+    let p = (i, i + 10)
+    let q = swap(p)
+    s7 = s7 + q[0]
+}
+let t7e = now()
+assert(s7 > 0, "tuple swap")
+println("  BENCH 7 [tuple_swap_100k]      " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Tuple in hashmap key ───────────────────────────
+// Use tuples manually as (row, col) keys encoded as Int
+let t8 = now()
+let grid = []: Int
+for i in 0..10000 {
+    grid.push(0)
+}
+for i in 0..100000 {
+    let coord = (i % 100, (i / 100) % 100)
+    let idx = coord[0] * 100 + coord[1]
+    grid[idx] = grid[idx] + 1
+}
+let t8e = now()
+assert(grid[0] > 0, "tuple coord")
+println("  BENCH 8 [tuple_coord_100k]     " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Nested tuple ───────────────────────────────────
+let t9 = now()
+let s9 = 0
+for i in 0..50000 {
+    let outer = ((i, i+1), (i+2, i+3))
+    s9 = s9 + outer[0][0] + outer[1][1]
+}
+let t9e = now()
+assert(s9 > 0, "nested tuple")
+println("  BENCH 9 [nested_tuple_50k]     " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Tuple sort (manual bubble) ────────────────────
+let pairs = []: (Int, Int)
+for i in 0..500 {
+    pairs.push((500 - i, i))
+}
+let t10 = now()
+for let i = 0; i < pairs.len(); i += 1 {
+    for let j = i + 1; j < pairs.len(); j += 1 {
+        if pairs[i][0] > pairs[j][0] {
+            let tmp = pairs[i]
+            pairs[i] = pairs[j]
+            pairs[j] = tmp
+        }
+    }
+}
+let t10e = now()
+assert(pairs[0][0] == 1, "tuple sort first")
+println("  BENCH 10 [tuple_sort_500]      " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [tuples] " + Cast::string(total) + "ms")

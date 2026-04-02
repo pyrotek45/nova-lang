@@ -1,0 +1,233 @@
+module perf_dyn
+
+// ============================================================
+// Dyn Dispatch Benchmarks
+// ============================================================
+// Tests: Dyn type field access, mixed-type Dyn lists, function
+//   field dispatch (vtable), multi-field Dyn, Dyn mutation,
+//   Dyn in collection iteration
+// ============================================================
+
+// ── Struct definitions ───────────────────────────────────────
+struct Warrior {
+    name: String,
+    hp: Int,
+    attack: Int,
+    speed: Int,
+}
+
+struct Mage {
+    name: String,
+    hp: Int,
+    attack: Int,
+    mana: Int,
+}
+
+struct Archer {
+    name: String,
+    hp: Int,
+    attack: Int,
+    range: Int,
+}
+
+// Dyn type aliases
+type entity   = Dyn(T = name: String + hp: Int + attack: Int)
+type attacker = Dyn(T = attack: Int)
+type named    = Dyn(T = name: String)
+type living   = Dyn(T = hp: Int)
+
+// ── BENCH 1: Dyn single-field read ──────────────────────────
+let w1 = Warrior { name: "Thor",   hp: 100, attack: 20, speed: 5 }
+let m1 = Mage    { name: "Merlin", hp: 60,  attack: 35, mana: 200 }
+let a1 = Archer  { name: "Robin",  hp: 80,  attack: 25, range: 10 }
+
+fn get_name_dyn(e: named) -> String { return e.name }
+
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    s1 = s1 + get_name_dyn(w1).len()
+    s1 = s1 + get_name_dyn(m1).len()
+    s1 = s1 + get_name_dyn(a1).len()
+}
+let t1e = now()
+assert(s1 > 0, "dyn name read")
+println("  BENCH 1 [dyn_field_read_100k]  " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Dyn multi-field read ───────────────────────────
+fn total_power(e: entity) -> Int { return e.hp + e.attack }
+
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    s2 = s2 + total_power(w1)
+    s2 = s2 + total_power(m1)
+    s2 = s2 + total_power(a1)
+}
+let t2e = now()
+assert(s2 > 0, "dyn multi-field")
+println("  BENCH 2 [dyn_multi_field_100k] " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Dyn list iteration ─────────────────────────────
+let party = []: entity
+for i in 0..1000 {
+    if i % 3 == 0 {
+        party.push(Warrior { name: "W", hp: i + 10, attack: i % 30 + 1, speed: 5 })
+    } elif i % 3 == 1 {
+        party.push(Mage { name: "M", hp: i + 5, attack: i % 40 + 1, mana: 100 })
+    } else {
+        party.push(Archer { name: "A", hp: i + 8, attack: i % 35 + 1, range: 10 })
+    }
+}
+
+let t3 = now()
+let s3 = 0
+for e in party {
+    s3 = s3 + total_power(e)
+}
+let t3e = now()
+assert(s3 > 0, "dyn list iter")
+println("  BENCH 3 [dyn_list_1k]          " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Dyn field mutation ─────────────────────────────
+fn heal(e: living, amount: Int) { e.hp = e.hp + amount }
+
+let t4 = now()
+for i in 0..100000 {
+    heal(w1, 1)
+    heal(m1, 1)
+    heal(a1, 1)
+}
+let t4e = now()
+assert(w1.hp > 100, "dyn mutate")
+println("  BENCH 4 [dyn_mutate_100k]      " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Dyn function dispatch ──────────────────────────
+struct Fighter {
+    name: String,
+    hp: Int,
+    act: fn(Fighter) -> Int,
+}
+
+struct Healer {
+    name: String,
+    hp: Int,
+    act: fn(Healer) -> Int,
+}
+
+type actor = Dyn(T = hp: Int + name: String)
+
+fn get_hp(e: actor) -> Int { return e.hp }
+
+let f5 = Fighter { name: "Conan", hp: 200, act: fn(self: Fighter) -> Int { return self.hp } }
+let h5 = Healer  { name: "Cleric", hp: 120, act: fn(self: Healer) -> Int { return self.hp } }
+
+let t5 = now()
+let s5 = 0
+for i in 0..100000 {
+    s5 = s5 + get_hp(f5)
+    s5 = s5 + get_hp(h5)
+}
+let t5e = now()
+assert(s5 > 0, "dyn fn field")
+println("  BENCH 5 [dyn_fn_100k]          " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Dyn in reduce ──────────────────────────────────
+fn sum_attack(entities: [entity]) -> Int {
+    let total = 0
+    for e in entities {
+        total = total + e.attack
+    }
+    return total
+}
+
+let t6 = now()
+let s6 = 0
+for i in 0..5000 {
+    s6 = s6 + sum_attack(party)
+}
+let t6e = now()
+assert(s6 > 0, "dyn reduce")
+println("  BENCH 6 [dyn_reduce_5k]        " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Dyn type building + field access ────────────────
+let t7 = now()
+let s7 = 0
+let mobs = []: attacker
+for i in 0..2000 {
+    if i % 2 == 0 {
+        mobs.push(Warrior { name: "W", hp: 50, attack: i % 50 + 1, speed: 3 })
+    } else {
+        mobs.push(Mage { name: "M", hp: 40, attack: i % 60 + 1, mana: 100 })
+    }
+}
+for m in mobs {
+    s7 = s7 + m.attack
+}
+let t7e = now()
+assert(s7 > 0, "dyn build access")
+println("  BENCH 7 [dyn_build_2k]         " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Dyn function in loop with mutation ──────────────
+fn damage(e: entity, dmg: Int) { e.hp = e.hp - dmg }
+
+let combat_party = []: entity
+for i in 0..100 {
+    combat_party.push(Warrior { name: "W", hp: 1000, attack: 10, speed: 3 })
+    combat_party.push(Mage    { name: "M", hp: 800,  attack: 15, mana: 100 })
+    combat_party.push(Archer  { name: "A", hp: 900,  attack: 12, range: 5 })
+}
+
+let t8 = now()
+for round in 0..200 {
+    for e in combat_party {
+        damage(e, 1)
+    }
+}
+let t8e = now()
+assert(combat_party[0].hp < 1000, "dyn combat")
+println("  BENCH 8 [dyn_combat_300x200]   " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Dyn with generic field type ────────────────────
+struct TaggedInt   { value: Int,    tag: String }
+struct TaggedFloat { value: Float,  tag: String }
+
+fn get_tag(x: Dyn(T = tag: String)) -> String { return x.tag }
+
+let ti = TaggedInt   { value: 42,   tag: "integer" }
+let tf = TaggedFloat { value: 3.14, tag: "float" }
+
+let t9 = now()
+let s9 = 0
+for i in 0..100000 {
+    s9 = s9 + get_tag(ti).len()
+    s9 = s9 + get_tag(tf).len()
+}
+let t9e = now()
+assert(s9 > 0, "dyn generic field")
+println("  BENCH 9 [dyn_generic_100k]     " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Dyn sorting by field ──────────────────────────
+fn find_max_attack(entities: [entity]) -> Int {
+    let best = 0
+    for e in entities {
+        if e.attack > best {
+            best = e.attack
+        }
+    }
+    return best
+}
+
+let t10 = now()
+let s10 = 0
+for i in 0..2000 {
+    s10 = s10 + find_max_attack(party)
+}
+let t10e = now()
+assert(s10 > 0, "dyn max scan")
+println("  BENCH 10 [dyn_maxscan_2k]      " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [dyn] " + Cast::string(total) + "ms")

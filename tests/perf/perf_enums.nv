@@ -1,0 +1,186 @@
+module perf_enums
+
+import super.super.std.core
+
+// ============================================================
+// Enum & Pattern Matching Benchmarks
+// ============================================================
+// Tests: enum variant creation, match dispatch, Maybe/Option
+//   patterns, enum in loops, nested enum, enum field access
+// ============================================================
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Custom: Int
+}
+
+fn color_value(c: Color) -> Int {
+    match c {
+        Red() => { return 1 }
+        Green() => { return 2 }
+        Blue() => { return 3 }
+        Custom(v) => { return v }
+    }
+    return 0
+}
+
+enum Shape {
+    Circle: Int,
+    Rect: (Int, Int),
+    Triangle: (Int, Int, Int)
+}
+
+fn shape_area(s: Shape) -> Int {
+    match s {
+        Circle(r) => { return r * r * 3 }
+        Rect(dims) => { return dims[0] * dims[1] }
+        Triangle(sides) => { return (sides[0] + sides[1] + sides[2]) / 2 }
+    }
+    return 0
+}
+
+// ── BENCH 1: Enum creation ──────────────────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    let c = Color::Red()
+    s1 = s1 + 1
+}
+let t1e = now()
+assert(s1 == 100000, "enum create")
+println("  BENCH 1 [enum_create_100k]     " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Enum with data creation ────────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    let c = Color::Custom(i)
+    s2 = s2 + 1
+}
+let t2e = now()
+assert(s2 == 100000, "enum data create")
+println("  BENCH 2 [enum_data_100k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Match dispatch simple ──────────────────────────
+let colors = [Color::Red(), Color::Green(), Color::Blue(), Color::Custom(10)]
+let t3 = now()
+let s3 = 0
+for i in 0..50000 {
+    for c in colors {
+        s3 = s3 + color_value(c)
+    }
+}
+let t3e = now()
+assert(s3 > 0, "match dispatch")
+println("  BENCH 3 [match_simple_200k]    " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Match with data extraction ─────────────────────
+let shapes = [Shape::Circle(5), Shape::Rect((3, 4)), Shape::Triangle((3, 4, 5))]
+let t4 = now()
+let s4 = 0
+for i in 0..50000 {
+    for sh in shapes {
+        s4 = s4 + shape_area(sh)
+    }
+}
+let t4e = now()
+assert(s4 > 0, "match data")
+println("  BENCH 4 [match_data_150k]      " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Option Some/None pattern ───────────────────────
+fn maybe_div(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+
+let t5 = now()
+let s5 = 0
+for i in 0..100000 {
+    if let v = maybe_div(i, 3) {
+        s5 = s5 + v
+    }
+}
+let t5e = now()
+assert(s5 > 0, "option pattern")
+println("  BENCH 5 [option_100k]          " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Maybe Just/Nothing ─────────────────────────────
+fn lookup(key: Int) -> Maybe(Int) {
+    if key % 2 == 0 { return Maybe::Just(key * 10) }
+    return Maybe::Nothing() @[A: Int]
+}
+
+let t6 = now()
+let s6 = 0
+for i in 0..100000 {
+    let val = lookup(i).orDefault(0)
+    s6 = s6 + val
+}
+let t6e = now()
+assert(s6 > 0, "maybe pattern")
+println("  BENCH 6 [maybe_100k]           " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Result Ok/Err ──────────────────────────────────
+fn safe_sqrt(n: Int) -> Result(Int, String) {
+    if n < 0 { return Result::Err("negative") @[A: Int] }
+    return Result::Ok(n) @[B: String]
+}
+
+let t7 = now()
+let s7 = 0
+for i in 0..100000 {
+    let r = safe_sqrt(i)
+    if r.isOk() {
+        s7 = s7 + r.unwrap()
+    }
+}
+let t7e = now()
+assert(s7 > 0, "result pattern")
+println("  BENCH 7 [result_100k]          " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Enum in list ───────────────────────────────────
+let t8 = now()
+let enum_list = []: Color
+for i in 0..10000 {
+    if i % 4 == 0 { enum_list.push(Color::Red()) }
+    elif i % 4 == 1 { enum_list.push(Color::Green()) }
+    elif i % 4 == 2 { enum_list.push(Color::Blue()) }
+    else { enum_list.push(Color::Custom(i)) }
+}
+let s8 = 0
+for c in enum_list {
+    s8 = s8 + color_value(c)
+}
+let t8e = now()
+assert(s8 > 0, "enum in list")
+println("  BENCH 8 [enum_list_10k]        " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Repeated match on same value ───────────────────
+let fixed_shape = Shape::Rect((10, 20))
+let t9 = now()
+let s9 = 0
+for i in 0..200000 {
+    s9 = s9 + shape_area(fixed_shape)
+}
+let t9e = now()
+assert(s9 == 40000000, "repeated match")
+println("  BENCH 9 [match_repeat_200k]    " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Option chain ──────────────────────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..100000 {
+    let x = Some(i)
+    let val = x.orDefault(0)
+    s10 = s10 + val
+}
+let t10e = now()
+assert(s10 > 0, "option chain")
+println("  BENCH 10 [option_chain_100k]   " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [enums] " + Cast::string(total) + "ms")

@@ -1,0 +1,151 @@
+module perf_pipe_ufcs
+
+// ═════════════════════════════════════════════════════════════
+// Pipe operator & UFCS chaining performance benchmarks
+// ═════════════════════════════════════════════════════════════
+
+import super.super.std.core
+import super.super.std.list
+
+// ── helper functions ────────────────────────────────────────
+fn extends double(x: Int) -> Int { return x * 2 }
+fn extends inc(x: Int) -> Int { return x + 1 }
+fn extends square(x: Int) -> Int { return x * x }
+fn extends negate(x: Int) -> Int { return 0 - x }
+fn extends half(x: Int) -> Int { return x / 2 }
+
+fn extends add(a: Int, b: Int) -> Int { return a + b }
+fn extends mul(a: Int, b: Int) -> Int { return a * b }
+
+// ── BENCH 1: simple UFCS ────────────────────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..200000 {
+    s1 = s1 + i.double()
+}
+let t1e = now()
+assert(s1 > 0, "simple ufcs")
+println("  BENCH 1 [ufcs_simple_200k]       " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: chained UFCS ───────────────────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    s2 = s2 + i.double().inc().half()
+}
+let t2e = now()
+assert(s2 > 0, "chained ufcs")
+println("  BENCH 2 [ufcs_chain3_100k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: deep UFCS chain (5 calls) ─────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..100000 {
+    s3 = s3 + i.double().inc().double().inc().half()
+}
+let t3e = now()
+assert(s3 > 0, "deep ufcs")
+println("  BENCH 3 [ufcs_chain5_100k]       " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: UFCS with multi-arg ────────────────────────────
+let t4 = now()
+let s4 = 0
+for i in 0..200000 {
+    s4 = s4 + i.add(10).mul(2)
+}
+let t4e = now()
+assert(s4 > 0, "ufcs multi-arg")
+println("  BENCH 4 [ufcs_multiarg_200k]     " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: list method chaining ───────────────────────────
+let t5 = now()
+let s5 = 0
+for round in 0..200 {
+    let base = 0.to(1000)
+    let mapped = base.map(|x: Int| x * 2)
+    let result = mapped.filter(|x: Int| x % 4 == 0)
+    s5 = s5 + result.len()
+}
+let t5e = now()
+assert(s5 > 0, "list method chain")
+println("  BENCH 5 [list_chain_200x1k]      " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: string UFCS methods ────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..50000 {
+    let result = "  Hello World  ".trim().toLower()
+    s6 = s6 + result.len()
+}
+let t6e = now()
+assert(s6 > 0, "string ufcs")
+println("  BENCH 6 [string_ufcs_50k]        " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: direct fn call comparison ──────────────────────
+fn direct_double(x: Int) -> Int { return x * 2 }
+
+let t7 = now()
+let s7 = 0
+for i in 0..200000 {
+    // direct
+    s7 = s7 + direct_double(i)
+}
+let t7e = now()
+assert(s7 > 0, "direct call")
+println("  BENCH 7 [direct_call_200k]       " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: UFCS same operations as BENCH 7 ────────────────
+let t8 = now()
+let s8 = 0
+for i in 0..200000 {
+    // ufcs
+    s8 = s8 + i.double()
+}
+let t8e = now()
+assert(s8 > 0, "ufcs equiv call")
+println("  BENCH 8 [ufcs_equiv_200k]        " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: UFCS with struct extends ───────────────────────
+struct Vec2 { x: Int, y: Int }
+
+fn extends length_sq(v: Vec2) -> Int {
+    return v.x * v.x + v.y * v.y
+}
+
+fn extends scale(v: Vec2, s: Int) -> Vec2 {
+    return Vec2 { x: v.x * s, y: v.y * s }
+}
+
+fn extends manhattan(v: Vec2) -> Int {
+    let ax = v.x
+    if ax < 0 { ax = 0 - ax }
+    let ay = v.y
+    if ay < 0 { ay = 0 - ay }
+    return ax + ay
+}
+
+let t9 = now()
+let s9 = 0
+for i in 0..100000 {
+    let v = Vec2 { x: i % 50, y: i % 30 }
+    s9 = s9 + v.scale(2).length_sq()
+}
+let t9e = now()
+assert(s9 > 0, "struct extends ufcs")
+println("  BENCH 9 [struct_ufcs_100k]       " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: mixed UFCS + extends chain ────────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..100000 {
+    let v = Vec2 { x: i % 100, y: i % 100 }
+    s10 = s10 + v.scale(3).manhattan()
+}
+let t10e = now()
+assert(s10 > 0, "mixed chain")
+println("  BENCH 10 [mixed_ufcs_chain_100k] " + Cast::string(t10e - t10) + "ms")
+
+// ── summary ─────────────────────────────────────────────────
+let total = (t1e - t1) + (t2e - t2) + (t3e - t3) + (t4e - t4) + (t5e - t5) + (t6e - t6) + (t7e - t7) + (t8e - t8) + (t9e - t9) + (t10e - t10)
+println("")
+println("  TOTAL [pipe_ufcs] " + Cast::string(total) + "ms")

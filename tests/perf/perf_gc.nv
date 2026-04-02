@@ -1,0 +1,165 @@
+module perf_gc
+
+import super.super.std.core
+
+// ============================================================
+// GC Pressure Benchmarks
+// ============================================================
+// Tests: rapid allocation/discard, large object churn, struct
+//   churn, closure churn, string churn, mixed allocation
+// ============================================================
+
+// ── BENCH 1: Rapid list alloc/discard ───────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..20000 {
+    let tmp = [i, i+1, i+2, i+3, i+4]
+    s1 = s1 + tmp.len()
+}
+let t1e = now()
+assert(s1 == 100000, "list churn")
+println("  BENCH 1 [list_churn_20k]       " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Growing list then discard ──────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..500 {
+    let big = []: Int
+    for j in 0..200 {
+        big.push(j)
+    }
+    s2 = s2 + big.len()
+}
+let t2e = now()
+assert(s2 == 100000, "grow discard")
+println("  BENCH 2 [grow_discard_500]     " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: String alloc/discard ───────────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..20000 {
+    let tmp = "hello_" + Cast::string(i) + "_world"
+    s3 = s3 + tmp.len()
+}
+let t3e = now()
+assert(s3 > 0, "string churn")
+println("  BENCH 3 [string_churn_20k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Struct alloc/discard ───────────────────────────
+struct GCNode { val: Int, label: String }
+
+let t4 = now()
+let s4 = 0
+for i in 0..20000 {
+    let n = GCNode { val: i, label: "node" }
+    s4 = s4 + n.val
+}
+let t4e = now()
+assert(s4 > 0, "struct churn")
+println("  BENCH 4 [struct_churn_20k]     " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Closure alloc/discard ──────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..20000 {
+    let val = i
+    let f = fn() -> Int { return val * 2 }
+    s5 = s5 + f()
+}
+let t5e = now()
+assert(s5 > 0, "closure churn")
+println("  BENCH 5 [closure_churn_20k]    " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Tuple alloc/discard ────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..50000 {
+    let tup = (i, i + 1, i + 2)
+    s6 = s6 + tup[0]
+}
+let t6e = now()
+assert(s6 > 0, "tuple churn")
+println("  BENCH 6 [tuple_churn_50k]      " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Nested list alloc ──────────────────────────────
+let t7 = now()
+let s7 = 0
+for i in 0..5000 {
+    let outer = [[i, i+1], [i+2, i+3], [i+4, i+5]]
+    s7 = s7 + outer.len()
+}
+let t7e = now()
+assert(s7 == 15000, "nested list")
+println("  BENCH 7 [nested_list_5k]       " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Box alloc/discard ──────────────────────────────
+let t8 = now()
+let s8 = 0
+for i in 0..50000 {
+    let b = Box(i)
+    s8 = s8 + b.value
+}
+let t8e = now()
+assert(s8 > 0, "box churn")
+println("  BENCH 8 [box_churn_50k]        " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Clone pressure ─────────────────────────────────
+let clone_src = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let t9 = now()
+let s9 = 0
+for i in 0..10000 {
+    let copy = clone(clone_src)
+    s9 = s9 + copy.len()
+}
+let t9e = now()
+assert(s9 == 100000, "clone pressure")
+println("  BENCH 9 [clone_pressure_10k]   " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Mixed type allocation storm ───────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..5000 {
+    let lst = [i, i+1, i+2]
+    let st = GCNode { val: i, label: "x" }
+    let tup = (i, i+1)
+    let bx = Box(i)
+    let val = i
+    let cls = fn() -> Int { return val }
+    s10 = s10 + lst.len() + st.val + tup[0] + bx.value + cls()
+}
+let t10e = now()
+assert(s10 > 0, "mixed alloc")
+println("  BENCH 10 [mixed_alloc_5k]      " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: List reuse (overwrite) ────────────────────────
+let reuse_list = []: Int
+let t11 = now()
+for i in 0..2000 {
+    reuse_list = []: Int
+    for j in 0..100 {
+        reuse_list.push(j)
+    }
+}
+let t11e = now()
+let s11 = reuse_list.len()
+assert(s11 == 100, "reuse list")
+println("  BENCH 11 [list_reuse_2k]       " + Cast::string(t11e - t11) + "ms")
+
+// ── BENCH 12: Struct list build/discard ─────────────────────
+let t12 = now()
+let s12 = 0
+for i in 0..1000 {
+    let nodes = []: GCNode
+    for j in 0..50 {
+        nodes.push(GCNode { val: j, label: "n" })
+    }
+    s12 = s12 + nodes.len()
+}
+let t12e = now()
+assert(s12 == 50000, "struct list build")
+println("  BENCH 12 [struct_list_1kx50]   " + Cast::string(t12e - t12) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)+(t12e-t12)
+println("  TOTAL [gc] " + Cast::string(total) + "ms")

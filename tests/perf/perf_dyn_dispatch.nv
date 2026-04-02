@@ -1,0 +1,215 @@
+module perf_dyn_dispatch
+
+// ═════════════════════════════════════════════════════════════
+// Dyn (structural / duck-typed dispatch) performance benchmarks
+// ═════════════════════════════════════════════════════════════
+
+import super.super.std.core
+
+// ── shared structs ──────────────────────────────────────────
+struct Dog    { name: String, age: Int, weight: Float }
+struct Cat    { name: String, age: Int, lives: Int }
+struct Robot  { name: String, age: Int, model: Int }
+struct Player { name: String, age: Int, score: Int, hp: Int }
+struct NPC    { name: String, age: Int, hp: Int, dialog: String }
+
+// ── BENCH 1: single-field Dyn call ──────────────────────────
+fn get_name(x: Dyn(T = name: String)) -> String {
+    return x.name
+}
+
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    let d = Dog { name: "Rex", age: 3, weight: 12.5 }
+    let n = get_name(d)
+    s1 = s1 + n.len()
+}
+let t1e = now()
+assert(s1 > 0, "single field dyn")
+println("  BENCH 1 [dyn_single_field_100k]  " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: multi-field Dyn call ───────────────────────────
+fn get_info(x: Dyn(T = name: String + age: Int)) -> String {
+    return x.name + ":" + Cast::string(x.age)
+}
+
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    let c = Cat { name: "Whiskers", age: 5, lives: 9 }
+    let info = get_info(c)
+    s2 = s2 + info.len()
+}
+let t2e = now()
+assert(s2 > 0, "multi field dyn")
+println("  BENCH 2 [dyn_multi_field_100k]   " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: polymorphic dispatch (diff struct types) ───────
+let t3 = now()
+let s3 = 0
+for i in 0..50000 {
+    let d = Dog { name: "Rex", age: 3, weight: 12.5 }
+    let c = Cat { name: "Whiskers", age: 5, lives: 9 }
+    let r = Robot { name: "R2D2", age: 1, model: 42 }
+    s3 = s3 + get_name(d).len()
+    s3 = s3 + get_name(c).len()
+    s3 = s3 + get_name(r).len()
+}
+let t3e = now()
+assert(s3 > 0, "polymorphic dyn")
+println("  BENCH 3 [dyn_poly_dispatch_150k] " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Dyn field write ────────────────────────────────
+fn rename(x: Dyn(T = name: String)) {
+    x.name = "changed"
+}
+
+let t4 = now()
+let s4 = 0
+for i in 0..100000 {
+    let d = Dog { name: "Rex", age: 3, weight: 12.5 }
+    rename(d)
+    if d.name == "changed" {
+        s4 = s4 + 1
+    }
+}
+let t4e = now()
+assert(s4 == 100000, "dyn field write")
+println("  BENCH 4 [dyn_field_write_100k]   " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Dyn list iteration ─────────────────────────────
+type named = Dyn(T = name: String)
+
+let t5 = now()
+let s5 = 0
+for round in 0..500 {
+    let items = []: named
+    for i in 0..20 {
+        if i % 3 == 0 {
+            items.push(Dog { name: "D", age: i, weight: 1.0 })
+        } elif i % 3 == 1 {
+            items.push(Cat { name: "C", age: i, lives: 9 })
+        } else {
+            items.push(Robot { name: "R", age: i, model: i })
+        }
+    }
+    for item in items {
+        s5 = s5 + get_name(item).len()
+    }
+}
+let t5e = now()
+assert(s5 > 0, "dyn list iter")
+println("  BENCH 5 [dyn_list_iter_10k]      " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Dyn with age sum (multi-field read) ────────────
+fn get_age(x: Dyn(T = age: Int)) -> Int {
+    return x.age
+}
+
+let t6 = now()
+let s6 = 0
+for i in 0..200000 {
+    let d = Dog { name: "Rex", age: i % 100, weight: 1.0 }
+    s6 = s6 + get_age(d)
+}
+let t6e = now()
+assert(s6 > 0, "dyn age read")
+println("  BENCH 6 [dyn_field_read_200k]    " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Dyn with 3-field contract ──────────────────────
+fn get_summary(x: Dyn(T = name: String + age: Int + hp: Int)) -> Int {
+    return x.age + x.hp
+}
+
+let t7 = now()
+let s7 = 0
+for i in 0..100000 {
+    let p = Player { name: "Hero", age: 20, score: 100, hp: 50 }
+    let n = NPC { name: "Guard", age: 30, hp: 80, dialog: "Hello" }
+    if i % 2 == 0 {
+        s7 = s7 + get_summary(p)
+    } else {
+        s7 = s7 + get_summary(n)
+    }
+}
+let t7e = now()
+assert(s7 > 0, "dyn 3-field")
+println("  BENCH 7 [dyn_3field_100k]        " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: vtable-style Dyn with -> dispatch ──────────────
+struct Button {
+    label: String,
+    render: fn(Button) -> String
+}
+
+struct Label {
+    label: String,
+    render: fn(Label) -> String
+}
+
+type renderable = Dyn(T = render: fn($T) -> String + label: String)
+
+fn render_thing(item: renderable) -> String {
+    return item->render()
+}
+
+let t8 = now()
+let s8 = 0
+let btn = Button {
+    label: "Click",
+    render: fn(self: Button) -> String {
+        return "B:" + self.label
+    }
+}
+let lbl = Label {
+    label: "Text",
+    render: fn(self: Label) -> String {
+        return "L:" + self.label
+    }
+}
+for i in 0..50000 {
+    if i % 2 == 0 {
+        s8 = s8 + render_thing(btn).len()
+    } else {
+        s8 = s8 + render_thing(lbl).len()
+    }
+}
+let t8e = now()
+assert(s8 > 0, "dyn vtable dispatch")
+println("  BENCH 8 [dyn_vtable_50k]         " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Dyn generic field ──────────────────────────────
+fn get_generic_name(x: Dyn(T = name: $S)) -> $S {
+    return x.name
+}
+
+let t9 = now()
+let s9 = 0
+for i in 0..100000 {
+    let d = Dog { name: "Rex", age: 3, weight: 12.5 }
+    s9 = s9 + get_generic_name(d).len()
+}
+let t9e = now()
+assert(s9 > 0, "dyn generic")
+println("  BENCH 9 [dyn_generic_100k]       " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: chained Dyn calls ─────────────────────────────
+fn name_len(x: Dyn(T = name: String)) -> Int {
+    return get_name(x).len()
+}
+
+let t10 = now()
+let s10 = 0
+for i in 0..100000 {
+    let d = Dog { name: "Rover", age: 3, weight: 12.5 }
+    s10 = s10 + name_len(d)
+}
+let t10e = now()
+assert(s10 == 500000, "chained dyn")
+println("  BENCH 10 [dyn_chained_100k]      " + Cast::string(t10e - t10) + "ms")
+
+// ── summary ─────────────────────────────────────────────────
+let total = (t1e - t1) + (t2e - t2) + (t3e - t3) + (t4e - t4) + (t5e - t5) + (t6e - t6) + (t7e - t7) + (t8e - t8) + (t9e - t9) + (t10e - t10)
+println("")
+println("  TOTAL [dyn_dispatch] " + Cast::string(total) + "ms")

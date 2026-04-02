@@ -1,0 +1,145 @@
+module perf_hashmap
+
+import super.super.std.hashmap
+import super.super.std.set
+
+// ============================================================
+// HashMap & Set Benchmarks
+// ============================================================
+// Tests: insert, get, has, delete, iteration, resize,
+//   Set add/has/remove, union, intersection
+// ============================================================
+
+// ── BENCH 1: HashMap insert throughput ──────────────────────
+let t1 = now()
+let m1 = HashMap::default() @[K: Int, V: Int]
+for i in 0..10000 {
+    m1.insert(i, i * 2)
+}
+let t1e = now()
+assert(m1.size() == 10000, "insert size")
+println("  BENCH 1 [hm_insert_10k]       " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: HashMap get throughput ─────────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..10000 {
+    if let v = m1.get(i) {
+        s2 = s2 + v
+    }
+}
+let t2e = now()
+assert(s2 > 0, "get sum")
+println("  BENCH 2 [hm_get_10k]          " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: HashMap has throughput ─────────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..10000 {
+    if m1.has(i) {
+        s3 = s3 + 1
+    }
+}
+let t3e = now()
+assert(s3 == 10000, "has all")
+println("  BENCH 3 [hm_has_10k]          " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: HashMap delete throughput ──────────────────────
+let m4 = HashMap::default() @[K: Int, V: Int]
+for i in 0..5000 {
+    m4.insert(i, i)
+}
+let t4 = now()
+for i in 0..5000 {
+    m4.delete(i)
+}
+let t4e = now()
+assert(m4.size() == 0, "delete all")
+println("  BENCH 4 [hm_delete_5k]        " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: HashMap insert/update cycle ────────────────────
+let m5 = HashMap::default() @[K: Int, V: Int]
+let t5 = now()
+for i in 0..10000 {
+    let key = i % 1000
+    let cur = m5.getOrDefault(key, 0)
+    m5.insert(key, cur + 1)
+}
+let t5e = now()
+assert(m5.size() == 1000, "update cycle")
+println("  BENCH 5 [hm_update_10k]       " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: HashMap entries iteration ──────────────────────
+let m6 = HashMap::default() @[K: Int, V: Int]
+for i in 0..5000 {
+    m6.insert(i, i)
+}
+let t6 = now()
+let entries = m6.entries()
+let s6 = 0
+for e in entries {
+    s6 = s6 + e[1]
+}
+let t6e = now()
+assert(s6 > 0, "entries sum")
+println("  BENCH 6 [hm_entries_5k]       " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: HashMap string keys ────────────────────────────
+let m7 = HashMap::default() @[K: String, V: Int]
+let t7 = now()
+for i in 0..5000 {
+    m7.insert("key_" + Cast::string(i), i)
+}
+let t7e = now()
+assert(m7.size() == 5000, "string keys")
+println("  BENCH 7 [hm_string_keys_5k]   " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Set add throughput ─────────────────────────────
+let t8 = now()
+let s1_set = Set::empty() @[T: Int]
+for i in 0..10000 {
+    s1_set.add(i)
+}
+let t8e = now()
+assert(s1_set.size() == 10000, "set add")
+println("  BENCH 8 [set_add_10k]         " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Set has throughput ─────────────────────────────
+let t9 = now()
+let s9 = 0
+for i in 0..10000 {
+    if s1_set.has(i) {
+        s9 = s9 + 1
+    }
+}
+let t9e = now()
+assert(s9 == 10000, "set has")
+println("  BENCH 9 [set_has_10k]         " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Set remove throughput ─────────────────────────
+let s10_set = Set::empty() @[T: Int]
+for i in 0..5000 {
+    s10_set.add(i)
+}
+let t10 = now()
+for i in 0..5000 {
+    s10_set.remove(i)
+}
+let t10e = now()
+assert(s10_set.size() == 0, "set remove")
+println("  BENCH 10 [set_remove_5k]      " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: Set dedup insert ──────────────────────────────
+let t11 = now()
+let dedup_set = Set::empty() @[T: Int]
+for i in 0..10000 {
+    dedup_set.add(i % 500)
+}
+let t11e = now()
+assert(dedup_set.size() == 500, "dedup")
+println("  BENCH 11 [set_dedup_10k]      " + Cast::string(t11e - t11) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)
+println("  TOTAL [hashmap] " + Cast::string(total) + "ms")

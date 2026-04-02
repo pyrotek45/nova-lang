@@ -1,0 +1,186 @@
+module perf_recursion
+
+// ============================================================
+// Recursion & Call Stack Benchmarks
+// ============================================================
+// Tests: recursive depth, tail-position recursion, mutual recursion,
+//   divide-and-conquer, recursive data processing
+// ============================================================
+
+// ── BENCH 1: Recursive fibonacci ────────────────────────────
+fn fib(n: Int) -> Int {
+    if n <= 1 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+let t1 = now()
+let s1 = fib(28)
+let t1e = now()
+assert(s1 == 317811, "fib 28")
+println("  BENCH 1 [rec_fib_28]           " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Recursive sum ──────────────────────────────────
+fn rec_sum(n: Int) -> Int {
+    if n <= 0 { return 0 }
+    return n + rec_sum(n - 1)
+}
+
+let t2 = now()
+let s2 = 0
+for i in 0..1000 {
+    s2 = s2 + rec_sum(200)
+}
+let t2e = now()
+assert(s2 == 20100000, "rec sum")
+println("  BENCH 2 [rec_sum_200x1k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Recursive power ────────────────────────────────
+fn rec_pow(base: Int, exp: Int) -> Int {
+    if exp == 0 { return 1 }
+    return base * rec_pow(base, exp - 1)
+}
+
+let t3 = now()
+let s3 = 0
+for i in 0..10000 {
+    s3 = s3 + rec_pow(2, 20)
+}
+let t3e = now()
+assert(s3 == 10485760000, "rec pow")
+println("  BENCH 3 [rec_pow_20x10k]       " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Recursive GCD (Euclidean) ──────────────────────
+fn rec_gcd(a: Int, b: Int) -> Int {
+    if b == 0 { return a }
+    return rec_gcd(b, a % b)
+}
+
+let t4 = now()
+let s4 = 0
+for i in 0..50000 {
+    s4 = s4 + rec_gcd(10946, 6765)
+}
+let t4e = now()
+assert(s4 == 50000, "rec gcd")
+println("  BENCH 4 [rec_gcd_50k]          " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Recursive binary search ────────────────────────
+fn bin_search(arr: [Int], target: Int, lo: Int, hi: Int) -> Int {
+    if lo > hi { return -1 }
+    let mid = (lo + hi) / 2
+    if arr[mid] == target { return mid }
+    if arr[mid] < target {
+        return bin_search(arr, target, mid + 1, hi)
+    }
+    return bin_search(arr, target, lo, mid - 1)
+}
+
+let sorted_arr = []: Int
+for i in 0..1000 {
+    sorted_arr.push(i * 3)
+}
+
+let t5 = now()
+let s5 = 0
+for i in 0..10000 {
+    let idx = bin_search(sorted_arr, (i % 1000) * 3, 0, 999)
+    s5 = s5 + idx
+}
+let t5e = now()
+assert(s5 > 0, "bin search")
+println("  BENCH 5 [rec_binsearch_10k]    " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Recursive list length ──────────────────────────
+fn rec_len(lst: [Int], idx: Int) -> Int {
+    if idx >= lst.len() { return 0 }
+    return 1 + rec_len(lst, idx + 1)
+}
+
+let len_list = []: Int
+for i in 0..500 {
+    len_list.push(i)
+}
+
+let t6 = now()
+let s6 = 0
+for i in 0..500 {
+    s6 = s6 + rec_len(len_list, 0)
+}
+let t6e = now()
+assert(s6 == 250000, "rec len")
+println("  BENCH 6 [rec_len_500x500]      " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Deep call chain ────────────────────────────────
+fn chain_b(n: Int) -> Int   // forward declaration
+fn chain_c(n: Int) -> Int   // forward declaration
+
+fn chain_a(n: Int) -> Int {
+    if n <= 0 { return 0 }
+    return chain_b(n - 1)
+}
+fn chain_b(n: Int) -> Int {
+    return chain_c(n)
+}
+fn chain_c(n: Int) -> Int {
+    return chain_a(n) + 1
+}
+
+let t7 = now()
+let s7 = 0
+for i in 0..1000 {
+    s7 = s7 + chain_a(300)
+}
+let t7e = now()
+assert(s7 > 0, "deep chain")
+println("  BENCH 7 [deep_chain_300x1k]    " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Recursive countdown ────────────────────────────
+fn countdown(n: Int) -> Int {
+    if n <= 0 { return 0 }
+    return 1 + countdown(n - 1)
+}
+
+let t8 = now()
+let s8 = 0
+for i in 0..2000 {
+    s8 = s8 + countdown(500)
+}
+let t8e = now()
+assert(s8 == 1000000, "countdown")
+println("  BENCH 8 [countdown_500x2k]     " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Recursive digit sum ────────────────────────────
+fn digit_sum(n: Int) -> Int {
+    if n < 10 { return n }
+    return (n % 10) + digit_sum(n / 10)
+}
+
+let t9 = now()
+let s9 = 0
+for i in 0..100000 {
+    s9 = s9 + digit_sum(123456789)
+}
+let t9e = now()
+assert(s9 == 4500000, "digit sum")
+println("  BENCH 9 [digit_sum_100k]       " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Recursive flatten (simulated) ─────────────────
+fn rec_flatten_sum(depth: Int, width: Int) -> Int {
+    if depth <= 0 { return width }
+    let total = 0
+    for i in 0..width {
+        total = total + rec_flatten_sum(depth - 1, width)
+    }
+    return total
+}
+
+let t10 = now()
+let s10 = rec_flatten_sum(4, 10)
+let t10e = now()
+assert(s10 == 100000, "rec flatten")
+println("  BENCH 10 [rec_flatten_4x10]    " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [recursion] " + Cast::string(total) + "ms")

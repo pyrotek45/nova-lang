@@ -1,0 +1,182 @@
+module perf_vm_stress
+
+// ============================================================
+// VM Bytecode Stress Benchmarks
+// ============================================================
+// Pure VM instruction throughput: tight loops that exercise
+//   specific opcode sequences — no stdlib, no allocations.
+//   These reveal raw VM dispatch speed for future optimization.
+// ============================================================
+
+// ── BENCH 1: Integer pipeline (add+mul+mod in one loop) ──────
+let t1 = now()
+let a1 = 1
+let b1 = 2
+let c1 = 3
+for i in 0..1000000 {
+    a1 = a1 + b1
+    b1 = b1 * 3
+    b1 = b1 % 1000
+    c1 = c1 + a1 + b1
+}
+let t1e = now()
+assert(c1 > 0, "int pipeline")
+println("  BENCH 1 [int_pipeline_1M]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Float pipeline (fadd+fmul in tight loop) ────────
+let t2 = now()
+let fa = 1.0
+let fb = 1.001
+for i in 0..500000 {
+    fa = fa * fb
+    if fa > 1000000.0 { fa = 1.0 }
+}
+let t2e = now()
+assert(fa > 0.0, "float pipeline")
+println("  BENCH 2 [float_pipeline_500k]  " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Branch-heavy (alternating comparisons) ──────────
+let t3 = now()
+let s3 = 0
+for i in 0..500000 {
+    if i % 2 == 0 {
+        if i % 4 == 0 {
+            s3 = s3 + 1
+        } else {
+            s3 = s3 + 2
+        }
+    } else {
+        if i % 3 == 0 {
+            s3 = s3 + 3
+        } else {
+            s3 = s3 + 4
+        }
+    }
+}
+let t3e = now()
+assert(s3 > 0, "branch heavy")
+println("  BENCH 3 [branch_500k]          " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Stack pressure (many local vars) ─────────────────
+let t4 = now()
+let s4 = 0
+for i in 0..200000 {
+    let v0 = i
+    let v1 = i + 1
+    let v2 = i + 2
+    let v3 = i + 3
+    let v4 = i + 4
+    let v5 = i + 5
+    let v6 = i + 6
+    let v7 = i + 7
+    s4 = s4 + v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7
+}
+let t4e = now()
+assert(s4 > 0, "stack pressure")
+println("  BENCH 4 [stack_pressure_200k]  " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Integer division chain ──────────────────────────
+let t5 = now()
+let s5 = 1000000000
+for i in 1..500001 {
+    s5 = s5 / 2
+    s5 = s5 + i
+}
+let t5e = now()
+assert(s5 > 0, "div chain")
+println("  BENCH 5 [div_chain_500k]       " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Boolean toggle chain ────────────────────────────
+let t6 = now()
+let flag = true
+let s6 = 0
+for i in 0..1000000 {
+    flag = !flag
+    if flag { s6 = s6 + 1 }
+}
+let t6e = now()
+assert(s6 == 500000, "bool toggle")
+println("  BENCH 6 [bool_toggle_1M]       " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Nested arithmetic expression ────────────────────
+let t7 = now()
+let s7 = 0
+for i in 0..500000 {
+    let v = ((i * 3 + 7) % 97) * ((i + 13) % 53) - (i % 17)
+    s7 = s7 + v
+}
+let t7e = now()
+assert(s7 >= 0, "nested arith")
+println("  BENCH 7 [nested_arith_500k]    " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Counter array hot write ─────────────────────────
+let counters = [0, 0, 0, 0, 0, 0, 0, 0]
+let t8 = now()
+for i in 0..1000000 {
+    counters[i % 8] = counters[i % 8] + 1
+}
+let t8e = now()
+assert(counters[0] == 125000, "counter array")
+println("  BENCH 8 [counter_arr_1M]       " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Fibonacci accumulation (iterative) ──────────────
+let t9 = now()
+let fib_a = 0
+let fib_b = 1
+for i in 0..1000000 {
+    let tmp = fib_a + fib_b
+    fib_a = fib_b
+    fib_b = tmp % 1000000007
+}
+let t9e = now()
+assert(fib_b > 0, "iterative fib")
+println("  BENCH 9 [iter_fib_1M]          " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Bit manipulation (shift/and/or) ────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..500000 {
+    let x = i * 2
+    let y = i + 1
+    // Simulate bit patterns with arithmetic ops
+    let lo = x % 256
+    let hi = y % 256
+    let packed = hi * 256 + lo
+    s10 = s10 + packed % 1000
+}
+let t10e = now()
+assert(s10 > 0, "bit ops")
+println("  BENCH 10 [bit_ops_500k]        " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: Tight accumulator (single variable, no alloc) ──
+let t11 = now()
+let acc = 0
+for i in 0..2000000 {
+    acc = acc + i
+}
+let t11e = now()
+assert(acc == 1999999000000, "tight acc")
+println("  BENCH 11 [tight_acc_2M]        " + Cast::string(t11e - t11) + "ms")
+
+// ── BENCH 12: Chained comparisons (branching stress) ─────────
+let t12 = now()
+let s12 = 0
+for i in 0..500000 {
+    if i > 0 {
+        if i < 500000 {
+            if i % 2 == 0 {
+                if i % 10 != 0 {
+                    s12 = s12 + 1
+                }
+            }
+        }
+    }
+}
+let t12e = now()
+assert(s12 > 0, "chained cmp")
+println("  BENCH 12 [chained_cmp_500k]    " + Cast::string(t12e - t12) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)+(t12e-t12)
+println("  TOTAL [vm_stress] " + Cast::string(total) + "ms")

@@ -1,0 +1,154 @@
+module perf_strings
+
+// ============================================================
+// String Operations Benchmarks
+// ============================================================
+// Tests: concat, Cast::string, chars/string roundtrip,
+//   contains, indexOf, replace, repeat, toUpper/toLower,
+//   substring, trim, len
+// ============================================================
+
+// ── BENCH 1: String concat loop ─────────────────────────────
+let t1 = now()
+let s1 = ""
+for i in 0..5000 {
+    s1 = s1 + "a"
+}
+let t1e = now()
+assert(s1.len() == 5000, "concat len")
+println("  BENCH 1 [concat_5k]            " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Cast::string int conversion ────────────────────
+let t2 = now()
+let s2 = ""
+for i in 0..50000 {
+    s2 = Cast::string(i)
+}
+let t2e = now()
+assert(s2 == "49999", "cast last")
+println("  BENCH 2 [cast_string_50k]      " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: String.len() throughput ────────────────────────
+let long_str = "a".repeat(1000)
+let t3 = now()
+let s3 = 0
+for i in 0..100000 {
+    s3 = s3 + long_str.len()
+}
+let t3e = now()
+assert(s3 == 100000000, "len throughput")
+println("  BENCH 3 [len_100k]             " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: String.contains() ──────────────────────────────
+let haystack = "abcdefghijklmnopqrstuvwxyz".repeat(20)
+let t4 = now()
+let s4 = 0
+for i in 0..20000 {
+    if haystack.contains("xyz") {
+        s4 = s4 + 1
+    }
+}
+let t4e = now()
+assert(s4 == 20000, "contains")
+println("  BENCH 4 [contains_20k]         " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: String.indexOf() ───────────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..20000 {
+    let idx = haystack.indexOf("mno")
+    s5 = s5 + idx
+}
+let t5e = now()
+assert(s5 > 0, "indexOf")
+println("  BENCH 5 [indexOf_20k]          " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: String.replace() ───────────────────────────────
+let rep_str = "hello world hello world hello world"
+let t6 = now()
+let s6 = ""
+for i in 0..10000 {
+    s6 = rep_str.replace("hello", "hi")
+}
+let t6e = now()
+assert(s6.contains("hi"), "replace")
+println("  BENCH 6 [replace_10k]          " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: String.repeat() ────────────────────────────────
+let t7 = now()
+let s7 = ""
+for i in 0..10000 {
+    s7 = "ab".repeat(50)
+}
+let t7e = now()
+assert(s7.len() == 100, "repeat")
+println("  BENCH 7 [repeat_10k]           " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: String.toUpper/toLower ─────────────────────────
+let case_str = "Hello World Test String"
+let t8 = now()
+let s8u = ""
+let s8l = ""
+for i in 0..20000 {
+    s8u = case_str.toUpper()
+    s8l = case_str.toLower()
+}
+let t8e = now()
+assert(s8u == "HELLO WORLD TEST STRING", "toUpper")
+assert(s8l == "hello world test string", "toLower")
+println("  BENCH 8 [case_conv_20k]        " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: String.substring() ─────────────────────────────
+let sub_str = "abcdefghijklmnopqrstuvwxyz"
+let t9 = now()
+let s9 = ""
+for i in 0..50000 {
+    s9 = sub_str.substring(5, 15)
+}
+let t9e = now()
+assert(s9.len() == 10, "substring")
+println("  BENCH 9 [substring_50k]        " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: String.trim() ─────────────────────────────────
+let trim_str = "   hello world   "
+let t10 = now()
+let s10 = ""
+for i in 0..50000 {
+    s10 = trim_str.trim()
+}
+let t10e = now()
+assert(s10 == "hello world", "trim")
+println("  BENCH 10 [trim_50k]            " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: chars/string roundtrip ────────────────────────
+let rt_str = "performance benchmark test"
+let t11 = now()
+let s11 = ""
+for i in 0..10000 {
+    let ch = rt_str.chars()
+    s11 = ch.string()
+}
+let t11e = now()
+assert(s11 == rt_str, "roundtrip")
+println("  BENCH 11 [chars_string_10k]    " + Cast::string(t11e - t11) + "ms")
+
+// ── BENCH 12: String startsWith/endsWith ────────────────────
+let prefix_str = "nova_lang_benchmark_test_string"
+let t12 = now()
+let s12 = 0
+for i in 0..50000 {
+    if prefix_str.startsWith("nova") {
+        s12 = s12 + 1
+    }
+    if prefix_str.endsWith("string") {
+        s12 = s12 + 1
+    }
+}
+let t12e = now()
+assert(s12 == 100000, "startsWith/endsWith")
+println("  BENCH 12 [prefix_suffix_50k]   " + Cast::string(t12e - t12) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)+(t12e-t12)
+println("  TOTAL [strings] " + Cast::string(total) + "ms")
