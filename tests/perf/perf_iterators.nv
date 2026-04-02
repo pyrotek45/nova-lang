@@ -1,0 +1,127 @@
+module perf_iterators
+
+import super.super.std.iter
+import super.super.std.core
+
+// ============================================================
+// Iterator / Lazy Pipeline Benchmarks
+// ============================================================
+// Tests: Iter::fromRange, Iter::fromVec, .map, .filter,
+//   .take, .drop, .collect, .sum, .count, .reduce, .chain
+// ============================================================
+
+// ── BENCH 1: Iter::fromRange + collect ──────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..500 {
+    let lst = Iter::fromRange(0, 200).collect()
+    s1 = s1 + lst.len()
+}
+let t1e = now()
+assert(s1 == 100000, "fromRange collect")
+println("  BENCH 1 [iter_range_500]       " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Iter::fromVec + map + collect ──────────────────
+let base_list = 0.to(1000)
+let t2 = now()
+let s2 = 0
+for i in 0..200 {
+    let mapped = Iter::fromVec(base_list).map(|x: Int| x * 2).collect()
+    s2 = s2 + mapped.len()
+}
+let t2e = now()
+assert(s2 == 200000, "map collect")
+println("  BENCH 2 [iter_map_200]         " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Iter filter + collect ──────────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..200 {
+    let filt = Iter::fromVec(base_list).filter(|x: Int| x % 2 == 0).collect()
+    s3 = s3 + filt.len()
+}
+let t3e = now()
+assert(s3 == 100000, "filter collect")
+println("  BENCH 3 [iter_filter_200]      " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Iter map + filter + collect ────────────────────
+let t4 = now()
+let s4 = 0
+for i in 0..200 {
+    let result = Iter::fromVec(base_list)
+        .map(|x: Int| x * 3)
+        .filter(|x: Int| x % 6 == 0)
+        .collect()
+    s4 = s4 + result.len()
+}
+let t4e = now()
+assert(s4 > 0, "map+filter")
+println("  BENCH 4 [iter_map_filter_200]  " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Iter.take ──────────────────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..1000 {
+    let taken = Iter::fromRange(0, 10000).take(100).collect()
+    s5 = s5 + taken.len()
+}
+let t5e = now()
+assert(s5 == 100000, "take")
+println("  BENCH 5 [iter_take_1k]         " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Iter.drop + collect ────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..200 {
+    let dropped = Iter::fromVec(base_list).drop(500).collect()
+    s6 = s6 + dropped.len()
+}
+let t6e = now()
+assert(s6 == 100000, "drop")
+println("  BENCH 6 [iter_drop_200]        " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Iter.sum ───────────────────────────────────────
+let t7 = now()
+let s7 = 0
+for i in 0..500 {
+    s7 = s7 + Iter::fromRange(0, 100).sum()
+}
+let t7e = now()
+assert(s7 == 2475000, "iter sum")
+println("  BENCH 7 [iter_sum_500]         " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Iter.count ─────────────────────────────────────
+let t8 = now()
+let s8 = 0
+for i in 0..500 {
+    s8 = s8 + Iter::fromRange(0, 200).count()
+}
+let t8e = now()
+assert(s8 == 100000, "iter count")
+println("  BENCH 8 [iter_count_500]       " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Iter.reduce (fold) ─────────────────────────────
+let t9 = now()
+let s9 = 0
+for i in 0..500 {
+    s9 = s9 + Iter::fromRange(1, 101).reduce(|acc: Int, x: Int| acc + x, 0)
+}
+let t9e = now()
+assert(s9 == 2525000, "iter reduce")
+println("  BENCH 9 [iter_reduce_500]      " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Iter.chain ────────────────────────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..500 {
+    let chained = Iter::fromRange(0, 100).chain(Iter::fromRange(100, 200)).collect()
+    s10 = s10 + chained.len()
+}
+let t10e = now()
+assert(s10 == 100000, "chain")
+println("  BENCH 10 [iter_chain_500]      " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [iterators] " + Cast::string(total) + "ms")

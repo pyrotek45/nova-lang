@@ -1,0 +1,157 @@
+module perf_loops
+
+import super.super.std.core
+
+// ============================================================
+// Loop Throughput Benchmarks
+// ============================================================
+// Tests loop dispatch, branch prediction, unrolling, ranges:
+//   C-style for, for-in range, for-in collection,
+//   while, nested loops, break/continue overhead
+// ============================================================
+
+// ── BENCH 1: C-style for loop ───────────────────────────────
+let t1 = now()
+let s1 = 0
+for let i = 0; i < 500000; i += 1 {
+    s1 = s1 + 1
+}
+let t1e = now()
+assert(s1 == 500000, "c-style loop")
+println("  BENCH 1 [c_style_500k]        " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: For-in exclusive range ─────────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..500000 {
+    s2 = s2 + 1
+}
+let t2e = now()
+assert(s2 == 500000, "range loop")
+println("  BENCH 2 [range_excl_500k]     " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: For-in inclusive range ─────────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..=99999 {
+    s3 = s3 + 1
+}
+let t3e = now()
+assert(s3 == 100000, "inclusive range loop")
+println("  BENCH 3 [range_incl_100k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: While loop ────────────────────────────────────
+let t4 = now()
+let s4 = 0
+let w4 = 0
+while w4 < 500000 {
+    s4 = s4 + 1
+    w4 = w4 + 1
+}
+let t4e = now()
+assert(s4 == 500000, "while loop")
+println("  BENCH 4 [while_500k]          " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Nested loops (tight) ───────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..700 {
+    for j in 0..700 {
+        s5 = s5 + 1
+    }
+}
+let t5e = now()
+assert(s5 == 490000, "nested 700x700")
+println("  BENCH 5 [nested_700x700]      " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Triple nested loops ────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..50 {
+    for j in 0..50 {
+        for k in 0..50 {
+            s6 = s6 + 1
+        }
+    }
+}
+let t6e = now()
+assert(s6 == 125000, "triple nested 50^3")
+println("  BENCH 6 [triple_nested_50^3]  " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Loop with break ────────────────────────────────
+let t7 = now()
+let s7 = 0
+for rep in 0..10000 {
+    for let i = 0; i < 100; i += 1 {
+        if i == 50 { break }
+        s7 = s7 + 1
+    }
+}
+let t7e = now()
+assert(s7 == 500000, "loop break 10k*50")
+println("  BENCH 7 [loop_break_10k]      " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Loop with continue ─────────────────────────────
+let t8 = now()
+let s8 = 0
+for i in 0..200000 {
+    if i % 2 == 0 { continue }
+    s8 = s8 + 1
+}
+let t8e = now()
+assert(s8 == 100000, "loop continue skip evens")
+println("  BENCH 8 [loop_continue_200k]  " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Loop unrolling check (small range) ─────────────
+// Compiler unrolls when both bounds < 255 and are literals
+let t9 = now()
+let s9 = 0
+for rep in 0..5000 {
+    for i in 0..10 {
+        s9 = s9 + i
+    }
+}
+let t9e = now()
+// sum 0..9 = 45, * 5000 = 225000
+assert(s9 == 225000, "unroll 0..10 x 5000")
+println("  BENCH 9 [unrolled_small_5k]   " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Non-unrolled (large range) ────────────────────
+let t10 = now()
+let s10 = 0
+for rep in 0..50 {
+    for i in 0..10000 {
+        s10 = s10 + 1
+    }
+}
+let t10e = now()
+assert(s10 == 500000, "non-unrolled 50*10k")
+println("  BENCH 10 [non_unrolled_50x10k] " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: For-in over list ──────────────────────────────
+let big_list = 0.to(10000)
+let t11 = now()
+let s11 = 0
+for item in big_list {
+    s11 = s11 + item
+}
+let t11e = now()
+assert(s11 == 49995000, "for-in list sum")
+println("  BENCH 11 [for_in_list_10k]    " + Cast::string(t11e - t11) + "ms")
+
+// ── BENCH 12: Countdown while loop ──────────────────────────
+let t12 = now()
+let s12 = 500000
+let cd = 0
+while s12 > 0 {
+    s12 -= 1
+    cd += 1
+}
+let t12e = now()
+assert(cd == 500000, "countdown")
+println("  BENCH 12 [countdown_500k]     " + Cast::string(t12e - t12) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)+(t12e-t12)
+println("  TOTAL [loops] " + Cast::string(total) + "ms")

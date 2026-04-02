@@ -1,0 +1,220 @@
+module perf_mixed
+
+import super.super.std.list
+import super.super.std.core
+
+// ============================================================
+// Mixed Real-World Workload Benchmarks
+// ============================================================
+// Tests: particle simulation, data pipeline, matrix ops,
+//   game-loop patterns, combined subsystem stress
+// ============================================================
+
+// ── BENCH 1: Particle simulation ────────────────────────────
+struct Particle { x: Float, y: Float, vx: Float, vy: Float }
+
+fn extends update_p(p: Particle) -> Particle {
+    return Particle {
+        x: p.x + p.vx,
+        y: p.y + p.vy,
+        vx: p.vx * 0.99,
+        vy: p.vy * 0.99 + 0.1,
+    }
+}
+
+let t1 = now()
+let particles = []: Particle
+for i in 0..200 {
+    let fi = Cast::float(i).unwrap()
+    particles.push(Particle { x: fi, y: 0.0, vx: 1.0, vy: 2.0 })
+}
+for frame in 0..500 {
+    for i in 0..particles.len() {
+        particles[i] = particles[i].update_p()
+    }
+}
+let t1e = now()
+assert(particles.len() == 200, "particle sim")
+println("  BENCH 1 [particle_200x500]     " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Data processing pipeline ───────────────────────
+let t2 = now()
+let data = []: Int
+for i in 0..5000 {
+    data.push(i)
+}
+let result = data
+    .filter(|x: Int| x % 3 == 0)
+    .map(|x: Int| x * 2)
+    .filter(|x: Int| x < 5000)
+let s2 = 0
+for v in result {
+    s2 = s2 + v
+}
+let t2e = now()
+assert(s2 > 0, "pipeline")
+println("  BENCH 2 [pipeline_5k]          " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Matrix multiply (flat) ─────────────────────────
+let N = 50
+let t3 = now()
+let mat_a = []: Int
+let mat_b = []: Int
+let mat_c = []: Int
+for i in 0..N*N {
+    mat_a.push(i % 10)
+    mat_b.push((i * 3) % 10)
+    mat_c.push(0)
+}
+for i in 0..N {
+    for j in 0..N {
+        let sum = 0
+        for k in 0..N {
+            sum = sum + mat_a[i * N + k] * mat_b[k * N + j]
+        }
+        mat_c[i * N + j] = sum
+    }
+}
+let t3e = now()
+assert(mat_c[0] >= 0, "matmul")
+println("  BENCH 3 [matmul_50x50]         " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: String builder pattern ─────────────────────────
+let t4 = now()
+let lines = []: String
+for i in 0..2000 {
+    lines.push("Line " + Cast::string(i) + ": data=" + Cast::string(i * 7))
+}
+let s4 = lines.len()
+let t4e = now()
+assert(s4 == 2000, "string builder")
+println("  BENCH 4 [string_builder_2k]    " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Game entity update ─────────────────────────────
+struct Entity { x: Int, y: Int, hp: Int, speed: Int }
+
+fn extends tick(e: Entity) -> Entity {
+    return Entity { x: e.x + e.speed, y: e.y + 1, hp: e.hp, speed: e.speed }
+}
+
+let t5 = now()
+let entities = []: Entity
+for i in 0..500 {
+    entities.push(Entity { x: 0, y: 0, hp: 100, speed: i % 5 + 1 })
+}
+for frame in 0..200 {
+    for i in 0..entities.len() {
+        entities[i] = entities[i].tick()
+    }
+}
+let t5e = now()
+assert(entities[0].y == 200, "entity update")
+println("  BENCH 5 [entity_update_500x200] " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Histogram computation ──────────────────────────
+let t6 = now()
+let hist = []: Int
+for i in 0..256 {
+    hist.push(0)
+}
+for i in 0..100000 {
+    let bucket = i % 256
+    hist[bucket] = hist[bucket] + 1
+}
+let s6 = 0
+for v in hist {
+    s6 = s6 + v
+}
+let t6e = now()
+assert(s6 == 100000, "histogram")
+println("  BENCH 6 [histogram_100k]       " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Collision detection (N^2 brute force) ──────────
+struct Obj { x: Int, y: Int }
+
+let t7 = now()
+let objects = []: Obj
+for i in 0..200 {
+    objects.push(Obj { x: i * 3, y: i * 2 })
+}
+let collisions = 0
+for i in 0..objects.len() {
+    for j in (i+1)..objects.len() {
+        let dx = objects[i].x - objects[j].x
+        let dy = objects[i].y - objects[j].y
+        if dx < 0 { dx = 0 - dx }
+        if dy < 0 { dy = 0 - dy }
+        if dx < 5 {
+            if dy < 5 {
+                collisions = collisions + 1
+            }
+        }
+    }
+}
+let t7e = now()
+assert(collisions >= 0, "collision")
+println("  BENCH 7 [collision_200]        " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Priority queue simulation ──────────────────────
+let t8 = now()
+let pq = []: Int
+for i in 0..5000 {
+    pq.push(5000 - i)
+}
+pq = pq.quicksort()
+let s8 = 0
+for i in 0..100 {
+    s8 = s8 + pq[i]
+}
+let t8e = now()
+assert(s8 > 0, "pq sort")
+println("  BENCH 8 [pq_sort_5k]           " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: State machine simulation ───────────────────────
+let t9 = now()
+let state = 0
+let transitions = 0
+for i in 0..200000 {
+    if state == 0 {
+        if i % 3 == 0 { state = 1 }
+    } elif state == 1 {
+        if i % 5 == 0 { state = 2 }
+        else { state = 0 }
+    } elif state == 2 {
+        if i % 7 == 0 { state = 0 }
+        else { state = 1 }
+    }
+    transitions = transitions + 1
+}
+let t9e = now()
+assert(transitions == 200000, "state machine")
+println("  BENCH 9 [state_machine_200k]   " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Sieve of Eratosthenes ────────────────────────
+let t10 = now()
+let limit = 10000
+let is_prime = []: Bool
+for i in 0..limit {
+    is_prime.push(true)
+}
+is_prime[0] = false
+is_prime[1] = false
+for let i = 2; i * i < limit; i += 1 {
+    if is_prime[i] {
+        for let j = i * i; j < limit; j += i {
+            is_prime[j] = false
+        }
+    }
+}
+let prime_count = 0
+for v in is_prime {
+    if v { prime_count = prime_count + 1 }
+}
+let t10e = now()
+assert(prime_count == 1229, "sieve")
+println("  BENCH 10 [sieve_10k]           " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [mixed] " + Cast::string(total) + "ms")

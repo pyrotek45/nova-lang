@@ -1,0 +1,204 @@
+module perf_option_result
+
+import super.super.std.core
+
+// ============================================================
+// Option / Result / Maybe Pattern Benchmarks
+// ============================================================
+// Tests: Option creation, if-let unwrap, .orDefault, chaining,
+//   Result Ok/Err, Maybe Just/Nothing, map/flatMap on optionals,
+//   heavy pattern-match dispatch, nested option handling
+// ============================================================
+
+// ── BENCH 1: Option Some creation + if-let ──────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..200000 {
+    let opt = Some(i)
+    if let v = opt {
+        s1 = s1 + v
+    }
+}
+let t1e = now()
+assert(s1 > 0, "some if-let")
+println("  BENCH 1 [some_iflet_200k]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Option None + if-let (no body) ─────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..200000 {
+    let opt = None(Int)
+    if let v = opt {
+        s2 = s2 + v
+    }
+}
+let t2e = now()
+assert(s2 == 0, "none if-let")
+println("  BENCH 2 [none_iflet_200k]      " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: .orDefault ─────────────────────────────────────
+let t3 = now()
+let s3 = 0
+for i in 0..200000 {
+    let opt = if i % 3 == 0 { Some(i) } else { None(Int) }
+    s3 = s3 + opt.orDefault(0)
+}
+let t3e = now()
+assert(s3 > 0, "orDefault")
+println("  BENCH 3 [orDefault_200k]       " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Chained Option functions ───────────────────────
+fn safe_div4(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+fn safe_mod4(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a % b)
+}
+
+let t4 = now()
+let s4 = 0
+for i in 0..100000 {
+    if let d = safe_div4(i * 3, i % 10 + 1) {
+        if let m = safe_mod4(d, 7) {
+            s4 = s4 + m
+        }
+    }
+}
+let t4e = now()
+assert(s4 >= 0, "chained option")
+println("  BENCH 4 [chain_option_100k]    " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Result Ok creation + unwrap ────────────────────
+fn make_ok(n: Int) -> Result(Int, String) { return Result::Ok(n) @[B: String] }
+fn make_err(s: String) -> Result(Int, String) { return Result::Err(s) @[A: Int] }
+
+let t5 = now()
+let s5 = 0
+for i in 0..200000 {
+    let r = make_ok(i)
+    s5 = s5 + r.unwrap()
+}
+let t5e = now()
+assert(s5 > 0, "result ok unwrap")
+println("  BENCH 5 [result_ok_200k]       " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Result Err + isErr ─────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..200000 {
+    let r = make_err("fail")
+    if r.isErr() {
+        s6 = s6 + 1
+    }
+}
+let t6e = now()
+assert(s6 == 200000, "result err isErr")
+println("  BENCH 6 [result_err_200k]      " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Result Ok/Err alternating + orDefault ──────────
+fn try_parse(n: Int) -> Result(Int, String) {
+    if n % 2 == 0 { return make_ok(n * 10) }
+    return make_err("odd")
+}
+
+let t7 = now()
+let s7 = 0
+for i in 0..200000 {
+    s7 = s7 + try_parse(i).orDefault(0)
+}
+let t7e = now()
+assert(s7 > 0, "result orDefault")
+println("  BENCH 7 [result_orDef_200k]    " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Maybe Just/Nothing creation ────────────────────
+fn make_just(n: Int) -> Maybe(Int) { return Maybe::Just(n) }
+fn make_nothing() -> Maybe(Int) { return Maybe::Nothing() @[A: Int] }
+
+let t8 = now()
+let s8 = 0
+for i in 0..200000 {
+    let m = if i % 2 == 0 { make_just(i) } else { make_nothing() }
+    s8 = s8 + m.orDefault(0)
+}
+let t8e = now()
+assert(s8 > 0, "maybe just nothing")
+println("  BENCH 8 [maybe_jn_200k]        " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Maybe isJust / isNothing ───────────────────────
+let t9 = now()
+let just_count = 0
+let nothing_count = 0
+for i in 0..100000 {
+    let m = if i % 3 == 0 { make_just(i) } else { make_nothing() }
+    if m.isJust() {
+        just_count = just_count + 1
+    } else {
+        nothing_count = nothing_count + 1
+    }
+}
+let t9e = now()
+assert(just_count + nothing_count == 100000, "maybe isJust/isNothing")
+println("  BENCH 9 [maybe_test_100k]      " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Option map (manual) ───────────────────────────
+fn opt_map(o: Option(Int), f: fn(Int) -> Int) -> Option(Int) {
+    if let v = o {
+        return Some(f(v))
+    }
+    return None(Int)
+}
+
+let t10 = now()
+let s10 = 0
+for i in 0..100000 {
+    let o = Some(i)
+    let mapped = opt_map(o, |x: Int| x * 3)
+    if let v = mapped {
+        s10 = s10 + v
+    }
+}
+let t10e = now()
+assert(s10 > 0, "opt map")
+println("  BENCH 10 [opt_map_100k]        " + Cast::string(t10e - t10) + "ms")
+
+// ── BENCH 11: Nested Option (Option inside list) ────────────
+let t11 = now()
+let opts = []: Option(Int)
+for i in 0..10000 {
+    if i % 2 == 0 {
+        opts.push(Some(i))
+    } else {
+        opts.push(None(Int))
+    }
+}
+let s11 = 0
+for o in opts {
+    s11 = s11 + o.orDefault(0)
+}
+let t11e = now()
+assert(s11 > 0, "nested option list")
+println("  BENCH 11 [opt_list_10k]        " + Cast::string(t11e - t11) + "ms")
+
+// ── BENCH 12: Result map chain ───────────────────────────────
+fn double_ok(r: Result(Int, String)) -> Result(Int, String) {
+    if r.isOk() { return make_ok(r.unwrap() * 2) }
+    return r
+}
+
+let t12 = now()
+let s12 = 0
+for i in 0..100000 {
+    let r = make_ok(i)
+    let r2 = double_ok(double_ok(r))
+    s12 = s12 + r2.unwrap()
+}
+let t12e = now()
+assert(s12 > 0, "result map chain")
+println("  BENCH 12 [result_chain_100k]   " + Cast::string(t12e - t12) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)+(t11e-t11)+(t12e-t12)
+println("  TOTAL [option_result] " + Cast::string(total) + "ms")

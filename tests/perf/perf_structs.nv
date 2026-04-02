@@ -1,0 +1,168 @@
+module perf_structs
+
+import super.super.std.core
+
+// ============================================================
+// Struct Benchmarks
+// ============================================================
+// Tests: struct allocation, field read/write, extends methods,
+//   clone, nested structs, Dyn dispatch, positional construction
+// ============================================================
+
+struct Point { x: Int, y: Int }
+struct Vec3 { x: Float, y: Float, z: Float }
+struct Rect { x: Int, y: Int, w: Int, h: Int }
+struct Node { value: Int, label: String }
+
+fn extends manhattan(p: Point) -> Int {
+    if p.x < 0 {
+        if p.y < 0 { return (0 - p.x) + (0 - p.y) }
+        return (0 - p.x) + p.y
+    }
+    if p.y < 0 { return p.x + (0 - p.y) }
+    return p.x + p.y
+}
+
+fn extends area(r: Rect) -> Int {
+    return r.w * r.h
+}
+
+fn extends dot(a: Vec3, b: Vec3) -> Float {
+    return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+// ── BENCH 1: Struct allocation ──────────────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    let pt = Point { x: i, y: i + 1 }
+    s1 = s1 + pt.x
+}
+let t1e = now()
+assert(s1 > 0, "struct alloc")
+println("  BENCH 1 [struct_alloc_100k]    " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Field read throughput ──────────────────────────
+let pt2 = Point { x: 42, y: 99 }
+let t2 = now()
+let s2 = 0
+for i in 0..200000 {
+    s2 = s2 + pt2.x + pt2.y
+}
+let t2e = now()
+assert(s2 == 28200000, "field read")
+println("  BENCH 2 [field_read_200k]      " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Field write throughput ─────────────────────────
+let pt3 = Point { x: 0, y: 0 }
+let t3 = now()
+for i in 0..200000 {
+    pt3.x = i
+    pt3.y = i + 1
+}
+let t3e = now()
+assert(pt3.x == 199999, "field write")
+println("  BENCH 3 [field_write_200k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Extends method call ────────────────────────────
+let t4 = now()
+let s4 = 0
+for i in 0..100000 {
+    let r = Rect { x: 0, y: 0, w: i % 100 + 1, h: i % 50 + 1 }
+    s4 = s4 + r.area()
+}
+let t4e = now()
+assert(s4 > 0, "extends method")
+println("  BENCH 4 [extends_method_100k]  " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Vec3 dot product ───────────────────────────────
+let va = Vec3 { x: 1.0, y: 2.0, z: 3.0 }
+let vb = Vec3 { x: 4.0, y: 5.0, z: 6.0 }
+let t5 = now()
+let s5 = 0.0
+for i in 0..100000 {
+    s5 = s5 + va.dot(vb)
+}
+let t5e = now()
+assert(s5 > 0.0, "dot product")
+println("  BENCH 5 [vec3_dot_100k]        " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Struct clone ───────────────────────────────────
+let src = Node { value: 42, label: "hello" }
+let t6 = now()
+let s6 = 0
+for i in 0..50000 {
+    let copy = clone(src)
+    s6 = s6 + copy.value
+}
+let t6e = now()
+assert(s6 == 2100000, "clone")
+println("  BENCH 6 [struct_clone_50k]     " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Nested struct access ───────────────────────────
+struct Line { start: Point, end_pt: Point }
+
+let t7 = now()
+let s7 = 0
+for i in 0..50000 {
+    let ln = Line { start: Point { x: i, y: 0 }, end_pt: Point { x: 0, y: i } }
+    s7 = s7 + ln.start.x + ln.end_pt.y
+}
+let t7e = now()
+assert(s7 > 0, "nested struct")
+println("  BENCH 7 [nested_struct_50k]    " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Dyn dispatch (vtable-style) ────────────────────
+struct Circle { radius: Int }
+struct Square { side: Int }
+struct Triangle { base: Int, height: Int }
+
+type shapeable = Dyn(T = radius: Int)
+
+fn extends perimeter(c: Circle) -> Int { return c.radius * 6 }
+fn extends perimeter(s: Square) -> Int { return s.side * 4 }
+
+fn dispatch_perim(x: shapeable) -> Int { return x.radius * 6 }
+
+let t8 = now()
+let s8 = 0
+let shapes_list = []: shapeable
+for i in 0..1000 {
+    shapes_list.push(Circle { radius: i + 1 })
+}
+for sh in shapes_list {
+    s8 = s8 + dispatch_perim(sh)
+}
+let t8e = now()
+assert(s8 > 0, "dyn dispatch")
+println("  BENCH 8 [dyn_dispatch_1k]      " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Struct list storage ────────────────────────────
+let t9 = now()
+let pts = []: Point
+for i in 0..20000 {
+    pts.push(Point { x: i, y: i * 2 })
+}
+let s9 = 0
+for pt in pts {
+    s9 = s9 + pt.x
+}
+let t9e = now()
+assert(s9 > 0, "struct list")
+println("  BENCH 9 [struct_list_20k]      " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Manhattan distance ────────────────────────────
+let t10 = now()
+let s10 = 0
+for i in 0..100000 {
+    let p = Point { x: i % 100 - 50, y: i % 80 - 40 }
+    s10 = s10 + p.manhattan()
+}
+let t10e = now()
+assert(s10 > 0, "manhattan")
+println("  BENCH 10 [manhattan_100k]      " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)+(t7e-t7)+(t8e-t8)+(t9e-t9)+(t10e-t10)
+println("  TOTAL [structs] " + Cast::string(total) + "ms")

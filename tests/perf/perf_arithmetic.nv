@@ -1,0 +1,133 @@
+module perf_arithmetic
+
+// ============================================================
+// Arithmetic Throughput Benchmarks
+// ============================================================
+// Tests VM integer/float instruction throughput:
+//   IADD, ISUB, IMUL, IDIV, IMOD, ILSS, IGRT
+//   FADD, FSUB, FMUL, FDIV
+//   Cast::float, Cast::int
+// ============================================================
+
+// ── BENCH 1: Integer addition loop ──────────────────────────
+let t1 = now()
+let sum1 = 0
+for i in 0..500000 {
+    sum1 = sum1 + i
+}
+let t1e = now()
+assert(sum1 == 124999750000, "int_add sum")
+println("  BENCH 1 [int_add_500k]        " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Integer multiplication ─────────────────────────
+let t2 = now()
+let prod = 1
+let prod_count = 0
+for i in 1..100001 {
+    prod = i * 3 + 1
+    prod_count = prod_count + 1
+}
+let t2e = now()
+assert(prod_count == 100000, "int_mul count")
+println("  BENCH 2 [int_mul_100k]        " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Integer division + modulo ──────────────────────
+let t3 = now()
+let div_sum = 0
+for i in 1..100001 {
+    div_sum = div_sum + (i / 7) + (i % 3)
+}
+let t3e = now()
+assert(div_sum > 0, "int_divmod positive")
+println("  BENCH 3 [int_divmod_100k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Euclidean modulo edge cases ────────────────────
+let t4 = now()
+let mod_sum = 0
+for i in 0..100000 {
+    // Nova uses Euclidean modulo: always non-negative
+    let val = (i - 50000) % 7
+    mod_sum = mod_sum + val
+}
+let t4e = now()
+assert(mod_sum >= 0, "euclidean mod always non-negative sum")
+println("  BENCH 4 [euclidean_mod_100k]  " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Float addition ─────────────────────────────────
+let t5 = now()
+let fsum = 0.0
+for i in 1..100001 {
+    fsum = fsum + Cast::float(i).unwrap() * 0.001
+}
+let t5e = now()
+assert(fsum > 5000.0, "float_add positive")
+println("  BENCH 5 [float_add_100k]      " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Float multiply-accumulate ──────────────────────
+let t6 = now()
+let fma = 0.0
+for i in 0..100000 {
+    let x = Cast::float(i).unwrap() * 0.01
+    fma = fma + x * x
+}
+let t6e = now()
+assert(fma > 0.0, "float_mac positive")
+println("  BENCH 6 [float_mac_100k]      " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: Mixed int/float conversion ─────────────────────
+let t7 = now()
+let conv_sum = 0
+for i in 0..50000 {
+    let f = Cast::float(i).unwrap()
+    let back = Cast::int(Cast::string(i)).unwrap()
+    conv_sum = conv_sum + back
+}
+let t7e = now()
+assert(conv_sum == 1249975000, "conversion sum")
+println("  BENCH 7 [int_float_conv_50k]  " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: Comparison-heavy loop ──────────────────────────
+let t8 = now()
+let cmp_count = 0
+for i in 0..200000 {
+    if i > 100000 {
+        cmp_count = cmp_count + 1
+    }
+}
+let t8e = now()
+assert(cmp_count == 99999, "comparison count")
+println("  BENCH 8 [comparisons_200k]    " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: Boolean logic throughput ───────────────────────
+let t9 = now()
+let bool_count = 0
+for i in 0..100000 {
+    let a = i > 50000
+    let b = i % 2 == 0
+    if a {
+        if b {
+            bool_count = bool_count + 1
+        }
+    }
+}
+let t9e = now()
+assert(bool_count > 0, "bool logic positive")
+println("  BENCH 9 [bool_logic_100k]     " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: Compound assignment (+=, -=) ──────────────────
+let t10 = now()
+let ca_val = 0
+for i in 0..200000 {
+    ca_val += 1
+}
+for i in 0..100000 {
+    ca_val -= 1
+}
+let t10e = now()
+assert(ca_val == 100000, "compound assign")
+println("  BENCH 10 [compound_assign_300k] " + Cast::string(t10e - t10) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e - t1) + (t2e - t2) + (t3e - t3) + (t4e - t4) + (t5e - t5) + (t6e - t6) + (t7e - t7) + (t8e - t8) + (t9e - t9) + (t10e - t10)
+println("  TOTAL [arithmetic] " + Cast::string(total) + "ms")

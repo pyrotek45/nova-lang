@@ -1,0 +1,145 @@
+module perf_clone
+
+// ═════════════════════════════════════════════════════════════
+// Clone / deep copy performance benchmarks
+// ═════════════════════════════════════════════════════════════
+
+import super.super.std.core
+import super.super.std.hashmap
+
+// ── BENCH 1: list clone ─────────────────────────────────────
+let t1 = now()
+let s1 = 0
+let src1 = 0.to(500)
+for i in 0..2000 {
+    let copy = clone(src1)
+    s1 = s1 + copy.len()
+}
+let t1e = now()
+assert(s1 == 1000000, "list clone")
+println("  BENCH 1 [list_clone_2kx500]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: string clone ───────────────────────────────────
+let t2 = now()
+let s2 = 0
+let src2 = "Hello World this is a test string for cloning benchmarks!"
+for i in 0..100000 {
+    let copy = clone(src2)
+    s2 = s2 + copy.len()
+}
+let t2e = now()
+assert(s2 > 0, "string clone")
+println("  BENCH 2 [string_clone_100k]      " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: struct clone ───────────────────────────────────
+struct Point3D { x: Int, y: Int, z: Int }
+
+let t3 = now()
+let s3 = 0
+for i in 0..100000 {
+    let p = Point3D { x: i, y: i * 2, z: i * 3 }
+    let c = clone(p)
+    s3 = s3 + c.x + c.y + c.z
+}
+let t3e = now()
+assert(s3 > 0, "struct clone")
+println("  BENCH 3 [struct_clone_100k]      " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: nested list clone ──────────────────────────────
+let t4 = now()
+let s4 = 0
+for round in 0..500 {
+    let outer = []: [Int]
+    for i in 0..20 {
+        outer.push([i, i + 1, i + 2, i + 3, i + 4])
+    }
+    let copy = clone(outer)
+    s4 = s4 + copy.len()
+}
+let t4e = now()
+assert(s4 == 10000, "nested list clone")
+println("  BENCH 4 [nested_list_clone_500]  " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: struct with list field clone ───────────────────
+struct Container { items: [Int], tag: String }
+
+let t5 = now()
+let s5 = 0
+for i in 0..10000 {
+    let c = Container { items: [1, 2, 3, 4, 5], tag: "test" }
+    let copy = clone(c)
+    s5 = s5 + copy.items.len()
+}
+let t5e = now()
+assert(s5 == 50000, "struct with list clone")
+println("  BENCH 5 [struct_list_clone_10k]  " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: tuple clone ────────────────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..100000 {
+    let t = (i, i * 2, i * 3)
+    let c = clone(t)
+    s6 = s6 + 1
+}
+let t6e = now()
+assert(s6 == 100000, "tuple clone")
+println("  BENCH 6 [tuple_clone_100k]       " + Cast::string(t6e - t6) + "ms")
+
+// ── BENCH 7: hashmap clone ──────────────────────────────────
+let t7 = now()
+let s7 = 0
+for round in 0..500 {
+    let m = HashMap::default() @[K: String, V: Int]
+    for i in 0..20 {
+        m.insert(Cast::string(i), i * i)
+    }
+    let copy = clone(m)
+    s7 = s7 + copy.size()
+}
+let t7e = now()
+assert(s7 == 10000, "hashmap clone")
+println("  BENCH 7 [hashmap_clone_500x20]   " + Cast::string(t7e - t7) + "ms")
+
+// ── BENCH 8: list of structs clone ──────────────────────────
+let t8 = now()
+let s8 = 0
+for round in 0..500 {
+    let pts = [x in 0.to(50) | Point3D { x: x, y: x, z: x }]
+    let copy = clone(pts)
+    s8 = s8 + copy.len()
+}
+let t8e = now()
+assert(s8 == 25000, "list of structs clone")
+println("  BENCH 8 [struct_list_clone_25k]  " + Cast::string(t8e - t8) + "ms")
+
+// ── BENCH 9: clone + modify (COW pattern) ───────────────────
+let t9 = now()
+let s9 = 0
+let base = 0.to(100)
+for i in 0..5000 {
+    let copy = clone(base)
+    copy.push(i)
+    s9 = s9 + copy.len()
+}
+let t9e = now()
+assert(s9 > 0, "clone + modify")
+println("  BENCH 9 [clone_modify_5k]        " + Cast::string(t9e - t9) + "ms")
+
+// ── BENCH 10: repeated deep clone ───────────────────────────
+let t10 = now()
+let s10 = 0
+let deep = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+for i in 0..10000 {
+    let c1 = clone(deep)
+    let c2 = clone(c1)
+    s10 = s10 + c2.len()
+}
+let t10e = now()
+assert(s10 == 30000, "deep clone chain")
+println("  BENCH 10 [deep_clone_chain_10k]  " + Cast::string(t10e - t10) + "ms")
+
+// ── summary ─────────────────────────────────────────────────
+let total = (t1e - t1) + (t2e - t2) + (t3e - t3) + (t4e - t4) + (t5e - t5) + (t6e - t6) + (t7e - t7) + (t8e - t8) + (t9e - t9) + (t10e - t10)
+println("")
+println("  TOTAL [clone] " + Cast::string(total) + "ms")
