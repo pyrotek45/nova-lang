@@ -1,0 +1,5 @@
+module test_while_let_not_option
+let x = 42
+while let val = x {
+    println("looping")
+}

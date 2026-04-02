@@ -1,0 +1,6 @@
+module test_match_wrong_type
+// Should error: match on non-enum type
+let x = 42
+match x {
+    _ => { println("hi") }
+}

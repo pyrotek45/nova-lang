@@ -1,0 +1,5 @@
+module test_while_not_bool
+let x = 42
+while x {
+    println("looping")
+}

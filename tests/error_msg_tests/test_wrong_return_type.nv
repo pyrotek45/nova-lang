@@ -1,0 +1,5 @@
+module test_wrong_return_type
+fn greet(name: String) -> Int {
+    return "Hello " + name
+}
+println(Cast::string(greet("world")))

@@ -1,0 +1,4 @@
+module test_enum_already_defined
+// Should error: enum already defined
+enum Color { Red, Green, Blue }
+enum Color { Yellow, Purple }

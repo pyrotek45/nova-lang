@@ -59,9 +59,9 @@ impl TypeChecker {
     ) -> NovaResult<()> {
         if type_list1.len() != type_list2.len() {
             return Err(self.generate_error_with_pos(
-                "E2 Incorrect amount of arguments".to_owned(),
+                format!("Incorrect number of arguments: expected {}, got {}", type_list1.len(), type_list2.len()),
                 format!(
-                    "Found {} arguments, but expecting {} arguments",
+                    "Found {} argument(s), but expecting {} argument(s).\n  Check the function signature and make sure the number of arguments matches.",
                     type_list2.len(),
                     type_list1.len()
                 ),
@@ -339,7 +339,7 @@ impl TypeChecker {
                     Ok(TType::Generic { name })
                 } else {
                     Err(Box::new(NovaError::SimpleTypeError {
-                        msg: format!("Generic type {} could not be inferred", name).into(),
+                        msg: format!("Generic type `{}` could not be inferred.\n  Provide explicit type annotations to help the type checker.", name).into(),
                         position: pos,
                     }))
                 }
@@ -668,8 +668,8 @@ impl TypeChecker {
                         Ok(_) => {}
                         _ => {
                             return Err(self.generate_error_with_pos(
-                                format!("Cannot return {} from function", ttype),
-                                format!("Expected {}", return_type),
+                                format!("Cannot return `{}` from function expecting `{}`", ttype, return_type),
+                                format!("The function's return type is `{}` but `return` expression has type `{}`.", return_type, ttype),
                                 pos.clone(),
                             ));
                         }
@@ -698,8 +698,8 @@ impl TypeChecker {
                             Ok(_) => {}
                             _ => {
                                 return Err(self.generate_error_with_pos(
-                                    format!("Cannot return {} from function", expr.get_type()),
-                                    format!("Expected {}", return_type),
+                                    format!("Cannot return `{}` from function expecting `{}`", expr.get_type(), return_type),
+                                    format!("The function's return type is `{}` but `return` expression has type `{}`.", return_type, expr.get_type()),
                                     pos.clone(),
                                 ));
                             }
@@ -903,9 +903,9 @@ impl TypeChecker {
             found: right_expr.get_type().to_string().into(),
             position: pos,
             msg: format!(
-                "Type error, cannot apply operation {operation:?} to {} and {}",
-                right_expr.get_type(),
+                "Cannot apply `{operation:?}` to `{}` and `{}`. Both operands must have compatible types, or define a dunder method (e.g. `__add__`, `__mul__`) for these types.",
                 left_expr.get_type(),
+                right_expr.get_type(),
             )
             .into(),
         })

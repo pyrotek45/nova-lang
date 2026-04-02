@@ -1,0 +1,3 @@
+module test_tilde_void
+fn donothing() { pass }
+donothing() ~> result { println(Cast::string(result)) }

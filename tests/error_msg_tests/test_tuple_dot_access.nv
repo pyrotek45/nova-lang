@@ -1,0 +1,4 @@
+module test_tuple_dot
+// Should error: trying to use dot syntax on a tuple (should suggest bracket indexing)
+let t = (42, "hello", true)
+let x = t.first

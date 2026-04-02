@@ -1,0 +1,4 @@
+module test_no_func_sig
+// Should error: no matching function signature
+fn add(a: Int, b: Int) -> Int { return a + b }
+let result = add("hello", "world")

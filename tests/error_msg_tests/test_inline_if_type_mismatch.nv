@@ -1,0 +1,2 @@
+module test_inline_if_type_mismatch
+let x = if true { 42 } else { "hello" }

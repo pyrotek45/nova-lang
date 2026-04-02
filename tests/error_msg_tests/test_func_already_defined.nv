@@ -1,0 +1,4 @@
+module test_func_already_defined
+fn double(x: Int) -> Int { return x * 2 }
+fn double(x: Int) -> Int { return x + x }
+println(Cast::string(double(5)))

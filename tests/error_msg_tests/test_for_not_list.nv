@@ -1,0 +1,5 @@
+module test_for_not_list
+let x = 42
+for i in x {
+    println(Cast::string(i))
+}

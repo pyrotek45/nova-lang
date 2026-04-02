@@ -1,0 +1,6 @@
+module test_if_not_bool
+// Should error: condition must be Bool
+let x = 42
+if x {
+    println("truthy?")
+}

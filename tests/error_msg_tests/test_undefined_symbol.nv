@@ -1,0 +1,2 @@
+module test_undefined_symbol
+println(Cast::string(foobar))

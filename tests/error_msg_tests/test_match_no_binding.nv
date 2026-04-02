@@ -1,0 +1,12 @@
+module test_match_no_binding
+// Should error: variant Circle carries data but missing binding
+enum Shape {
+    Circle: Float,
+    Triangle
+}
+
+let s = Shape::Circle(3.14)
+match s {
+    Circle => { println("circle") }
+    Triangle() => { println("triangle") }
+}

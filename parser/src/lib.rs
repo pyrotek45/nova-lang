@@ -593,16 +593,10 @@ impl Parser {
                 }
                 _ => {
                     return Err(self.generate_error_with_pos(
-                        format!("E1 Not a valid call: {}", identifier),
+                        format!("Cannot call method `.{}()` on type `{}`", identifier, ttype),
                         format!(
-                            "No function signature '{}' with {} as arguments, Cant call method on type {}",
-                            identifier,
-                            argument_types
-                                .iter()
-                                .map(|t| t.to_string())
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                            ttype,
+                            "The type `{}` does not support method calls.\n  Only struct/enum types and built-in types (List, Option, String, Int, Float, Bool, Char, Tuple) support methods.\n  To define a method on a type, use:\n    `fn extends method_name(self: MyType, ...) -> ReturnType {{ ... }}`\n  Then call it as: `value.method_name()`",
+                            ttype
                         ),
                         pos,
                     ))
@@ -653,16 +647,16 @@ impl Parser {
                 pos,
             )
         } else {
+            let arg_types_str = argument_types
+                .iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
             Err(self.generate_error_with_pos(
-                format!("E1 Not a valid call: {}", identifier),
+                format!("No matching method `{}` for argument types [{}]", identifier, arg_types_str),
                 format!(
-                    "No function signature '{}' with {} as arguments",
-                    identifier,
-                    argument_types
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
+                    "No method `{}` accepts [{}] as arguments.\n  Check that:\n  - The method is defined for this type (using `fn extends`)\n  - The argument types match the method's parameter types\n  Example: `fn extends {}(self: TypeName, ...) -> ReturnType {{ ... }}`",
+                    identifier, arg_types_str, identifier
                 ),
                 pos,
             ))
@@ -685,8 +679,8 @@ impl Parser {
             } => (parameters, return_type),
             _ => {
                 return Err(self.generate_error_with_pos(
-                    format!("E2 Not a valid function type: {}", function_type),
-                    String::new(),
+                    format!("Expected a function type, found `{}`", function_type),
+                    "This identifier does not refer to a callable function. In Nova, functions are declared with `fn name(param: Type) -> ReturnType { ... }`".to_string(),
                     pos,
                 ))
             }
@@ -904,16 +898,16 @@ impl Parser {
                 pos,
             )
         } else {
+            let arg_types_str = argument_types
+                .iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
             Err(self.generate_error_with_pos(
-                format!("E1 Not a valid call: {}", identifier),
+                format!("No matching function `{}` for argument types [{}]", identifier, arg_types_str),
                 format!(
-                    "No function signature '{}' with {} as arguments",
-                    identifier,
-                    argument_types
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
+                    "No function signature `{}` accepts [{}] as arguments.\n  Check that:\n  - The function exists and is defined before this call\n  - The argument types match the function's parameter types\n  - If calling a method, use `value.method(args)` syntax",
+                    identifier, arg_types_str
                 ),
                 pos,
             ))
@@ -947,8 +941,8 @@ impl Parser {
                 {
                     let TType::Custom { type_params, .. } = lhs.get_type() else {
                         return Err(self.generate_error_with_pos(
-                            "Expected a custom type with type parameters",
-                            format!("got {}", lhs.get_type()),
+                            format!("Expected a generic custom type, found `{}`", lhs.get_type()),
+                            "This type has generic type parameters but the value does not carry type parameter information.\n  This is an internal type error — please report it.",
                             pos,
                         ));
                     };
@@ -975,7 +969,22 @@ impl Parser {
                     return self.generate_field_not_found_error(&identifier, type_name, pos);
                 }
             } else {
-                return self.generate_field_not_found_error(&identifier, type_name, pos);
+                // Type is known (custom_to_string returned Some) but not in custom_types
+                // This means it's a built-in type like Tuple, List, Int, etc.
+                match lhs.get_type() {
+                    TType::Tuple { ref elements } => {
+                        return Err(self.generate_error_with_pos(
+                            format!("Cannot use dot syntax `.{}` on a Tuple", identifier),
+                            format!(
+                                "Tuples use bracket indexing, not dot access. Use `my_tuple[0]`, `my_tuple[1]`, etc. This tuple has {} element(s) (indices 0..{})",
+                                elements.len(),
+                                elements.len().saturating_sub(1)
+                            ),
+                            pos,
+                        ));
+                    }
+                    _ => return self.generate_field_not_found_error(&identifier, type_name, pos),
+                }
             }
         } else {
             // check if dynamic type with fields in contract
@@ -993,10 +1002,28 @@ impl Parser {
                 } else {
                     return self.generate_field_not_found_error(&identifier, "Dyn", pos);
                 }
-            } else {
+            } else if let TType::Tuple { elements } = lhs.get_type() {
                 return Err(self.generate_error_with_pos(
-                    format!("E1 Not a valid field access: {}", identifier),
-                    format!("{} is not a custom type", lhs.get_type()),
+                    format!("Cannot use dot syntax `.{}` on a Tuple", identifier),
+                    format!(
+                        "Tuples use bracket indexing, not dot access. Use `my_tuple[0]`, `my_tuple[1]`, etc. This tuple has {} element(s) (indices 0..{})",
+                        elements.len(),
+                        elements.len().saturating_sub(1)
+                    ),
+                    pos,
+                ));
+            } else {
+                let hint = match lhs.get_type() {
+                    TType::List { .. } => "Lists use methods like `.len()`, `.push(val)`, `.map(|x: T| ...)`, `.filter(|x: T| ...)`. Use `list[index]` for element access.",
+                    TType::Option { .. } => "Options use `if let val = opt_expr { ... }` to unwrap, or `.unwrap()` to get the inner value.",
+                    TType::Int | TType::Float => "Numeric types use methods like `.to(end)` for ranges. Use `Cast::string(val)` to convert to String.",
+                    TType::String => "Strings use methods like `.len()`, `.split(delim)`, `.trim()`. Use `+` for concatenation.",
+                    TType::Bool => "Bool does not have fields. Use `Cast::string(val)` to convert to String.",
+                    _ => "Only struct/enum types support dot field access. Use bracket indexing `[index]` for tuples and lists.",
+                };
+                return Err(self.generate_error_with_pos(
+                    format!("Cannot access field `.{}` on type `{}`", identifier, lhs.get_type()),
+                    hint.to_string(),
                     pos,
                 ));
             }
@@ -1027,9 +1054,23 @@ impl Parser {
         type_name: &str,
         pos: FilePosition,
     ) -> NovaResult<Expr> {
+        let mut available_fields = String::new();
+        if let Some(fields) = self.typechecker.environment.custom_types.get(type_name) {
+            let field_names: Vec<&str> = fields
+                .iter()
+                .filter(|(name, _)| name.as_ref() != "type")
+                .map(|(name, _)| name.as_ref())
+                .collect();
+            if !field_names.is_empty() {
+                available_fields = format!(" Available fields: {}", field_names.join(", "));
+            }
+        }
         Err(self.generate_error_with_pos(
-            format!("No field '{}' found for {}", identifier, type_name),
-            "cannot retrieve field".to_string(),
+            format!("No field '{}' found on type `{}`", identifier, type_name),
+            format!(
+                "The type `{}` does not have a field named `{}`.{}",
+                type_name, identifier, available_fields
+            ),
             pos,
         ))
     }
@@ -1074,8 +1115,8 @@ impl Parser {
                 {
                     if arguments.len() != parameters.len() {
                         return Err(self.generate_error_with_pos(
-                            "Incorrect number of arguments",
-                            format!("Got {}, expected {}", arguments.len(), parameters.len()),
+                            format!("Incorrect number of arguments: expected {}, got {}", parameters.len(), arguments.len()),
+                            format!("This function expects {} argument(s) but {} were provided.", parameters.len(), arguments.len()),
                             pos,
                         ));
                     }
@@ -1100,8 +1141,8 @@ impl Parser {
                     };
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot call {}", lhs.get_type()),
-                        "Not a function",
+                        format!("Cannot call `{}` — it is not a function", lhs.get_type()),
+                        "Expected a callable function type, but found a non-function value.\n  Only functions and closures can be called with `(...)`.",
                         pos,
                     ));
                 }
@@ -1127,8 +1168,11 @@ impl Parser {
         pos: FilePosition,
     ) -> NovaResult<Expr> {
         Err(self.generate_error_with_pos(
-            format!("'{}' does not exist", identifier),
-            "Cannot retrieve field".to_string(),
+            format!("'{}' is not defined", identifier),
+            format!(
+                "The identifier `{}` was not found in the current scope. Make sure it is declared with `let` before use, or check for typos. If this is a type, it must be declared with `struct` or `enum` before this point.",
+                identifier
+            ),
             pos,
         ))
     }
@@ -1190,7 +1234,7 @@ impl Parser {
                     if let Some(start_expr) = &start_expr {
                         if start_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int",
+                                "List index must be an Int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1204,7 +1248,7 @@ impl Parser {
                     if let Some(step_expr) = &step {
                         if step_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int",
+                                "List index must be an Int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1218,7 +1262,7 @@ impl Parser {
                     if let Some(end_expr) = &end_expr {
                         if end_expr.get_type() != TType::Int {
                             return Err(self.generate_error_with_pos(
-                                "Must index List with an int",
+                                "List index must be an Int",
                                 format!(
                                     "Cannot index into {} with {}",
                                     lhs.get_type(),
@@ -1250,7 +1294,7 @@ impl Parser {
                     // typecheck
                     if start_expr.get_type() != TType::Int {
                         return Err(self.generate_error_with_pos(
-                            "Must index List with an int",
+                            "List index must be an Int",
                             format!(
                                 "Cannot index into {} with {}",
                                 lhs.get_type(),
@@ -1308,9 +1352,9 @@ impl Parser {
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        "Must index Tuple with an int",
+                        "Tuple must be indexed with an integer literal",
                         format!(
-                            "cannot index into {} with {}",
+                            "Cannot index into `{}` with `{}`.\n  Use a constant integer: `my_tuple[0]`, `my_tuple[1]`, etc.",
                             lhs.get_type(),
                             fmt_token_opt(self.current_token())
                         ),
@@ -1320,8 +1364,8 @@ impl Parser {
             }
             _ => {
                 return Err(self.generate_error(
-                    "Cannot index into non-list or non-tuple",
-                    "Must be of type list or tuple",
+                    "Cannot index into this type",
+                    format!("Only lists and tuples can be indexed with `[...]`.\n  Lists: `my_list[i]`\n  Tuples: `my_tuple[0]`, `my_tuple[1]`"),
                 ));
             }
         }
@@ -1336,8 +1380,8 @@ impl Parser {
         position: FilePosition,
     ) -> NovaResult<Expr> {
         Err(self.generate_error_with_pos(
-            format!("Tuple cannot index into {index}"),
-            format!("Tuple has {} values", tuple_size),
+            format!("Tuple index `{}` is out of bounds", index),
+            format!("This tuple has {} element(s), valid indices are 0..{}.", tuple_size, tuple_size.saturating_sub(1)),
             position,
         ))
     }
@@ -1362,10 +1406,9 @@ impl Parser {
                     } = left_expr.get_type()
                     {
                         if arguments.len() != parameters.len() {
-                            let msg = "E3 Incorrect number of arguments";
                             return Err(self.generate_error_with_pos(
-                                msg,
-                                format!("Got {}, expected {}", arguments.len(), parameters.len()),
+                                format!("Incorrect number of arguments: expected {}, got {}", parameters.len(), arguments.len()),
+                                format!("This function expects {} argument(s) but {} were provided.", parameters.len(), arguments.len()),
                                 field_position,
                             ));
                         }
@@ -1393,15 +1436,15 @@ impl Parser {
                         }
                     } else {
                         return Err(self.generate_error_with_pos(
-                            format!("Cannot call {}", left_expr.get_type()),
-                            "Not a function",
+                            format!("Cannot call `{}` — it is not a function", left_expr.get_type()),
+                            "Expected a callable function type, but found a non-function value.\n  Only functions and closures can be called with `(...)`.",
                             field_position,
                         ));
                     }
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot get {field} from {}", identifier.clone()),
-                        format!("{} is not defined", identifier),
+                        format!("Cannot get `{}` from `{}`", field, identifier),
+                        format!("The identifier `{}` is not defined in the current scope. Check spelling or make sure it is declared before use.", identifier),
                         field_position,
                     ));
                 }
@@ -1469,8 +1512,8 @@ impl Parser {
             )
         } else {
             Err(self.generate_error_with_pos(
-                format!("E1 Not a valid symbol: {}", identifier),
-                "Unknown identifier".to_string(),
+                format!("Undefined symbol `{}`", identifier),
+                format!("The identifier `{}` is not defined.\n  Check spelling, or make sure it is declared before this point.", identifier),
                 position,
             ))
         }
@@ -1512,8 +1555,8 @@ impl Parser {
             Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
         } else {
             Err(self.generate_error_with_pos(
-                format!("E2 Not a valid symbol: {}", identifier),
-                "Unknown identifier".to_string(),
+                format!("Undefined symbol `{}`", identifier),
+                format!("The identifier `{}` is not defined in the current or enclosing scope.\n  Check spelling, or make sure it is declared before this point.", identifier),
                 position,
             ))
         }
@@ -1524,7 +1567,7 @@ impl Parser {
         if self.depth > MAX_DEPTH {
             return Err(self.generate_error(
                 "Expression too deeply nested",
-                format!("exceeded maximum nesting depth of {MAX_DEPTH}"),
+                format!("Exceeded maximum nesting depth of {MAX_DEPTH}.\n  Simplify the expression or break it into smaller parts."),
             ));
         }
         Ok(())
@@ -1547,8 +1590,8 @@ impl Parser {
             if sign == Unary::Not {
                 if factor.get_type() != TType::Bool {
                     return Err(self.generate_error(
-                        "Cannot use ! on non-boolean",
-                        format!("Got {}", factor.get_type()),
+                        format!("Cannot use `!` on type `{}`", factor.get_type()),
+                        "The `!` (not) operator only works on Bool values.\n  Example: `!true`, `!(x > 5)`",
                     ));
                 } else {
                     return Ok(Expr::Unary {
@@ -1578,8 +1621,8 @@ impl Parser {
                 // condition must be a boolean
                 if condition.get_type() != TType::Bool {
                     return Err(self.generate_error(
-                        "Condition must be a boolean",
-                        format!("Got {}", condition.get_type()),
+                        format!("Condition must be a Bool, found `{}`", condition.get_type()),
+                        "The condition in an inline `if` expression must be a Bool.\n  Example: `if x > 0 { x } else { -x }`",
                     ));
                 }
                 let if_branch = self.block_expr()?;
@@ -1589,9 +1632,9 @@ impl Parser {
                     if_branch.get_type()
                 } else {
                     return Err(self.generate_error_with_pos(
-                        "Both branches must return the same type",
+                        format!("Both branches of inline `if` must return the same type"),
                         format!(
-                            "Got {} and {}",
+                            "The `if` branch returns `{}` but the `else` branch returns `{}`.\n  Both must be the same type since this is used as an expression.",
                             if_branch.get_type(),
                             else_branch.get_type()
                         ),
@@ -1659,16 +1702,16 @@ impl Parser {
                         // check if generic function exist
                         if self.typechecker.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
-                                format!("Generic Function {} already defined", &identifier),
-                                "Cannot redefine a generic function",
+                                format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                                format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                                 pos.clone(),
                             ));
                         }
                         // check if normal function exist
                         if self.typechecker.environment.has(&identifier) {
                             return Err(self.generate_error_with_pos(
-                                format!("Function {} already defined", &identifier,),
-                                "Cannot redefine a generic function",
+                                format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                                format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                                 pos.clone(),
                             ));
                         }
@@ -1800,8 +1843,8 @@ impl Parser {
                 //dbg!(will_return);
                 if !will_return {
                     return Err(self.generate_error_with_pos(
-                        "E2 Function must return a value",
-                        "Last statement is not a return",
+                        "Closure must return a value",
+                        "The last statement in this closure is not a return.\n  Make sure the closure body returns a value matching the declared return type.",
                         pos,
                     ));
                 }
@@ -1852,8 +1895,8 @@ impl Parser {
                             );
                         } else {
                             return Err(self.generate_error_with_pos(
-                                "List comprehension must be a list",
-                                format!("{} is not a list", listexpr.get_type()),
+                                format!("List comprehension source must be a list, found `{}`", listexpr.get_type()),
+                                "The expression after `in` must be a list.\n  Example: `[x in my_list | x * 2]`",
                                 pos,
                             ));
                         }
@@ -1875,8 +1918,8 @@ impl Parser {
                                 );
                             } else {
                                 return Err(self.generate_error_with_pos(
-                                    "List comprehension must be a list",
-                                    format!("{} is not a list", listexpr.get_type()),
+                                    format!("List comprehension source must be a list, found `{}`", listexpr.get_type()),
+                                    "The expression after `in` must be a list.\n  Example: `[x in my_list | x * 2]`",
                                     pos,
                                 ));
                             }
@@ -1894,8 +1937,8 @@ impl Parser {
                         // typecheck taht outexpr is not void
                         if outexpr.last().unwrap().get_type() == TType::Void {
                             return Err(self.generate_error_with_pos(
-                                "List comprehension must return a value",
-                                "Return expression is Void",
+                                "List comprehension body must return a value",
+                                "The output expression returns Void.\n  Make sure the expression after `|` produces a value.\n  Example: `[x in my_list | x * 2]`",
                                 pos,
                             ));
                         }
@@ -1912,8 +1955,8 @@ impl Parser {
                         for guard in guards.iter() {
                             if guard.get_type() != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    "Guard must be a boolean",
-                                    format!("{} is not a boolean", guard.get_type()),
+                                    format!("List comprehension guard must be a Bool, found `{}`", guard.get_type()),
+                                    "Guard expressions filter elements and must return a Bool.\n  Example: `[x in my_list | x * 2 | x > 0]`",
                                     pos,
                                 ));
                             }
@@ -2010,15 +2053,15 @@ impl Parser {
                     self.consume_symbol(RightParen)?;
                     // error tuple must contain at least two elements
                     return Err(self.generate_error(
-                        "Tuple must contain at least one elements",
-                        "Add more elements to the tuple",
+                        "Tuple must contain at least one element",
+                        "An empty `()` is not a valid expression.\n  For a single-element tuple, use: `(value,)`\n  For a multi-element tuple, use: `(a, b, c)`",
                     ));
                 } else {
                     let expr = self.expr()?;
                     if expr.get_type() == TType::None {
                         return Err(self.generate_error(
-                            "Tuple must not contain None",
-                            "Add a comma after the element",
+                            "Tuple element cannot be None/Void",
+                            "Each element in a tuple must have a concrete type.\n  Make sure every expression inside `(...)` returns a value.",
                         ));
                     }
                     // check if expr is a tuple
@@ -2036,8 +2079,8 @@ impl Parser {
                             let expr = self.expr()?;
                             if expr.get_type() == TType::None {
                                 return Err(self.generate_error(
-                                    "Tuple must not contain None",
-                                    "Add a comma after the element",
+                                    "Tuple element cannot be None/Void",
+                                    "Each element in a tuple must have a concrete type.\n  Make sure every expression inside `(...)` returns a value.",
                                 ));
                             }
                             tuple.push(expr);
@@ -2200,7 +2243,7 @@ impl Parser {
                 };
             }
             None => {
-                return Err(self.generate_error("End of file error", "expected expression"));
+                return Err(self.generate_error("Unexpected end of file", "An expression was expected but the file ended.\n  Check for missing closing braces `}`, brackets `]`, or parentheses `)`."));
             }
             _ => left = Expr::Void,
         }
@@ -2308,16 +2351,16 @@ impl Parser {
                 // check if generic function exist
                 if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
-                        format!("Generic Function {} already defined", &identifier),
-                        "Cannot redefine a generic function",
+                        format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                        format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                         pos.clone(),
                     ));
                 }
                 // check if normal function exist
                 if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
-                        format!("Function {} already defined", &identifier,),
-                        "Cannot redefine a generic function",
+                        format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                        format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                         pos.clone(),
                     ));
                 }
@@ -2494,8 +2537,8 @@ impl Parser {
         {
             if arguments.len() != parameters.len() {
                 return Err(self.generate_error_with_pos(
-                    "Incorrect number of arguments",
-                    format!("Got {}, expected {}", arguments.len(), parameters.len()),
+                    format!("Incorrect number of arguments: expected {}, got {}", parameters.len(), arguments.len()),
+                    format!("This function expects {} argument(s) but {} were provided.", parameters.len(), arguments.len()),
                     pos.clone(),
                 ));
             }
@@ -2523,8 +2566,8 @@ impl Parser {
             })
         } else {
             Err(self.generate_error_with_pos(
-                format!("Cannot call {}", function_expr.get_type()),
-                "Not a function",
+                format!("Cannot call `{}` — it is not a function", function_expr.get_type()),
+                format!("Expected a callable function type, but found `{}`.\n  Only function values can be called with `(...)`.", function_expr.get_type()),
                 pos.clone(),
             ))
         }
@@ -2604,8 +2647,8 @@ impl Parser {
                             }
                             _ => {
                                 return Err(self.generate_error_with_pos(
-                                    "Invalid operation",
-                                    "Operation not supported",
+                                    format!("Unsupported operator `{}` for types `{}` and `{}`", operation, left_expr.get_type(), right_expr.get_type()),
+                                    format!("The operator `{}` is not defined for `{}` and `{}`.\n  For custom types, define a dunder method like `fn extends __mul__(a: MyType, b: MyType) -> MyType {{ ... }}`", operation, left_expr.get_type(), right_expr.get_type()),
                                     current_pos.clone(),
                                 ));
                             }
@@ -2663,8 +2706,8 @@ impl Parser {
                                 }
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
@@ -2732,8 +2775,8 @@ impl Parser {
                                 }
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
@@ -2828,11 +2871,11 @@ impl Parser {
                         _ => {
                             return Err(self.generate_error_with_pos(
                                 format!(
-                                    "cannot assign {} to {}",
+                                    "Cannot assign `{}` to `{}`",
                                     right_expr.get_type(),
                                     left_expr.get_type()
                                 ),
-                                "Cannot assign a value to a literal value",
+                                "The left-hand side of `=` must be a variable, not a literal value.\n  Use `let name = value` to create a new variable.",
                                 current_pos.clone(),
                             ));
                         }
@@ -2841,11 +2884,11 @@ impl Parser {
                         if right_expr.get_type() != left_expr.get_type() {
                             return Err(self.generate_error_with_pos(
                                 format!(
-                                    "cannot assign {} to {}",
+                                    "Cannot assign `{}` to `{}`",
                                     right_expr.get_type(),
                                     left_expr.get_type()
                                 ),
-                                "Cannot assign a value to a literal value",
+                                format!("Type mismatch: the variable has type `{}` but the expression returns `{}`.", left_expr.get_type(), right_expr.get_type()),
                                 current_pos.clone(),
                             ));
                         }
@@ -2868,19 +2911,19 @@ impl Parser {
             // if current token is { else its expr,
             match self.current_token_value() {
                 Some(StructuralSymbol(LeftBrace)) => {
-                    // cant assing a void
+                    // cant assign a void
                     if left_expr.get_type() == TType::Void {
                         return Err(self.generate_error_with_pos(
-                            format!("Variable '{}' cannot be assinged to void", identifier),
-                            "Make sure the expression returns a value",
+                            format!("Variable `{}` cannot be assigned to Void", identifier),
+                            "The expression on the left of `~>` does not return a value (returns Void).\n  Make sure the expression produces a value.\n  Syntax: `expr ~> name { ... }`",
                             pos.clone(),
                         ));
                     }
 
                     if self.typechecker.environment.has(&identifier) {
                         return Err(self.generate_error_with_pos(
-                            format!("Variable '{}' has already been created", identifier),
-                            "",
+                            format!("Variable `{}` is already defined in this scope", identifier),
+                            format!("`{}` already exists. Choose a different name for the `~>` binding.", identifier),
                             pos.clone(),
                         ));
                     } else {
@@ -2934,8 +2977,8 @@ impl Parser {
                 // check if void
                 if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
                     return Err(self.generate_error_with_pos(
-                        "Cannot compare void",
-                        "Make sure expression returns a value",
+                        "Cannot compare Void values",
+                        "One or both sides of the comparison do not return a value (Void).\n  Make sure both sides are expressions that produce a value.",
                         current_pos.clone(),
                     ));
                 }
@@ -3022,8 +3065,8 @@ impl Parser {
                                     }
                                     _ => {
                                         return Err(self.generate_error(
-                                            "Expected function",
-                                            "Make sure function is defined",
+                                            "No matching operator overload found",
+                                            "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                         ))
                                     }
                                 };
@@ -3063,19 +3106,19 @@ impl Parser {
                                         }
                                         _ => {
                                             return Err(self.generate_error(
-                                                "Expected function",
-                                                "Make sure function is defined",
+                                                "No matching operator overload found",
+                                                "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                             ))
                                         }
                                     };
                                     // check if return type is bool
                                     if returntype != TType::Bool {
                                         return Err(self.generate_error_with_pos(
-                                            "Comparison operation expects bool",
+                                            "Comparison operator must return Bool",
                                             format!(
-                                                "expected {} , but found {}",
-                                                left_expr.get_type(),
-                                                right_expr.get_type(),
+                                                "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                                returntype,
+                                                
                                             ),
                                             current_pos.clone(),
                                         ));
@@ -3125,19 +3168,19 @@ impl Parser {
                                         }
                                         _ => {
                                             return Err(self.generate_error(
-                                                "Expected function",
-                                                "Make sure function is defined",
+                                                "No matching operator overload found",
+                                                "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                             ))
                                         }
                                     };
                                     // check if return type is bool
                                     if returntype != TType::Bool {
                                         return Err(self.generate_error_with_pos(
-                                            "Comparison operation expects bool",
+                                            "Comparison operator must return Bool",
                                             format!(
-                                                "expected {} , but found {}",
-                                                left_expr.get_type(),
-                                                right_expr.get_type(),
+                                                "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                                returntype,
+                                                
                                             ),
                                             current_pos.clone(),
                                         ));
@@ -3228,19 +3271,19 @@ impl Parser {
                                 }
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
                             // check if return type is bool
                             if returntype != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    "Comparison operation expects bool",
+                                    "Comparison operator must return Bool",
                                     format!(
-                                        "expected {} , but found {}",
-                                        left_expr.get_type(),
-                                        right_expr.get_type(),
+                                        "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                        returntype,
+                                        
                                     ),
                                     current_pos.clone(),
                                 ));
@@ -3289,19 +3332,19 @@ impl Parser {
                                 }
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
                             // check if return type is bool
                             if returntype != TType::Bool {
                                 return Err(self.generate_error_with_pos(
-                                    "Comparison operation expects bool",
+                                    "Comparison operator must return Bool",
                                     format!(
-                                        "expected {} , but found {}",
-                                        left_expr.get_type(),
-                                        right_expr.get_type(),
+                                        "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                        returntype,
+                                        
                                     ),
                                     current_pos.clone(),
                                 ));
@@ -3340,8 +3383,8 @@ impl Parser {
                 // check if void
                 if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
                     return Err(self.generate_error_with_pos(
-                        "Cannot compare void",
-                        "Make sure expression returns a value",
+                        "Cannot use logical operators on Void values",
+                        "One or both sides of `&&`/`||` do not return a value (Void).\n  Make sure both sides are expressions that produce a Bool.",
                         current_pos.clone(),
                     ));
                 }
@@ -3380,8 +3423,8 @@ impl Parser {
                                 }
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
@@ -3420,19 +3463,19 @@ impl Parser {
                                     }
                                     _ => {
                                         return Err(self.generate_error(
-                                            "Expected function",
-                                            "Make sure function is defined",
+                                            "No matching operator overload found",
+                                            "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                         ))
                                     }
                                 };
                                 // check if return type is bool
                                 if returntype != TType::Bool {
                                     return Err(self.generate_error_with_pos(
-                                        "Comparison operation expects bool",
+                                        "Comparison operator must return Bool",
                                         format!(
-                                            "expected {} , but found {}",
-                                            left_expr.get_type(),
-                                            right_expr.get_type(),
+                                            "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                            returntype,
+                                            
                                         ),
                                         current_pos.clone(),
                                     ));
@@ -3481,19 +3524,19 @@ impl Parser {
                                     }
                                     _ => {
                                         return Err(self.generate_error(
-                                            "Expected function",
-                                            "Make sure function is defined",
+                                            "No matching operator overload found",
+                                            "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                         ))
                                     }
                                 };
                                 // check if return type is bool
                                 if returntype != TType::Bool {
                                     return Err(self.generate_error_with_pos(
-                                        "Comparison operation expects bool",
+                                        "Comparison operator must return Bool",
                                         format!(
-                                            "expected {} , but found {}",
-                                            left_expr.get_type(),
-                                            right_expr.get_type(),
+                                            "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                            returntype,
+                                            
                                         ),
                                         current_pos.clone(),
                                     ));
@@ -3619,8 +3662,8 @@ impl Parser {
                                 TType::Function { return_type, .. } => *return_type,
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
@@ -3647,8 +3690,8 @@ impl Parser {
                                 TType::Function { return_type, .. } => *return_type,
                                 _ => {
                                     return Err(self.generate_error(
-                                        "Expected function",
-                                        "Make sure function is defined",
+                                        "No matching operator overload found",
+                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
                                     ))
                                 }
                             };
@@ -3664,8 +3707,8 @@ impl Parser {
                         } else {
                             // error if no custom method, let user know that the operation is not supported
                             return Err(self.generate_error_with_pos(
-                                "Operation not supported",
-                                format!("Try implementing the method {}", function_id),
+                                format!("No operator overload `{}` found for `{}` and `{}`", operation, left_expr.get_type(), right_expr.get_type()),
+                                format!("Define a dunder method to support this operation.\n  Example: `fn extends {}(a: {}, b: {}) -> {} {{ ... }}`", function_id.split("::").last().unwrap_or(&function_id), left_expr.get_type(), right_expr.get_type(), left_expr.get_type()),
                                 current_pos.clone(),
                             ));
                         }
@@ -3702,8 +3745,8 @@ impl Parser {
                     .is_some_and(|t| t.is_symbol(RightParen))
                 {
                     return Err(self.generate_error(
-                        "Tuple must contain at least two elements",
-                        "Add more elements to the tuple",
+                        "Tuple type must contain at least two elements",
+                        "A tuple type requires at least two elements, e.g. `(Int, String)`.\n  A single-element parenthesized type like `(Int)` is just `Int`.",
                     ));
                 }
                 typelist.push(self.ttype()?);
@@ -3782,8 +3825,8 @@ impl Parser {
                 self.consume_symbol(RightParen)?;
                 if let TType::Option { .. } = ttype {
                     return Err(self.generate_error(
-                        "Cannot have option directly inside an option",
-                        "Type Error: Try removing the extra `?`",
+                        "Cannot nest Option directly inside Option",
+                        "Nested `Option(Option(...))` is not allowed.\n  Use a single `Option(T)` instead.",
                     ));
                 }
                 Ok(TType::Option {
@@ -3873,8 +3916,14 @@ impl Parser {
                     {
                         if generic_len.len() != type_annotation.len() {
                             return Err(self.generate_error_with_pos(
-                                format!("Expected {} type parameters", generic_len.len()),
-                                format!("Got {} type parameters", type_annotation.len()),
+                                format!("Expected {} type parameter(s) for `{}`", generic_len.len(), identifier),
+                                format!("Got {} type parameter(s), but `{}` requires {}.\n  Example: `{}({})`",
+                                    type_annotation.len(),
+                                    identifier,
+                                    generic_len.len(),
+                                    identifier,
+                                    generic_len.iter().map(|g| g.to_string()).collect::<Vec<_>>().join(", ")
+                                ),
                                 pos,
                             ));
                         }
@@ -3888,8 +3937,8 @@ impl Parser {
                     let Some(alias) = self.typechecker.environment.type_alias.get(&identifier)
                     else {
                         return Err(self.generate_error_with_pos(
-                            "Unknown type",
-                            format!("Unknown type '{identifier}' "),
+                            format!("Unknown type `{}`", identifier),
+                            format!("The type `{identifier}` is not defined.\n  Check spelling and make sure it is declared before use.\n  Built-in types: Int, Float, Bool, String, Char, Any, None\n  Custom types must be declared with `enum` or `struct` before use."),
                             pos,
                         ));
                     };
@@ -3899,7 +3948,7 @@ impl Parser {
             _ => Err(self.generate_error(
                 "Expected type annotation",
                 format!(
-                    "got {} but expected a type name",
+                    "Got `{}` but expected a type name.\n  Valid types: Int, Float, Bool, String, Char, Option(T), [T], (T1, T2), fn(T) -> R, or a custom type name",
                     fmt_token_opt(self.current_token())
                 ),
             )),
@@ -3939,8 +3988,8 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "parameter identifier already defined",
-                    "try using another name",
+                    "Duplicate parameter name",
+                    "Each parameter must have a unique name. Choose a different name for this parameter.",
                     pos,
                 ));
             }
@@ -3966,8 +4015,8 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if parameters.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "parameter identifier already defined",
-                    "try using another name",
+                    "Duplicate parameter name",
+                    "Each parameter must have a unique name. Choose a different name for this parameter.",
                     pos,
                 ));
             }
@@ -4002,8 +4051,11 @@ impl Parser {
         let pos = self.get_current_token_position();
         if test.get_type() != TType::Bool {
             return Err(self.generate_error_with_pos(
-                "If statement expression must return a bool",
-                format!("got {}", test.get_type()),
+                format!("Condition must be a Bool, found `{}`", test.get_type()),
+                format!(
+                    "The condition expression returned `{}` but `if`/`elif` requires a Bool.\n  Use a comparison like `x > 0`, `x == 0`, `x != \"\"`, etc.",
+                    test.get_type()
+                ),
                 pos,
             ));
         }
@@ -4106,8 +4158,11 @@ impl Parser {
         if expr.get_type().custom_to_string().is_some() {
         } else {
             return Err(self.generate_error_with_pos(
-                "Match statement expects an enum type",
-                format!("got {}", expr.get_type()),
+                format!("Match statement expects an enum type, found `{}`", expr.get_type()),
+                format!(
+                    "The `match` keyword only works with enum types, but got `{}`.\n  Example:\n    match my_enum {{\n      VariantA(val) => {{ ... }}\n      VariantB => {{ ... }}\n      _ => {{ ... }}\n    }}",
+                    expr.get_type()
+                ),
                 self.get_current_token_position(),
             ));
         }
@@ -4125,8 +4180,8 @@ impl Parser {
                 // check to see if default branch is already defined
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
-                        "default branch already defined",
-                        "make sure only one default branch is defined",
+                        "Default branch `_` is already defined",
+                        "A match statement can only have one default `_` branch. Remove the duplicate.",
                         pos,
                     ));
                 }
@@ -4170,8 +4225,8 @@ impl Parser {
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         return Err(self.generate_error_with_pos(
-                            "Expected custom type",
-                            format!("got {}", expr.get_type()),
+                            format!("Expected a generic custom type, found `{}`", expr.get_type()),
+                            "This type has generic type parameters but the value does not carry type parameter information.\n  This is an internal type error — please report it.",
                             pos,
                         ));
                     };
@@ -4202,16 +4257,34 @@ impl Parser {
 
                 if vtype != TType::None && enum_id.is_none() {
                     return Err(self.generate_error_with_pos(
-                        format!("variant '{}' is missing Identifier", variant),
-                        "Variant(id), id is missing",
+                        format!("Variant `{}` carries data but is missing a binding variable", variant),
+                        format!(
+                            "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
+                            vtype, variant
+                        ),
                         pos,
                     ));
                 }
 
                 if !found {
+                    // Build list of available variants for the hint
+                    let available: Vec<String> = new_fields
+                        .iter()
+                        .filter(|(name, _)| name.as_ref() != "type")
+                        .map(|(name, ttype)| {
+                            if *ttype == TType::None {
+                                format!("`{}`", name)
+                            } else {
+                                format!("`{}` (holds `{}`)", name, ttype)
+                            }
+                        })
+                        .collect();
                     return Err(self.generate_error_with_pos(
-                        format!("variant '{}' not found in type", variant),
-                        "make sure the variant is in the type",
+                        format!("Variant `{}` not found in this enum type", variant),
+                        format!(
+                            "Available variants: {}. Check for typos — variant names are case-sensitive.",
+                            available.join(", ")
+                        ),
                         pos,
                     ));
                 }
@@ -4271,8 +4344,8 @@ impl Parser {
                 {
                     let TType::Custom { type_params, .. } = expr.get_type() else {
                         return Err(self.generate_error_with_pos(
-                            "not a custom type",
-                            "make sure the type is a custom type",
+                            format!("Expected a generic custom type, found `{}`", expr.get_type()),
+                            "This type has generic type parameters but the value does not carry type parameter information.\n  This is an internal type error — please report it.",
                             pos,
                         ));
                     };
@@ -4290,8 +4363,11 @@ impl Parser {
                 for (i, field) in new_fields.iter().enumerate() {
                     if field.0.deref() != "type" && !covered.contains(&i) {
                         return Err(self.generate_error_with_pos(
-                            format!("variant '{}' is not covered", field.0),
-                            "make sure all variants are covered",
+                            format!("Variant `{}` is not covered in match", field.0),
+                            format!(
+                                "All enum variants must be handled. Either add a branch for `{}` or add a default `_ => {{ ... }}` branch.",
+                                field.0
+                            ),
                             pos,
                         ));
                     }
@@ -4321,7 +4397,7 @@ impl Parser {
         {
             return Err(self.generate_error_with_pos(
                 format!("type '{}' already defined", alias),
-                "try using another name",
+                "Each parameter must have a unique name. Choose a different name for this parameter.",
                 self.get_current_token_position(),
             ));
         }
@@ -4432,10 +4508,18 @@ impl Parser {
             if !generic_field_names.contains(generic_type) {
                 return Err(self.generate_error_with_pos(
                     format!(
-                        "enum '{}' is missing generic type {}",
+                        "Enum `{}` uses generic type `{}` but it is not declared",
                         enum_name, generic_type
                     ),
-                    "You must include generic types in enum name(...generictypes)",
+                    format!(
+                        "Declare generic types in the enum header: `enum {}({}) {{ ... }}`\n  Example: `enum Option(T) {{ Some: $T, None }}`",
+                        enum_name,
+                        if generic_field_names.is_empty() {
+                            generic_type.to_string()
+                        } else {
+                            format!("{}, {}", generic_field_names.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", "), generic_type)
+                        }
+                    ),
                     position.clone(),
                 ));
             }
@@ -4496,8 +4580,8 @@ impl Parser {
                 .insert(enum_name.clone());
         } else {
             return Err(self.generate_error_with_pos(
-                format!("Enum '{}' is already instantiated", enum_name),
-                "Cannot reinstantiate the same type",
+                format!("Enum `{}` is already defined", enum_name),
+                "Each enum name can only be defined once. Choose a different name or remove the duplicate definition.".to_string(),
                 position.clone(),
             ));
         }
@@ -4552,10 +4636,18 @@ impl Parser {
             if !generic_field_names.contains(generic_type) {
                 return Err(self.generate_error_with_pos(
                     format!(
-                        "Struct '{}' is missing generic type {}",
+                        "Struct `{}` uses generic type `{}` but it is not declared",
                         struct_name, generic_type
                     ),
-                    "You must include generic types in struct name(...generictypes)",
+                    format!(
+                        "Declare generic types in the struct header: `struct {}({}) {{ ... }}`\n  Example: `struct Pair(T) {{ first: $T, second: $T }}`",
+                        struct_name,
+                        if generic_field_names.is_empty() {
+                            generic_type.to_string()
+                        } else {
+                            format!("{}, {}", generic_field_names.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", "), generic_type)
+                        }
+                    ),
                     position.clone(),
                 ));
             }
@@ -4612,8 +4704,8 @@ impl Parser {
                 .insert(struct_name.clone(), fields);
         } else {
             return Err(self.generate_error_with_pos(
-                format!("Struct '{}' is already instantiated", struct_name),
-                "Cannot reinstantiate the same type",
+                format!("Struct `{}` is already defined", struct_name),
+                "Each struct name can only be defined once. Choose a different name or remove the duplicate definition.".to_string(),
                 position.clone(),
             ));
         }
@@ -4637,8 +4729,8 @@ impl Parser {
             let (identifier, pos) = self.get_identifier()?;
             if self.typechecker.environment.has(&identifier) {
                 return Err(self.generate_error_with_pos(
-                    "identifier already used",
-                    format!("identifier '{identifier}' is already used within this scope"),
+                    format!("Variable `{}` is already defined in this scope", identifier),
+                    format!("`{}` already exists. Choose a different loop variable name.", identifier),
                     pos.clone(),
                 ));
             }
@@ -4703,8 +4795,8 @@ impl Parser {
                         )
                     } else {
                         return Err(self.generate_error_with_pos(
-                            "foreach can only iterate over arrays",
-                            format!("got {}", array.get_type()),
+                            format!("`for..in` can only iterate over lists, found `{}`", array.get_type()),
+                            format!("The expression has type `{}`, but `for..in` requires a `[T]` (list).\n  Example: `for item in my_list {{ ... }}`\n  For ranges, use: `for i in 0 ..< 10 {{ ... }}`", array.get_type()),
                             arraypos.clone(),
                         ));
                     }
@@ -4730,8 +4822,8 @@ impl Parser {
             let inc = self.expr()?;
             if test.get_type() != TType::Bool && test.get_type() != TType::Void {
                 return Err(self.generate_error_with_pos(
-                    "test expression must return a bool",
-                    format!("got {}", test.get_type()),
+                    format!("For-loop condition must be a Bool, found `{}`", test.get_type()),
+                    "The middle expression in `for init; condition; step { ... }` must be a Bool.\n  Use a comparison like `i < 10`, `i != 0`, etc.",
                     testpos,
                 ));
             }
@@ -4758,8 +4850,8 @@ impl Parser {
                 inner
             } else {
                 return Err(self.generate_error_with_pos(
-                    "unwrap expects an option type",
-                    format!("got {}", expr.get_type()),
+                    format!("`while let` expects an Option type, found `{}`", expr.get_type()),
+                    "The `while let` pattern loops while an Option has a value.\n  Syntax: `while let variable = option_expression { ... }`\n  The expression must return an Option type.".to_string(),
                     pos.clone(),
                 ));
             };
@@ -4767,8 +4859,8 @@ impl Parser {
             // make sure symbol doesn't already exist
             if self.typechecker.environment.has(&identifier) {
                 Err(self.generate_error_with_pos(
-                    format!("Symbol '{}' is already instantiated", identifier),
-                    "Cannot reinstantiate the same symbol in the same scope",
+                    format!("Variable `{}` is already defined in this scope", identifier),
+                    format!("`{}` already exists. Choose a different variable name for `while let`.", identifier),
                     pos.clone(),
                 ))
             } else {
@@ -4793,8 +4885,8 @@ impl Parser {
             let test = self.top_expr()?;
             if test.get_type() != TType::Bool && test.get_type() != TType::Void {
                 return Err(self.generate_error_with_pos(
-                    "test expression must return a bool",
-                    format!("got {}", test.get_type()),
+                    format!("While-loop condition must be a Bool, found `{}`", test.get_type()),
+                    "The condition in `while <expr> { ... }` must evaluate to a Bool.\n  Use a comparison like `x > 0`, `!done`, etc.",
                     testpos,
                 ));
             }
@@ -4827,8 +4919,8 @@ impl Parser {
                 inner
             } else {
                 return Err(self.generate_error_with_pos(
-                    "unwrap expects an option type",
-                    format!("got {}", expr.get_type()),
+                    format!("`if let` expects an Option type, found `{}`", expr.get_type()),
+                    "The `if let` pattern unwraps an Option value.\n  Syntax: `if let variable_name = option_expression { ... }`\n  Example:\n    let opt: Option(Int) = Some(42)\n    if let value = opt {\n      println(Cast::string(value))\n    }\n  Note: Do NOT use `if let Some(x) = ...` — just use `if let x = ...`".to_string(),
                     pos.clone(),
                 ));
             };
@@ -4836,8 +4928,8 @@ impl Parser {
             // make sure symbol doesn't already exist
             if self.typechecker.environment.has(&identifier) {
                 Err(self.generate_error_with_pos(
-                    format!("Symbol '{}' is already instantiated", identifier),
-                    "Cannot reinstantiate the same symbol in the same scope",
+                    format!("Variable `{}` is already defined in this scope", identifier),
+                    format!("`{}` already exists. Choose a different variable name for `if let`.", identifier),
                     pos.clone(),
                 ))
             } else {
@@ -4877,8 +4969,11 @@ impl Parser {
             let test = self.expr()?;
             if test.get_type() != TType::Bool {
                 return Err(self.generate_error_with_pos(
-                    "If statement's expression must return a bool",
-                    format!("got {}", test.get_type()),
+                    format!("Condition must be a Bool, found `{}`", test.get_type()),
+                    format!(
+                        "The condition expression returned `{}` but `if` requires a Bool.\n  Use a comparison like `x > 0`, `x == 0`, `x != \"\"`, etc.",
+                        test.get_type()
+                    ),
                     testpos.clone(),
                 ));
             }
@@ -4914,8 +5009,8 @@ impl Parser {
         if self.modules.has(&identifier) {
             // throw error
             return Err(self.generate_error_with_pos(
-                "Cannot use module as identifier",
-                format!("got {}", identifier),
+                format!("Cannot use module name `{}` as a variable", identifier),
+                format!("`{}` is already used as a module name. Choose a different variable name.", identifier),
                 pos.clone(),
             ));
         }
@@ -4950,8 +5045,9 @@ impl Parser {
                 (Ok(_), Ok(_)) => {}
                 _ => {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot assign {} to {}", expr.get_type(), ttype),
-                        "Make sure the expression returns the givin type",
+                        format!("Cannot assign `{}` to `{}`", expr.get_type(), ttype),
+                        format!("The declared type is `{}` but the expression returns `{}`.\n  Make sure the right-hand side matches the declared type.",
+                            ttype, expr.get_type()),
                         pos.clone(),
                     ));
                 }
@@ -4965,16 +5061,16 @@ impl Parser {
         // cant assing a void
         if expr.get_type() == TType::Void {
             return Err(self.generate_error_with_pos(
-                format!("Variable '{}' cannot be assinged to void", identifier),
-                "Make sure the expression returns a value",
+                format!("Variable `{}` cannot be assigned to Void", identifier),
+                "The expression does not return a value (returns Void).\n  Make sure the right-hand side is an expression that produces a value, not a statement.",
                 pos.clone(),
             ));
         }
         // make sure symbol doesnt already exist
         if self.typechecker.environment.has(&identifier) {
             Err(self.generate_error_with_pos(
-                format!("Symbol '{}' is already instantiated", identifier),
-                "Cannot reinstantiate the same symbol in the same scope",
+                format!("Variable `{}` is already defined in this scope", identifier),
+                format!("A variable named `{}` already exists. Use a different name, or use `{} = <expr>` to reassign.", identifier, identifier),
                 pos.clone(),
             ))
         } else {
@@ -5028,8 +5124,9 @@ impl Parser {
                     && !builtin_types.contains(&&*custom_type)
                 {
                     return Err(self.generate_error_with_pos(
-                        format!("Custom type {} does not exist", custom_type),
-                        "Cannot extend a non existent custom type",
+                        format!("Type `{}` does not exist", custom_type),
+                        format!("`{}` is not a defined struct or enum.\n  `fn extends` can only extend existing custom types or built-in types.\n  Syntax: `fn extends({}) method_name(self: {}, ...) -> ReturnType {{ ... }}`",
+                            custom_type, custom_type, custom_type),
                         self.get_current_token_position(),
                     ));
                 }
@@ -5045,8 +5142,8 @@ impl Parser {
             // check to see if its a valid custom type
             if !self.modules.has(&custom_type) {
                 return Err(self.generate_error_with_pos(
-                    format!("Module {} does not exist", custom_type),
-                    "Cannot extend a non existent module",
+                    format!("Module `{}` does not exist", custom_type),
+                    format!("`{}` is not a defined module.\n  `fn mod` can only add functions to existing modules.\n  Make sure the module is imported or declared before this function.", custom_type),
                     self.get_current_token_position(),
                 ));
             }
@@ -5093,8 +5190,8 @@ impl Parser {
             | id @ "__ge__" => {
                 if parameters.len() != 2 {
                     return Err(self.generate_error_with_pos(
-                        format!("Dunder method {id} expects Two parameters"),
-                        format!("got {}", parameters.len()),
+                        format!("Dunder method `{}` requires exactly 2 parameters", id),
+                        format!("Got {} parameter(s).\n  Dunder methods define operator overloads and must take exactly 2 parameters (left and right operands).\n  Example: `fn extends {} (a: MyType, b: MyType) -> MyType {{ ... }}`", parameters.len(), id),
                         pos.clone(),
                     ));
                 }
@@ -5115,15 +5212,15 @@ impl Parser {
                 // }
                 if is_mod {
                     return Err(self.generate_error_with_pos(
-                        format!("Cannot create module function for {id}"),
-                        "Cannot create module function for dunder methods",
+                        format!("Cannot define dunder method `{}` on a module", id),
+                        "Dunder methods define operator overloads and must extend a custom type, not a module.",
                         pos.clone(),
                     ));
                 }
                 if !get_first {
                     return Err(self.generate_error_with_pos(
-                        format!("Must extend from {id}"),
-                        "dunder methods must extends from a custom type",
+                        format!("Dunder method `{}` must use `extends` from the first parameter", id),
+                        format!("Dunder methods must extend from the first parameter's type.\n  Example: `fn extends {}(a: MyType, b: MyType) -> MyType {{ ... }}`", id),
                         pos.clone(),
                     ));
                 }
@@ -5172,8 +5269,8 @@ impl Parser {
                     _ => {
                         // error
                         return Err(self.generate_error_with_pos(
-                            "Cannot extend from type",
-                            "Cannot extend from this type",
+                            format!("Cannot extend from type `{}`", ttype),
+                            "Only custom types (structs/enums) and built-in types (Int, Float, Bool, String, Char, List, Option, Tuple, Function) can be extended.\n  Use `fn extends method_name(self: Type, ...) -> R {{ ... }}` syntax.",
                             pos.clone(),
                         ));
                     }
@@ -5189,16 +5286,16 @@ impl Parser {
                 // check if generic function exist
                 if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
-                        format!("Generic Function {} already defined", &identifier),
-                        "Cannot redefine a generic function",
+                        format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                        format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                         pos.clone(),
                     ));
                 }
                 // check if normal function exist
                 if self.typechecker.environment.has(&identifier) {
                     return Err(self.generate_error_with_pos(
-                        format!("Function {} already defined", &identifier,),
-                        "Cannot redefine a generic function",
+                        format!("Parameter name `{}` conflicts with an existing function", &identifier),
+                        format!("A function named `{}` already exists in scope.\n  Use a different parameter name to avoid shadowing.", &identifier),
                         pos.clone(),
                     ));
                 }
@@ -5229,14 +5326,15 @@ impl Parser {
             {
                 return Err(self.generate_error_with_pos(
                     format!(
-                        "Function {identifier} with inputs {} is already defined",
+                        "Function `{}` with parameter types ({}) is already defined",
+                        identifier,
                         typeinput
                             .iter()
                             .map(|x| x.to_string())
                             .collect::<Vec<String>>()
                             .join(", ")
                     ),
-                    "Cannot redefine a function with the same signature",
+                    "A function with the same name and parameter types already exists.\n  Nova supports function overloading — use different parameter types to create a new overload.",
                     pos.clone(),
                 ));
             }
@@ -5254,10 +5352,10 @@ impl Parser {
             if self.typechecker.environment.no_override.has(&identifier) {
                 return Err(self.generate_error_with_pos(
                     format!(
-                        "Cannot create generic functon since, {} is already defined",
+                        "Cannot create generic function `{}` — a non-generic overload already exists",
                         &identifier
                     ),
-                    "Cannot create generic function since this function is overload-able",
+                    "A non-generic function with this name already exists and cannot be overridden by a generic version.\n  Rename the function or remove the existing overload.",
                     pos.clone(),
                 ));
             }
@@ -5405,8 +5503,8 @@ impl Parser {
                 // do nothing
             } else if !will_return {
                 return Err(self.generate_error_with_pos(
-                    "Function is missing a return statement in a branch",
-                    "Function missing return",
+                    "Function is missing a `return` statement in one or more branches",
+                    "All code paths must return a value when the function has a non-Void return type.\n  Make sure every `if`/`elif`/`else` branch has a `return` statement.",
                     pos.clone(),
                 ));
             }
@@ -5492,7 +5590,7 @@ impl Parser {
                     statements.push(statement);
                 }
                 if self.index == index_change {
-                    return Err(self.generate_error("Expected statement", "Expected statement"));
+                    return Err(self.generate_error("Expected statement", "A statement was expected but the parser could not continue.\n  Check for missing semicolons, extra tokens, or unclosed braces."));
                 }
             }
             statements
@@ -5516,8 +5614,8 @@ impl Parser {
             self.modules.insert(module_name);
         } else {
             return Err(self.generate_error(
-                "Expected module declaration",
-                "Module declaration must be the first statement",
+                "Expected `module` declaration",
+                "Every Nova file must begin with a module declaration.\n  Example: `module my_module`\n  This must be the first statement in the file.",
             ));
         }
 

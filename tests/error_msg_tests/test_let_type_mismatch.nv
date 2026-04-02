@@ -1,0 +1,2 @@
+module test_let_type_mismatch
+let x: Int = "hello"

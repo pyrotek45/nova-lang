@@ -294,7 +294,7 @@ impl Compiler {
                                     captured_var
                                 )
                                 .into(),
-                                note: "".into(),
+                                note: format!("The closure captures `{}` but it could not be found. Make sure the variable is defined in an enclosing scope before the closure.", captured_var).into(),
                             }));
                         }
                     }
@@ -1474,7 +1474,7 @@ impl Compiler {
                                 captured_var
                             )
                             .into(),
-                            note: "".into(),
+                            note: format!("The closure captures `{}` but it could not be found. Make sure the variable is defined in an enclosing scope before the closure.", captured_var).into(),
                         }));
                     }
                 }
@@ -1906,7 +1906,7 @@ impl Compiler {
                 } else {
                     return Err(Box::new(NovaError::Compiler {
                         msg: format!("Function \"{}\" not found", identifier).into(),
-                        note: "Function could not be loaded".into(),
+                        note: format!("The identifier `{}` could not be resolved to a local variable, global variable, or function.\n  Make sure it is defined before this point in the code.", identifier).into(),
                     }));
                 }
             }
@@ -1988,7 +1988,7 @@ impl Compiler {
                         } else {
                             return Err(Box::new(NovaError::Compiler {
                                 msg: format!("Function \"{}\" not found", identifier).into(),
-                                note: "Function could not be loaded".into(),
+                                note: format!("The function `{}` could not be found as a native function, local variable, or global definition.\n  Make sure it is defined or imported before this call.", identifier).into(),
                             }));
                         }
                     }

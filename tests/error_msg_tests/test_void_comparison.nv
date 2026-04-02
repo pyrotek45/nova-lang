@@ -1,0 +1,5 @@
+module test_void_comparison
+fn donothing() { pass }
+if donothing() == donothing() {
+  println("bad")
+}

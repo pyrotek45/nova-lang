@@ -1,0 +1,3 @@
+module test_list_index_non_int
+let xs = [1, 2, 3]
+let val = xs["hello"]
