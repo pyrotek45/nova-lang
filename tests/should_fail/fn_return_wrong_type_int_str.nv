@@ -1,0 +1,3 @@
+module fn_return_wrong_type_int_str
+// Should fail: returning Int from function declared to return String
+fn foo(x: Int) -> String { return x }

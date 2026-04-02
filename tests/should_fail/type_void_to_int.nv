@@ -1,0 +1,4 @@
+module type_void_to_int
+// Should fail: assigning void function result to typed variable
+fn greet() { println("hello") }
+let x: Int = greet()

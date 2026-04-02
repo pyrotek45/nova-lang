@@ -1,0 +1,3 @@
+module type_bool_arithmetic
+// Should fail: performing arithmetic on bool and int
+let x = true + 5

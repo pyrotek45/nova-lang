@@ -1,0 +1,4 @@
+module fn_too_few_args_multi
+// Should fail: calling function with too few arguments (2 params, 1 arg)
+fn add(a: Int, b: Int) -> Int { return a + b }
+let result = add(1)

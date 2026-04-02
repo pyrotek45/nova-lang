@@ -1,0 +1,62 @@
+module perf_generics
+
+// ============================================================
+// Generics Throughput Benchmarks
+// ============================================================
+// Tests generic function dispatch and generic struct instantiation.
+// ============================================================
+
+// Generic identity
+fn identity(x: $T) -> $T { return x }
+
+// Generic pair struct
+struct Pair(T, U) { first: $T, second: $U }
+
+fn extends swap(p: Pair($T, $U)) -> Pair($U, $T) {
+    return Pair { first: p.second, second: p.first }
+}
+
+// ── BENCH 1: Generic function calls (Int) ───────────────────
+let t1 = now()
+let gen_sum = 0
+for i in 0..100000 {
+    gen_sum = gen_sum + identity(i)
+}
+let t1e = now()
+assert(gen_sum > 0, "generic int sum")
+println("  BENCH 1 [generic_int_100k]    " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Generic function calls (String) ────────────────
+let t2 = now()
+let gen_str = ""
+for i in 0..10000 {
+    gen_str = identity("x")
+}
+let t2e = now()
+assert(gen_str == "x", "generic string identity")
+println("  BENCH 2 [generic_str_10k]     " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Generic struct creation ────────────────────────
+let t3 = now()
+let pair_sum = 0
+for i in 0..50000 {
+    let p = Pair { first: i, second: i * 2 }
+    pair_sum = pair_sum + p.first + p.second
+}
+let t3e = now()
+assert(pair_sum > 0, "generic struct sum")
+println("  BENCH 3 [generic_struct_50k]  " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Generic method (swap) ──────────────────────────
+let t4 = now()
+let swap_sum = 0
+for i in 0..50000 {
+    let p = Pair { first: i, second: i + 1 }
+    let s = p.swap()
+    swap_sum = swap_sum + s.first
+}
+let t4e = now()
+assert(swap_sum > 0, "generic swap sum")
+println("  BENCH 4 [generic_swap_50k]    " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_generics")

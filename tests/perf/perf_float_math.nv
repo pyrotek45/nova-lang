@@ -1,0 +1,59 @@
+module perf_float_math
+
+// ============================================================
+// Float Math Benchmarks
+// ============================================================
+// Tests floating-point arithmetic, sqrt, and accumulation.
+// ============================================================
+
+// ── BENCH 1: Float addition loop ────────────────────────────
+let t1 = now()
+let fsum = 0.0
+for i in 0..200000 {
+    fsum = fsum + Cast::float(i).unwrap() * 0.001
+}
+let t1e = now()
+assert(fsum > 0.0, "float add sum")
+println("  BENCH 1 [float_add_200k]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Float multiplication ───────────────────────────
+let t2 = now()
+let fmul_sum = 0.0
+for i in 1..100001 {
+    fmul_sum = fmul_sum + Cast::float(i).unwrap() * 3.14159
+}
+let t2e = now()
+assert(fmul_sum > 0.0, "float mul sum")
+println("  BENCH 2 [float_mul_100k]      " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Float division ─────────────────────────────────
+let t3 = now()
+let fdiv_sum = 0.0
+for i in 1..100001 {
+    fdiv_sum = fdiv_sum + Cast::float(i).unwrap() / 7.0
+}
+let t3e = now()
+assert(fdiv_sum > 0.0, "float div sum")
+println("  BENCH 3 [float_div_100k]      " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: sqrt computation ───────────────────────────────
+let t4 = now()
+let sqrt_sum = 0.0
+for i in 1..100001 {
+    sqrt_sum = sqrt_sum + Cast::float(i).unwrap().sqrt()
+}
+let t4e = now()
+assert(sqrt_sum > 0.0, "sqrt sum")
+println("  BENCH 4 [sqrt_100k]           " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Mixed float arithmetic ────────────────────────
+let t5 = now()
+let mixed = 1.0
+for i in 1..100001 {
+    let fi = Cast::float(i).unwrap()
+    mixed = (mixed + fi) * 1.000001 - fi
+}
+let t5e = now()
+println("  BENCH 5 [float_mixed_100k]    " + Cast::string(t5e - t5) + "ms")
+
+println("PASS: perf_float_math")

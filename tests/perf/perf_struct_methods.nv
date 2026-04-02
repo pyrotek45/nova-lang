@@ -1,0 +1,71 @@
+module perf_struct_methods
+
+// ============================================================
+// Struct Method (extends) Benchmarks
+// ============================================================
+// Tests method calls via fn extends / UFCS throughput.
+// ============================================================
+
+struct Vec2 { x: Float, y: Float }
+
+fn extends magnitude(v: Vec2) -> Float {
+    return (v.x * v.x + v.y * v.y).sqrt()
+}
+
+fn extends add(a: Vec2, b: Vec2) -> Vec2 {
+    return Vec2 { x: a.x + b.x, y: a.y + b.y }
+}
+
+fn extends scale(v: Vec2, s: Float) -> Vec2 {
+    return Vec2 { x: v.x * s, y: v.y * s }
+}
+
+fn extends dot(a: Vec2, b: Vec2) -> Float {
+    return a.x * b.x + a.y * b.y
+}
+
+// ── BENCH 1: Struct creation + method calls ─────────────────
+let t1 = now()
+let v = Vec2 { x: 0.0, y: 0.0 }
+for i in 0..50000 {
+    let u = Vec2 { x: Cast::float(i).unwrap(), y: Cast::float(i).unwrap() * 0.5 }
+    v = v.add(u)
+}
+let t1e = now()
+assert(v.x > 0.0, "struct method sum")
+println("  BENCH 1 [struct_method_50k]   " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Magnitude computation ──────────────────────────
+let t2 = now()
+let mag_total = 0.0
+for i in 1..50001 {
+    let p = Vec2 { x: Cast::float(i).unwrap(), y: Cast::float(i).unwrap() * 2.0 }
+    mag_total = mag_total + p.magnitude()
+}
+let t2e = now()
+assert(mag_total > 0.0, "magnitude sum")
+println("  BENCH 2 [magnitude_50k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Dot product ────────────────────────────────────
+let t3 = now()
+let dot_total = 0.0
+let a = Vec2 { x: 1.0, y: 2.0 }
+for i in 0..100000 {
+    let b = Vec2 { x: Cast::float(i).unwrap(), y: Cast::float(i).unwrap() }
+    dot_total = dot_total + a.dot(b)
+}
+let t3e = now()
+assert(dot_total > 0.0, "dot product sum")
+println("  BENCH 3 [dot_product_100k]    " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Scale + chain ──────────────────────────────────
+let t4 = now()
+let sv = Vec2 { x: 1.0, y: 1.0 }
+for i in 0..50000 {
+    sv = sv.scale(1.00001)
+}
+let t4e = now()
+assert(sv.x > 1.0, "scaled value")
+println("  BENCH 4 [scale_chain_50k]     " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_struct_methods")

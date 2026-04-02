@@ -111,8 +111,8 @@ assert(s6 == 250000, "rec len")
 println("  BENCH 6 [rec_len_500x500]      " + Cast::string(t6e - t6) + "ms")
 
 // ── BENCH 7: Deep call chain ────────────────────────────────
-fn chain_b(n: Int) -> Int   // forward declaration
-fn chain_c(n: Int) -> Int   // forward declaration
+fn chain_b(n: Int) -> Int
+fn chain_c(n: Int) -> Int
 
 fn chain_a(n: Int) -> Int {
     if n <= 0 { return 0 }

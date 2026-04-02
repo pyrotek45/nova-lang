@@ -1,0 +1,4 @@
+module enum_struct_name_clash
+// Should fail: enum name clashes with existing struct name
+struct Color { r: Int, g: Int, b: Int }
+enum Color { Red, Green, Blue }

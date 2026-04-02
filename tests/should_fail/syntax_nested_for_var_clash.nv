@@ -1,0 +1,7 @@
+module syntax_nested_for_var_clash
+// Should fail: nested for-loop reuses same loop variable name
+for i in 0..10 {
+    for i in 0..5 {
+        println(Cast::string(i))
+    }
+}

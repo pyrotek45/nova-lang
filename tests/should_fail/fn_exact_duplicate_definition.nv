@@ -1,0 +1,4 @@
+module fn_exact_duplicate_definition
+// Should fail: defining the exact same function twice
+fn double(x: Int) -> Int { return x * 2 }
+fn double(x: Int) -> Int { return x + x }

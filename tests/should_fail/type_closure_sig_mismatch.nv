@@ -1,0 +1,3 @@
+module type_closure_sig_mismatch
+// Should fail: assigning closure with wrong signature to typed variable
+let f: fn(Int) -> Int = |x: String| x

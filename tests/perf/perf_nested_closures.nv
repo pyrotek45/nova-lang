@@ -1,0 +1,60 @@
+module perf_nested_closures
+
+// ============================================================
+// Nested Closure & Capture Benchmarks
+// ============================================================
+// Tests closure creation, variable capture, and nested calls.
+// ============================================================
+
+// ── BENCH 1: Simple closure calls ───────────────────────────
+let t1 = now()
+let sum = 0
+let add_one = |x: Int| x + 1
+for i in 0..100000 {
+    sum = sum + add_one(i)
+}
+let t1e = now()
+assert(sum > 0, "closure call sum")
+println("  BENCH 1 [closure_call_100k]   " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Closure capturing outer variable ───────────────
+let t2 = now()
+let captured_total = 0
+let offset = 10
+let add_offset = |x: Int| x + offset
+for i in 0..100000 {
+    captured_total = captured_total + add_offset(i)
+}
+let t2e = now()
+assert(captured_total > 0, "captured closure sum")
+println("  BENCH 2 [captured_100k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Higher-order closure creation ──────────────────
+let t3 = now()
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x + n
+}
+let add5 = make_adder(5)
+let add10 = make_adder(10)
+let ho_sum = 0
+for i in 0..50000 {
+    ho_sum = ho_sum + add5(i) + add10(i)
+}
+let t3e = now()
+assert(ho_sum > 0, "higher-order closure sum")
+println("  BENCH 3 [higher_order_50k]    " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Trailing closure syntax ────────────────────────
+let t4 = now()
+fn apply(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+let trail_sum = 0
+for i in 0..50000 {
+    trail_sum = trail_sum + apply(i): |x: Int| x * 2 + 1
+}
+let t4e = now()
+assert(trail_sum > 0, "trailing closure sum")
+println("  BENCH 4 [trailing_50k]        " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_nested_closures")

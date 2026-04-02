@@ -1,0 +1,4 @@
+module struct_wrong_field_count_extra
+// Should fail: initializing struct with more fields than declared
+struct Point { x: Int, y: Int }
+let p = Point { x: 1, y: 2, z: 3 }

@@ -4471,6 +4471,15 @@ impl Parser {
         self.consume_identifier(Some("enum"))?;
         let (enum_name, position) = self.get_identifier()?;
 
+        // Check for duplicate enum/struct name before initializing
+        if self.typechecker.environment.no_override.has(&enum_name) {
+            return Err(self.generate_error_with_pos(
+                format!("Enum `{}` is already defined", enum_name),
+                "Each enum name can only be defined once. Choose a different name or remove the duplicate definition.",
+                position.clone(),
+            ));
+        }
+
         // Initialize the struct in the environment for recursive types
         self.typechecker
             .environment
@@ -4573,18 +4582,10 @@ impl Parser {
             .custom_types
             .insert(enum_name.clone(), fields);
 
-        if !self.typechecker.environment.has(&enum_name) {
-            self.typechecker
-                .environment
-                .no_override
-                .insert(enum_name.clone());
-        } else {
-            return Err(self.generate_error_with_pos(
-                format!("Enum `{}` is already defined", enum_name),
-                "Each enum name can only be defined once. Choose a different name or remove the duplicate definition.".to_string(),
-                position.clone(),
-            ));
-        }
+        self.typechecker
+            .environment
+            .no_override
+            .insert(enum_name.clone());
 
         Ok(Some(Statement::Enum {
             ttype: TType::Custom {

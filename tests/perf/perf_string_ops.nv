@@ -1,0 +1,54 @@
+module perf_string_ops
+
+// ============================================================
+// String Operation Benchmarks
+// ============================================================
+// Tests string concatenation, conversion, and manipulation.
+// ============================================================
+
+// ── BENCH 1: String concatenation loop ──────────────────────
+let t1 = now()
+let s = ""
+for i in 0..10000 {
+    s = s + "a"
+}
+let t1e = now()
+assert(s.len() == 10000, "string concat length")
+println("  BENCH 1 [str_concat_10k]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Int-to-String conversion ───────────────────────
+let t2 = now()
+let conv_count = 0
+for i in 0..100000 {
+    let cs = Cast::string(i)
+    conv_count = conv_count + 1
+}
+let t2e = now()
+assert(conv_count == 100000, "int to string count")
+println("  BENCH 2 [int_to_str_100k]     " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: String comparison ──────────────────────────────
+let t3 = now()
+let cmp_count = 0
+let target = "hello"
+for i in 0..100000 {
+    if target == "hello" {
+        cmp_count = cmp_count + 1
+    }
+}
+let t3e = now()
+assert(cmp_count == 100000, "string compare count")
+println("  BENCH 3 [str_compare_100k]    " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: String + number formatting ─────────────────────
+let t4 = now()
+let fmt_count = 0
+for i in 0..50000 {
+    let msg = "item_" + Cast::string(i) + "_done"
+    fmt_count = fmt_count + 1
+}
+let t4e = now()
+assert(fmt_count == 50000, "string format count")
+println("  BENCH 4 [str_format_50k]      " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_string_ops")
