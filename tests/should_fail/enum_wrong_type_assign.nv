@@ -1,0 +1,5 @@
+module enum_wrong_type_assign
+// Should fail: assigning enum variant of wrong enum type to typed variable
+enum Color { Red, Green, Blue }
+enum Fruit { Apple, Banana }
+let c: Color = Fruit::Apple

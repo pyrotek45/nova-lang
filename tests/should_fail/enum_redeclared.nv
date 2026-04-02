@@ -1,13 +1,17 @@
 module main
 
-// SHOULD FAIL: enum variant called with wrong argument type
-// Color::Red expects None (unit variant) — passing an Int should fail
+// SHOULD FAIL: defining two enums with the same name
 enum Color {
     Red,
     Green,
     Blue
 }
 
-// Red is a unit variant; calling it with an Int arg should fail
-let c = Color::Red(42)
+enum Color {
+    Cyan,
+    Magenta,
+    Yellow
+}
+
+let c = Color::Red
 println(c)

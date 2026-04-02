@@ -1,0 +1,4 @@
+module enum_nonexistent_variant
+// Should fail: accessing a variant that doesn't exist on the enum
+enum Direction { Up, Down, Left, Right }
+let d: Direction = Direction::Forward

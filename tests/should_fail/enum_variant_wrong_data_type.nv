@@ -1,0 +1,4 @@
+module enum_variant_wrong_data_type
+// Should fail: passing wrong data type to enum variant constructor
+enum Shape { Circle: Float, Point }
+let s = Shape::Circle("not a float")

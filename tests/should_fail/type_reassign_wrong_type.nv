@@ -1,0 +1,4 @@
+module type_reassign_wrong_type
+// Should fail: reassigning variable to value of different type
+let x = 5
+x = "hello"

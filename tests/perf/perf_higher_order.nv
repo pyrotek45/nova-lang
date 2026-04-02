@@ -1,0 +1,159 @@
+module perf_higher_order
+// HOF, map/filter/reduce pipelines, function composition chains
+
+import super.super.std.core
+import super.super.std.list
+
+fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+
+fn compose2(f: fn(Int) -> Int, g: fn(Int) -> Int, x: Int) -> Int {
+    return f(g(x))
+}
+
+fn twice(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(f(x))
+}
+
+// BENCH 1: pass-by-function-ref, 200k calls
+let t0 = now()
+let double = |x: Int| x * 2
+let sum1 = [0]
+let i = 0
+while i < 200000 {
+    sum1[0] += apply(double, i % 100)
+    i += 1
+}
+let t1 = now()
+println("  BENCH 1 [apply_fn_200k]          " + Cast::string(t1 - t0) + "ms")
+
+// BENCH 2: compose2, 100k calls
+let t2 = now()
+let add1 = |x: Int| x + 1
+let mul3 = |x: Int| x * 3
+let sum2 = [0]
+let j = 0
+while j < 100000 {
+    sum2[0] += compose2(add1, mul3, j % 50)
+    j += 1
+}
+let t3 = now()
+println("  BENCH 2 [compose2_100k]          " + Cast::string(t3 - t2) + "ms")
+
+// BENCH 3: twice (f(f(x))), 200k calls
+let t4 = now()
+let sum3 = [0]
+let k = 0
+while k < 200000 {
+    sum3[0] += twice(add1, k % 100)
+    k += 1
+}
+let t5 = now()
+println("  BENCH 3 [twice_200k]             " + Cast::string(t5 - t4) + "ms")
+
+// BENCH 4: list.map 10k elements, 200 times
+let t6 = now()
+let sum4 = [0]
+let l = 0
+while l < 200 {
+    let base4 = 0.to(10000)
+    let mapped = base4.map(|x: Int| x * 2)
+    sum4[0] += mapped.len()
+    l += 1
+}
+let t7 = now()
+println("  BENCH 4 [map_200x10k]            " + Cast::string(t7 - t6) + "ms")
+
+// BENCH 5: list.filter 10k elements, 200 times
+let t8 = now()
+let sum5 = [0]
+let m = 0
+while m < 200 {
+    let base5 = 0.to(10000)
+    let filtered = base5.filter(|x: Int| (x % 2) == 0)
+    sum5[0] += filtered.len()
+    m += 1
+}
+let t9 = now()
+println("  BENCH 5 [filter_200x10k]         " + Cast::string(t9 - t8) + "ms")
+
+// BENCH 6: list.reduce 10k elements, 100 times
+let ta = now()
+let sum6 = [0]
+let n = 0
+while n < 100 {
+    let base6 = 0.to(10000)
+    let total = base6.reduce(|acc: Int, x: Int, _i: Int| acc + x, 0)
+    sum6[0] += total % 1000
+    n += 1
+}
+let tb = now()
+println("  BENCH 6 [reduce_100x10k]         " + Cast::string(tb - ta) + "ms")
+
+// BENCH 7: map then filter pipeline, 100 times
+let tc = now()
+let sum7 = [0]
+let o = 0
+while o < 100 {
+    let base7 = 0.to(10000)
+    let result = base7
+        .map(|x: Int| x + 1)
+        .filter(|x: Int| (x % 3) == 0)
+    sum7[0] += result.len()
+    o += 1
+}
+let td = now()
+println("  BENCH 7 [map_filter_100x10k]     " + Cast::string(td - tc) + "ms")
+
+// BENCH 8: closure factory -- 1k closures, call each 100 times
+let te = now()
+let adders = []: fn(Int) -> Int
+let p = 0
+while p < 1000 {
+    let captured = p
+    adders.push(|x: Int| x + captured)
+    p += 1
+}
+let sum8 = [0]
+let q = 0
+while q < 100 {
+    let s_inner = 0
+    while s_inner < 1000 {
+        sum8[0] += adders[s_inner](q)
+        s_inner += 1
+    }
+    q += 1
+}
+let tf = now()
+println("  BENCH 8 [closure_factory_100k]   " + Cast::string(tf - te) + "ms")
+
+// BENCH 9: closure capturing loop var, 50k calls
+let tg = now()
+let sum9 = [0]
+let r = 0
+while r < 50000 {
+    let rv = r
+    let add_r = |x: Int| x + rv
+    sum9[0] += apply(add_r, r % 100)
+    r += 1
+}
+let th = now()
+println("  BENCH 9 [curried_hof_50k]        " + Cast::string(th - tg) + "ms")
+
+// BENCH 10: map with closure capturing Box, 200 x 1k
+let ti = now()
+let multiplier = Box(3)
+let sum10 = [0]
+let sv = 0
+while sv < 200 {
+    let small = 0.to(1000)
+    let mv = multiplier.value
+    let scaled = small.map(|x: Int| x * mv)
+    sum10[0] += scaled.len()
+    sv += 1
+}
+let tj = now()
+println("  BENCH 10 [map_captured_200x1k]   " + Cast::string(tj - ti) + "ms")
+
+println("  TOTAL [higher_order] " + Cast::string(tj - t0) + "ms")

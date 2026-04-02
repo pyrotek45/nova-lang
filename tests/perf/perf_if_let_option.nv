@@ -1,0 +1,71 @@
+module perf_if_let_option
+
+// ============================================================
+// Option / if-let / while-let Benchmarks
+// ============================================================
+// Tests Option wrapping, unwrapping, and pattern matching perf.
+// ============================================================
+
+fn maybe_double(x: Int) -> Option(Int) {
+    if x % 2 == 0 {
+        return Some(x * 2)
+    }
+    return None(Int)
+}
+
+// ── BENCH 1: Option creation + if-let ───────────────────────
+let t1 = now()
+let opt_sum = 0
+for i in 0..100000 {
+    let result = maybe_double(i)
+    if let val = result {
+        opt_sum = opt_sum + val
+    }
+}
+let t1e = now()
+assert(opt_sum > 0, "if-let option sum")
+println("  BENCH 1 [if_let_100k]         " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Some/None construction ─────────────────────────
+let t2 = now()
+let some_count = 0
+for i in 0..100000 {
+    let opt: Option(Int) = Some(i)
+    if let v = opt {
+        some_count = some_count + 1
+    }
+}
+let t2e = now()
+assert(some_count == 100000, "some construction count")
+println("  BENCH 2 [some_construct_100k] " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: None path (miss) ───────────────────────────────
+let t3 = now()
+let miss_count = 0
+for i in 0..100000 {
+    let result = maybe_double(i * 2 + 1)
+    if let val = result {
+        miss_count = miss_count + 1
+    }
+}
+let t3e = now()
+assert(miss_count == 0, "all misses")
+println("  BENCH 3 [none_miss_100k]      " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Option in list ─────────────────────────────────
+let t4 = now()
+let opts = []: Option(Int)
+for i in 0..10000 {
+    opts.push(maybe_double(i))
+}
+let opt_list_sum = 0
+for opt in opts {
+    if let v = opt {
+        opt_list_sum = opt_list_sum + v
+    }
+}
+let t4e = now()
+assert(opt_list_sum > 0, "option list sum")
+println("  BENCH 4 [option_list_10k]     " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_if_let_option")

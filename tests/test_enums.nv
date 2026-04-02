@@ -58,12 +58,7 @@ fn get_radius(s: Shape) -> Float {
 }
 assert(get_radius(circle) == 5.0, "match extract data")
 
-// Generic enum (Maybe from std)
-enum Maybe(A) {
-    Just: $A,
-    Nothing
-}
-
+// Generic enum (Maybe from std — using imported definition from core)
 let just_val = Maybe::Just(42)
 let nothing_val = Maybe::Nothing() @[A: Int]
 

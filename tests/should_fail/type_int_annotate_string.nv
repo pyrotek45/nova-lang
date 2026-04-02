@@ -1,0 +1,4 @@
+module type_int_annotate_string
+// Should fail: annotating variable as String but assigning Int
+let x = 5
+let y: String = x

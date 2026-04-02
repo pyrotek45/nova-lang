@@ -1,0 +1,65 @@
+module perf_scope_variables
+
+// ============================================================
+// Scope & Variable Throughput Benchmarks
+// ============================================================
+// Tests variable allocation, block scoping, and shadowing perf.
+// ============================================================
+
+// ── BENCH 1: Rapid variable creation ────────────────────────
+let t1 = now()
+let total = 0
+for i in 0..100000 {
+    let x = i * 2
+    let y = x + 1
+    let z = y - i
+    total = total + z
+}
+let t1e = now()
+assert(total > 0, "var creation sum")
+println("  BENCH 1 [var_creation_100k]   " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Nested block scoping ───────────────────────────
+let t2 = now()
+let outer = 0
+for i in 0..50000 {
+    let a = i
+    {
+        let b = a + 1
+        {
+            let c = b + 1
+            outer = outer + c
+        }
+    }
+}
+let t2e = now()
+assert(outer > 0, "nested scope sum")
+println("  BENCH 2 [nested_scope_50k]    " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Variable reassignment ──────────────────────────
+let t3 = now()
+let acc = 0
+for i in 0..200000 {
+    acc = acc + 1
+    acc = acc - 1
+    acc = acc + i
+    acc = acc - i
+    acc = acc + 1
+}
+let t3e = now()
+assert(acc == 200000, "reassignment total")
+println("  BENCH 3 [reassignment_200k]   " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Store expression (~>) ──────────────────────────
+let t4 = now()
+let store_sum = 0
+for i in 0..50000 {
+    i * 3 + 1 ~> val {
+        store_sum = store_sum + val
+    }
+}
+let t4e = now()
+assert(store_sum > 0, "store expr sum")
+println("  BENCH 4 [store_expr_50k]      " + Cast::string(t4e - t4) + "ms")
+
+println("PASS: perf_scope_variables")

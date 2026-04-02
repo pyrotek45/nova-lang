@@ -787,6 +787,10 @@ fn area(s: Shape) -> Float {
 }
 ```
 
+> **Name uniqueness:** Enum and struct names share a single namespace. You cannot define
+> two enums with the same name, nor an enum whose name collides with an existing struct
+> (or vice versa). The compiler rejects duplicates at parse time.
+
 ---
 
 ## 10. Generics
@@ -1428,9 +1432,27 @@ Nova's type system is strict and static. The following are all compile-time erro
 - Using an `Option(T)` where `T` is expected (must unwrap first)
 - Mixing `Int` and `Float` without explicit cast
 - Calling an extends function on the wrong receiver type
+- Defining two enums with the same name (duplicate enum)
+- Defining an enum whose name collides with an existing struct (or vice versa)
+- Defining two functions with identical name and parameter types
+- Missing `return` in a branch of a non-void function
+- Redefining a variable that already exists in the current scope
+- Using a loop variable name that's already in scope (e.g. nested `for i`)
 
 Nova has no type inference. The type of every binding is determined at declaration, and the
 compiler does not attempt to infer types from usage.
+
+### Error Message Quality
+
+Nova's compiler produces rich, contextual error messages with source-code snippets, caret
+annotations pointing to the exact token, and actionable `help:` hints. Errors include:
+
+- **Type mismatches** — shows expected vs found types with the exact location
+- **Unknown symbols** — suggests checking spelling and scope
+- **Function call errors** — lists the argument types that were passed
+- **Missing struct fields** — names the absent field
+- **Match exhaustiveness** — lists the missing enum variants
+- **Operator errors** — explains which dunder methods could be defined
 
 ---
 
@@ -2353,6 +2375,11 @@ if let val = maybe_val {
 | `Color::Red` (no parens) | Must write `Color::Red()` even for no-data variants |
 | `Maybe::Nothing()` without type | Use `Maybe::Nothing() @[A: Int]` for generic no-data |
 | `\|\| true && false` precedence | `\|\|` binds tighter than `&&` in Nova — use parens |
+| `enum Foo { ... } enum Foo { ... }` | Duplicate enum name — each name must be unique |
+| `struct A { ... } enum A { ... }` | Enum/struct names share one namespace — use distinct names |
+| `for i in 0..10 { for i in 0..5 { } }` | Nested loops can't reuse the same loop variable name |
+| `let y: String = 5` | Type annotation must match the value — cannot assign `Int` to `String` |
+| `fn foo() -> Int { if b { return 1 } }` | Missing return on else branch — all paths must return |
 
 ---
 

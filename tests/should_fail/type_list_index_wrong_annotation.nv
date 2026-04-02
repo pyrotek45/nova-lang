@@ -1,0 +1,4 @@
+module type_list_index_wrong_annotation
+// Should fail: annotating list element access as wrong type
+let nums = [1, 2, 3]
+let first: String = nums[0]

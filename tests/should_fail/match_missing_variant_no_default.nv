@@ -1,0 +1,10 @@
+module match_missing_variant_no_default
+// Should fail: match expression missing variant(s) and no default arm
+enum Color { Red, Green, Blue }
+fn color_name(c: Color) -> String {
+    match c {
+        Red() => { return "red" }
+        Green() => { return "green" }
+    }
+    return "unknown"
+}

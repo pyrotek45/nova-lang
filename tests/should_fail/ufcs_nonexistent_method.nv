@@ -1,0 +1,4 @@
+module ufcs_nonexistent_method
+// Should fail: calling a method that doesn't exist on the type
+let x = 5
+let y = x.nonexistent()

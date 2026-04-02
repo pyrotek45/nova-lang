@@ -1,0 +1,7 @@
+module fn_wrong_struct_arg_type
+// Should fail: passing struct of wrong type to function expecting different struct
+struct A { val: Int }
+struct B { val: Int }
+fn process(a: A) -> Int { return a.val }
+let b = B { val: 5 }
+process(b)

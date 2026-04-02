@@ -1,0 +1,5 @@
+module fn_missing_return_branch
+// Should fail: function missing return in some code paths
+fn check(x: Int) -> Int {
+    if x > 0 { return 1 }
+}
