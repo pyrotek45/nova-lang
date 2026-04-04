@@ -139,19 +139,23 @@ fn extends barChart(self: PlotArea, data: [Float], color: (Int, Int, Int)) {
     if data.len() == 0 { return }
     let n = data.len()
     let barW = self.w / n
+    let gap = 2
+    if barW <= 4 { gap = 0 }
     for let i = 0; i < n; i += 1 {
-        let bp = self.toScreen(Cast::float(i).unwrap(), data[i])
+        let bx = self.x + i * barW
+        let bp = self.toScreen(0.0, data[i])
         let zp = self.toScreen(0.0, 0.0)
-        let bx = bp[0]
         let by = bp[1]
         let zero = zp[1]
         if zero < self.y { zero = self.y }
         if zero > self.y + self.h { zero = self.y + self.h }
+        if by < self.y { by = self.y }
+        if by > self.y + self.h { by = self.y + self.h }
         let bh = zero - by
         if bh < 0 {
-            raylib::drawRectangle(bx, zero, barW - 1, 0 - bh, color)
+            raylib::drawRectangle(bx + gap, zero, barW - gap * 2, 0 - bh, color)
         } else {
-            raylib::drawRectangle(bx, by, barW - 1, bh, color)
+            raylib::drawRectangle(bx + gap, by, barW - gap * 2, bh, color)
         }
     }
 }
