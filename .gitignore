@@ -3,3 +3,7 @@ Cargo.lock
 history.txt
 fuzz/corpus/
 fuzz/artifacts/
+perf_report.md
+tests/_tmp_*
+tests/tmp_*
+tests/perf/_tmp_*

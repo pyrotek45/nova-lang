@@ -1,0 +1,153 @@
+module perf_boxing
+// Benchmarks measuring Box/ref-cell overhead and indirection costs
+
+import super.super.std.core
+
+fn make_box_int(n: Int) -> Box(Int) {
+    return Box(n)
+}
+
+fn increment_box(b: Box(Int)) {
+    b.value += 1
+}
+
+fn box_accumulate(b: Box(Int), n: Int) {
+    let i = 0
+    while i < n {
+        b.value += i
+        i += 1
+    }
+}
+
+struct Counter { value: Int }
+
+fn counter_inc(c: Counter) {
+    c.value += 1
+}
+
+// BENCH 1: Box create/read -- 200k iters
+let t0 = now()
+let sum1 = [0]
+let i = 0
+while i < 200000 {
+    let b = Box(i)
+    sum1[0] += b.value
+    i += 1
+}
+let t1 = now()
+println("  BENCH 1 [box_create_read_200k]   " + Cast::string(t1 - t0) + "ms")
+
+// BENCH 2: Box write/read cycle -- 200k iters
+let t2 = now()
+let counter = Box(0)
+let j = 0
+while j < 200000 {
+    counter.value += 1
+    j += 1
+}
+let t3 = now()
+println("  BENCH 2 [box_write_200k]         " + Cast::string(t3 - t2) + "ms")
+
+// BENCH 3: Box passed to function -- 100k iters
+let t4 = now()
+let cnt2 = Box(0)
+let k = 0
+while k < 100000 {
+    increment_box(cnt2)
+    k += 1
+}
+let t5 = now()
+println("  BENCH 3 [box_fn_pass_100k]       " + Cast::string(t5 - t4) + "ms")
+
+// BENCH 4: direct Int accumulation -- 500k iters
+let t6 = now()
+let direct_acc = 0
+let l = 0
+while l < 500000 {
+    direct_acc += l % 7
+    l += 1
+}
+let t7 = now()
+println("  BENCH 4 [direct_int_500k]        " + Cast::string(t7 - t6) + "ms")
+
+// BENCH 5: Box Int accumulation -- 500k iters
+let t8 = now()
+let box_acc = Box(0)
+let m = 0
+while m < 500000 {
+    box_acc.value += m % 7
+    m += 1
+}
+let t9 = now()
+println("  BENCH 5 [box_int_500k]           " + Cast::string(t9 - t8) + "ms")
+
+// BENCH 6: multiple Box values in loop -- 100k iters
+let ta = now()
+let ba = Box(0)
+let bb = Box(0)
+let bc = Box(0)
+let n2 = 0
+while n2 < 100000 {
+    ba.value += 1
+    bb.value += 2
+    bc.value += 3
+    n2 += 1
+}
+let tb = now()
+println("  BENCH 6 [multi_box_100k]         " + Cast::string(tb - ta) + "ms")
+
+// BENCH 7: struct field mutation -- 200k iters
+let tc = now()
+let c = Counter { value: 0 }
+let o = 0
+while o < 200000 {
+    counter_inc(c)
+    o += 1
+}
+let td = now()
+println("  BENCH 7 [struct_mut_200k]        " + Cast::string(td - tc) + "ms")
+
+// BENCH 8: Box in list -- 50k iters
+let te = now()
+let boxes = []: Box(Int)
+let p = 0
+while p < 1000 {
+    boxes.push(Box(p))
+    p += 1
+}
+let q = 0
+while q < 50000 {
+    boxes[q % 1000].value += 1
+    q += 1
+}
+let tf = now()
+println("  BENCH 8 [box_list_50k]           " + Cast::string(tf - te) + "ms")
+
+// BENCH 9: closure capturing box -- 100k iters
+let tg = now()
+let shared = Box(0)
+let adder = fn() -> Int {
+    shared.value += 1
+    return shared.value
+}
+let r = 0
+while r < 100000 {
+    let _ = adder()
+    r += 1
+}
+let th = now()
+println("  BENCH 9 [closure_box_100k]       " + Cast::string(th - tg) + "ms")
+
+// BENCH 10: nested box accumulation -- 50k iters
+let ti = now()
+let outer_box = Box(0)
+let s = 0
+while s < 50000 {
+    let inner = Box(s % 100)
+    outer_box.value += inner.value
+    s += 1
+}
+let tj = now()
+println("  BENCH 10 [nested_box_50k]        " + Cast::string(tj - ti) + "ms")
+
+println("  TOTAL [boxing] " + Cast::string(tj - t0) + "ms")

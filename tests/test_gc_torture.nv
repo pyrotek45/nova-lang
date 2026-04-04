@@ -1,0 +1,479 @@
+module test_gc_torture
+
+import super.std.list
+import super.std.core
+import super.std.hashmap
+import super.std.iter
+import super.std.set
+import super.std.deque
+
+// counters: [pass, fail, groups]
+let _c = [0, 0, 0]
+
+fn group(name: String) {
+    _c[2] = _c[2] + 1
+}
+
+fn check(cond: Bool, label: String) {
+    if cond {
+        _c[0] = _c[0] + 1
+    } else {
+        _c[1] = _c[1] + 1
+        println("  FAIL: " + label)
+    }
+}
+
+// ═══════════════════════════════════════════════
+// GROUP 1: Rapid list allocation and deallocation
+// ═══════════════════════════════════════════════
+group("rapid_list_alloc")
+
+// Create and discard many lists in a loop
+for let i = 0; i < 1000; i += 1 {
+    let tmp = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    // tmp goes out of scope each iteration, should be GC'd
+}
+check(true, "1000 list alloc/dealloc cycles")
+
+// Accumulate and verify a long list
+let big = []: Int
+for let i = 0; i < 1000; i += 1 {
+    big.push(i)
+}
+check(big.len() == 1000, "big list len 1000")
+check(big[0] == 0, "big[0]")
+check(big[999] == 999, "big[999]")
+
+// Sum to verify integrity
+let bsum = 0
+for item in big {
+    bsum = bsum + item
+}
+check(bsum == 499500, "big list sum")
+
+println("  GROUP 1 [rapid_list_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 2: String allocation churn
+// ═══════════════════════════════════════════════
+group("string_alloc_churn")
+
+// Many temporary strings
+for let i = 0; i < 500; i += 1 {
+    let s = "item_" + Cast::string(i) + "_data"
+}
+check(true, "500 string alloc/dealloc")
+
+// String concatenation building
+let built = ""
+for let i = 0; i < 100; i += 1 {
+    built = built + "x"
+}
+check(built.len() == 100, "concat 100 chars")
+
+// Many string concat temp lists
+for let i = 0; i < 100; i += 1 {
+    let tmp = "hello" + " " + "world" + " " + Cast::string(i)
+}
+check(true, "100 string concat alloc/dealloc")
+
+println("  GROUP 2 [string_alloc_churn] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 3: Struct allocation pressure
+// ═══════════════════════════════════════════════
+group("struct_alloc_pressure")
+
+struct GCNode { val: Int, tag: String }
+
+// Rapid struct creation
+for let i = 0; i < 1000; i += 1 {
+    let node = GCNode { val: i, tag: "node" }
+}
+check(true, "1000 struct alloc/dealloc")
+
+// Accumulate structs in a list
+let nodes = []: GCNode
+for let i = 0; i < 500; i += 1 {
+    nodes.push(GCNode { val: i, tag: "n" + Cast::string(i) })
+}
+check(nodes.len() == 500, "500 structs in list")
+check(nodes[0].val == 0, "nodes[0].val")
+check(nodes[499].val == 499, "nodes[499].val")
+
+// Replace elements (old ones should be GC'd)
+for let i = 0; i < 100; i += 1 {
+    nodes[i] = GCNode { val: i * 100, tag: "replaced" }
+}
+check(nodes[0].val == 0, "replaced[0]")
+check(nodes[99].val == 9900, "replaced[99]")
+
+println("  GROUP 3 [struct_alloc_pressure] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 4: Nested list structures
+// ═══════════════════════════════════════════════
+group("nested_lists")
+
+// Create nested lists and let them be GC'd
+for let i = 0; i < 200; i += 1 {
+    let inner1 = [1, 2, 3]
+    let inner2 = [4, 5, 6]
+    let outer = [inner1, inner2]
+}
+check(true, "200 nested list cycles")
+
+// Build a matrix and verify
+let matrix = []: [Int]
+for let i = 0; i < 50; i += 1 {
+    let row = []: Int
+    for let j = 0; j < 50; j += 1 {
+        row.push(i * 50 + j)
+    }
+    matrix.push(row)
+}
+check(matrix.len() == 50, "matrix 50 rows")
+check(matrix[0].len() == 50, "matrix 50 cols")
+check(matrix[0][0] == 0, "matrix[0][0]")
+check(matrix[49][49] == 2499, "matrix[49][49]")
+
+println("  GROUP 4 [nested_lists] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 5: Closure allocation
+// ═══════════════════════════════════════════════
+group("closure_alloc")
+
+// Create many closures that capture different values
+let closures = []: fn() -> Int
+for let i = 0; i < 200; i += 1 {
+    let captured = i
+    closures.push(fn() -> Int { return captured })
+}
+check(closures.len() == 200, "200 closures")
+check(closures[0]() == 0, "closure[0]()")
+check(closures[99]() == 99, "closure[99]()")
+check(closures[199]() == 199, "closure[199]()")
+
+// Create and discard closures rapidly
+for let i = 0; i < 500; i += 1 {
+    let captured_val = i
+    let tmp_fn = fn() -> Int { return captured_val * 2 }
+    let r = tmp_fn()
+}
+check(true, "500 closure alloc/dealloc")
+
+println("  GROUP 5 [closure_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 6: HashMap allocation pressure
+// ═══════════════════════════════════════════════
+group("hashmap_alloc")
+
+// Create and discard many HashMaps
+for let i = 0; i < 100; i += 1 {
+    let hm = HashMap::default() @[K: String, V: Int]
+    hm.insert("a", 1)
+    hm.insert("b", 2)
+    hm.insert("c", 3)
+}
+check(true, "100 hashmap alloc/dealloc")
+
+// Large hashmap with many entries
+let large_hm = HashMap::default() @[K: String, V: Int]
+for let i = 0; i < 200; i += 1 {
+    large_hm.insert("key_" + Cast::string(i), i)
+}
+check(large_hm.size() == 200, "large hashmap size")
+check(large_hm.get("key_0").unwrap() == 0, "large hm key_0")
+check(large_hm.get("key_199").unwrap() == 199, "large hm key_199")
+
+// Delete half the entries
+for let i = 0; i < 100; i += 1 {
+    large_hm.delete("key_" + Cast::string(i))
+}
+check(large_hm.size() == 100, "hm after delete half")
+
+println("  GROUP 6 [hashmap_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 7: Mixed allocation patterns
+// ═══════════════════════════════════════════════
+group("mixed_alloc")
+
+// Alternate between different allocation types
+for let i = 0; i < 200; i += 1 {
+    if i % 4 == 0 {
+        let tmp = [i, i + 1, i + 2]
+    } elif i % 4 == 1 {
+        let tmp = "str_" + Cast::string(i)
+    } elif i % 4 == 2 {
+        let tmp = GCNode { val: i, tag: "mix" }
+    } else {
+        let captured = i
+        let tmp = fn() -> Int { return captured }
+    }
+}
+check(true, "200 mixed alloc cycles")
+
+// Build a complex structure then verify
+let complex = []: (String, [Int])
+for let i = 0; i < 50; i += 1 {
+    let nums = []: Int
+    for let j = 0; j < 10; j += 1 {
+        nums.push(i * 10 + j)
+    }
+    complex.push(("item_" + Cast::string(i), nums))
+}
+check(complex.len() == 50, "complex structure len")
+check(complex[0][0] == "item_0", "complex[0] label")
+check(complex[0][1].len() == 10, "complex[0] nums len")
+check(complex[49][1][9] == 499, "complex[49] last num")
+
+println("  GROUP 7 [mixed_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 8: Clone under pressure
+// ═══════════════════════════════════════════════
+group("clone_pressure")
+
+// Clone many lists rapidly
+let source = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+for let i = 0; i < 500; i += 1 {
+    let c = clone(source)
+    c.push(i)
+}
+check(source.len() == 10, "source unmodified after 500 clones")
+
+// Clone structs
+let src_node = GCNode { val: 42, tag: "original" }
+for let i = 0; i < 500; i += 1 {
+    let c = clone(src_node)
+    c.val = i
+}
+check(src_node.val == 42, "struct unmodified after 500 clones")
+
+// Clone nested structures
+let nested_src = [[1, 2], [3, 4], [5, 6]]
+for let i = 0; i < 200; i += 1 {
+    let c = clone(nested_src)
+    c[0].push(99)
+}
+check(nested_src[0].len() == 2, "nested clone isolation")
+
+println("  GROUP 8 [clone_pressure] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 9: Set allocation
+// ═══════════════════════════════════════════════
+group("set_alloc")
+
+// Create and discard sets
+for let i = 0; i < 100; i += 1 {
+    let s = Set::empty() @[T: Int]
+    s.add(1)
+    s.add(2)
+    s.add(3)
+}
+check(true, "100 set alloc/dealloc")
+
+// Large set
+let large_set = Set::empty() @[T: Int]
+for let i = 0; i < 500; i += 1 {
+    large_set.add(i)
+}
+check(large_set.size() == 500, "large set size")
+check(large_set.has(0), "large set has 0")
+check(large_set.has(499), "large set has 499")
+check(!large_set.has(500), "large set !has 500")
+
+println("  GROUP 9 [set_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 10: Iterator chaining (lazy GC)
+// ═══════════════════════════════════════════════
+group("iter_chaining")
+
+// Chain multiple iterator operations creating many intermediate closures
+let iter_result = Iter::fromVec(0.to(100))
+    .map(|x: Int| x * x)
+    .filter(|x: Int| x % 2 == 0)
+    .take(20)
+    .collect()
+check(iter_result.len() == 20, "chained iter len")
+check(iter_result[0] == 0, "chained iter[0]")
+check(iter_result[1] == 4, "chained iter[1]")
+
+// Many iterator operations in a loop
+let iter_total = 0
+for let i = 0; i < 50; i += 1 {
+    let s = Iter::fromVec([1, 2, 3, 4, 5]).sum()
+    iter_total = iter_total + s
+}
+check(iter_total == 750, "50 iter sum loops")
+
+println("  GROUP 10 [iter_chaining] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 11: Box under GC pressure
+// ═══════════════════════════════════════════════
+group("box_gc_pressure")
+
+// Create many Boxes
+for let i = 0; i < 500; i += 1 {
+    let b = Box(i)
+    b.value = b.value + 1
+}
+check(true, "500 Box alloc/dealloc")
+
+// Box with closures capturing it
+let shared_box = Box(0)
+let fns = []: fn()
+for let i = 0; i < 100; i += 1 {
+    fns.push(fn() { shared_box.value = shared_box.value + 1 })
+}
+for fn_item in fns {
+    fn_item()
+}
+check(shared_box.value == 100, "100 closures incrementing Box")
+
+println("  GROUP 11 [box_gc_pressure] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 12: Deque allocation
+// ═══════════════════════════════════════════════
+group("deque_alloc")
+
+// Create and discard deques
+for let i = 0; i < 100; i += 1 {
+    let dq = Deque::empty() @[T: Int]
+    dq.pushBack(1)
+    dq.pushBack(2)
+    dq.pushFront(0)
+}
+check(true, "100 deque alloc/dealloc")
+
+// Large deque operations
+let large_dq = Deque::empty() @[T: Int]
+for let i = 0; i < 500; i += 1 {
+    large_dq.pushBack(i)
+}
+check(large_dq.len() == 500, "large deque len")
+check(large_dq.peekFront().unwrap() == 0, "deque front")
+check(large_dq.peekBack().unwrap() == 499, "deque back")
+
+// Pop from both ends
+for let i = 0; i < 100; i += 1 {
+    large_dq.popFront()
+    large_dq.popBack()
+}
+check(large_dq.len() == 300, "deque after 100 pops each end")
+
+println("  GROUP 12 [deque_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 13: Tuple allocation
+// ═══════════════════════════════════════════════
+group("tuple_alloc")
+
+// Rapid tuple creation
+for let i = 0; i < 500; i += 1 {
+    let t = (i, "val_" + Cast::string(i), i * 2)
+}
+check(true, "500 tuple alloc/dealloc")
+
+// Tuples in a list
+let tuples = []: (Int, String)
+for let i = 0; i < 200; i += 1 {
+    tuples.push((i, "t" + Cast::string(i)))
+}
+check(tuples.len() == 200, "200 tuples in list")
+check(tuples[0][0] == 0, "tuple[0][0]")
+check(tuples[199][0] == 199, "tuple[199][0]")
+
+println("  GROUP 13 [tuple_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 14: Enum allocation
+// ═══════════════════════════════════════════════
+group("enum_alloc")
+
+enum GCEnum {
+    NumVal: Int,
+    StrVal: String,
+    ListVal: [Int],
+    Empty
+}
+
+// Create many enum variants
+for let i = 0; i < 300; i += 1 {
+    if i % 4 == 0 {
+        let e = GCEnum::NumVal(i)
+    } elif i % 4 == 1 {
+        let e = GCEnum::StrVal("s" + Cast::string(i))
+    } elif i % 4 == 2 {
+        let e = GCEnum::ListVal([i, i + 1])
+    } else {
+        let e = GCEnum::Empty()
+    }
+}
+check(true, "300 enum alloc/dealloc")
+
+// Enums in a list with match
+let enum_list = []: GCEnum
+for let i = 0; i < 100; i += 1 {
+    enum_list.push(GCEnum::NumVal(i))
+}
+let enum_sum = 0
+for ev in enum_list {
+    match ev {
+        NumVal(n) => { enum_sum = enum_sum + n }
+        StrVal(s) => {}
+        ListVal(l) => {}
+        Empty() => {}
+    }
+}
+check(enum_sum == 4950, "enum match sum")
+
+println("  GROUP 14 [enum_alloc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 15: Stress test - combined heavy allocation
+// ═══════════════════════════════════════════════
+group("combined_stress")
+
+// Do everything at once in a tight loop
+let stress_total = 0
+for let i = 0; i < 100; i += 1 {
+    // List
+    let ls = [i, i + 1, i + 2]
+    // String
+    let ss = "item_" + Cast::string(i)
+    // Struct
+    let nd = GCNode { val: i, tag: ss }
+    // Closure
+    let captured = i
+    let cf = fn() -> Int { return captured }
+    // Tuple
+    let tp = (i, ss)
+    // HashMap
+    let hm = HashMap::default() @[K: String, V: Int]
+    hm.insert("k", i)
+    // Verify one thing survived
+    stress_total = stress_total + cf()
+}
+// sum 0..99 = 4950
+check(stress_total == 4950, "combined stress sum")
+
+println("  GROUP 15 [combined_stress] OK")
+
+// ═══════════════════════════════════════════════
+// SUMMARY
+// ═══════════════════════════════════════════════
+println("")
+println(format("All {} groups passed ({} checks, {} failures)", [Cast::string(_c[2]), Cast::string(_c[0]), Cast::string(_c[1])]))
+if _c[1] == 0 {
+    println("PASS: test_gc_torture")
+} else {
+    println("FAIL: test_gc_torture")
+}

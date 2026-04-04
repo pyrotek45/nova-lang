@@ -1,0 +1,188 @@
+module bench_compare
+
+// ═══════════════════════════════════════════════════════════════
+// Head-to-head Nova vs Python micro-benchmarks.
+// Structurally identical to bench_compare.py.
+// ═══════════════════════════════════════════════════════════════
+
+// ── 1. Integer addition loop (1M iterations) ────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..1000000 {
+    s1 = s1 + i
+}
+let t1e = now()
+assert(s1 == 499999500000, "int_add sum")
+println("  1  [int_add_1M]                        " + Cast::string(t1e - t1) + " ms")
+
+// ── 2. Float multiply-accumulate (500k) ─────────────────────
+let t2 = now()
+let fs = 0.0
+for i in 0..500000 {
+    fs = fs + Cast::float(i).unwrap() * 0.001
+}
+let t2e = now()
+assert(fs > 0.0, "float_mul sum")
+println("  2  [float_mul_500k]                    " + Cast::string(t2e - t2) + " ms")
+
+// ── 3. Recursive Fibonacci (fib 30) ─────────────────────────
+fn fib(n: Int) -> Int {
+    if n <= 1 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+let t3 = now()
+let r3 = fib(30)
+let t3e = now()
+assert(r3 == 832040, "fib 30")
+println("  3  [fib_recursive_30]                  " + Cast::string(t3e - t3) + " ms")
+
+// ── 4. While-loop countdown (2M) ────────────────────────────
+let t4 = now()
+let n4 = 2000000
+let s4 = 0
+while n4 > 0 {
+    s4 = s4 + n4
+    n4 = n4 - 1
+}
+let t4e = now()
+assert(s4 == 2000001000000, "while sum")
+println("  4  [while_countdown_2M]                " + Cast::string(t4e - t4) + " ms")
+
+// ── 5. Function call overhead (500k calls) ──────────────────
+fn add_one(x: Int) -> Int { return x + 1 }
+
+let t5 = now()
+let s5 = 0
+for i in 0..500000 {
+    s5 = add_one(s5)
+}
+let t5e = now()
+assert(s5 == 500000, "fn call sum")
+println("  5  [fn_call_500k]                      " + Cast::string(t5e - t5) + " ms")
+
+// ── 6. List push + iterate (100k push, then sum) ────────────
+let t6 = now()
+let lst6 = []: Int
+for i in 0..100000 {
+    lst6.push(i)
+}
+let s6 = 0
+for v in lst6 {
+    s6 = s6 + v
+}
+let t6e = now()
+assert(s6 == 4999950000, "list sum")
+println("  6  [list_push_iter_100k]               " + Cast::string(t6e - t6) + " ms")
+
+// ── 7. String concatenation (20k iterations) ────────────────
+let t7 = now()
+let str7 = ""
+for i in 0..20000 {
+    str7 = str7 + "a"
+}
+let t7e = now()
+assert(str7.len() == 20000, "string len")
+println("  7  [string_concat_20k]                 " + Cast::string(t7e - t7) + " ms")
+
+// ── 8. Closure / captured variable (200k calls) ─────────────
+let t8 = now()
+let offset = 10
+let add_offset = |x: Int| x + offset
+let s8 = 0
+for i in 0..200000 {
+    s8 = add_offset(s8)
+}
+let t8e = now()
+assert(s8 == 2000000, "closure sum")
+println("  8  [closure_capture_200k]              " + Cast::string(t8e - t8) + " ms")
+
+// ── 9. Struct field read/write (200k iterations) ────────────
+struct Point9 { x: Int, y: Int }
+
+let t9 = now()
+let p9 = Point9 { x: 0, y: 0 }
+for i in 0..200000 {
+    p9.x = p9.x + 1
+    p9.y = p9.y + 2
+}
+let t9e = now()
+assert(p9.x == 200000, "struct x")
+assert(p9.y == 400000, "struct y")
+println("  9  [struct_field_rw_200k]              " + Cast::string(t9e - t9) + " ms")
+
+// ── 10. List comprehension (100 reps x 10k base) ────────────
+let t10 = now()
+let total10 = 0
+for rep in 0..100 {
+    let base10 = []: Int
+    for j in 0..10000 {
+        base10.push(j)
+    }
+    let mapped10 = [x in base10 | x * 2]
+    let filtered10 = [x in mapped10 | x | x % 4 == 0]
+    total10 = total10 + filtered10.len()
+}
+let t10e = now()
+assert(total10 == 500000, "comprehension total")
+println("  10 [comprehension_100x10k]             " + Cast::string(t10e - t10) + " ms")
+
+// ── 11. Nested loop — matrix multiply 60x60 ─────────────────
+let t11 = now()
+let N = 60
+let A = []: Int
+let B = []: Int
+let C = []: Int
+for i in 0..3600 {
+    A.push(0)
+    B.push(0)
+    C.push(0)
+}
+for i in 0..N {
+    for j in 0..N {
+        A[i * N + j] = i + j
+        B[i * N + j] = i - j
+    }
+}
+for i in 0..N {
+    for j in 0..N {
+        let s11 = 0
+        for k in 0..N {
+            s11 = s11 + A[i * N + k] * B[k * N + j]
+        }
+        C[i * N + j] = s11
+    }
+}
+let t11e = now()
+println("  11 [matmul_60x60]                      " + Cast::string(t11e - t11) + " ms")
+
+// ── 12. Sieve of Eratosthenes (50k) ─────────────────────────
+let t12 = now()
+let SN = 50000
+let is_prime = []: Bool
+for i in 0..SN {
+    is_prime.push(true)
+}
+is_prime[0] = false
+is_prime[1] = false
+for i in 2..SN {
+    if is_prime[i] {
+        let j = i * i
+        while j < SN {
+            is_prime[j] = false
+            j = j + i
+        }
+    }
+}
+let prime_count = 0
+for i in 0..SN {
+    if is_prime[i] {
+        prime_count = prime_count + 1
+    }
+}
+let t12e = now()
+assert(prime_count == 5133, "sieve count")
+println("  12 [sieve_50k]                         " + Cast::string(t12e - t12) + " ms")
+
+println("")
+println("PASS: bench_compare")

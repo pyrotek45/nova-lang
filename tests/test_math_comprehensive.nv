@@ -1,0 +1,366 @@
+module test_math_comprehensive
+
+// ============================================================
+// Comprehensive Math Tests
+// ============================================================
+// Tests all std/math functions plus Int/Float edge cases,
+// precision, overflow behavior, and conversion round-trips.
+// ============================================================
+
+import super.std.core
+import super.std.math
+import super.std.list
+
+// ============================================================
+// GROUP 1: Int extension methods
+// ============================================================
+
+// min/max
+assert(3.min(7) == 3, "min(3,7)")
+assert(7.min(3) == 3, "min(7,3)")
+assert(5.min(5) == 5, "min(5,5)")
+assert((-3).min(3) == -3, "min(-3,3)")
+assert(0.min(0) == 0, "min(0,0)")
+
+assert(3.max(7) == 7, "max(3,7)")
+assert(7.max(3) == 7, "max(7,3)")
+assert(5.max(5) == 5, "max(5,5)")
+assert((-3).max(3) == 3, "max(-3,3)")
+
+// abs
+assert(5.abs() == 5, "abs(5)")
+assert((-5).abs() == 5, "abs(-5)")
+assert(0.abs() == 0, "abs(0)")
+
+// pow
+assert(2.pow(0) == 1, "2^0")
+assert(2.pow(1) == 2, "2^1")
+assert(2.pow(10) == 1024, "2^10")
+assert(3.pow(4) == 81, "3^4")
+assert(10.pow(6) == 1000000, "10^6")
+assert(1.pow(100) == 1, "1^100")
+
+// clamp
+assert(5.clamp(0, 10) == 5, "clamp mid")
+assert((-5).clamp(0, 10) == 0, "clamp low")
+assert(15.clamp(0, 10) == 10, "clamp high")
+assert(0.clamp(0, 10) == 0, "clamp boundary low")
+assert(10.clamp(0, 10) == 10, "clamp boundary high")
+
+// factorial
+assert(0.factorial() == 1, "0!")
+assert(1.factorial() == 1, "1!")
+assert(5.factorial() == 120, "5!")
+assert(10.factorial() == 3628800, "10!")
+
+// gcd
+assert(12.gcd(8) == 4, "gcd(12,8)")
+assert(7.gcd(13) == 1, "gcd(7,13) coprime")
+assert(100.gcd(75) == 25, "gcd(100,75)")
+assert(0.gcd(5) == 5, "gcd(0,5)")
+assert(5.gcd(0) == 5, "gcd(5,0)")
+
+// lcm
+assert(4.lcm(6) == 12, "lcm(4,6)")
+assert(7.lcm(13) == 91, "lcm(7,13)")
+assert(3.lcm(3) == 3, "lcm(3,3)")
+
+// isEven / isOdd
+assert(0.isEven(), "0 is even")
+assert(!0.isOdd(), "0 is not odd")
+assert(2.isEven(), "2 is even")
+assert(!2.isOdd(), "2 is not odd")
+assert(!3.isEven(), "3 is not even")
+assert(3.isOdd(), "3 is odd")
+assert((-4).isEven(), "-4 is even")
+
+// sign
+assert(5.sign() == 1, "sign(5)")
+assert((-5).sign() == -1, "sign(-5)")
+assert(0.sign() == 0, "sign(0)")
+
+// isPrime
+assert(!0.isPrime(), "0 not prime")
+assert(!1.isPrime(), "1 not prime")
+assert(2.isPrime(), "2 is prime")
+assert(3.isPrime(), "3 is prime")
+assert(!4.isPrime(), "4 not prime")
+assert(5.isPrime(), "5 is prime")
+assert(7.isPrime(), "7 is prime")
+assert(!9.isPrime(), "9 not prime")
+assert(11.isPrime(), "11 is prime")
+assert(97.isPrime(), "97 is prime")
+assert(!100.isPrime(), "100 not prime")
+
+// digitSum
+assert(0.digitSum() == 0, "digitSum(0)")
+assert(5.digitSum() == 5, "digitSum(5)")
+assert(123.digitSum() == 6, "digitSum(123)")
+assert(999.digitSum() == 27, "digitSum(999)")
+
+// digits
+assert(0.digits().len() == 1, "digits(0) length")
+assert(0.digits()[0] == 0, "digits(0) value")
+assert(123.digits().len() == 3, "digits(123) length")
+assert(123.digits()[0] == 1, "digits(123) first")
+assert(123.digits()[2] == 3, "digits(123) last")
+
+// modpow
+assert(2.modpow(10, 1000) == 24, "modpow(2,10,1000)")
+assert(3.modpow(4, 5) == 1, "modpow(3,4,5)")
+
+println("  GROUP 1 [int_extensions] OK")
+
+// ============================================================
+// GROUP 2: Float extension methods
+// ============================================================
+
+// Float constants
+let pi = Float::pi()
+assert(pi > 3.14, "pi lower")
+assert(pi < 3.15, "pi upper")
+
+let e = Float::e()
+assert(e > 2.71, "e lower")
+assert(e < 2.72, "e upper")
+
+// radians / degrees
+let rad = 180.0.radians()
+assert(rad > 3.14, "180 degrees in radians lower")
+assert(rad < 3.15, "180 degrees in radians upper")
+
+let deg = pi.degrees()
+assert(deg > 179.9, "pi in degrees lower")
+assert(deg < 180.1, "pi in degrees upper")
+
+// normalize
+let norm = 5.0.normalize(0.0, 10.0)
+assert(norm == 0.5, "normalize mid")
+let norm2 = 0.0.normalize(0.0, 10.0)
+assert(norm2 == 0.0, "normalize low")
+let norm3 = 10.0.normalize(0.0, 10.0)
+assert(norm3 == 1.0, "normalize high")
+
+println("  GROUP 2 [float_extensions] OK")
+
+// ============================================================
+// GROUP 3: Standalone math functions
+// ============================================================
+
+// fib
+assert(fib(0) == 0, "fib(0)")
+assert(fib(1) == 1, "fib(1)")
+assert(fib(2) == 1, "fib(2)")
+assert(fib(10) == 55, "fib(10)")
+assert(fib(20) == 6765, "fib(20)")
+
+// fibSeq
+let fs = fibSeq(5)
+assert(fs.len() == 5, "fibSeq(5) length")
+assert(fs[0] == 0, "fibSeq first")
+assert(fs[4] == 3, "fibSeq last")
+
+// bin
+assert(bin(0) == "0", "bin(0)")
+assert(bin(1) == "1", "bin(1)")
+assert(bin(10) == "1010", "bin(10)")
+assert(bin(255) == "11111111", "bin(255)")
+
+// hex
+assert(hex(0) == "0", "hex(0)")
+assert(hex(10) == "a", "hex(10)")
+assert(hex(255) == "ff", "hex(255)")
+assert(hex(256) == "100", "hex(256)")
+
+// oct
+assert(oct(0) == "0", "oct(0)")
+assert(oct(8) == "10", "oct(8)")
+assert(oct(64) == "100", "oct(64)")
+
+// divmod
+let dm = divmod(17, 5)
+assert(dm[0] == 3, "divmod quotient")
+assert(dm[1] == 2, "divmod remainder")
+
+let dm2 = divmod(100, 10)
+assert(dm2[0] == 10, "divmod(100,10) quotient")
+assert(dm2[1] == 0, "divmod(100,10) remainder")
+
+// lerp
+assert(lerp(0.0, 10.0, 0.0) == 0.0, "lerp t=0")
+assert(lerp(0.0, 10.0, 1.0) == 10.0, "lerp t=1")
+assert(lerp(0.0, 10.0, 0.5) == 5.0, "lerp t=0.5")
+assert(lerp(-10.0, 10.0, 0.5) == 0.0, "lerp negative range")
+
+// lerpF (int version)
+assert(lerpF(0, 100, 0.5) == 50, "lerpF mid")
+assert(lerpF(0, 100, 0.0) == 0, "lerpF start")
+assert(lerpF(0, 100, 1.0) == 100, "lerpF end")
+
+// round
+assert(round(2.3) == 2, "round(2.3)")
+assert(round(2.7) == 3, "round(2.7)")
+assert(round(2.5) == 3, "round(2.5)")
+// round(-1.4) => int(-1.4+0.5) = int(-0.9) = 0 (truncates toward zero)
+assert(round(-1.4) == 0, "round(-1.4)")
+assert(round(-2.6) == -2, "round(-2.6)")
+
+// smoothstep
+assert(smoothstep(0.0) == 0.0, "smoothstep(0)")
+assert(smoothstep(1.0) == 1.0, "smoothstep(1)")
+let ss_mid = smoothstep(0.5)
+assert(ss_mid == 0.5, "smoothstep(0.5) == 0.5")
+
+// sign (float)
+assert(sign(5.0) == 1.0, "sign(5.0)")
+assert(sign(-3.0) == -1.0, "sign(-3.0)")
+assert(sign(0.0) == 0.0, "sign(0.0)")
+
+// isPrime (standalone)
+assert(isPrime(2), "isPrime(2)")
+assert(isPrime(97), "isPrime(97)")
+assert(!isPrime(100), "!isPrime(100)")
+
+// primes
+let p = primes(20)
+assert(p.len() == 8, "primes(20) count: 2,3,5,7,11,13,17,19")
+assert(p[0] == 2, "primes first")
+assert(p[7] == 19, "primes last")
+
+// collatz
+let col = collatz(6)
+// 6 -> 3 -> 10 -> 5 -> 16 -> 8 -> 4 -> 2 -> 1
+assert(col[0] == 6, "collatz first")
+assert(col[col.len() - 1] == 1, "collatz ends at 1")
+
+println("  GROUP 3 [standalone_math] OK")
+
+// ============================================================
+// GROUP 4: Int arithmetic edge cases
+// ============================================================
+
+// Overflow behavior with large numbers
+let big = 1000000000
+assert(big * big == 1000000000000000000, "10^9 * 10^9 = 10^18")
+
+// Chained operations
+assert(1 + 2 + 3 + 4 + 5 == 15, "chained addition")
+assert(2 * 3 * 4 * 5 == 120, "chained multiplication")
+assert(100 - 10 - 20 - 30 == 40, "chained subtraction (left-assoc)")
+
+// Division rounding
+assert(7 / 2 == 3, "int division rounds down")
+assert(1 / 3 == 0, "1/3 = 0 int division")
+assert((-7) / 2 == -3, "negative int division")
+
+// Modulo edge cases
+assert(0 % 5 == 0, "0 mod 5")
+assert(5 % 5 == 0, "5 mod 5")
+assert(1 % 1 == 0, "1 mod 1")
+assert(13 % 7 == 6, "13 mod 7")
+
+// Negation chains
+assert(-(-(-5)) == -5, "triple negation")
+assert(-(-(-(-5))) == 5, "quadruple negation")
+
+println("  GROUP 4 [int_edge_cases] OK")
+
+// ============================================================
+// GROUP 5: Float precision & edge cases
+// ============================================================
+
+// Very small numbers
+let tiny = 0.000001
+assert(tiny > 0.0, "tiny > 0")
+assert(tiny < 0.001, "tiny < 0.001")
+assert(tiny * 1000000.0 > 0.99, "tiny * 1M > 0.99")
+assert(tiny * 1000000.0 < 1.01, "tiny * 1M < 1.01")
+
+// Float comparison precision
+assert(0.1 + 0.2 > 0.29, "0.1 + 0.2 > 0.29")
+assert(0.1 + 0.2 < 0.31, "0.1 + 0.2 < 0.31")
+
+// Negative zero
+assert(-0.0 == 0.0, "negative zero equals zero")
+
+// Float and int conversion
+let fi = Cast::float(42).unwrap()
+assert(fi == 42.0, "int to float")
+let ii = Cast::int("42").unwrap()
+assert(ii == 42, "string to int")
+
+// Cast round-trips
+let s = Cast::string(123)
+assert(s == "123", "int to string")
+let back = Cast::int(s).unwrap()
+assert(back == 123, "string back to int")
+
+let sf = Cast::string(42)
+let bf = Cast::int(sf).unwrap()
+assert(bf == 42, "round-trip int->string->int")
+
+println("  GROUP 5 [float_precision] OK")
+
+// ============================================================
+// GROUP 6: mapRange and remap
+// ============================================================
+
+// mapRange — maps a float from one range to another
+let mr1 = 5.0.mapRange(0.0, 10.0, 0.0, 100.0)
+assert(mr1 == 50.0, "mapRange mid")
+
+let mr2 = 0.0.mapRange(0.0, 10.0, 100.0, 200.0)
+assert(mr2 == 100.0, "mapRange low")
+
+let mr3 = 10.0.mapRange(0.0, 10.0, 100.0, 200.0)
+assert(mr3 == 200.0, "mapRange high")
+
+// remap (standalone version)
+let rm1 = remap(5.0, 0.0, 10.0, 0.0, 100.0)
+assert(rm1 == 50.0, "remap mid")
+
+println("  GROUP 6 [mapRange_remap] OK")
+
+// ============================================================
+// GROUP 7: Combined math operations
+// ============================================================
+
+// Pythagorean check: sqrt(3^2 + 4^2) = 5
+let hyp = 25.sqrt()
+assert(hyp == 5.0, "sqrt(25) = 5.0")
+
+// Power chains
+assert(2.pow(2).pow(2) == 16, "2^2^2 (left-assoc)")
+
+// GCD and LCM relationship: a*b == gcd(a,b) * lcm(a,b)
+let ga = 12
+let gb = 18
+let g = ga.gcd(gb)
+let l = ga.lcm(gb)
+assert(ga * gb == g * l, "a*b == gcd*lcm")
+
+// Sum of first N primes
+let first_primes = primes(30)
+let psum = 0
+for pr in first_primes {
+    psum = psum + pr
+}
+// Primes up to 30: 2,3,5,7,11,13,17,19,23,29 = 129
+assert(psum == 129, "sum of primes up to 30")
+
+// Fibonacci is golden ratio related
+// fib(n+1) / fib(n) approaches phi = 1.618...
+let f20 = fib(20)
+let f19 = fib(19)
+let ratio = Cast::float(f20).unwrap() / Cast::float(f19).unwrap()
+assert(ratio > 1.618, "fib ratio > 1.618")
+assert(ratio < 1.619, "fib ratio < 1.619")
+
+println("  GROUP 7 [combined_math] OK")
+
+// ============================================================
+// Summary
+// ============================================================
+println("")
+println("All 7 math groups passed")
+println("PASS: test_math_comprehensive")

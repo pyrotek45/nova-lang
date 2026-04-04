@@ -201,9 +201,10 @@ impl Parser {
             }
             Ok(())
         } else {
+            let leftover = fmt_token_opt(self.current_token());
             Err(Box::new(NovaError::Parsing {
-                msg: "Parsing not completed, left over tokens unparsed".into(),
-                note: "Make sure your statement ends with Semicolon.".into(),
+                msg: format!("Unexpected token {} after end of statement", leftover).into(),
+                note: "The parser finished a statement but found extra tokens.\n  Common causes:\n  - Missing semicolon between statements\n  - Extra closing brace `}`\n  - Stray token or typo\n  Statements in Nova are separated by newlines or semicolons.".into(),
                 position: self.get_current_token_position(),
                 extra: None,
             }))
@@ -2099,6 +2100,43 @@ impl Parser {
             }
             Some(Identifier(_)) => {
                 let (mut identifier, pos) = self.get_identifier()?;
+                // ── Detect common wrong-language identifiers used as expressions ──
+                match identifier.as_ref() {
+                    "True" | "False" => {
+                        let correct = if identifier.as_ref() == "True" { "true" } else { "false" };
+                        return Err(self.generate_error_with_pos(
+                            format!("Unknown identifier `{}`", identifier),
+                            format!(
+                                "Boolean literals in Nova are lowercase: `true` and `false` (not `{}`).\n  \
+                                 Did you mean `{}`?",
+                                identifier, correct
+                            ),
+                            pos,
+                        ));
+                    }
+                    "null" | "nil" | "none" | "undefined" => {
+                        return Err(self.generate_error_with_pos(
+                            format!("Unknown identifier `{}`", identifier),
+                            format!(
+                                "Nova uses `None(T)` to represent the absence of a value (there is no `{}`).\n  \
+                                 Example: `let x: Option(Int) = None(Int)`\n  \
+                                 Note: `None` (capital N) requires a type parameter in parentheses.",
+                                identifier
+                            ),
+                            pos,
+                        ));
+                    }
+                    "this" => {
+                        return Err(self.generate_error_with_pos(
+                            "Unknown identifier `this`",
+                            "Nova does not use `this`. Methods receive the instance as an explicit first parameter.\n  \
+                             Example: `fn extends greet(p: Person) -> String { return p.name }`\n  \
+                             Use the first parameter name instead of `this`.",
+                            pos,
+                        ));
+                    }
+                    _ => {}
+                }
                 identifier = match self.current_token_value() {
                     Some(Operator(Operator::DoubleColon))
                         if matches!(
@@ -2244,6 +2282,14 @@ impl Parser {
             }
             None => {
                 return Err(self.generate_error("Unexpected end of file", "An expression was expected but the file ended.\n  Check for missing closing braces `}`, brackets `]`, or parentheses `)`."));
+            }
+            Some(Operator(Operator::Assignment)) => {
+                return Err(self.generate_error(
+                    "Unexpected `=` — did you mean `==`?",
+                    "A single `=` is assignment, not comparison.\n  \
+                     For equality comparison, use `==`.\n  \
+                     Example: `if x == 5 { ... }`",
+                ));
             }
             _ => left = Expr::Void,
         }
@@ -3958,11 +4004,54 @@ impl Parser {
     fn get_identifier(&mut self) -> NovaResult<(Rc<str>, FilePosition)> {
         let identifier = match self.current_token_value() {
             Some(Identifier(id)) => id.clone(),
+            Some(Keyword(kw)) => {
+                return Err(self.generate_error(
+                    format!("Expected identifier, found keyword `{}`", kw),
+                    format!(
+                        "`{}` is a reserved keyword and cannot be used as a name.\n  \
+                         Choose a different name for this identifier.",
+                        kw
+                    ),
+                ));
+            }
+            Some(Integer(_)) => {
+                return Err(self.generate_error(
+                    "Expected identifier, found a number",
+                    "Identifiers must start with a letter or underscore, not a digit.\n  \
+                     Example: `my_var`, `count`, `_temp`",
+                ));
+            }
+            Some(StructuralSymbol(sym)) => {
+                return Err(self.generate_error(
+                    format!("Expected identifier, found `{}`", sym),
+                    format!(
+                        "A name was expected here but got `{}`.\n  \
+                         Check for missing identifiers, extra punctuation, or unclosed brackets.",
+                        sym
+                    ),
+                ));
+            }
+            Some(Operator(op)) => {
+                return Err(self.generate_error(
+                    format!("Expected identifier, found `{}`", op),
+                    format!(
+                        "A name was expected here but got `{}`.\n  \
+                         Check for missing identifiers or extra operators.",
+                        op
+                    ),
+                ));
+            }
+            None => {
+                return Err(self.generate_error(
+                    "Expected identifier, but reached end of file",
+                    "The file ended unexpectedly. Check for missing closing braces `}}`, brackets `]`, or parentheses `)`.",
+                ));
+            }
             _ => {
                 return Err(self.generate_error(
                     "Expected identifier",
                     format!(
-                        "got {} but expected an identifier",
+                        "got {} but expected an identifier (a name like `x`, `my_func`, `Point`, etc.)",
                         fmt_token_opt(self.current_token())
                     ),
                 ));
@@ -4160,7 +4249,16 @@ impl Parser {
             return Err(self.generate_error_with_pos(
                 format!("Match statement expects an enum type, found `{}`", expr.get_type()),
                 format!(
-                    "The `match` keyword only works with enum types, but got `{}`.\n  Example:\n    match my_enum {{\n      VariantA(val) => {{ ... }}\n      VariantB => {{ ... }}\n      _ => {{ ... }}\n    }}",
+                    "The `match` keyword only works with enum types, but got `{}`.\n  \
+                     Example:\n    \
+                     enum Color {{ Red, Green, Blue }}\n    \
+                     match my_color {{\n      \
+                     Red()       => {{ ... }}\n      \
+                     Green()     => {{ ... }}\n      \
+                     Blue()      => {{ ... }}\n    \
+                     }}\n  \
+                     Variants with data: `Leaf(val) => {{ ... }}`\n  \
+                     Default branch:     `_ => {{ ... }}`",
                     expr.get_type()
                 ),
                 self.get_current_token_position(),
@@ -4176,6 +4274,40 @@ impl Parser {
             .is_some_and(|t| t.is_symbol(RightBrace))
         {
             let (variant, pos) = self.get_identifier()?;
+
+            // ── Fix: detect qualified variant names like `Color::Red` ──
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_op(Operator::DoubleColon))
+            {
+                // Peek ahead to grab the variant name after `::`
+                let next_variant = self
+                    .input
+                    .get(self.index + 1)
+                    .and_then(|t| {
+                        if let TokenValue::Identifier(id) = &t.value {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| "...".into());
+                return Err(self.generate_error_with_pos(
+                    format!(
+                        "Use just `{}` instead of qualifying with the enum type",
+                        next_variant
+                    ),
+                    format!(
+                        "Match arms use the variant name alone, not the fully-qualified path.\n  \
+                         Write `{nv}` instead of `{v}::{nv}`\n  \
+                         Example:\n    match value {{\n      {nv}()  => {{ ... }}\n      Other(x) => {{ ... }}\n    }}",
+                        nv = next_variant,
+                        v = variant
+                    ),
+                    pos,
+                ));
+            }
+
             if &*variant == "_" {
                 // check to see if default branch is already defined
                 if default_branch.is_some() {
@@ -4195,6 +4327,10 @@ impl Parser {
                         expr: body,
                     }])
                 };
+                // ── Fix: silently skip optional trailing commas after default arm ──
+                while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                    self.advance();
+                }
                 continue;
             }
             // collect identifiers
@@ -4321,6 +4457,11 @@ impl Parser {
 
                 self.typechecker.environment.pop_block();
             }
+
+            // ── Fix: silently skip optional trailing commas between match arms ──
+            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                self.advance();
+            }
         }
         self.consume_symbol(RightBrace)?;
 
@@ -4362,11 +4503,16 @@ impl Parser {
                 };
                 for (i, field) in new_fields.iter().enumerate() {
                     if field.0.deref() != "type" && !covered.contains(&i) {
+                        let arm_hint = if field.1 == TType::None {
+                            format!("{}() => {{ ... }}", field.0)
+                        } else {
+                            format!("{}(val) => {{ ... }}", field.0)
+                        };
                         return Err(self.generate_error_with_pos(
                             format!("Variant `{}` is not covered in match", field.0),
                             format!(
-                                "All enum variants must be handled. Either add a branch for `{}` or add a default `_ => {{ ... }}` branch.",
-                                field.0
+                                "All enum variants must be handled.\n  Add: `{}`\n  Or add a default branch: `_ => {{ ... }}`",
+                                arm_hint
                             ),
                             pos,
                         ));
@@ -4431,6 +4577,113 @@ impl Parser {
                 "continue" => {
                     self.consume_identifier(Some("continue"))?;
                     Ok(Some(Statement::Continue))
+                }
+                // ── Detect common wrong-language keywords and give helpful hints ──
+                "var" | "const" => {
+                    let kw = id.clone();
+                    Err(self.generate_error(
+                        format!("Unknown keyword `{}`", kw),
+                        format!(
+                            "Nova uses `let` for variable declarations (there is no `{}`).\n  \
+                             Example: `let x = 5`\n  \
+                             With a type annotation: `let x: Int = 5`",
+                            kw
+                        ),
+                    ))
+                }
+                "def" | "func" | "function" => {
+                    let kw = id.clone();
+                    Err(self.generate_error(
+                        format!("Unknown keyword `{}`", kw),
+                        format!(
+                            "Nova uses `fn` to define functions (there is no `{}`).\n  \
+                             Example: `fn add(a: Int, b: Int) -> Int {{ return a + b }}`\n  \
+                             For closures: `|x: Int| x * 2`",
+                            kw
+                        ),
+                    ))
+                }
+                "class" => {
+                    Err(self.generate_error(
+                        "Unknown keyword `class`",
+                        "Nova uses `struct` for data types and `enum` for tagged unions (there are no classes).\n  \
+                         Struct example: `struct Point { x: Float, y: Float }`\n  \
+                         Enum example:  `enum Color { Red, Green, Blue }`\n  \
+                         To add methods: `fn extends method_name(self: MyType) -> R { ... }`",
+                    ))
+                }
+                "switch" => {
+                    Err(self.generate_error(
+                        "Unknown keyword `switch`",
+                        "Nova uses `match` for pattern matching on enums (there is no `switch`).\n  \
+                         Note: `match` only works on enum types, not on integers or strings.\n  \
+                         Example:\n    enum Color { Red, Green, Blue }\n    match my_color {\n      Red()   => { println(\"red\") }\n      Green() => { println(\"green\") }\n      _       => { println(\"other\") }\n    }\n  \
+                         For integer/string branching, use `if`/`elif`/`else` instead.",
+                    ))
+                }
+                "elif" => {
+                    // `elif` at statement level means it's not following an if/elif body.
+                    // In a proper if-chain, elif is consumed by if_statement() directly.
+                    Err(self.generate_error(
+                        "Unexpected `elif` without a preceding `if`",
+                        "An `elif` must follow an `if` or another `elif` block.\n  \
+                         Example:\n    if x > 0 {\n      println(\"positive\")\n    } elif x < 0 {\n      println(\"negative\")\n    } else {\n      println(\"zero\")\n    }",
+                    ))
+                }
+                "null" | "nil" | "none" | "undefined" => {
+                    let kw = id.clone();
+                    Err(self.generate_error(
+                        format!("Unknown keyword `{}`", kw),
+                        format!(
+                            "Nova uses `None(T)` to represent the absence of a value (there is no `{}`).\n  \
+                             Example: `let x: Option(Int) = None(Int)`\n  \
+                             Note: `None` requires a type parameter in parentheses.",
+                            kw
+                        ),
+                    ))
+                }
+                "True" | "False" => {
+                    let kw = id.clone();
+                    Err(self.generate_error(
+                        format!("Unknown identifier `{}`", kw),
+                        format!(
+                            "Boolean literals in Nova are lowercase: `true` and `false` (not `{}`).\n  \
+                             Example: `let flag = true`",
+                            kw
+                        ),
+                    ))
+                }
+                "this" => {
+                    Err(self.generate_error(
+                        "Unknown identifier `this`",
+                        "Nova does not use `this`. Methods receive the instance as an explicit first parameter.\n  \
+                         Example: `fn extends greet(p: Person) -> String { return p.name }`\n  \
+                         The first parameter (commonly named `self`) is used instead of `this`.",
+                    ))
+                }
+                "void" | "Void" => {
+                    Err(self.generate_error(
+                        "Cannot use `Void` as a value",
+                        "Void is a return type, not a value. Functions that return nothing have return type Void.\n  \
+                         If you want to represent \"no value\", use `None(T)` with the Option type.\n  \
+                         Example: `let x: Option(Int) = None(Int)`",
+                    ))
+                }
+                "mut" => {
+                    Err(self.generate_error(
+                        "Unknown keyword `mut`",
+                        "Nova does not have a `mut` keyword — all variables are mutable by default.\n  \
+                         Just use `let` to declare a variable.\n  \
+                         Example: `let x = 5`  (x can be reassigned later with `x = 10`)",
+                    ))
+                }
+                "lambda" => {
+                    Err(self.generate_error(
+                        "Unknown keyword `lambda`",
+                        "Nova uses `fn` for named functions and `|args| expr` for closures/lambdas.\n  \
+                         Closure example: `let double = |x: Int| x * 2`\n  \
+                         Multi-line:      `let f = |x: Int| { let y = x + 1; y * 2 }`",
+                    ))
                 }
                 _ => self.expression_statement(),
             },
@@ -5045,10 +5298,47 @@ impl Parser {
             ) {
                 (Ok(_), Ok(_)) => {}
                 _ => {
+                    // ── Fix: detect uncalled enum/struct constructors ──
+                    let hint = if let TType::Function { return_type, parameters } = expr.get_type() {
+                        if *return_type == ttype {
+                            if parameters.len() == 1 && parameters[0] == TType::None {
+                                // Nullary constructor like `Color::Red` — needs `()`
+                                format!(
+                                    "This is a constructor function, not a value — it needs to be called.\n  \
+                                     Add `()` after the variant name to construct the value.\n  \
+                                     Example: `let {id}: {ty} = {ty}::VariantName()`",
+                                    id = identifier, ty = ttype
+                                )
+                            } else {
+                                let param_types: Vec<String> = parameters.iter().map(|p| format!("{}", p)).collect();
+                                let placeholders: Vec<&str> = parameters.iter().map(|p| match p {
+                                    TType::Int => "0",
+                                    TType::Float => "0.0",
+                                    TType::Bool => "true",
+                                    TType::String => "\"value\"",
+                                    TType::Char => "'a'",
+                                    _ => "value",
+                                }).collect();
+                                format!(
+                                    "This is a constructor that takes ({params}) and returns `{ty}`. \
+                                     Call it with arguments to create the value.\n  \
+                                     Example: `let {id}: {ty} = {ty}::VariantName({args})`",
+                                    params = param_types.join(", "), ty = ttype,
+                                    id = identifier,
+                                    args = placeholders.join(", ")
+                                )
+                            }
+                        } else {
+                            format!("The declared type is `{}` but the expression returns `{}`.\n  Make sure the right-hand side matches the declared type.",
+                                ttype, expr.get_type())
+                        }
+                    } else {
+                        format!("The declared type is `{}` but the expression returns `{}`.\n  Make sure the right-hand side matches the declared type.",
+                            ttype, expr.get_type())
+                    };
                     return Err(self.generate_error_with_pos(
                         format!("Cannot assign `{}` to `{}`", expr.get_type(), ttype),
-                        format!("The declared type is `{}` but the expression returns `{}`.\n  Make sure the right-hand side matches the declared type.",
-                            ttype, expr.get_type()),
+                        hint,
                         pos.clone(),
                     ));
                 }
