@@ -154,7 +154,7 @@ See the [Getting Started](getting_started.md) guide for project setup workflow.
 
 Nova uses **relative-path imports** via the `super` keyword:
 
-```nova
+```rust
 import super.std.core    // resolves to ../std/core.nv relative to source file
 import super.std.list    // resolves to ../std/list.nv
 ```

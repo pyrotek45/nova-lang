@@ -12,7 +12,7 @@ no separate toolchain, no config files, no build system. Write code, run it.
 
 **Import directly from GitHub.** No registry, no publish step. Point at a repo and go:
 
-```nova
+```rust
 import @ "pyrotek45/nova-utils/strings.nv"
 import @ "pyrotek45/nova-utils/strings.nv" ! "a1b2c3d"   // pin to a commit
 ```
@@ -24,7 +24,7 @@ physics, tweens, tilemaps, and a charting library.
 **Structural typing without inheritance.** `Dyn(T)` accepts any struct with the right shape.
 No interfaces to declare, no traits to implement:
 
-```nova
+```rust
 fn greet(thing: Dyn(T = name: String)) -> String {
     return "Hello, " + thing.name
 }
@@ -34,7 +34,7 @@ Works on `Dog`, `Robot`, or anything else with a `name: String` field.
 
 **Extend any type, anywhere.** UFCS lets you add methods to types you don't own:
 
-```nova
+```rust
 fn extends shout(s: String) -> String {
     return s.toUpper() + "!!!"
 }
@@ -45,7 +45,7 @@ println("hello".shout())   // HELLO!!!
 
 ## Quick Look
 
-```nova
+```rust
 module main
 import super.std.list
 
@@ -56,7 +56,7 @@ println(squares)   // [64, 81, 100]
 
 ### Slicing and comprehensions
 
-```nova
+```rust
 xs[-3:]                                   // last 3 elements
 xs[1:6]                                   // index 1..5
 [x in 0.to(20) | x | x % 2 == 0]        // even numbers
@@ -65,7 +65,7 @@ xs[1:6]                                   // index 1..5
 
 ### Pattern matching
 
-```nova
+```rust
 enum Shape {
     Circle:    Float,
     Rectangle: (Float, Float),
@@ -82,7 +82,7 @@ fn area(s: Shape) -> Float {
 
 ### Pipe and bind
 
-```nova
+```rust
 5 |> add1() |> double()                     // pipe chain
 someList.len() ~> n { n * n + n }           // bind operator
 [1, 2, 3, 4, 5].filter(): |x: Int| x > 3   // trailing closure
@@ -90,7 +90,7 @@ someList.len() ~> n { n * n + n }           // bind operator
 
 ### Safe casts, no null
 
-```nova
+```rust
 if let n = Cast::int("42") {
     println("parsed: " + Cast::string(n))
 }
