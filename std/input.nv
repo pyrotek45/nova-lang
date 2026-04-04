@@ -112,6 +112,17 @@ fn extends isReleased(self: InputMap, action: String) -> Bool {
     return false
 }
 
+// True only on the first frame the key goes down
+fn extends justPressed(self: InputMap, action: String) -> Bool {
+    if self.keys.has(action) {
+        let key = self.keys.get(action)
+        if key.isSome() {
+            return raylib::isKeyJustPressed(key.unwrap())
+        }
+    }
+    return false
+}
+
 // True when the action key is NOT pressed
 fn extends isUp(self: InputMap, action: String) -> Bool {
     if self.keys.has(action) {

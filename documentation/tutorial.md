@@ -2933,11 +2933,16 @@ e.entityDrawCircle((255, 230, 0))     // circle
 ### Raw Raylib Input
 
 ```nova
-raylib::isKeyPressed("A")        // held down
+raylib::isKeyPressed("A")        // held down (true every frame)
+raylib::isKeyDown("A")           // alias for isKeyPressed
+raylib::isKeyJustPressed("A")    // fires once when key first goes down
 raylib::isKeyReleased("A")       // released this frame
 raylib::mousePosition()          // (Int, Int)
 raylib::getMouseWheel()          // Float
 ```
+
+Use `isKeyPressed`/`isKeyDown` for continuous movement (action games).
+Use `isKeyJustPressed` for single-fire actions (turn-based, menus, toggles).
 
 ### InputMap — Action Bindings
 

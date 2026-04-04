@@ -379,7 +379,7 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_get_key_as_string,
         );
-        // is key pressed which returns bool
+        // is key held down (true every frame while held)
         self.add_function(
             "raylib::isKeyPressed",
             TType::Function {
@@ -388,6 +388,26 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_key_down,
+        );
+        // is key held down (alias)
+        self.add_function(
+            "raylib::isKeyDown",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_key_down,
+        );
+        // is key just pressed (fires once on the frame the key goes down)
+        self.add_function(
+            "raylib::isKeyJustPressed",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_key_pressed,
         );
         // is key released
         self.add_function(
