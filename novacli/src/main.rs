@@ -590,8 +590,29 @@ fn nova_init(name: &str, with_sources: &[String]) {
     });
 
     // Write main.nv
-    let main_content = format!(
-        r#"module main
+    let has_libs = !with_sources.is_empty();
+    let main_content = if has_libs {
+        format!(
+            r#"module main
+
+// Nova project: {}
+// Run with:  nova run  (from inside the project folder)
+// Or:        nova run {}/main.nv
+
+// Import standard libraries from libs/
+import libs.core
+
+fn main() {{
+    println("Hello from {}!")
+}}
+
+main()
+"#,
+            name, name, name
+        )
+    } else {
+        format!(
+            r#"module main
 
 // Nova project: {}
 // Run with:  nova run  (from inside the project folder)
@@ -603,8 +624,9 @@ fn main() {{
 
 main()
 "#,
-        name, name, name
-    );
+            name, name, name
+        )
+    };
 
     fs::write(project_dir.join("main.nv"), main_content).unwrap_or_else(|e| {
         eprintln!("Error: could not write main.nv: {}", e);
