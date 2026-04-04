@@ -462,15 +462,15 @@ generateDungeon(1)
 updateVisibility()
 
 while raylib::rendering() {
-    if raylib::isKeyReleased("Q") { break }
-    if raylib::isKeyReleased("R") { restartGame() }
+    if raylib::isKeyJustPressed("Q") { break }
+    if raylib::isKeyJustPressed("R") { restartGame() }
 
     if gameState == "playing" {
-        if raylib::isKeyReleased("W") || raylib::isKeyReleased("Up")    { tryMove(0, -1) }
-        if raylib::isKeyReleased("S") || raylib::isKeyReleased("Down")  { tryMove(0, 1)  }
-        if raylib::isKeyReleased("A") || raylib::isKeyReleased("Left")  { tryMove(-1, 0) }
-        if raylib::isKeyReleased("D") || raylib::isKeyReleased("Right") { tryMove(1, 0)  }
-        if raylib::isKeyReleased("Space") {
+        if raylib::isKeyJustPressed("W") || raylib::isKeyJustPressed("Up")    { tryMove(0, -1) }
+        if raylib::isKeyJustPressed("S") || raylib::isKeyJustPressed("Down")  { tryMove(0, 1)  }
+        if raylib::isKeyJustPressed("A") || raylib::isKeyJustPressed("Left")  { tryMove(-1, 0) }
+        if raylib::isKeyJustPressed("D") || raylib::isKeyJustPressed("Right") { tryMove(1, 0)  }
+        if raylib::isKeyJustPressed("Space") {
             turnCount = turnCount + 1
             moveMobs()
             updateVisibility()

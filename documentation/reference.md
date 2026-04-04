@@ -1073,7 +1073,9 @@ Use `import super.std.color` for named constants.
 | Signature | Description |
 |---|---|
 | `raylib::getKey() -> Option(String)` | Key pressed this frame. |
-| `raylib::isKeyPressed(String) -> Bool` | Key held down? |
+| `raylib::isKeyPressed(String) -> Bool` | Key held down? (true every frame while held) |
+| `raylib::isKeyDown(String) -> Bool` | Alias for `isKeyPressed`. |
+| `raylib::isKeyJustPressed(String) -> Bool` | Key just went down this frame? (fires once) |
 | `raylib::isKeyReleased(String) -> Bool` | Key released this frame? |
 | `raylib::isKeyUp(String) -> Bool` | Key not pressed? |
 

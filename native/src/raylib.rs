@@ -309,14 +309,37 @@ pub fn raylib_get_key_as_string(state: &mut state::State) -> NovaResult<()> {
 pub fn raylib_is_key_down(state: &mut state::State) -> NovaResult<()> {
     let key_name = pop_string(state)?;
 
-    let _rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
     }))?;
 
-    let pressed = if let Some(key) = string_to_key(&key_name) {
-        unsafe { raylib::ffi::IsKeyDown(key as i32) }
-    } else {
-        false
+    let pressed = {
+        let rl = rl_rc.borrow();
+        if let Some(key) = string_to_key(&key_name) {
+            rl.is_key_down(key)
+        } else {
+            false
+        }
+    };
+
+    state.memory.stack.push(VmData::Bool(pressed));
+    Ok(())
+}
+
+pub fn raylib_is_key_pressed(state: &mut state::State) -> NovaResult<()> {
+    let key_name = pop_string(state)?;
+
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+
+    let pressed = {
+        let rl = rl_rc.borrow();
+        if let Some(key) = string_to_key(&key_name) {
+            rl.is_key_pressed(key)
+        } else {
+            false
+        }
     };
 
     state.memory.stack.push(VmData::Bool(pressed));
@@ -326,14 +349,17 @@ pub fn raylib_is_key_down(state: &mut state::State) -> NovaResult<()> {
 pub fn raylib_is_key_released(state: &mut state::State) -> NovaResult<()> {
     let key_name = pop_string(state)?;
 
-    let _rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
         msg: "Raylib not initialized".into(),
     }))?;
 
-    let released = if let Some(key) = string_to_key(&key_name) {
-        unsafe { raylib::ffi::IsKeyReleased(key as i32) }
-    } else {
-        false
+    let released = {
+        let rl = rl_rc.borrow();
+        if let Some(key) = string_to_key(&key_name) {
+            rl.is_key_released(key)
+        } else {
+            false
+        }
     };
 
     state.memory.stack.push(VmData::Bool(released));
