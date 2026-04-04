@@ -133,6 +133,8 @@ nova dis   --git <path> # Disassemble a file from GitHub
 nova dbg   <file.nv>    # Debug run
 nova dbg   --git <path> # Debug a file from GitHub
 nova init  <name>       # Create a new project (--with for GitHub deps)
+nova install <n> <r/p>  # Install a library into libs/<name>/ from GitHub
+nova remove  <name>     # Remove a library from libs/<name>/
 nova test               # Run all test_*.nv files in tests/
 nova repl               # Interactive REPL
 ```

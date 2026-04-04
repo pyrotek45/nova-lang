@@ -183,6 +183,8 @@ nova time  <file.nv>   Run and show execution time
 nova dis   <file.nv>   Disassemble bytecode
 nova dbg   <file.nv>   Debug run
 nova init  <name>      Create a new project (with --with for GitHub deps)
+nova install <n> <r/p> Install a library into libs/<name>/ from GitHub
+nova remove  <name>    Remove a library from libs/<name>/
 nova test              Run all test_*.nv files in tests/
 nova repl              Interactive REPL
 ```
