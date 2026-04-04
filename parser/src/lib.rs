@@ -1390,7 +1390,7 @@ impl Parser {
             _ => {
                 return Err(self.generate_error(
                     "Cannot index into this type",
-                    format!("Only lists, tuples, and strings can be indexed with `[...]`.\n  Lists: `my_list[i]`\n  Tuples: `my_tuple[0]`, `my_tuple[1]`\n  Strings: `my_string[i]`"),
+                    "Only lists, tuples, and strings can be indexed with `[...]`.\n  Lists: `my_list[i]`\n  Tuples: `my_tuple[0]`, `my_tuple[1]`\n  Strings: `my_string[i]`".to_string(),
                 ));
             }
         }
@@ -1657,7 +1657,7 @@ impl Parser {
                     if_branch.get_type()
                 } else {
                     return Err(self.generate_error_with_pos(
-                        format!("Both branches of inline `if` must return the same type"),
+                        "Both branches of inline `if` must return the same type".to_string(),
                         format!(
                             "The `if` branch returns `{}` but the `else` branch returns `{}`.\n  Both must be the same type since this is used as an expression.",
                             if_branch.get_type(),

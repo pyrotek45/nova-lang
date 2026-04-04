@@ -612,15 +612,14 @@ main()
     });
 
     // Write a starter test
-    let test_content = format!(
-        r#"module test_example
+    let test_content = r#"module test_example
 
 assert(1 + 1 == 2, "basic addition")
 assert(true, "truth")
 
 println("PASS: test_example")
 "#
-    );
+    .to_string();
 
     fs::write(project_dir.join("tests/test_example.nv"), test_content).unwrap_or_else(|e| {
         eprintln!("Error: could not write tests/test_example.nv: {}", e);
