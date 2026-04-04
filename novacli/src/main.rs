@@ -149,6 +149,30 @@ fn entry_command() -> Option<()> {
         "test" => {
             nova_test(&mut args);
         }
+        "install" => {
+            let name = args.next().unwrap_or_else(|| {
+                eprintln!("Error: nova install requires a library name and a GitHub path.");
+                eprintln!("  Usage:    nova install <name> <owner/repo/folder>");
+                eprintln!("  Example:  nova install std pyrotek45/nova-lang/std");
+                exit(1);
+            });
+            let repo_path = args.next().unwrap_or_else(|| {
+                eprintln!("Error: nova install requires a GitHub path after the library name.");
+                eprintln!("  Usage:    nova install <name> <owner/repo/folder>");
+                eprintln!("  Example:  nova install std pyrotek45/nova-lang/std");
+                exit(1);
+            });
+            nova_install(&name, &repo_path);
+        }
+        "remove" => {
+            let name = args.next().unwrap_or_else(|| {
+                eprintln!("Error: nova remove requires a library name.");
+                eprintln!("  Usage:    nova remove <name>");
+                eprintln!("  Example:  nova remove std");
+                exit(1);
+            });
+            nova_remove(&name);
+        }
         "repl" => repl_session(),
         "help" => print_help(),
         _ => {
@@ -544,6 +568,8 @@ fn print_help() {
     println!("\tdbg   --git owner/repo/path     // debug a file from GitHub");
     println!("\ttest  [dir]                     // run all test_*.nv files in tests/ (or given dir)");
     println!("\tinit  <name> [--with repo/path] // create a new project (optionally fetch a folder)");
+    println!("\tinstall <name> <repo/path>      // install a library into libs/<name>/");
+    println!("\tremove  <name>                  // remove a library from libs/<name>/");
     println!("\trepl                            // start the interactive repl");
     println!("\thelp                            // display this menu");
     println!("\nPROJECT STRUCTURE");
@@ -661,6 +687,59 @@ println("PASS: test_example")
     println!("  cd {}", name);
     println!("  nova run");
     println!("  nova test");
+}
+
+fn nova_install(name: &str, github_path: &str) {
+    use std::fs;
+
+    let libs_dir = PathBuf::from("libs");
+    if !libs_dir.exists() {
+        // Create libs/ if it doesn't exist yet (user might be in a basic project)
+        fs::create_dir_all(&libs_dir).unwrap_or_else(|e| {
+            eprintln!("Error: could not create libs/ directory: {}", e);
+            exit(1);
+        });
+    }
+
+    let target_dir = libs_dir.join(name);
+    if target_dir.exists() {
+        eprintln!(
+            "Library '{}' is already installed at libs/{}.",
+            name, name
+        );
+        eprintln!("  To update it, remove it first:  nova remove {}", name);
+        exit(1);
+    }
+
+    fs::create_dir_all(&target_dir).unwrap_or_else(|e| {
+        eprintln!("Error: could not create libs/{}: {}", name, e);
+        exit(1);
+    });
+
+    fetch_github_folder_to_libs(github_path, &target_dir);
+
+    println!(
+        "\nInstalled '{}' into libs/{}.",
+        name, name
+    );
+    println!("  Import with:  import libs.{}.modulename", name);
+}
+
+fn nova_remove(name: &str) {
+    use std::fs;
+
+    let target_dir = PathBuf::from("libs").join(name);
+    if !target_dir.exists() {
+        eprintln!("Error: library '{}' is not installed (libs/{} does not exist).", name, name);
+        exit(1);
+    }
+
+    fs::remove_dir_all(&target_dir).unwrap_or_else(|e| {
+        eprintln!("Error: could not remove libs/{}: {}", name, e);
+        exit(1);
+    });
+
+    println!("Removed '{}' from libs/.", name);
 }
 
 /// Fetch all .nv files from a GitHub folder and save them into libs/.
