@@ -181,10 +181,13 @@ nova run --git <path>  Fetch and run from GitHub
 nova check <file.nv>   Type-check without running
 nova time  <file.nv>   Run and show execution time
 nova dis   <file.nv>   Disassemble bytecode
+nova dbg   <file.nv>   Debug run
 nova init  <name>      Create a new project (with --with for GitHub deps)
 nova test              Run all test_*.nv files in tests/
 nova repl              Interactive REPL
 ```
+
+All file commands also accept `--git owner/repo/path.nv` to work directly from GitHub.
 
 See the [Getting Started](documentation/getting_started.md) guide for project setup and workflow.
 

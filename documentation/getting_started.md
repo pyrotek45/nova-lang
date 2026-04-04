@@ -132,6 +132,7 @@ All commands that accept a file also accept `--git` to fetch from GitHub:
 nova check --git pyrotek45/nova-lang/demo/fib.nv
 nova time  --git pyrotek45/nova-lang/demo/fib.nv
 nova dis   --git pyrotek45/nova-lang/demo/fib.nv
+nova dbg   --git pyrotek45/nova-lang/demo/fib.nv
 ```
 
 If you omit both `--git` and a file path, Nova auto-detects `main.nv` in the
