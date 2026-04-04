@@ -1,0 +1,992 @@
+module test_edge_cases_advanced
+
+import super.std.list
+import super.std.core
+import super.std.string
+import super.std.math
+import super.std.hashmap
+import super.std.iter
+import super.std.option
+import super.std.set
+
+// counters: [pass, fail, groups]
+let _c = [0, 0, 0]
+
+fn group(name: String) {
+    _c[2] = _c[2] + 1
+}
+
+fn check(cond: Bool, label: String) {
+    if cond {
+        _c[0] = _c[0] + 1
+    } else {
+        _c[1] = _c[1] + 1
+        println("  FAIL: " + label)
+    }
+}
+
+// ═══════════════════════════════════════════════
+// GROUP 1: Deep recursion
+// ═══════════════════════════════════════════════
+group("deep_recursion")
+
+fn sum_recursive(n: Int) -> Int {
+    if n <= 0 { return 0 }
+    return n + sum_recursive(n - 1)
+}
+check(sum_recursive(0) == 0, "sum_recursive(0)")
+check(sum_recursive(1) == 1, "sum_recursive(1)")
+check(sum_recursive(100) == 5050, "sum_recursive(100)")
+check(sum_recursive(500) == 125250, "sum_recursive(500)")
+
+// Mutual recursion with forward declarations
+fn even_check(n: Int) -> Bool
+fn odd_check(n: Int) -> Bool
+
+fn even_check(n: Int) -> Bool {
+    if n == 0 { return true }
+    return odd_check(n - 1)
+}
+fn odd_check(n: Int) -> Bool {
+    if n == 0 { return false }
+    return even_check(n - 1)
+}
+check(even_check(0), "even_check(0)")
+check(!odd_check(0), "!odd_check(0)")
+check(even_check(10), "even_check(10)")
+check(odd_check(11), "odd_check(11)")
+check(!even_check(7), "!even_check(7)")
+
+// Fibonacci via recursion (small n)
+fn fib_rec(n: Int) -> Int {
+    if n <= 1 { return n }
+    return fib_rec(n - 1) + fib_rec(n - 2)
+}
+check(fib_rec(0) == 0, "fib_rec(0)")
+check(fib_rec(1) == 1, "fib_rec(1)")
+check(fib_rec(10) == 55, "fib_rec(10)")
+check(fib_rec(15) == 610, "fib_rec(15)")
+
+println("  GROUP 1 [deep_recursion] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 2: Integer boundary values
+// ═══════════════════════════════════════════════
+group("integer_boundaries")
+
+// Large integer arithmetic
+let big_a = 1000000000
+let big_b = 2000000000
+check(big_a + big_b == 3000000000, "3 billion add")
+check(big_a * 3 == 3000000000, "billion * 3")
+
+// Euclidean modulo (always non-negative in Nova)
+check(10 % 3 == 1, "10 % 3")
+check(-10 % 3 == 2, "euclidean -10 % 3 == 2")
+check(-1 % 5 == 4, "euclidean -1 % 5 == 4")
+check(0 % 7 == 0, "0 % 7")
+check(7 % 7 == 0, "7 % 7")
+check(-7 % 7 == 0, "-7 % 7")
+
+// Integer division truncation
+check(7 / 2 == 3, "7 / 2 truncates")
+check(-7 / 2 == -3, "-7 / 2 truncates toward zero")
+check(1 / 3 == 0, "1 / 3 == 0")
+
+// Chained operations
+check(2 + 3 * 4 == 14, "precedence: 2 + 3*4 == 14")
+check((2 + 3) * 4 == 20, "parens: (2+3)*4 == 20")
+check(100 - 50 - 25 == 25, "left assoc subtraction")
+
+// Zero edge cases
+check(0 * 999999 == 0, "0 * big")
+check(0 + 0 == 0, "0 + 0")
+check(0 - 0 == 0, "0 - 0")
+
+println("  GROUP 2 [integer_boundaries] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 3: Float edge cases
+// ═══════════════════════════════════════════════
+group("float_edge_cases")
+
+// Negative zero
+let nz = -0.0
+check(nz == 0.0, "-0.0 == 0.0")
+
+// Small float arithmetic
+check(0.1 + 0.2 != 0.3, "float imprecision 0.1+0.2 != 0.3")
+let sum_f = 0.1 + 0.2
+check(sum_f > 0.29, "0.1+0.2 > 0.29")
+check(sum_f < 0.31, "0.1+0.2 < 0.31")
+
+// Float/int conversion
+let fv = Cast::float(42).unwrap()
+check(fv == 42.0, "Cast::float(42) == 42.0")
+let iv = Cast::int("123").unwrap()
+check(iv == 123, "Cast::int('123') == 123")
+
+// Cast failures
+let bad_int = Cast::int("hello")
+check(!bad_int.isSome(), "Cast::int('hello') is None")
+let bad_float = Cast::float("xyz")
+check(!bad_float.isSome(), "Cast::float('xyz') is None")
+
+// Valid float cast from string
+let good_float = Cast::float("3.14")
+check(good_float.isSome(), "Cast::float('3.14') is Some")
+
+println("  GROUP 3 [float_edge_cases] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 4: String operations
+// ═══════════════════════════════════════════════
+group("string_operations")
+
+// Empty string
+let es = ""
+check(es.len() == 0, "empty string len")
+check(es + "" == "", "empty + empty")
+check(es + "a" == "a", "empty + a")
+
+// Concatenation
+let hello = "hello" + " " + "world"
+check(hello == "hello world", "concat")
+check(hello.len() == 11, "concat len")
+
+// String conversions
+check(Cast::string(42) == "42", "int to string")
+check(Cast::string(true) == "true", "bool to string")
+check(Cast::string(false) == "false", "bool to string false")
+check(Cast::string(3.14) == "3.14", "float to string")
+
+// Chars
+let ch = 'A'
+check(ch == 'A', "char literal")
+let ch_str = Cast::string(ch)
+check(ch_str == "A", "char to string")
+
+// String methods
+check("hello".toUpper() == "HELLO", "toUpper")
+check("HELLO".toLower() == "hello", "toLower")
+check("  hi  ".trim() == "hi", "trim")
+
+// Split
+let parts = "a,b,c".split(',')
+check(parts.len() == 3, "split len")
+check(parts[0] == "a", "split[0]")
+check(parts[2] == "c", "split[2]")
+
+// Chars list
+let chs = "abc".chars()
+check(chs.len() == 3, "chars len")
+check(chs[0] == 'a', "chars[0]")
+
+// String comparison
+check("abc" == "abc", "str eq")
+check("abc" != "def", "str neq")
+
+// Reverse
+check("hello".reverse() == "olleh", "reverse")
+check("".reverse() == "", "empty reverse")
+check("a".reverse() == "a", "single char reverse")
+
+println("  GROUP 4 [string_operations] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 5: List operations and slicing
+// ═══════════════════════════════════════════════
+group("list_operations")
+
+// Basic ops
+let ls = [10, 20, 30, 40, 50]
+check(ls.len() == 5, "list len")
+check(ls[0] == 10, "list[0]")
+check(ls[4] == 50, "list[4]")
+
+// Push/pop
+let mut_ls = [1, 2, 3]
+mut_ls.push(4)
+check(mut_ls.len() == 4, "push len")
+check(mut_ls[3] == 4, "push val")
+let popped = mut_ls.pop()
+check(popped.isSome(), "pop isSome")
+check(popped.unwrap() == 4, "pop val")
+
+// Slicing
+let sl = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+let sl1 = sl[2:5]
+check(sl1.len() == 3, "slice [2:5] len")
+check(sl1[0] == 2, "slice [2:5][0]")
+check(sl1[2] == 4, "slice [2:5][2]")
+
+// Open-ended slices
+let sl2 = sl[7:]
+check(sl2.len() == 3, "slice [7:] len")
+check(sl2[0] == 7, "slice [7:][0]")
+
+let sl3 = sl[:3]
+check(sl3.len() == 3, "slice [:3] len")
+check(sl3[2] == 2, "slice [:3][2]")
+
+// Full copy slice
+let sl_copy = sl[:]
+check(sl_copy.len() == 10, "full slice len")
+check(sl_copy[0] == 0, "full slice[0]")
+check(sl_copy[9] == 9, "full slice[9]")
+
+// Negative slicing
+let neg_sl = sl[-3:]
+check(neg_sl.len() == 3, "neg slice [-3:] len")
+check(neg_sl[0] == 7, "neg slice [-3:][0]")
+
+let neg_sl2 = sl[:-2]
+check(neg_sl2.len() == 8, "neg slice [:-2] len")
+
+// Slice with step
+let step_sl = sl[0:8$2]
+check(step_sl.len() == 4, "step slice len")
+check(step_sl[0] == 0, "step[0]")
+check(step_sl[1] == 2, "step[1]")
+check(step_sl[3] == 6, "step[3]")
+
+// Map / filter / reduce
+let mapped = [1, 2, 3].map(|x: Int| x * 10)
+check(mapped[0] == 10, "map[0]")
+check(mapped[2] == 30, "map[2]")
+
+let filtered = [1, 2, 3, 4, 5, 6].filter(|x: Int| x > 3)
+check(filtered.len() == 3, "filter len")
+check(filtered[0] == 4, "filter[0]")
+
+let reduced = [1, 2, 3, 4].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)
+check(reduced == 10, "reduce sum")
+
+// Flatten
+let nested = [[1, 2], [3, 4], [5]]
+let flat = nested.flatten()
+check(flat.len() == 5, "flatten len")
+check(flat[0] == 1, "flatten[0]")
+check(flat[4] == 5, "flatten[4]")
+
+// Concat
+let cat = [1, 2].concat([3, 4])
+check(cat.len() == 4, "concat len")
+check(cat[3] == 4, "concat[3]")
+
+// Sort
+let unsorted = [5, 3, 1, 4, 2]
+let sorted = unsorted.sortWith(|a: Int, b: Int| a > b)
+check(sorted[0] == 1, "sort[0]")
+check(sorted[4] == 5, "sort[4]")
+
+println("  GROUP 5 [list_operations] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 6: List comprehensions
+// ═══════════════════════════════════════════════
+group("list_comprehensions")
+
+// Basic comprehension
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+check(squares.len() == 5, "comp len")
+check(squares[0] == 1, "comp[0]")
+check(squares[4] == 25, "comp[4]")
+
+// Comprehension with guard
+let even_sq = [x in [1, 2, 3, 4, 5, 6] | x * x | x % 2 == 0]
+check(even_sq.len() == 3, "guard comp len")
+check(even_sq[0] == 4, "guard comp[0]")
+check(even_sq[1] == 16, "guard comp[1]")
+check(even_sq[2] == 36, "guard comp[2]")
+
+// Comprehension with .to()
+let range_sq = [x in 0.to(5) | x * x]
+check(range_sq.len() == 5, "to() comp len")
+check(range_sq[0] == 0, "to() comp[0]")
+check(range_sq[4] == 16, "to() comp[4]")
+
+// Nested comprehension (cross product)
+let cross = [x in [1, 2], y in [10, 20] | x + y]
+check(cross.len() == 4, "nested comp len")
+check(cross[0] == 11, "nested comp[0]")
+check(cross[1] == 21, "nested comp[1]")
+check(cross[2] == 12, "nested comp[2]")
+check(cross[3] == 22, "nested comp[3]")
+
+// Comprehension with multiple guards
+// Comprehension with multiple guards: even, >5, <15 in [1..19] => 6,8,10,12,14
+let multi_g = [x in 1.to(20) | x | x % 2 == 0 | x > 5 | x < 15]
+check(multi_g.len() == 5, "multi guard len")
+check(multi_g[0] == 6, "multi guard[0]")
+check(multi_g[4] == 14, "multi guard[4]")
+
+// Identity comprehension (just copies)
+let id_comp = [x in [10, 20, 30] | x]
+check(id_comp.len() == 3, "id comp len")
+check(id_comp[0] == 10, "id comp[0]")
+
+println("  GROUP 6 [list_comprehensions] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 7: Tuples
+// ═══════════════════════════════════════════════
+group("tuples")
+
+let t1 = (1, "hello", true)
+check(t1[0] == 1, "tuple[0]")
+check(t1[1] == "hello", "tuple[1]")
+check(t1[2] == true, "tuple[2]")
+
+// Single element tuple
+let single_t = (42,)
+check(single_t[0] == 42, "single tuple[0]")
+
+// Pair
+let pair = (10, 20)
+check(pair[0] == 10, "pair[0]")
+check(pair[1] == 20, "pair[1]")
+
+// Tuple from function
+let dm = divmod(17, 5)
+check(dm[0] == 3, "divmod quotient")
+check(dm[1] == 2, "divmod remainder")
+
+// Nested tuple
+let nested_t = ((1, 2), (3, 4))
+check(nested_t[0][0] == 1, "nested tuple[0][0]")
+check(nested_t[1][1] == 4, "nested tuple[1][1]")
+
+println("  GROUP 7 [tuples] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 8: Option type
+// ═══════════════════════════════════════════════
+group("option_type")
+
+let some_v: Option(Int) = Some(42)
+let none_v: Option(Int) = None(Int)
+
+check(some_v.isSome(), "Some isSome")
+check(!none_v.isSome(), "None !isSome")
+check(some_v.unwrap() == 42, "Some unwrap")
+
+// orDefault
+check(some_v.orDefault(0) == 42, "Some orDefault")
+check(none_v.orDefault(99) == 99, "None orDefault")
+
+// isNone
+check(none_v.isNone(), "None isNone")
+check(!some_v.isNone(), "Some !isNone")
+
+// if let
+let if_let_res = 0
+if let val = some_v {
+    if_let_res = val + 1
+}
+check(if_let_res == 43, "if let Some")
+
+let if_let_none = -1
+if let val2 = none_v {
+    if_let_none = val2
+}
+check(if_let_none == -1, "if let None")
+
+// map
+let mapped_opt = some_v.map(|x: Int| x * 2)
+check(mapped_opt.isSome(), "map Some isSome")
+check(mapped_opt.unwrap() == 84, "map Some val")
+
+let mapped_none = none_v.map(|x: Int| x * 2)
+check(mapped_none.isNone(), "map None isNone")
+
+// filter
+let filt_pass = some_v.filter(|x: Int| x > 10)
+check(filt_pass.isSome(), "filter pass")
+let filt_fail = some_v.filter(|x: Int| x > 100)
+check(filt_fail.isNone(), "filter fail")
+
+// toList
+let to_list_some = some_v.toList()
+check(to_list_some.len() == 1, "toList Some len")
+check(to_list_some[0] == 42, "toList Some[0]")
+let to_list_none = none_v.toList()
+check(to_list_none.len() == 0, "toList None len")
+
+println("  GROUP 8 [option_type] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 9: HashMap operations
+// ═══════════════════════════════════════════════
+group("hashmap_ops")
+
+let hm = HashMap::default() @[K: String, V: Int]
+check(hm.isEmpty(), "new map isEmpty")
+check(hm.size() == 0, "new map size")
+
+hm.insert("a", 1)
+hm.insert("b", 2)
+hm.insert("c", 3)
+check(hm.size() == 3, "map size after inserts")
+check(!hm.isEmpty(), "map not empty")
+check(hm.has("a"), "has a")
+check(!hm.has("z"), "!has z")
+
+let got = hm.get("b")
+check(got.isSome(), "get b isSome")
+check(got.unwrap() == 2, "get b == 2")
+
+let got_none = hm.get("z")
+check(!got_none.isSome(), "get z isNone")
+
+// getOrDefault
+check(hm.getOrDefault("a", 0) == 1, "getOrDefault existing")
+check(hm.getOrDefault("z", 99) == 99, "getOrDefault missing")
+
+// delete
+hm.delete("b")
+check(hm.size() == 2, "size after delete")
+check(!hm.has("b"), "deleted key gone")
+
+// keys and values
+let ks = hm.keys()
+check(ks.len() == 2, "keys len")
+let vs = hm.values()
+check(vs.len() == 2, "values len")
+
+// entries
+let ents = hm.entries()
+check(ents.len() == 2, "entries len")
+
+// clear
+hm.clear()
+check(hm.size() == 0, "after clear size")
+check(hm.isEmpty(), "after clear isEmpty")
+
+// fromPairs
+let hm2 = HashMap::fromPairs([("x", 10), ("y", 20)]) @[K: String, V: Int]
+check(hm2.size() == 2, "fromPairs size")
+check(hm2.get("x").unwrap() == 10, "fromPairs get x")
+
+// increment
+let counter = HashMap::default() @[K: String, V: Int]
+counter.insert("hits", 0)
+counter.increment("hits")
+counter.increment("hits")
+counter.increment("hits")
+check(counter.get("hits").unwrap() == 3, "increment 3x")
+
+println("  GROUP 9 [hashmap_ops] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 10: Set operations
+// ═══════════════════════════════════════════════
+group("set_ops")
+
+let s1 = Set::empty() @[T: Int]
+check(s1.size() == 0, "empty set size")
+
+s1.add(1)
+s1.add(2)
+s1.add(3)
+check(s1.size() == 3, "set size 3")
+check(s1.has(1), "set has 1")
+check(s1.has(2), "set has 2")
+check(!s1.has(99), "set !has 99")
+
+// Duplicate add (no-op for sets)
+s1.add(2)
+check(s1.size() == 3, "set no dup")
+
+// Remove
+s1.remove(2)
+check(s1.size() == 2, "set after remove")
+check(!s1.has(2), "set removed 2")
+
+// fromList dedup
+let s2 = Set::fromList([1, 2, 2, 3, 3, 3])
+check(s2.size() == 3, "fromList dedup")
+check(s2.has(1), "fromList has 1")
+check(s2.has(3), "fromList has 3")
+
+// singleton
+let s3 = Set::singleton(42)
+check(s3.size() == 1, "singleton size")
+check(s3.has(42), "singleton has")
+
+println("  GROUP 10 [set_ops] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 11: Iterators
+// ═══════════════════════════════════════════════
+group("iterators")
+
+// fromVec -> collect
+let it1 = Iter::fromVec([1, 2, 3, 4, 5]).collect()
+check(it1.len() == 5, "iter collect len")
+check(it1[0] == 1, "iter collect[0]")
+
+// map
+let it2 = Iter::fromVec([1, 2, 3]).map(|x: Int| x * x).collect()
+check(it2.len() == 3, "iter map len")
+check(it2[0] == 1, "iter map[0]")
+check(it2[2] == 9, "iter map[2]")
+
+// filter
+let it3 = Iter::fromVec([1, 2, 3, 4, 5, 6]).filter(|x: Int| x % 2 == 0).collect()
+check(it3.len() == 3, "iter filter len")
+check(it3[0] == 2, "iter filter[0]")
+
+// chained map+filter
+let it4 = Iter::fromVec([1, 2, 3, 4, 5])
+    .map(|x: Int| x * 2)
+    .filter(|x: Int| x > 4)
+    .collect()
+check(it4.len() == 3, "iter chain len")
+check(it4[0] == 6, "iter chain[0]")
+check(it4[2] == 10, "iter chain[2]")
+
+// take
+let it5 = Iter::fromVec([10, 20, 30, 40, 50]).take(3).collect()
+check(it5.len() == 3, "iter take len")
+check(it5[2] == 30, "iter take[2]")
+
+// drop
+let it6 = Iter::fromVec([10, 20, 30, 40, 50]).drop(2).collect()
+check(it6.len() == 3, "iter drop len")
+check(it6[0] == 30, "iter drop[0]")
+
+// sum
+let it_sum = Iter::fromVec([1, 2, 3, 4, 5]).sum()
+check(it_sum == 15, "iter sum")
+
+// count
+let it_count = Iter::fromVec([1, 2, 3]).count()
+check(it_count == 3, "iter count")
+
+// any / all
+let it_any = Iter::fromVec([1, 2, 3, 4]).any(|x: Int| x > 3)
+check(it_any, "iter any")
+let it_all = Iter::fromVec([2, 4, 6]).all(|x: Int| x % 2 == 0)
+check(it_all, "iter all")
+
+// find
+let found = Iter::fromVec([10, 20, 30, 40]).find(|x: Int| x > 25)
+check(found.isSome(), "iter find isSome")
+check(found.unwrap() == 30, "iter find val")
+
+println("  GROUP 11 [iterators] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 12: Structs and extends
+// ═══════════════════════════════════════════════
+group("structs_extends")
+
+struct Point { x: Int, y: Int }
+
+fn extends magnitude_sq(pt: Point) -> Int {
+    return pt.x * pt.x + pt.y * pt.y
+}
+
+fn extends translate(pt: Point, dx: Int, dy: Int) -> Point {
+    return Point { x: pt.x + dx, y: pt.y + dy }
+}
+
+fn extends(Point) origin() -> Point {
+    return Point { x: 0, y: 0 }
+}
+
+let ori = Point::origin()
+check(ori.x == 0, "origin x")
+check(ori.y == 0, "origin y")
+
+let p1 = Point { x: 3, y: 4 }
+check(p1.magnitude_sq() == 25, "magnitude 3,4")
+
+let p2 = p1.translate(10, 20)
+check(p2.x == 13, "translate x")
+check(p2.y == 24, "translate y")
+
+// Positional construction
+let p3 = Point(5, 12)
+check(p3.magnitude_sq() == 169, "positional struct")
+
+// Field mutation
+let p4 = Point(0, 0)
+p4.x = 7
+p4.y = 24
+check(p4.magnitude_sq() == 625, "field mutation")
+
+// type field
+check(p4.type == "Point", "struct type field")
+
+// Aliasing
+let p5 = p4
+p5.x = 100
+check(p4.x == 100, "struct aliasing")
+
+// Clone
+let p6 = clone(p4)
+p6.x = 0
+check(p4.x == 100, "clone independence")
+
+println("  GROUP 12 [structs_extends] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 13: Enums and pattern matching
+// ═══════════════════════════════════════════════
+group("enums_matching")
+
+enum Shape {
+    Circle: Float,
+    Rect: (Float, Float),
+    Dot
+}
+
+fn extends area(s: Shape) -> Float {
+    match s {
+        Circle(r) => { return 3.14159 * r * r }
+        Rect(dims) => { return dims[0] * dims[1] }
+        Dot() => { return 0.0 }
+    }
+    return 0.0
+}
+
+let circ = Shape::Circle(5.0)
+let r_area = circ.area()
+check(r_area > 78.0, "circle area > 78")
+check(r_area < 79.0, "circle area < 79")
+
+let rect = Shape::Rect((4.0, 5.0))
+check(rect.area() == 20.0, "rect area")
+
+let dot = Shape::Dot()
+check(dot.area() == 0.0, "dot area")
+
+// Maybe enum from std/core
+let just_v = Maybe::Just(42)
+let nothing_v = Maybe::Nothing() @[A: Int]
+
+check(just_v.isJust(), "Maybe isJust")
+check(nothing_v.isNothing(), "Maybe isNothing")
+check(just_v.unwrap() == 42, "Maybe unwrap")
+check(nothing_v.orDefault(99) == 99, "Maybe orDefault")
+
+// Result enum
+let ok_v = Result::Ok(10) @[B: String]
+let err_v = Result::Err("bad") @[A: Int]
+
+check(ok_v.isOk(), "Result isOk")
+check(err_v.isErr(), "Result isErr")
+check(ok_v.unwrap() == 10, "Result unwrap")
+check(err_v.unwrapErr() == "bad", "Result unwrapErr")
+
+println("  GROUP 13 [enums_matching] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 14: Closures and higher-order functions
+// ═══════════════════════════════════════════════
+group("closures_hof")
+
+// Basic closure
+let add_fn = fn(a: Int, b: Int) -> Int { return a + b }
+check(add_fn(3, 4) == 7, "closure call")
+
+// Lambda
+let sq = |x: Int| x * x
+check(sq(5) == 25, "lambda")
+
+// Closure capturing
+let offset = 100
+let add_offset = |x: Int| x + offset
+check(add_offset(5) == 105, "closure capture")
+
+// Box for mutable shared state
+let ctr = Box(0)
+let inc = fn() -> Int { ctr.value = ctr.value + 1; return ctr.value }
+check(inc() == 1, "Box inc 1")
+check(inc() == 2, "Box inc 2")
+check(inc() == 3, "Box inc 3")
+
+// Function reference with @
+fn triple(x: Int) -> Int { return x * 3 }
+let ref_fn = triple@(Int)
+check(ref_fn(10) == 30, "fn reference")
+
+// Closure factory
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x + n
+}
+let add5 = make_adder(5)
+let add10 = make_adder(10)
+check(add5(3) == 8, "adder 5+3")
+check(add10(3) == 13, "adder 10+3")
+
+// Closure as arg to higher-order
+fn apply_twice(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(f(x))
+}
+check(apply_twice(|x: Int| x + 1, 0) == 2, "apply_twice inc")
+check(apply_twice(|x: Int| x * 2, 3) == 12, "apply_twice double")
+
+// Pipe operator
+fn double_val(x: Int) -> Int { return x * 2 }
+fn inc_val(x: Int) -> Int { return x + 1 }
+let pipe_r = 5 |> inc_val() |> double_val()
+check(pipe_r == 12, "pipe (5+1)*2 == 12")
+
+println("  GROUP 14 [closures_hof] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 15: Control flow edge cases
+// ═══════════════════════════════════════════════
+group("control_flow")
+
+// Nested if/elif/else
+fn classify(x: Int) -> String {
+    if x < 0 {
+        return "negative"
+    } elif x == 0 {
+        return "zero"
+    } elif x < 10 {
+        return "small"
+    } elif x < 100 {
+        return "medium"
+    } else {
+        return "large"
+    }
+}
+check(classify(-5) == "negative", "classify -5")
+check(classify(0) == "zero", "classify 0")
+check(classify(5) == "small", "classify 5")
+check(classify(50) == "medium", "classify 50")
+check(classify(100) == "large", "classify 100")
+
+// Break from nested loop
+let outer_count = Box(0)
+for let ii = 0; ii < 10; ii += 1 {
+    for let jj = 0; jj < 10; jj += 1 {
+        if jj == 3 { break }
+        outer_count.value = outer_count.value + 1
+    }
+}
+// Each outer iteration runs inner 0,1,2 then breaks = 3 per outer * 10 = 30
+check(outer_count.value == 30, "nested break count")
+
+// Continue in loop
+let cont_sum = 0
+for let ii2 = 0; ii2 < 10; ii2 += 1 {
+    if ii2 % 2 == 0 { continue }
+    cont_sum = cont_sum + ii2
+}
+// 1 + 3 + 5 + 7 + 9 = 25
+check(cont_sum == 25, "continue odd sum")
+
+// While with break
+let wv = 0
+while true {
+    wv = wv + 1
+    if wv >= 5 { break }
+}
+check(wv == 5, "while break")
+
+// For-in range exclusive
+let range_sum = 0
+for ri in 0..5 {
+    range_sum = range_sum + ri
+}
+check(range_sum == 10, "range 0..5 sum")
+
+// For-in range inclusive
+let range_inc_sum = 0
+for ri2 in 0..=5 {
+    range_inc_sum = range_inc_sum + ri2
+}
+check(range_inc_sum == 15, "range 0..=5 sum")
+
+// For-in collection
+let col = [10, 20, 30]
+let col_sum = 0
+for item in col {
+    col_sum = col_sum + item
+}
+check(col_sum == 60, "for-in collection sum")
+
+println("  GROUP 15 [control_flow] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 16: Clone and aliasing
+// ═══════════════════════════════════════════════
+group("clone_aliasing")
+
+// List aliasing
+let orig_l = [1, 2, 3]
+let alias_l = orig_l
+alias_l.push(4)
+check(orig_l.len() == 4, "list alias shared push")
+
+// List clone
+let orig_l2 = [10, 20, 30]
+let copy_l2 = clone(orig_l2)
+copy_l2.push(40)
+check(orig_l2.len() == 3, "cloned list independent")
+check(copy_l2.len() == 4, "cloned list has push")
+
+// Struct clone
+struct Data { val: Int, items: [Int] }
+let d1 = Data { val: 1, items: [10, 20] }
+let d2 = clone(d1)
+d2.val = 99
+d2.items.push(30)
+check(d1.val == 1, "clone struct val independent")
+check(d1.items.len() == 2, "clone struct nested list independent")
+
+// String aliasing - strings alias too
+let s_orig = "hello"
+let s_alias = s_orig
+// strings are immutable-ish via concat (creates new)
+let s_new = s_alias + " world"
+// original unchanged
+check(s_orig == "hello", "string concat doesn't mutate")
+
+println("  GROUP 16 [clone_aliasing] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 17: Dyn types
+// ═══════════════════════════════════════════════
+group("dyn_types")
+
+struct Dog { name: String, age: Int }
+struct Robot { name: String, model: Int }
+
+fn get_name(thing: Dyn(T = name: String)) -> String {
+    return thing.name
+}
+
+let dog = Dog { name: "Rex", age: 5 }
+let robot = Robot { name: "R2D2", model: 2 }
+
+check(get_name(dog) == "Rex", "dyn Dog name")
+check(get_name(robot) == "R2D2", "dyn Robot name")
+
+// Multi-field dyn
+fn get_info(x: Dyn(T = name: String + age: Int)) -> String {
+    return x.name + ":" + Cast::string(x.age)
+}
+check(get_info(dog) == "Rex:5", "multi-field dyn")
+
+println("  GROUP 17 [dyn_types] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 18: Bind operator and syntax sugar
+// ═══════════════════════════════════════════════
+group("syntax_sugar")
+
+// Bind operator ~>
+let bind_r = 42 ~> x { x + 8 }
+check(bind_r == 50, "bind 42 ~> x+8")
+
+let bind_r2 = [1, 2, 3, 4, 5].len() ~> n { n * n }
+check(bind_r2 == 25, "bind len ~> n*n")
+
+// If expression
+let if_expr = if true { 10 } else { 20 }
+check(if_expr == 10, "if expr true")
+let if_expr2 = if false { 10 } else { 20 }
+check(if_expr2 == 20, "if expr false")
+
+// Compound assignment
+let ca = 10
+ca += 5
+check(ca == 15, "+=")
+ca -= 3
+check(ca == 12, "-=")
+ca = ca / 4
+check(ca == 3, "manual /=")
+
+// Format
+let fmt = format("Hello {}! Age {}", ["Alice", "30"])
+check(fmt == "Hello Alice! Age 30", "format")
+
+// Trailing closure
+fn apply_tc(x: Int, f: fn(Int) -> Int) -> Int { return f(x) }
+let tc_r = apply_tc(5): |x: Int| x * 3
+check(tc_r == 15, "trailing closure")
+
+println("  GROUP 18 [syntax_sugar] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 19: Generic structs
+// ═══════════════════════════════════════════════
+group("generic_structs")
+
+struct Wrapper(T) { value: $T }
+
+let w1 = Wrapper { value: 42 }
+check(w1.value == 42, "Wrapper(Int)")
+
+let w2 = Wrapper { value: "hello" }
+check(w2.value == "hello", "Wrapper(String)")
+
+let w3 = Wrapper { value: [1, 2, 3] }
+check(w3.value.len() == 3, "Wrapper([Int])")
+
+struct Pair2(A, B) { fst: $A, snd: $B }
+
+fn extends swap_pair(p_in: Pair2($A, $B)) -> Pair2($B, $A) {
+    return Pair2 { fst: p_in.snd, snd: p_in.fst }
+}
+
+let pr = Pair2 { fst: 1, snd: "one" }
+check(pr.fst == 1, "Pair fst")
+check(pr.snd == "one", "Pair snd")
+
+let swapped = pr.swap_pair()
+check(swapped.fst == "one", "swap fst")
+check(swapped.snd == 1, "swap snd")
+
+println("  GROUP 19 [generic_structs] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 20: Struct function fields (:: and ->)
+// ═══════════════════════════════════════════════
+group("struct_fn_fields")
+
+struct Processor {
+    name: String,
+    process: fn(String) -> String
+}
+
+let upper_proc = Processor {
+    name: "upper",
+    process: |s: String| s.toUpper()
+}
+let result_proc = upper_proc::process("hello")
+check(result_proc == "HELLO", ":: fn field call")
+
+struct Handler {
+    label: String,
+    handle: fn(Handler, String) -> String
+}
+
+let hnd = Handler {
+    label: "test",
+    handle: fn(self: Handler, msg: String) -> String {
+        return self.label + ": " + msg
+    }
+}
+let hnd_result = hnd->handle("hi")
+check(hnd_result == "test: hi", "-> fn field call with self")
+
+println("  GROUP 20 [struct_fn_fields] OK")
+
+// ═══════════════════════════════════════════════
+// SUMMARY
+// ═══════════════════════════════════════════════
+println("")
+println(format("All {} groups passed ({} checks, {} failures)", [Cast::string(_c[2]), Cast::string(_c[0]), Cast::string(_c[1])]))
+if _c[1] == 0 {
+    println("PASS: test_edge_cases_advanced")
+} else {
+    println("FAIL: test_edge_cases_advanced")
+}

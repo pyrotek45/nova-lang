@@ -1,0 +1,535 @@
+module test_closure_advanced
+
+import super.std.list
+import super.std.core
+import super.std.iter
+
+// counters: [pass, fail, groups]
+let _c = [0, 0, 0]
+
+fn group(name: String) {
+    _c[2] = _c[2] + 1
+}
+
+fn check(cond: Bool, label: String) {
+    if cond {
+        _c[0] = _c[0] + 1
+    } else {
+        _c[1] = _c[1] + 1
+        println("  FAIL: " + label)
+    }
+}
+
+// ═══════════════════════════════════════════════
+// GROUP 1: Box-based mutable state
+// ═══════════════════════════════════════════════
+group("box_mutable_state")
+
+// Counter
+let ctr = Box(0)
+let inc = fn() -> Int { ctr.value = ctr.value + 1; return ctr.value }
+let dec = fn() -> Int { ctr.value = ctr.value - 1; return ctr.value }
+let get = fn() -> Int { return ctr.value }
+
+check(inc() == 1, "inc 1")
+check(inc() == 2, "inc 2")
+check(inc() == 3, "inc 3")
+check(dec() == 2, "dec 2")
+check(get() == 2, "get 2")
+
+// Multiple closures sharing same Box
+let shared = Box(0)
+let writers = []: fn()
+for let i = 0; i < 5; i += 1 {
+    writers.push(fn() { shared.value = shared.value + 1 })
+}
+for w in writers {
+    w()
+}
+check(shared.value == 5, "5 writers shared Box")
+
+println("  GROUP 1 [box_mutable_state] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 2: Closure factories
+// ═══════════════════════════════════════════════
+group("closure_factories")
+
+// Adder factory
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x + n
+}
+let add3 = make_adder(3)
+let add10 = make_adder(10)
+let add0 = make_adder(0)
+check(add3(7) == 10, "adder(3)(7)")
+check(add10(5) == 15, "adder(10)(5)")
+check(add0(42) == 42, "adder(0)(42)")
+
+// Multiplier factory
+fn make_mult(n: Int) -> fn(Int) -> Int {
+    return |x: Int| x * n
+}
+let double = make_mult(2)
+let triple_f = make_mult(3)
+check(double(5) == 10, "mult(2)(5)")
+check(triple_f(5) == 15, "mult(3)(5)")
+
+// Counter factory
+fn make_counter(start: Int) -> fn() -> Int {
+    let state = Box(start)
+    return fn() -> Int {
+        let v = state.value
+        state.value = state.value + 1
+        return v
+    }
+}
+let c1 = make_counter(0)
+let c2 = make_counter(100)
+check(c1() == 0, "counter1 first")
+check(c1() == 1, "counter1 second")
+check(c2() == 100, "counter2 first")
+check(c2() == 101, "counter2 second")
+check(c1() == 2, "counter1 third (independent)")
+
+// Predicate factory
+fn make_gt(threshold: Int) -> fn(Int) -> Bool {
+    return |x: Int| x > threshold
+}
+let gt5 = make_gt(5)
+let gt100 = make_gt(100)
+check(gt5(6), "gt5(6)")
+check(!gt5(3), "!gt5(3)")
+check(gt100(101), "gt100(101)")
+check(!gt100(50), "!gt100(50)")
+
+println("  GROUP 2 [closure_factories] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 3: HOF chains
+// ═══════════════════════════════════════════════
+group("hof_chains")
+
+// apply_twice
+fn apply_twice(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(f(x))
+}
+check(apply_twice(|x: Int| x + 1, 0) == 2, "twice inc")
+check(apply_twice(|x: Int| x * 2, 1) == 4, "twice double")
+check(apply_twice(|x: Int| x * x, 2) == 16, "twice square")
+
+// compose: f(g(x))
+fn compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return |x: Int| f(g(x))
+}
+let inc_then_double = compose(|x: Int| x * 2, |x: Int| x + 1)
+check(inc_then_double(3) == 8, "compose inc_then_double(3)")
+let double_then_inc = compose(|x: Int| x + 1, |x: Int| x * 2)
+check(double_then_inc(3) == 7, "compose double_then_inc(3)")
+
+// apply_n
+fn apply_n(f: fn(Int) -> Int, n: Int, x: Int) -> Int {
+    let result = x
+    for let i = 0; i < n; i += 1 {
+        result = f(result)
+    }
+    return result
+}
+check(apply_n(|x: Int| x + 1, 5, 0) == 5, "apply_n inc 5")
+check(apply_n(|x: Int| x * 2, 4, 1) == 16, "apply_n double 4")
+
+// map with closures
+let data = [1, 2, 3, 4, 5]
+let doubled_data = data.map(|x: Int| x * 2)
+check(doubled_data[0] == 2, "map double[0]")
+check(doubled_data[4] == 10, "map double[4]")
+
+// filter then map
+let processed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * x)
+check(processed.len() == 5, "filter-map len")
+check(processed[0] == 4, "filter-map[0]")
+check(processed[4] == 100, "filter-map[4]")
+
+// reduce with closure
+let sum_r = [1, 2, 3, 4, 5].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)
+check(sum_r == 15, "reduce sum")
+let product_r = [1, 2, 3, 4, 5].reduce(|acc: Int, x: Int, i: Int| acc * x, 1)
+check(product_r == 120, "reduce product")
+
+println("  GROUP 3 [hof_chains] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 4: Closures capturing in loops
+// ═══════════════════════════════════════════════
+group("closure_loop_capture")
+
+// Capture loop variable via rebinding
+let fns = []: fn() -> Int
+for let i = 0; i < 5; i += 1 {
+    let captured = i
+    fns.push(fn() -> Int { return captured })
+}
+check(fns[0]() == 0, "captured[0]")
+check(fns[1]() == 1, "captured[1]")
+check(fns[4]() == 4, "captured[4]")
+
+// Many closures in loop
+let many_fns = []: fn() -> Int
+for let i = 0; i < 100; i += 1 {
+    let val = i * 2
+    many_fns.push(fn() -> Int { return val })
+}
+check(many_fns[0]() == 0, "many[0]")
+check(many_fns[50]() == 100, "many[50]")
+check(many_fns[99]() == 198, "many[99]")
+
+// Closures capturing complex values
+let str_fns = []: fn() -> String
+for let i = 0; i < 10; i += 1 {
+    let tag = "item_" + Cast::string(i)
+    str_fns.push(fn() -> String { return tag })
+}
+check(str_fns[0]() == "item_0", "str capture[0]")
+check(str_fns[9]() == "item_9", "str capture[9]")
+
+println("  GROUP 4 [closure_loop_capture] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 5: Decorator pattern
+// ═══════════════════════════════════════════════
+group("decorator_pattern")
+
+// Logging decorator
+fn with_log(name: String, f: fn(Int) -> Int) -> fn(Int) -> Int {
+    let call_count = Box(0)
+    return fn(x: Int) -> Int {
+        call_count.value = call_count.value + 1
+        return f(x)
+    }
+}
+let logged_double = with_log("double", |x: Int| x * 2)
+check(logged_double(5) == 10, "logged double(5)")
+check(logged_double(3) == 6, "logged double(3)")
+
+// Caching decorator (memoize single value)
+fn memoize_last(f: fn(Int) -> Int) -> fn(Int) -> Int {
+    let cache_key = Box(-999999)
+    let cache_val = Box(0)
+    return fn(x: Int) -> Int {
+        if x == cache_key.value {
+            return cache_val.value
+        }
+        let result = f(x)
+        cache_key.value = x
+        cache_val.value = result
+        return result
+    }
+}
+let cached_sq = memoize_last(|x: Int| x * x)
+check(cached_sq(5) == 25, "cached sq(5)")
+check(cached_sq(5) == 25, "cached sq(5) again (from cache)")
+check(cached_sq(3) == 9, "cached sq(3)")
+
+// Validation wrapper
+fn validated(f: fn(Int) -> Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int {
+        if x < 0 {
+            return 0
+        }
+        return f(x)
+    }
+}
+let safe_double = validated(|x: Int| x * 2)
+check(safe_double(5) == 10, "safe double(5)")
+check(safe_double(-3) == 0, "safe double(-3)")
+check(safe_double(0) == 0, "safe double(0)")
+
+println("  GROUP 5 [decorator_pattern] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 6: Iterator closures
+// ═══════════════════════════════════════════════
+group("iterator_closures")
+
+// Complex iterator chains
+let result1 = Iter::fromVec([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * 3)
+    .collect()
+check(result1.len() == 5, "iter filter-map len")
+check(result1[0] == 6, "iter filter-map[0]")
+check(result1[4] == 30, "iter filter-map[4]")
+
+// takeWhile
+let result2 = Iter::fromVec([1, 2, 3, 10, 20, 30])
+    .takeWhile(|x: Int| x < 5)
+    .collect()
+check(result2.len() == 3, "takeWhile len")
+check(result2[2] == 3, "takeWhile[2]")
+
+// dropWhile
+let result3 = Iter::fromVec([1, 2, 3, 10, 20, 30])
+    .dropWhile(|x: Int| x < 5)
+    .collect()
+check(result3.len() == 3, "dropWhile len")
+check(result3[0] == 10, "dropWhile[0]")
+
+// any and all with closures
+let has_big = Iter::fromVec([1, 2, 3, 100]).any(|x: Int| x > 50)
+check(has_big, "any > 50")
+let all_pos = Iter::fromVec([1, 2, 3, 4]).all(|x: Int| x > 0)
+check(all_pos, "all > 0")
+let not_all_big = Iter::fromVec([1, 2, 3, 4]).all(|x: Int| x > 2)
+check(!not_all_big, "!all > 2")
+
+// reduce/fold
+let sum_iter = Iter::fromVec([1, 2, 3, 4, 5]).reduce(|acc: Int, x: Int| acc + x, 0)
+check(sum_iter == 15, "iter reduce sum")
+
+println("  GROUP 6 [iterator_closures] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 7: Closures as struct fields
+// ═══════════════════════════════════════════════
+group("closure_struct_fields")
+
+struct Transformer {
+    name: String,
+    transform: fn(Int) -> Int
+}
+
+let doubler = Transformer { name: "double", transform: |x: Int| x * 2 }
+let squarer = Transformer { name: "square", transform: |x: Int| x * x }
+
+check(doubler::transform(5) == 10, "struct fn double")
+check(squarer::transform(5) == 25, "struct fn square")
+
+// List of struct+closure
+let transforms = [doubler, squarer]
+let vals = [3]
+for t_item in transforms {
+    vals.push(t_item::transform(vals[vals.len() - 1]))
+}
+// 3 -> double -> 6 -> square -> 36
+check(vals[1] == 6, "chain double")
+check(vals[2] == 36, "chain square")
+
+// Struct with self-dispatching function
+struct Actor {
+    hp: Int,
+    damage: fn(Actor, Int) -> Int
+}
+
+let player = Actor {
+    hp: 100,
+    damage: fn(self: Actor, dmg: Int) -> Int {
+        self.hp = self.hp - dmg
+        return self.hp
+    }
+}
+check(player->damage(30) == 70, "actor damage 30")
+check(player->damage(20) == 50, "actor damage 20")
+check(player.hp == 50, "actor hp after damage")
+
+println("  GROUP 7 [closure_struct_fields] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 8: Closures and Option
+// ═══════════════════════════════════════════════
+group("closures_option")
+
+// Option map with closure
+let opt_val: Option(Int) = Some(10)
+let opt_mapped = opt_val.map(|x: Int| x * 3)
+check(opt_mapped.isSome(), "opt map isSome")
+check(opt_mapped.unwrap() == 30, "opt map val")
+
+// None map
+let opt_none: Option(Int) = None(Int)
+let mapped_none = opt_none.map(|x: Int| x * 3)
+check(mapped_none.isNone(), "none map isNone")
+
+// orDoFn (lazy computation)
+let lazy_result = opt_none.orDoFn(|| 42)
+check(lazy_result == 42, "orDoFn from None")
+let lazy_skip = opt_val.orDoFn(|| 99)
+check(lazy_skip == 10, "orDoFn from Some (ignored)")
+
+// filter with closure
+let filtered_some = opt_val.filter(|x: Int| x > 5)
+check(filtered_some.isSome(), "filter pass Some")
+let filtered_none = opt_val.filter(|x: Int| x > 100)
+check(filtered_none.isNone(), "filter fail to None")
+
+// flatMap
+let flat_result = opt_val.flatMap(fn(x: Int) -> Option(Int) {
+    if x > 5 {
+        return Some(x * 2)
+    }
+    return None(Int)
+})
+check(flat_result.isSome(), "flatMap Some")
+check(flat_result.unwrap() == 20, "flatMap val")
+
+println("  GROUP 8 [closures_option] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 9: Recursive closures via Box
+// ═══════════════════════════════════════════════
+group("recursive_closures")
+
+// Accumulator pattern
+fn make_accumulator(initial: Int) -> (fn(Int), fn() -> Int) {
+    let state = Box(initial)
+    let add_fn = fn(x: Int) { state.value = state.value + x }
+    let get_fn = fn() -> Int { return state.value }
+    return (add_fn, get_fn)
+}
+let acc_pair = make_accumulator(0)
+let acc_add = acc_pair[0]
+let acc_get = acc_pair[1]
+acc_add(10)
+acc_add(20)
+acc_add(30)
+check(acc_get() == 60, "accumulator 10+20+30")
+
+// Stack pattern via Box+List
+fn make_stack() -> (fn(Int), fn() -> Int, fn() -> Int) {
+    let items = []: Int
+    let push_fn = fn(x: Int) { items.push(x) }
+    let pop_fn = fn() -> Int {
+        if items.len() == 0 { return -1 }
+        return items.pop().unwrap()
+    }
+    let size_fn = fn() -> Int { return items.len() }
+    return (push_fn, pop_fn, size_fn)
+}
+let stack = make_stack()
+let stack_push = stack[0]
+let stack_pop = stack[1]
+let stack_size = stack[2]
+
+stack_push(1)
+stack_push(2)
+stack_push(3)
+check(stack_size() == 3, "stack size 3")
+check(stack_pop() == 3, "stack pop 3")
+check(stack_pop() == 2, "stack pop 2")
+check(stack_size() == 1, "stack size 1")
+
+println("  GROUP 9 [recursive_closures] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 10: Function overloading with closures
+// ═══════════════════════════════════════════════
+group("overloading")
+
+fn process(x: Int) -> String { return "int:" + Cast::string(x) }
+fn process(x: String) -> String { return "str:" + x }
+fn process(x: Bool) -> String { return "bool:" + Cast::string(x) }
+
+check(process(42) == "int:42", "overload int")
+check(process("hi") == "str:hi", "overload str")
+check(process(true) == "bool:true", "overload bool")
+
+// Function references for overloads
+let int_proc = process@(Int)
+let str_proc = process@(String)
+check(int_proc(7) == "int:7", "fn ref int")
+check(str_proc("hey") == "str:hey", "fn ref str")
+
+println("  GROUP 10 [overloading] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 11: Closures and GC interaction
+// ═══════════════════════════════════════════════
+group("closures_gc")
+
+// Create closures that capture large data structures
+let heavy_fns = []: fn() -> Int
+for let i = 0; i < 50; i += 1 {
+    let big_list = []: Int
+    for let j = 0; j < 100; j += 1 {
+        big_list.push(j)
+    }
+    let captured_len = big_list.len()
+    heavy_fns.push(fn() -> Int { return captured_len })
+}
+check(heavy_fns[0]() == 100, "heavy fn[0]")
+check(heavy_fns[49]() == 100, "heavy fn[49]")
+
+// Closures that outlive their creation scope
+fn create_delayed_fns() -> [fn() -> Int] {
+    let result = []: fn() -> Int
+    for let i = 0; i < 20; i += 1 {
+        let val = i * i
+        result.push(fn() -> Int { return val })
+    }
+    return result
+}
+let delayed = create_delayed_fns()
+check(delayed[0]() == 0, "delayed[0]")
+check(delayed[5]() == 25, "delayed[5]")
+check(delayed[19]() == 361, "delayed[19]")
+
+// Many closures sharing a Box, then calling all of them
+let shared_b = Box(0)
+let all_fns = []: fn() -> Int
+for let i = 0; i < 100; i += 1 {
+    all_fns.push(fn() -> Int {
+        shared_b.value = shared_b.value + 1
+        return shared_b.value
+    })
+}
+for f in all_fns {
+    f()
+}
+check(shared_b.value == 100, "100 closures Box")
+
+println("  GROUP 11 [closures_gc] OK")
+
+// ═══════════════════════════════════════════════
+// GROUP 12: Trailing closures
+// ═══════════════════════════════════════════════
+group("trailing_closures")
+
+fn apply_f(x: Int, f: fn(Int) -> Int) -> Int { return f(x) }
+
+// Normal call
+let t1 = apply_f(5, |x: Int| x * 2)
+check(t1 == 10, "normal closure arg")
+
+// Trailing closure
+let t2 = apply_f(5): |x: Int| x * 2
+check(t2 == 10, "trailing closure")
+
+// Trailing with UFCS
+fn extends transform2(x: Int, f: fn(Int) -> Int) -> Int {
+    return f(x)
+}
+let t3 = 10.transform2(): |x: Int| x + 5
+check(t3 == 15, "trailing UFCS closure")
+
+// Trailing with list ops
+let t4 = [1, 2, 3, 4, 5].filter(): |x: Int| x > 3
+check(t4.len() == 2, "trailing filter len")
+check(t4[0] == 4, "trailing filter[0]")
+
+let t5 = [1, 2, 3].map(): |x: Int| x * 10
+check(t5[0] == 10, "trailing map[0]")
+check(t5[2] == 30, "trailing map[2]")
+
+println("  GROUP 12 [trailing_closures] OK")
+
+// ═══════════════════════════════════════════════
+// SUMMARY
+// ═══════════════════════════════════════════════
+println("")
+println(format("All {} groups passed ({} checks, {} failures)", [Cast::string(_c[2]), Cast::string(_c[0]), Cast::string(_c[1])]))
+if _c[1] == 0 {
+    println("PASS: test_closure_advanced")
+} else {
+    println("FAIL: test_closure_advanced")
+}

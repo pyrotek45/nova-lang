@@ -1,0 +1,178 @@
+module perf_control_flow
+// Benchmarks for branch-heavy, short-circuit, and jump-intensive code
+
+import super.super.std.core
+
+fn is_prime(n: Int) -> Bool {
+    if n < 2 { return false }
+    if n == 2 { return true }
+    if (n % 2) == 0 { return false }
+    let i = 3
+    while i * i <= n {
+        if (n % i) == 0 { return false }
+        i += 2
+    }
+    return true
+}
+
+fn collatz_steps(n: Int) -> Int {
+    let steps = 0
+    let x = n
+    while x != 1 {
+        if (x % 2) == 0 {
+            x = x / 2
+        } else {
+            x = x * 3 + 1
+        }
+        steps += 1
+    }
+    return steps
+}
+
+fn clamp(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+
+fn fizzbuzz(n: Int) -> Int {
+    if (n % 15) == 0 { return 3 }
+    elif (n % 3) == 0 { return 1 }
+    elif (n % 5) == 0 { return 2 }
+    else { return 0 }
+}
+
+fn sign(n: Int) -> Int {
+    if n > 0 { return 1 }
+    elif n < 0 { return -1 }
+    else { return 0 }
+}
+
+fn abs_val(n: Int) -> Int {
+    if n < 0 { return -n }
+    return n
+}
+
+// BENCH 1: dense branch (fizzbuzz style) -- 500k iters
+let t0 = now()
+let sum1 = [0]
+let i = 0
+while i < 500000 {
+    sum1[0] += fizzbuzz(i)
+    i += 1
+}
+let t1 = now()
+println("  BENCH 1 [fizzbuzz_500k]          " + Cast::string(t1 - t0) + "ms")
+
+// BENCH 2: short-circuit AND -- 500k iters
+let t2 = now()
+let count2 = [0]
+let j = 0
+while j < 500000 {
+    if (j % 2) == 0 && (j % 3) == 0 {
+        count2[0] += 1
+    }
+    j += 1
+}
+let t3 = now()
+println("  BENCH 2 [short_circuit_and_500k] " + Cast::string(t3 - t2) + "ms")
+
+// BENCH 3: short-circuit OR -- 500k iters
+let t4 = now()
+let count3 = [0]
+let k = 0
+while k < 500000 {
+    if (k % 17) == 0 || (k % 19) == 0 {
+        count3[0] += 1
+    }
+    k += 1
+}
+let t5 = now()
+println("  BENCH 3 [short_circuit_or_500k]  " + Cast::string(t5 - t4) + "ms")
+
+// BENCH 4: clamp with 3 branches -- 500k iters
+let t6 = now()
+let sum4 = [0]
+let l = 0
+while l < 500000 {
+    sum4[0] += clamp(l % 200 - 50, 0, 100)
+    l += 1
+}
+let t7 = now()
+println("  BENCH 4 [clamp_500k]             " + Cast::string(t7 - t6) + "ms")
+
+// BENCH 5: sign function -- 500k iters
+let t8 = now()
+let sum5 = [0]
+let m = 0
+while m < 500000 {
+    sum5[0] += sign(m % 201 - 100)
+    m += 1
+}
+let t9 = now()
+println("  BENCH 5 [sign_500k]              " + Cast::string(t9 - t8) + "ms")
+
+// BENCH 6: prime sieve up to 10000 (dense early-exit branches)
+let ta = now()
+let primes = [0]
+let n = 2
+while n < 10000 {
+    if is_prime(n) { primes[0] += 1 }
+    n += 1
+}
+let tb = now()
+println("  BENCH 6 [prime_sieve_10k]        " + Cast::string(tb - ta) + "ms")
+if primes[0] != 1229 { println("FAIL prime count: " + Cast::string(primes[0])) }
+
+// BENCH 7: collatz max steps for 1..10000
+let tc = now()
+let max_steps = [0]
+let p = 1
+while p < 10000 {
+    let steps = collatz_steps(p)
+    if steps > max_steps[0] { max_steps[0] = steps }
+    p += 1
+}
+let td = now()
+println("  BENCH 7 [collatz_10k]            " + Cast::string(td - tc) + "ms")
+
+// BENCH 8: while with break -- break every 7 steps, 100k outer loops
+let te = now()
+let sum8 = [0]
+let q = 0
+while q < 100000 {
+    let inner = 0
+    while inner < 1000 {
+        if (inner % 7) == 0 { break }
+        sum8[0] += inner
+        inner += 1
+    }
+    q += 1
+}
+let tf = now()
+println("  BENCH 8 [break_loop_100k]        " + Cast::string(tf - te) + "ms")
+
+// BENCH 9: continue-heavy loop -- 300k iters
+let tg = now()
+let sum9 = [0]
+let r = 0
+while r < 300000 {
+    r += 1
+    if (r % 3) != 0 { continue }
+    sum9[0] += r
+}
+let th = now()
+println("  BENCH 9 [continue_300k]          " + Cast::string(th - tg) + "ms")
+
+// BENCH 10: abs function -- 1M iters
+let ti = now()
+let sum10 = [0]
+let s2 = 0
+while s2 < 1000000 {
+    sum10[0] += abs_val(s2 % 201 - 100)
+    s2 += 1
+}
+let tj = now()
+println("  BENCH 10 [abs_1M]                " + Cast::string(tj - ti) + "ms")
+
+println("  TOTAL [control_flow] " + Cast::string(tj - t0) + "ms")

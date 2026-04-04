@@ -1,0 +1,210 @@
+module perf_match_patterns
+
+import super.super.std.core
+
+// ============================================================
+// Match / Dispatch / Branch Benchmarks
+// ============================================================
+// Tests: chained if-elif, enum match dispatch, nested if,
+//        bool branches, fizzbuzz guards, HOF brightness
+
+enum Shape {
+    Circle: Int,
+    Rect: (Int, Int),
+    Point,
+}
+
+fn area(s: Shape) -> Int {
+    match s {
+        Circle(r)    => { return r * r * 3 }
+        Rect(dims)   => { return dims[0] * dims[1] }
+        Point()      => { return 0 }
+    }
+    return 0
+}
+
+enum Token {
+    Num: Int,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Eof,
+}
+
+fn token_value(t: Token) -> Int {
+    match t {
+        Num(n) => { return n }
+        Add()  => { return 1 }
+        Sub()  => { return 2 }
+        Mul()  => { return 3 }
+        Div()  => { return 4 }
+        Eof()  => { return 0 }
+    }
+    return 0
+}
+
+fn classify_int(n: Int) -> Int {
+    if n == 0 { return 0 }
+    elif n == 1 { return 1 }
+    elif n == 2 { return 2 }
+    elif n == 3 { return 3 }
+    else { return 4 }
+}
+
+fn classify_range(n: Int) -> Int {
+    if n < 0 { return 0 }
+    elif n < 10 { return 1 }
+    elif n < 100 { return 2 }
+    elif n < 1000 { return 3 }
+    else { return 4 }
+}
+
+fn brightness(r: Int, g: Int, b: Int) -> Int {
+    return r + g + b
+}
+
+// BENCH 1: chained if-elif (5-way) -- 300k iters
+let t0 = now()
+let sum1 = [0]
+let i = 0
+while i < 300000 {
+    sum1[0] += classify_int(i % 5)
+    i += 1
+}
+let t1 = now()
+println("  BENCH 1 [if_chain_5way_300k]     " + Cast::string(t1 - t0) + "ms")
+
+// BENCH 2: chained if-elif (range classify) -- 300k iters
+let t2 = now()
+let sum2 = [0]
+let j = 0
+while j < 300000 {
+    sum2[0] += classify_range(j % 2000)
+    j += 1
+}
+let t3 = now()
+println("  BENCH 2 [if_elif_range_300k]     " + Cast::string(t3 - t2) + "ms")
+
+// BENCH 3: enum match with data -- 200k iters
+let t4 = now()
+let sum3 = [0]
+let shapes = [Shape::Circle(5), Shape::Rect((3, 4)), Shape::Point()]
+let k = 0
+while k < 200000 {
+    sum3[0] += area(shapes[k % 3])
+    k += 1
+}
+let t5 = now()
+println("  BENCH 3 [enum_match_data_200k]   " + Cast::string(t5 - t4) + "ms")
+
+// BENCH 4: token dispatch (6-variant enum) -- 200k iters
+let t6 = now()
+let sum4 = [0]
+let tokens = [Token::Num(42), Token::Add(), Token::Sub(), Token::Mul(), Token::Div(), Token::Eof()]
+let m = 0
+while m < 200000 {
+    sum4[0] += token_value(tokens[m % 6])
+    m += 1
+}
+let t7 = now()
+println("  BENCH 4 [token_dispatch_200k]    " + Cast::string(t7 - t6) + "ms")
+
+// BENCH 5: nested if (2 levels) -- 100k iters
+let t8 = now()
+let sum5 = [0]
+let n = 0
+while n < 100000 {
+    let outer = n % 3
+    let inner = n % 5
+    let v = 0
+    if outer == 0 {
+        if inner == 0 { v = 10 }
+        elif inner == 1 { v = 20 }
+        else { v = 30 }
+    } elif outer == 1 { v = 40 }
+    else { v = 50 }
+    sum5[0] += v
+    n += 1
+}
+let t9 = now()
+println("  BENCH 5 [nested_if_100k]         " + Cast::string(t9 - t8) + "ms")
+
+// BENCH 6: bool branch -- 500k iters
+let ta = now()
+let sum6 = [0]
+let p = 0
+while p < 500000 {
+    let bv = (p % 2) == 0
+    let v = if bv { 1 } else { 2 }
+    sum6[0] += v
+    p += 1
+}
+let tb = now()
+println("  BENCH 6 [bool_branch_500k]       " + Cast::string(tb - ta) + "ms")
+
+// BENCH 7: fizzbuzz-style guard chain -- 100k iters
+let tc = now()
+let sum7 = [0]
+let q = 0
+while q < 100000 {
+    let v = 1
+    if (q % 15) == 0 { v = 15 }
+    elif (q % 3) == 0 { v = 3 }
+    elif (q % 5) == 0 { v = 5 }
+    sum7[0] += v
+    q += 1
+}
+let td = now()
+println("  BENCH 7 [fizzbuzz_guard_100k]    " + Cast::string(td - tc) + "ms")
+
+// BENCH 8: enum variant list scan -- 50k x 6 variants
+let te = now()
+let sum8 = [0]
+let shapes2 = [
+    Shape::Circle(1), Shape::Rect((2, 3)), Shape::Point(),
+    Shape::Circle(6), Shape::Rect((7, 8)), Shape::Point()
+]
+let r = 0
+while r < 50000 {
+    let sv = 0
+    while sv < 6 {
+        sum8[0] += area(shapes2[sv])
+        sv += 1
+    }
+    r += 1
+}
+let tf = now()
+println("  BENCH 8 [enum_scan_50kx6]        " + Cast::string(tf - te) + "ms")
+
+// BENCH 9: brightness (3 int args) -- 200k iters
+let tg = now()
+let sum9 = [0]
+let cols = [[255,0,0],[0,255,0],[0,0,255],[128,128,128]]
+let s2 = 0
+while s2 < 200000 {
+    let c = cols[s2 % 4]
+    sum9[0] += brightness(c[0], c[1], c[2])
+    s2 += 1
+}
+let th = now()
+println("  BENCH 9 [brightness_200k]        " + Cast::string(th - tg) + "ms")
+
+// BENCH 10: 4-way if as expression -- 300k iters
+let ti = now()
+let sum10 = [0]
+let t_i = 0
+while t_i < 300000 {
+    let mod4 = t_i % 4
+    let r2 = 0
+    if mod4 == 0 { r2 = 10 }
+    elif mod4 == 1 { r2 = 20 }
+    elif mod4 == 2 { r2 = 30 }
+    else { r2 = 40 }
+    sum10[0] += r2
+    t_i += 1
+}
+let tj = now()
+println("  BENCH 10 [if_expr_4way_300k]     " + Cast::string(tj - ti) + "ms")
+
+println("  TOTAL [match_patterns] " + Cast::string(tj - t0) + "ms")
