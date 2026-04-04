@@ -1,13 +1,49 @@
 # Nova
 
-Nova is a statically typed language that compiles to bytecode and runs on a stack-based VM.
-The type system is strict but the syntax is expressive — list comprehensions, slicing, closures,
-pattern matching, and structural dispatch without the ceremony you'd expect.
-
-Runtime errors tell you exactly where things went wrong: file, line, and a clear message.
-No silent panics, no opaque crashes.
+A statically typed language with expressive syntax, a built-in package manager,
+and game development out of the box. Compiles to bytecode, runs on a stack-based VM.
 
 ---
+
+## Why Nova?
+
+**One binary does everything.** `nova run`, `nova check`, `nova test`, `nova install` —
+no separate toolchain, no config files, no build system. Write code, run it.
+
+**Import directly from GitHub.** No registry, no publish step. Point at a repo and go:
+
+```nova
+import @ "pyrotek45/nova-utils/strings.nv"
+import @ "pyrotek45/nova-utils/strings.nv" ! "a1b2c3d"   // pin to a commit
+```
+
+**Ship games from day one.** Raylib is built in. Open a window, draw sprites, play audio —
+all with zero setup. The standard library includes scene management, entity systems,
+physics, tweens, tilemaps, and a charting library.
+
+**Structural typing without inheritance.** `Dyn(T)` accepts any struct with the right shape.
+No interfaces to declare, no traits to implement:
+
+```nova
+fn greet(thing: Dyn(T = name: String)) -> String {
+    return "Hello, " + thing.name
+}
+```
+
+Works on `Dog`, `Robot`, or anything else with a `name: String` field.
+
+**Extend any type, anywhere.** UFCS lets you add methods to types you don't own:
+
+```nova
+fn extends shout(s: String) -> String {
+    return s.toUpper() + "!!!"
+}
+println("hello".shout())   // HELLO!!!
+```
+
+---
+
+## Quick Look
 
 ```nova
 module main
@@ -18,92 +54,16 @@ let squares = [x in xs[-3:] | x * x]   // last 3, squared
 println(squares)   // [64, 81, 100]
 ```
 
----
-
-## Language Features
-
-### List slicing
-
-Same syntax as Python. Negative indices, stride, the lot:
+### Slicing and comprehensions
 
 ```nova
-xs[-3:]      // last 3 elements
-xs[1:6]      // index 1 up to 5
-xs[:$2]      // every 2nd element
-xs[-4:-1$2]  // stride with negative indices
+xs[-3:]                                   // last 3 elements
+xs[1:6]                                   // index 1..5
+[x in 0.to(20) | x | x % 2 == 0]        // even numbers
+[x in [1,2], y in [10,20] | (x, y)]      // cartesian product
 ```
 
-### List comprehensions
-
-```nova
-let evens   = [x in 0.to(20) | x | x % 2 == 0]
-let squares = [x in [1,2,3,4,5] | x * x]
-let pairs   = [x in [1,2], y in [10,20] | (x, y)]
-```
-
-### Bind operator `~>`
-
-Name an intermediate value inline without a throwaway variable:
-
-```nova
-let result = someList.len() ~> n { n * n + n }
-```
-
-### Trailing closures
-
-```nova
-let filtered = [1, 2, 3, 4, 5].filter(): |x: Int| x > 3
-let mapped   = [1, 2, 3].map():          |x: Int| x * 10
-```
-
-### Pipe operator
-
-```nova
-fn double(x: Int) -> Int { return x * 2 }
-fn add1(x: Int)   -> Int { return x + 1 }
-
-println(5 |> add1() |> double())   // 12
-```
-
-### Dyn types — structural dispatch without inheritance
-
-Accept any struct that has the right fields:
-
-```nova
-struct Dog   { name: String, breed: String }
-struct Robot { name: String, model: Int }
-
-fn greet(thing: Dyn(T = name: String)) -> String {
-    return "I am " + thing.name
-}
-
-println(greet(Dog   { name: "Rex",  breed: "Husky" }))
-println(greet(Robot { name: "R2D2", model: 2       }))
-```
-
-### Option type
-
-`Cast::int` returns `Option(Int)`. No null, no exception:
-
-```nova
-if let n = Cast::int("42") {
-    println("parsed: " + Cast::string(n))
-}
-
-let safe = Cast::int("oops").orDefault(0)
-```
-
-### Box — shared mutable state across closures
-
-```nova
-let counter = Box(0)
-let inc = fn() -> Int { counter.value += 1; return counter.value }
-
-println(inc())   // 1
-println(inc())   // 2
-```
-
-### Pattern matching on enums
+### Pattern matching
 
 ```nova
 enum Shape {
@@ -120,52 +80,26 @@ fn area(s: Shape) -> Float {
 }
 ```
 
-### Universal Function Call Syntax
-
-Any function can be called as a method. Extend any type, anywhere:
+### Pipe and bind
 
 ```nova
-fn extends shout(s: String) -> String {
-    return s.toUpper() + "!!!"
-}
+5 |> add1() |> double()                     // pipe chain
+someList.len() ~> n { n * n + n }           // bind operator
+[1, 2, 3, 4, 5].filter(): |x: Int| x > 3   // trailing closure
+```
 
-println("hello".shout())   // HELLO!!!
+### Safe casts, no null
+
+```nova
+if let n = Cast::int("42") {
+    println("parsed: " + Cast::string(n))
+}
+let safe = Cast::int("oops").orDefault(0)
 ```
 
 ---
 
-## Putting It Together
-
-```nova
-module main
-import super.std.core
-import super.std.list
-
-struct Person { name: String, score: Int }
-
-fn extends rank(p: Person) -> String {
-    if p.score >= 90 { return "S" }
-    if p.score >= 70 { return "A" }
-    return "B"
-}
-
-let people = [
-    Person { name: "Alice", score: 95 },
-    Person { name: "Bob",   score: 73 },
-    Person { name: "Carol", score: 61 },
-]
-
-let top = [p in people | p | p.score >= 70]
-for p in top {
-    println(p.name + " -> " + p.rank())
-}
-// Alice -> S
-// Bob   -> A
-```
-
----
-
-## Build and Run
+## Get Started
 
 ```bash
 git clone https://github.com/pyrotek45/nova-lang
@@ -174,58 +108,70 @@ cargo build --release
 ./target/release/nova run demo/fib.nv
 ```
 
-```
-nova run   <file.nv>   Run a program
-nova run               Run main.nv in current directory (project mode)
-nova run --git <path>  Fetch and run from GitHub
-nova check <file.nv>   Type-check without running
-nova time  <file.nv>   Run and show execution time
-nova dis   <file.nv>   Disassemble bytecode
-nova dbg   <file.nv>   Debug run
-nova init  <name>      Create a new project (with --with for GitHub deps)
-nova install <n> <r/p> Install a library into libs/<name>/ from GitHub
-nova remove  <name>    Remove a library from libs/<name>/
-nova test              Run all test_*.nv files in tests/
-nova repl              Interactive REPL
+Or on NixOS:
+
+```bash
+nix-env -if default.nix
+nova run demo/fib.nv
 ```
 
-All file commands also accept `--git owner/repo/path.nv` to work directly from GitHub.
+### Project workflow
 
-See the [Getting Started](documentation/getting_started.md) guide for project setup and workflow.
+```bash
+nova init myapp               # scaffold a new project
+nova init myapp --with user/repo/libs   # ...with a GitHub dependency
+nova run                      # run main.nv in project mode
+nova test                     # run all test_*.nv files
+nova install utils pyrotek45/nova-utils/src   # add a library
+nova remove utils             # remove it
+```
 
----
+### All commands
 
-## Demo Programs
+```
+nova run   <file.nv>          Run a program
+nova run                      Run main.nv (project mode)
+nova check <file.nv>          Type-check without running
+nova time  <file.nv>          Run and show execution time
+nova dis   <file.nv>          Disassemble bytecode
+nova dbg   <file.nv>          Debug run
+nova init  <name>             New project
+nova install <name> <repo>    Install library from GitHub
+nova remove  <name>           Remove a library
+nova test                     Run tests
+nova repl                     Interactive REPL
+```
 
-| File | What it does |
-|---|---|
-| `demo/fib.nv` | Fibonacci (recursive) |
-| `demo/snake.nv` | Terminal snake game |
-| `demo/flappy.nv` | Flappy bird in the terminal |
-| `demo/forth.nv` | A Forth interpreter written in Nova |
-| `demo/matmul.nv` | Matrix multiplication |
-| `demo/option_type.nv` | Option and Maybe patterns |
-| `demo/speedtest.nv` | Performance benchmark |
-| `demo/plotdemo.nv` | 7-chart showcase (line, bar, scatter, fill, pie, multi-line, thick) |
+Every file command also accepts `--git owner/repo/path.nv` to work directly from GitHub.
 
 ---
 
 ## Standard Library
 
-| Module | What it gives you |
+| Module | Purpose |
 |---|---|
 | `std/core` | `Box`, `Gen`, `range`, `Maybe`, `Result`, Option helpers |
 | `std/list` | `map`, `filter`, `reduce`, `sortWith`, `flatten`, `zip` |
-| `std/iter` | Lazy iterators — `map`, `filter`, `collect` |
-| `std/string` | `split`, `padLeft`, `padRight`, `capitalize`, `lines`, `words` |
-| `std/math` | `sqrt`, `pow`, `abs`, `floor`, trig |
+| `std/iter` | Lazy iterators |
+| `std/string` | `split`, `padLeft`, `capitalize`, `lines`, `words` |
+| `std/math` | `sqrt`, `pow`, `abs`, trig |
 | `std/io` | `prompt`, `readLines`, `writeLines` |
-| `std/hashmap` | O(1) `HashMap` |
-| `std/maybe` | `Maybe(T)` — `Just`/`Nothing` with pattern matching |
-| `std/result` | `Result(A,B)` — `Ok`/`Err` for error propagation |
-| `std/grid` | Generic 2D grid — `Grid(T)` for tilemaps and pathfinding |
-| `std/plot` | Charts and graphs — line, bar, scatter, pie, fill (raylib) |
-| `std/tui` | `run`, `clear`, `printAt`, `printColor`, `drawBox`, colour presets, input polling |
+| `std/hashmap` | O(1) hash map |
+| `std/grid` | Generic 2D grid for tilemaps and pathfinding |
+| `std/plot` | Line, bar, scatter, pie, and fill charts (raylib) |
+| `std/tui` | Terminal UI — cursor, colour, input, draw primitives |
+
+Game development: `std/camera`, `std/entity`, `std/physics`, `std/scene`,
+`std/tween`, `std/vec2`, `std/noise`, `std/timer`, `std/widget`
+
+---
+
+## Documentation
+
+- [Tutorial](documentation/tutorial.md) — 59 sections from hello world to shipping games
+- [Reference](documentation/reference.md) — complete language reference
+- [Getting Started](documentation/getting_started.md) — project setup and workflow
+- [Installation](documentation/installation.md) — build from source or install via Nix
 
 ---
 
