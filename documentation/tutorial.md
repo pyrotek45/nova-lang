@@ -39,40 +39,46 @@ A comprehensive guide to writing Nova — from first program to full games.
 29. [Common Mistakes](#29-common-mistakes)
 30. [Built-in Functions](#30-built-in-functions)
 31. [CLI and REPL](#31-cli-and-repl)
-32. [Novel Feature Combinations](#32-novel-feature-combinations)
+32. [Structuring Large Projects](#32-structuring-large-projects)
+33. [Creating and Publishing Libraries](#33-creating-and-publishing-libraries)
+34. [Novel Feature Combinations](#34-novel-feature-combinations)
 
 ### Part II — Game Development
 
-33. [Quick Start — Your First Window](#33-quick-start--your-first-window)
-34. [Critical Rules for Game Dev](#34-critical-rules-for-game-dev)
-35. [Scene Management](#35-scene-management)
-36. [Entity System](#36-entity-system)
-37. [Input Handling](#37-input-handling)
-38. [Physics and Collision](#38-physics-and-collision)
-39. [Camera](#39-camera)
-40. [Timers and Tweens](#40-timers-and-tweens)
-41. [Vec2 Math](#41-vec2-math)
-42. [Tilemaps and Noise](#42-tilemaps-and-noise)
-43. [Sprites and Audio](#43-sprites-and-audio)
-44. [HUD and UI](#44-hud-and-ui)
-45. [Advanced Game Patterns](#45-advanced-game-patterns)
-46. [Game Dev Tips and Tricks](#46-game-dev-tips-and-tricks)
-47. [Performance Tips](#47-performance-tips)
-48. [Complete Example — Breakout](#48-complete-example--breakout)
-49. [Complete Example — Top-Down Shooter](#49-complete-example--top-down-shooter)
+35. [Quick Start — Your First Window](#35-quick-start--your-first-window)
+36. [Critical Rules for Game Dev](#36-critical-rules-for-game-dev)
+37. [Scene Management](#37-scene-management)
+38. [Entity System](#38-entity-system)
+39. [Input Handling](#39-input-handling)
+40. [Physics and Collision](#40-physics-and-collision)
+41. [Camera](#41-camera)
+42. [Timers and Tweens](#42-timers-and-tweens)
+43. [Vec2 Math](#43-vec2-math)
+44. [Tilemaps and Noise](#44-tilemaps-and-noise)
+45. [Sprites and Audio](#45-sprites-and-audio)
+46. [HUD and UI](#46-hud-and-ui)
+47. [Advanced Game Patterns](#47-advanced-game-patterns)
+48. [Game Dev Tips and Tricks](#48-game-dev-tips-and-tricks)
+49. [Performance Tips](#49-performance-tips)
+50. [Complete Example — Breakout](#50-complete-example--breakout)
+51. [Complete Example — Top-Down Shooter](#51-complete-example--top-down-shooter)
 
 ### Part III — Terminal Applications
 
-50. [Terminal Quick Start](#50-terminal-quick-start)
-51. [Raw Mode and Key Input](#51-raw-mode-and-key-input)
-52. [Colours and Cursor](#52-colours-and-cursor)
-53. [Terminal Menu System](#53-terminal-menu-system)
-54. [Terminal Game Loop](#54-terminal-game-loop)
-55. [Terminal Patterns](#55-terminal-patterns)
+52. [Terminal Quick Start](#52-terminal-quick-start)
+53. [Raw Mode and Key Input](#53-raw-mode-and-key-input)
+54. [Colours and Cursor](#54-colours-and-cursor)
+55. [Terminal Menu System](#55-terminal-menu-system)
+56. [Terminal Game Loop](#56-terminal-game-loop)
+57. [Terminal Patterns](#57-terminal-patterns)
 
 ### Part IV — For Python Developers
 
-56. [Nova for Python Developers](#56-nova-for-python-developers)
+58. [Nova for Python Developers](#58-nova-for-python-developers)
+
+### Part V — Charts and Plotting
+
+59. [Charts and Plotting](#59-charts-and-plotting)
 
 ---
 
@@ -2038,7 +2044,454 @@ prepending `module repl`. If the file already exists, you'll be asked to confirm
 
 ---
 
-## 32. Novel Feature Combinations
+## 32. Structuring Large Projects
+
+As your Nova project grows, good file organisation keeps things manageable.
+This section covers practical patterns for medium-to-large codebases.
+
+### Flat vs Nested `libs/`
+
+For small projects (a handful of modules), a flat `libs/` folder works fine:
+
+```
+myapp/
+    main.nv
+    libs/
+        math.nv
+        utils.nv
+        config.nv
+    tests/
+        test_math.nv
+```
+
+```nova
+// main.nv
+import libs.math
+import libs.utils
+```
+
+For larger projects, group related modules into subfolders:
+
+```
+mygame/
+    main.nv
+    libs/
+        std/           ← installed via: nova install std pyrotek45/nova-lang/std
+            core.nv
+            math.nv
+            list.nv
+        engine/        ← your own game engine modules
+            physics.nv
+            renderer.nv
+            audio.nv
+        data/          ← game data modules
+            levels.nv
+            items.nv
+    src/
+        player.nv
+        enemy.nv
+        ui.nv
+    tests/
+        test_player.nv
+        test_enemy.nv
+```
+
+```nova
+// main.nv
+import libs.std.core
+import libs.std.math
+import libs.engine.physics
+import libs.engine.renderer
+import src.player
+import src.enemy
+import src.ui
+```
+
+### The `src/` vs `libs/` Convention
+
+Use two top-level folders to separate **your code** from **dependencies**:
+
+| Folder | Purpose | Example |
+|---|---|---|
+| `src/` | Your application-specific code | `src/player.nv`, `src/ui.nv` |
+| `libs/` | Third-party libraries and reusable modules | `libs/std/core.nv`, `libs/utils/helpers.nv` |
+| `tests/` | Test files (named `test_*.nv`) | `tests/test_player.nv` |
+
+This mirrors how most language ecosystems separate application code from
+library code. When someone looks at your project, they immediately know
+what's yours (`src/`) and what's imported (`libs/`).
+
+### Using `super` in Subfolders
+
+Files inside subfolders need `super` to reach sibling folders:
+
+```nova
+// src/player.nv
+module player
+
+import super.libs.std.core       // go up to project root, then into libs/std/
+import super.libs.engine.physics  // go up to project root, then into libs/engine/
+
+struct Player {
+    x: Float,
+    y: Float,
+    health: Int
+}
+```
+
+Each `super` goes up one directory. From `src/player.nv`, one `super` reaches
+the project root. From `src/deep/nested.nv`, you'd need `super.super.libs.math`.
+
+> **Tip:** Keep your folder hierarchy shallow. If you need more than two `super`s,
+> consider flattening your structure.
+
+### One Module Per File
+
+Every `.nv` file must start with `module name`. The module name should match
+the filename (without `.nv`):
+
+```nova
+// libs/engine/physics.nv
+module physics
+
+fn gravity(velocity: Float, dt: Float) -> Float {
+    velocity + 9.8 * dt
+}
+```
+
+This is important because:
+- **Duplicate prevention:** Nova skips re-importing a module if one with the same
+  name was already loaded. If two files declare `module utils`, the second import
+  is silently ignored.
+- **Readability:** `import libs.engine.physics` clearly maps to
+  `libs/engine/physics.nv` containing `module physics`.
+
+### Splitting a Large Module
+
+If a single module grows too large, split it into several files and create a
+"barrel" module that re-imports them:
+
+```
+libs/engine/
+    engine.nv       ← barrel module, imports the rest
+    physics.nv
+    renderer.nv
+    audio.nv
+```
+
+```nova
+// libs/engine/engine.nv
+module engine
+
+import super.engine.physics
+import super.engine.renderer
+import super.engine.audio
+```
+
+Now `main.nv` only needs one import:
+
+```nova
+import libs.engine.engine
+// physics, renderer, audio functions are all in scope
+```
+
+### Keeping Tests Organised
+
+Match your test files to your source files:
+
+```
+tests/
+    test_player.nv   ← tests for src/player.nv
+    test_enemy.nv    ← tests for src/enemy.nv
+    test_physics.nv  ← tests for libs/engine/physics.nv
+```
+
+Each test file can import the module it tests:
+
+```nova
+// tests/test_player.nv
+module test_player
+
+import super.src.player
+
+assert(Player::new(0.0, 0.0, 100).health == 100, "player starts with 100 hp")
+
+println("PASS: test_player")
+```
+
+Run them all with `nova test`, or a specific directory with `nova test tests/`.
+
+---
+
+## 33. Creating and Publishing Libraries
+
+Nova makes it easy to share reusable code as a library on GitHub. Anyone
+can install your library with `nova install`.
+
+### Step 1: Create the Library
+
+A Nova library is just a folder of `.nv` files in a GitHub repository.
+Each file should declare a `module` and export functions, structs, or enums.
+
+Start by creating a repo structure:
+
+```
+my-nova-lib/
+    README.md
+    core.nv
+    helpers.nv
+    types.nv
+```
+
+### Step 2: Write Your Modules
+
+Every file needs a `module` declaration. Use clear, descriptive module names:
+
+```nova
+// core.nv
+module core
+
+// A generic Stack built on lists
+struct Stack(T) {
+    items: [T]
+}
+
+fn Stack::new() -> Stack(T) {
+    Stack([])
+}
+
+extends Stack(T) {
+    fn push(self: Stack(T), item: T) -> Stack(T) {
+        self.items.append(item)
+        self
+    }
+
+    fn pop(self: Stack(T)) -> (Stack(T), Option(T)) {
+        if self.items.length() == 0 {
+            return (self, None)
+        }
+        let last = self.items[self.items.length() - 1]
+        (Stack(self.items.slice(0, self.items.length() - 1)), Some(last))
+    }
+
+    fn peek(self: Stack(T)) -> Option(T) {
+        if self.items.length() == 0 {
+            return None
+        }
+        Some(self.items[self.items.length() - 1])
+    }
+
+    fn size(self: Stack(T)) -> Int {
+        self.items.length()
+    }
+}
+```
+
+```nova
+// helpers.nv
+module helpers
+
+fn repeat_string(s: String, n: Int) -> String {
+    let result = ""
+    let i = 0
+    while i < n {
+        result = result + s
+        i = i + 1
+    }
+    result
+}
+
+fn pad_left(s: String, width: Int, fill: String) -> String {
+    let padding = width - s.length()
+    if padding <= 0 { return s }
+    repeat_string(fill, padding) + s
+}
+
+fn pad_right(s: String, width: Int, fill: String) -> String {
+    let padding = width - s.length()
+    if padding <= 0 { return s }
+    s + repeat_string(fill, padding)
+}
+```
+
+### Step 3: Add Documentation
+
+Add a header comment to each file explaining what it provides:
+
+```nova
+// ============================================================
+// core.nv — Core data structures for my-nova-lib
+// ============================================================
+//
+// Provides: Stack(T)
+//
+// Usage:
+//   nova install mylib yourname/my-nova-lib
+//   import libs.mylib.core
+//
+// ============================================================
+module core
+```
+
+And write a `README.md` for your repo:
+
+```markdown
+# my-nova-lib
+
+A collection of useful data structures and helpers for Nova.
+
+## Install
+
+    nova install mylib yourname/my-nova-lib
+
+## Usage
+
+    import libs.mylib.core
+    import libs.mylib.helpers
+
+## Modules
+
+| Module | Description |
+|---|---|
+| `core` | Stack(T) data structure |
+| `helpers` | String utilities: repeat, pad_left, pad_right |
+| `types` | Common type aliases and constructors |
+```
+
+### Step 4: Add Tests
+
+Create a `tests/` folder in your library repo so users can verify it works:
+
+```
+my-nova-lib/
+    README.md
+    core.nv
+    helpers.nv
+    types.nv
+    tests/
+        test_core.nv
+        test_helpers.nv
+```
+
+```nova
+// tests/test_core.nv
+module test_core
+
+import super.core
+
+let s = Stack::new()
+let s = s.push(1).push(2).push(3)
+assert(s.size() == 3, "stack has 3 items")
+assert(s.peek() == Some(3), "peek returns top")
+
+let (s, top) = s.pop()
+assert(top == Some(3), "pop returns 3")
+assert(s.size() == 2, "stack has 2 after pop")
+
+println("PASS: test_core")
+```
+
+### Step 5: Push to GitHub
+
+```bash
+cd my-nova-lib
+git init
+git add .
+git commit -m "initial release"
+git remote add origin https://github.com/yourname/my-nova-lib.git
+git push -u origin main
+```
+
+### Step 6: Users Install Your Library
+
+Anyone can now install your library into their project:
+
+```bash
+cd their-project
+nova install mylib yourname/my-nova-lib
+```
+
+This fetches all `.nv` files into `libs/mylib/` and they can import with:
+
+```nova
+import libs.mylib.core
+import libs.mylib.helpers
+```
+
+### Library Design Tips
+
+**Keep modules focused.** Each file should do one thing well. A `core.nv` that
+has data structures, a `helpers.nv` with utility functions, and a `types.nv`
+with shared type definitions is better than one giant `everything.nv`.
+
+**Use `extends` for method-style APIs.** Instead of standalone functions,
+extend your types so users get a fluent interface:
+
+```nova
+// Prefer this:
+let s = Stack::new().push(1).push(2)
+
+// Over this:
+let s = push(push(Stack::new(), 1), 2)
+```
+
+**Document with comments.** Nova doesn't have a doc generator yet, but clear
+header comments go a long way. The standard library uses this pattern:
+
+```nova
+// ============================================================
+// modulename.nv — Short description
+// ============================================================
+//
+// Longer description of what the module provides.
+//
+// Usage:  import libs.yourlib.modulename
+// ============================================================
+module modulename
+```
+
+**Provide a barrel import.** If your library has many modules, add an
+`all.nv` that imports everything:
+
+```nova
+// all.nv
+module all
+
+import super.mylib.core
+import super.mylib.helpers
+import super.mylib.types
+```
+
+Users who want everything can do `import libs.mylib.all`.
+
+**Version with git tags.** Users can lock imports to a specific commit with
+`import @` syntax, but for `nova install` they always get the latest `main`.
+Use git tags (`v1.0`, `v1.1`) to mark stable releases, and mention in your
+README which tag is stable.
+
+**Test before you push.** Run `nova test` in your library repo to make sure
+everything works. Your users will thank you.
+
+### The Standard Library as a Reference
+
+Nova's own standard library (`std/`) is a good model for how to structure a
+library. Look at the source files for patterns:
+
+| File | What it demonstrates |
+|---|---|
+| `std/core.nv` | Barrel import, re-exports from other std modules |
+| `std/list.nv` | `extends` for adding methods to built-in types |
+| `std/math.nv` | Pure function library with `fn mod()` |
+| `std/vec2.nv` | Struct + constructor + extends (OOP-style API) |
+| `std/grid.nv` | Generic struct `Grid(T)` with full API |
+| `std/hashmap.nv` | Data structure with constructor, methods, and operators |
+| `std/option.nv` | Extensions for the built-in `Option` type |
+
+Browse them at `https://github.com/pyrotek45/nova-lang/tree/main/std`.
+
+---
+
+## 34. Novel Feature Combinations
 
 Nova's features are designed to compose. This section shows creative ways to combine
 them into powerful, concise idioms.
@@ -2299,7 +2752,7 @@ fn isEven(n: Int) -> Bool {         // definition
 
 ---
 
-## 33. Quick Start — Your First Window
+## 35. Quick Start — Your First Window
 
 ```nova
 raylib::init("My Game", 800, 600, 60)
@@ -2340,7 +2793,7 @@ my_game/
 
 ---
 
-## 34. Critical Rules for Game Dev
+## 36. Critical Rules for Game Dev
 
 ### 31.1 Box-Wrap Mutable Scalars in Closures
 
@@ -2390,7 +2843,7 @@ Nova uses `elif` for chained conditionals. In expression context, only `if/else`
 
 ---
 
-## 35. Scene Management
+## 37. Scene Management
 
 Scenes decouple game states (title, gameplay, pause, game-over):
 
@@ -2424,7 +2877,7 @@ while raylib::rendering() {
 
 ---
 
-## 36. Entity System
+## 38. Entity System
 
 ```nova
 import super.std.entity
@@ -2475,7 +2928,7 @@ e.entityDrawCircle((255, 230, 0))     // circle
 
 ---
 
-## 37. Input Handling
+## 39. Input Handling
 
 ### Raw Raylib Input
 
@@ -2503,7 +2956,7 @@ if keys.isPressed("jump") { /* jump */ }
 
 ---
 
-## 38. Physics and Collision
+## 40. Physics and Collision
 
 ```nova
 import super.std.physics
@@ -2531,7 +2984,7 @@ if hit.hit { /* hit.point, hit.normal, hit.t */ }
 
 ---
 
-## 39. Camera
+## 41. Camera
 
 ```nova
 import super.std.camera
@@ -2558,7 +3011,7 @@ let screenPos = cam.worldToScreen(entity.pos)
 
 ---
 
-## 40. Timers and Tweens
+## 42. Timers and Tweens
 
 ### Timers
 
@@ -2585,7 +3038,7 @@ if fadeIn.isDone() { fadeIn.ping() }   // ping-pong
 
 ---
 
-## 41. Vec2 Math
+## 43. Vec2 Math
 
 ```nova
 import super.std.vec2
@@ -2602,7 +3055,7 @@ e.vel.x = dir.x * SPEED
 
 ---
 
-## 42. Tilemaps and Noise
+## 44. Tilemaps and Noise
 
 ### Grid
 
@@ -2626,7 +3079,7 @@ map.set(col, row, if h > 0.6 { 1 } else { 0 })
 
 ---
 
-## 43. Sprites and Audio
+## 45. Sprites and Audio
 
 ### Sprites
 
@@ -2663,7 +3116,7 @@ raylib::closeAudio()
 
 ---
 
-## 44. HUD and UI
+## 46. HUD and UI
 
 ### Health Bar
 
@@ -2694,7 +3147,7 @@ fn drawButton(x: Int, y: Int, w: Int, h: Int, text: String, hover: Bool) {
 
 ---
 
-## 45. Advanced Game Patterns
+## 47. Advanced Game Patterns
 
 ### Enum-Based Entity Kinds
 
@@ -2761,7 +3214,7 @@ fn popScreen() { if stack.len() > 0 { stack.pop() } }
 
 ---
 
-## 46. Game Dev Tips and Tricks
+## 48. Game Dev Tips and Tricks
 
 ### Frame Animation
 
@@ -2823,7 +3276,7 @@ if debugOn.value {
 
 ---
 
-## 47. Performance Tips
+## 49. Performance Tips
 
 | Problem | Solution |
 |---|---|
@@ -2836,7 +3289,7 @@ if debugOn.value {
 
 ---
 
-## 48. Complete Example — Breakout
+## 50. Complete Example — Breakout
 
 ```nova
 module breakout
@@ -3068,7 +3521,7 @@ while raylib::rendering() {
 
 ---
 
-## 49. Complete Example — Top-Down Shooter
+## 51. Complete Example — Top-Down Shooter
 
 ```nova
 module shooter
@@ -3306,7 +3759,7 @@ while raylib::rendering() {
 
 ---
 
-## 50. Terminal Quick Start
+## 52. Terminal Quick Start
 
 ```nova
 terminal::clearScreen()
@@ -3322,7 +3775,7 @@ Key built-in functions: `terminal::clearScreen()`, `terminal::moveTo(col, row)`,
 
 ---
 
-## 51. Raw Mode and Key Input
+## 53. Raw Mode and Key Input
 
 Raw mode disables line buffering — each keypress is available immediately:
 
@@ -3369,7 +3822,7 @@ if c == '\x1b' {
 
 ---
 
-## 52. Colours and Cursor
+## 54. Colours and Cursor
 
 ```nova
 terminal::setForeground(255, 100, 50)    // orange text
@@ -3390,7 +3843,7 @@ println(Ansi::rgb(255, 128, 0, "orange"))
 
 ---
 
-## 53. Terminal Menu System
+## 55. Terminal Menu System
 
 Use `std/tui` with `SceneManager` for multi-screen terminal apps:
 
@@ -3429,7 +3882,7 @@ fn makeMenuScene(mgr: SceneManager) -> Scene {
 
 ---
 
-## 54. Terminal Game Loop
+## 56. Terminal Game Loop
 
 A terminal game loop with frame timing:
 
@@ -3474,7 +3927,7 @@ terminal::clearScreen()
 
 ---
 
-## 55. Terminal Patterns
+## 57. Terminal Patterns
 
 ### Always Clean Up
 
@@ -3520,7 +3973,7 @@ struct AppState { x: Int, y: Int, score: Int, running: Bool }
 
 ---
 
-## 56. Nova for Python Developers
+## 58. Nova for Python Developers
 
 ### Quick Comparison
 
@@ -3587,7 +4040,11 @@ for word in words { counts.increment(word) }
 
 ---
 
-## 57. Charts and Plotting
+# Part V — Charts and Plotting
+
+---
+
+## 59. Charts and Plotting
 
 Nova ships with `std/plot` — a charting library built on raylib.
 
