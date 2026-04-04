@@ -11,6 +11,8 @@ and raylib bindings.
 2. [Built-in Functions](#2-built-in-functions)
 3. [Standard Library](#3-standard-library)
 4. [Raylib API](#4-raylib-api)
+5. [Import System](#5-import-system)
+6. [CLI Reference](#6-cli-reference)
 
 ---
 
@@ -23,7 +25,7 @@ and raylib bindings.
 | `Int` | 64-bit signed integer. |
 | `Float` | 64-bit IEEE 754 floating-point number. |
 | `Bool` | Boolean value: `true` or `false`. |
-| `String` | UTF-8 encoded text. |
+| `String` | UTF-8 encoded text. Indexable: `"hello"[0]` → `'h'`. Supports negative indexing. |
 | `Char` | Single Unicode character. |
 | `Void` | Absence of a return value. |
 
@@ -236,13 +238,43 @@ These functions are available without any imports.
 | Signature | Description |
 |---|---|
 | `exit() -> Void` | Terminate the program. |
-| `terminal::args() -> Option([String])` | Command-line arguments after the script name. |
+| `error() -> Void` | Trigger a runtime error and halt. |
+| `todo() -> T` | Placeholder for unimplemented code. Compiles as any return type. |
+| `unreachable() -> T` | Marks unreachable code. Compiles as any return type. |
+| `terminal::args() -> Option([String])` | Command-line arguments after the script name. Returns `None` if no extra arguments. |
+
+`terminal::args()` returns everything passed after `nova run file.nv`:
+
+```bash
+nova run myapp.nv hello world 42
+```
+
+```nova
+let args = terminal::args()         // Some(["hello", "world", "42"])
+if args.isSome() {
+    let list = args.unwrap()
+    println(list[0])                // "hello"
+}
+```
+
+### Generic Annotation
+
+When calling `todo()`, `unreachable()`, or other generic functions where the return
+type cannot be inferred, use `@[T: Type]`:
+
+```nova
+return todo() @[T: String]
+return unreachable() @[T: Int]
+let map = HashMap::default() @[K: String, V: Int]
+```
 
 ---
 
 ## 3. Standard Library
 
-All modules live in `nova-lang/std/`. Import with `import super.std.<name>`.
+All modules live in `nova-lang/std/`. Import with `import super.std.<name>`
+(dot-path relative to your file). See [Import System](#5-import-system) for
+full syntax details including GitHub imports.
 
 ---
 
@@ -627,10 +659,16 @@ import super.std.ansi
 import super.std.color
 ```
 
-Provides `(Int,Int,Int)` RGB tuples: `red`, `green`, `blue`, `white`, `black`, `yellow`,
-`cyan`, `magenta`, and many more.
-
-Helpers: `rgb(r,g,b)`, `lerpColor(a,b,t)`, `invert(c)`, `darken(c,f)`, `lighten(c,f)`.
+| Function / Constant | Description |
+|---|---|
+| `red`, `green`, `blue`, `white`, `black` | Primary colour tuples `(Int,Int,Int)` |
+| `yellow`, `cyan`, `magenta` | Secondary colour tuples |
+| `orange`, `purple`, `pink`, `brown`, `gray` | Extended palette |
+| `rgb(r, g, b)` | Construct an RGB tuple |
+| `lerpColor(a, b, t)` | Interpolate between two colours (t = 0.0–1.0) |
+| `invert(c)` | Invert an RGB colour |
+| `darken(c, f)` | Darken by factor f (0.0–1.0) |
+| `lighten(c, f)` | Lighten by factor f (0.0–1.0) |
 
 ---
 
@@ -640,8 +678,19 @@ Helpers: `rgb(r,g,b)`, `lerpColor(a,b,t)`, `invert(c)`, `darken(c,f)`, `lighten(
 import super.std.tui
 ```
 
-Raw-mode terminal rendering: `run(fn)`, `printAt(x,y,s)`, `clear()`, `flush()`, `size()`,
-`fg(r,g,b)`, `bg(r,g,b)`, `resetColor()`, `drawBox(x,y,w,h)`, `getch()`, `poll()`.
+| Function | Description |
+|---|---|
+| `run(fn)` | Start a TUI app with a main function |
+| `printAt(x, y, s)` | Print string at position (col, row) |
+| `clear()` | Clear the terminal |
+| `flush()` | Flush output buffer |
+| `size()` | Get terminal size `(Int, Int)` |
+| `fg(r, g, b)` | Set foreground colour (RGB) |
+| `bg(r, g, b)` | Set background colour (RGB) |
+| `resetColor()` | Reset terminal colours to default |
+| `drawBox(x, y, w, h)` | Draw a box outline with Unicode characters |
+| `getch()` | Read a single character (blocking) |
+| `poll()` | Non-blocking character read |
 
 ---
 
@@ -651,18 +700,99 @@ Raw-mode terminal rendering: `run(fn)`, `printAt(x,y,s)`, `clear()`, `flush()`, 
 import super.std.widget
 ```
 
-Composable TUI widgets: `Button`, `Label`, `Panel`, `ProgressBar`, `Toggle`.
-Each has `.draw()`, and interactive widgets have `.isClicked()` / `.isHovered()`.
+| Type | Description |
+|---|---|
+| `Button` | Clickable button with label and position |
+| `Label` | Static text display at a position |
+| `Panel` | Rectangular container with border |
+| `ProgressBar` | Horizontal progress indicator |
+| `Toggle` | On/off toggle switch |
+
+| Method | Description |
+|---|---|
+| `.draw()` | Render the widget to the terminal |
+| `.isClicked()` | True if widget was clicked (interactive widgets) |
+| `.isHovered()` | True if cursor is over widget (interactive widgets) |
 
 ---
 
-### `std/plot` — Charts (Raylib)
+### `std/plot` — Charts & Graphs (Raylib)
 
 ```nova
 import super.std.plot
 ```
 
-Chart and plot drawing using raylib for rendering.
+> Requires an active raylib window (`raylib::init(...)` + `while raylib::rendering() { ... }`).
+
+#### PlotArea Struct
+
+A `PlotArea` maps data coordinates to screen pixels.
+
+| Constructor | Description |
+|---|---|
+| `PlotArea::new(x, y, w, h, xMin, xMax, yMin, yMax)` | Manual bounds |
+| `PlotArea::auto(x, y, w, h, data: [Float])` | Auto-range from data |
+| `PlotArea::square(x, y, size, data: [Float])` | Square auto-range |
+
+#### Coordinate Conversion
+
+| Method | Signature | Description |
+|---|---|---|
+| `toScreen` | `(Float, Float) -> (Int, Int)` | Data → pixel |
+| `toData` | `(Int, Int) -> (Float, Float)` | Pixel → data |
+
+#### Chart Drawing (extends PlotArea)
+
+| Method | Signature | Description |
+|---|---|---|
+| `lineChart` | `([Float], (Int,Int,Int))` | Connected line from sequential data |
+| `lineChartThick` | `([Float], Float, (Int,Int,Int))` | Thick line chart |
+| `barChart` | `([Float], (Int,Int,Int))` | Vertical bars |
+| `barChartLabeled` | `([Float], [String], color, labelColor)` | Bars + x-axis labels |
+| `scatter` | `([(Float,Float)], Int, (Int,Int,Int))` | Scatter points |
+| `scatterSized` | `([(Float,Float)], [Int], (Int,Int,Int))` | Variable-size scatter |
+| `fillArea` | `([Float], (Int,Int,Int))` | Filled area chart |
+| `hLine` | `(Float, (Int,Int,Int))` | Horizontal reference line |
+| `vLine` | `(Float, (Int,Int,Int))` | Vertical reference line |
+
+#### Decorations (extends PlotArea)
+
+| Method | Description |
+|---|---|
+| `drawAxes(color)` | X/Y axes at data origin |
+| `drawGrid(cols, rows, color)` | Background grid |
+| `drawBorder(color)` | Outline rectangle |
+| `drawXLabels(labels, fontSize, color)` | X-axis labels |
+| `drawYLabels(steps, fontSize, color)` | Y-axis tick labels |
+| `drawTitle(title, fontSize, color)` | Centered title above chart |
+
+#### Standalone Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `drawPieChart` | `(cx, cy, radius, [Float], [(Int,Int,Int)])` | Filled pie chart |
+| `drawPieChartLabeled` | `(cx, cy, radius, [Float], [String], colors, labelColor, fontSize)` | Pie chart with text labels |
+
+#### Example
+
+```nova
+import super.std.plot
+
+raylib::init("Chart", 800, 600, 30)
+let data = [3.0, 7.0, 2.0, 9.0, 5.0]
+let area = PlotArea::auto(50, 50, 700, 400, data)
+
+while raylib::rendering() {
+    raylib::clear((25, 25, 30))
+    area.drawGrid(5, 4, (50, 50, 55))
+    area.drawAxes((150, 150, 150))
+    area.barChart(data, (60, 120, 220))
+    area.lineChart(data, (220, 60, 60))
+    area.drawTitle("My Chart", 20, (230, 230, 230))
+}
+```
+
+See `demo/plotdemo.nv` for a comprehensive 7-chart demo.
 
 ---
 
@@ -830,14 +960,31 @@ import super.std.scene
 import super.std.grid
 ```
 
+`Grid(T)` is a **generic** fixed-size 2D grid. Specify the element type
+with `@[T: Type]` at construction.
+
+```nova
+let intGrid  = Grid::new(10, 10, 0)     @[T: Int]
+let boolGrid = Grid::new(5, 5, false)   @[T: Bool]
+let strGrid  = Grid::new(3, 3, ".")     @[T: String]
+```
+
 | Method | Description |
 |---|---|
-| `Grid::new(w, h, default)` | Create grid with default value |
-| `grid.get(x, y)` / `grid.set(x, y, v)` | Access cells |
-| `grid.fillRect(x, y, w, h, v)` | Fill rectangular region |
-| `grid.bfs(sx, sy, gx, gy, walkable)` | BFS pathfinding |
-| `grid.draw(ox, oy, tileSize, colorFn)` | Draw with colour function |
+| `Grid::new(cols, rows, default) @[T: Type]` | Create `Grid(T)` filled with `default` |
+| `grid.get(col, row) -> T` | Read cell value |
+| `grid.set(col, row, value: T)` | Write cell value |
+| `grid.fill(value: T)` | Set all cells to `value` |
+| `grid.fillRect(x, y, w, h, value: T)` | Fill rectangular region |
+| `grid.inBounds(col, row) -> Bool` | Check if coordinates are valid |
+| `grid.cols() -> Int` / `grid.rows() -> Int` | Grid dimensions |
+| `grid.neighbors4(col, row) -> [(Int, Int)]` | 4 cardinal neighbours |
+| `grid.neighbors8(col, row) -> [(Int, Int)]` | 8 surrounding neighbours |
+| `grid.forEach(fn(Int, Int, T))` | Iterate all cells with col, row, value |
+| `grid.bfs(sx, sy, gx, gy, fn(T)->Bool) -> [(Int,Int)]` | BFS pathfinding |
+| `grid.draw(ox, oy, tileSize, fn(T)->(Int,Int,Int))` | Draw with colour function |
 | `grid.drawLines(ox, oy, tileSize, color)` | Draw grid lines |
+| `grid.drawLabels(ox, oy, tileSize, fn(T)->String, fontSize, color)` | Draw text labels |
 
 ---
 
@@ -976,3 +1123,98 @@ before exit.
 | `raylib::getMusicTimePlayed(Int) -> Float` | Elapsed play time (seconds). |
 | `raylib::seekMusic(Int, Float) -> Void` | Seek to position (seconds). |
 | `raylib::setMusicLooping(Int, Bool) -> Void` | Enable/disable looping. |
+
+---
+
+## 5. Import System
+
+Every Nova file begins with `module <name>`. The module name is used for
+deduplication — if a module has already been imported, subsequent imports
+of the same module are silently skipped.
+
+### Local Imports
+
+| Syntax | Resolves to | Notes |
+|---|---|---|
+| `import helper` | `./helper.nv` | Same directory |
+| `import libs.math` | `./libs/math.nv` | Subfolder |
+| `import super.std.core` | `../std/core.nv` | `super` = go up one directory |
+| `import super.super.std.grid` | `../../std/grid.nv` | Chain `super` to go up multiple |
+| `import "libs/helper.nv"` | `./libs/helper.nv` | String literal — path used as-is |
+| `import "../std/core.nv"` | `../std/core.nv` | String literal with parent traversal |
+
+**Rules:**
+- Dot-separated names: each `.` becomes `/`, `.nv` is appended automatically.
+- `super` translates to `..` (parent directory).
+- All paths are relative to the file containing the `import`.
+- All imported symbols flatten into the caller's scope (no prefix needed).
+
+### GitHub Imports
+
+Fetch a file from a public GitHub repository:
+
+```nova
+import @ "owner/repo/path/to/file.nv"
+```
+
+Lock to a specific commit hash:
+
+```nova
+import @ "owner/repo/path/to/file.nv" ! "a1b2c3d"
+```
+
+| Part | Meaning |
+|---|---|
+| `@` | Signals a GitHub import |
+| `"owner/repo/path"` | GitHub path: `owner/repo/filepath` |
+| `! "hash"` | Optional: fetch from this exact commit instead of `main` |
+
+The `module` declaration inside the fetched file determines the module name.
+Duplicate detection works the same as local imports.
+
+---
+
+## 6. CLI Reference
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `nova run file.nv` | Compile and run a file |
+| `nova run` | Run `main.nv` in the current directory (project mode) |
+| `nova run --git owner/repo/path.nv [commit]` | Fetch and run from GitHub |
+| `nova check [file.nv]` | Typecheck only (no execution) |
+| `nova check --git owner/repo/path.nv [commit]` | Typecheck a file from GitHub |
+| `nova time [file.nv]` | Run and print execution time |
+| `nova time --git owner/repo/path.nv [commit]` | Time a file from GitHub |
+| `nova dbg [file.nv]` | Run in debug mode |
+| `nova dbg --git owner/repo/path.nv [commit]` | Debug a file from GitHub |
+| `nova dis [file.nv]` | Disassemble compiled bytecode |
+| `nova dis --git owner/repo/path.nv [commit]` | Disassemble a file from GitHub |
+| `nova init name [--with owner/repo/folder]` | Create a new project |
+| `nova test [dir]` | Run all `test_*.nv` files in `tests/` (or given dir) |
+| `nova repl` | Start interactive REPL |
+| `nova help` | Show help |
+
+All commands that accept `[file.nv]` also accept `--git` to fetch the file
+from GitHub. They will auto-detect `main.nv` in the current directory if
+the file argument is omitted.
+
+### Project Structure
+
+A Nova project is any folder with a `main.nv` file. No config file is needed.
+
+```
+myproject/
+    main.nv          ← entry point (module main)
+    libs/            ← shared modules
+        math.nv
+        helper.nv
+    tests/           ← test files (run with: nova test)
+        test_math.nv
+```
+
+- `nova init myproject` creates this structure with a hello-world template and starter test.
+- `nova init myproject --with owner/repo/folder` also fetches all `.nv` files from a GitHub folder into `libs/`.
+- `cd myproject && nova run` runs the project.
+- `cd myproject && nova test` runs all tests.

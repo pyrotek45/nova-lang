@@ -1,0 +1,23 @@
+module test_cli_args
+
+// ── terminal::args() ──
+// Returns Option([String]): the command-line arguments after the script name.
+// When run through the test runner, no extra args are passed, so the result is None.
+
+let args = terminal::args()
+
+// The test runner invokes: nova run tests/test_cli_args.nv
+// with no additional arguments, so args should be None.
+assert(args.isSome() == false, "no extra args when run by test runner")
+
+// Verify the type is correct by building an Option([String]) manually
+let manual_none = None([String])
+assert(manual_none.isSome() == false, "None([String]).isSome() is false")
+
+let manual_some = Some(["hello", "world"])
+assert(manual_some.isSome() == true, "Some([String]).isSome() is true")
+assert(manual_some.unwrap().len() == 2, "Some list has 2 elements")
+assert(manual_some.unwrap()[0] == "hello", "first element is hello")
+assert(manual_some.unwrap()[1] == "world", "second element is world")
+
+println("PASS: test_cli_args")

@@ -103,21 +103,21 @@ fn extends center(self: Entity) -> Vec2 {
 // ── EntityWorld ───────────────────────────────────────────────────────────────
 
 struct EntityWorld {
-    _entities: [Entity],
-    _nextId:   Int,
+    entities: [Entity],
+    nextId:   Int,
 }
 
 fn extends(EntityWorld) new() -> EntityWorld {
     return EntityWorld {
-        _entities: []: Entity,
-        _nextId:   0,
+        entities: []: Entity,
+        nextId:   0,
     }
 }
 
 // Create a new entity with default vel/size and add it to the world
 fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
-    let id = self._nextId
-    self._nextId = self._nextId + 1
+    let id = self.nextId
+    self.nextId = self.nextId + 1
     let e = Entity {
         id:    id,
         pos:   Vec2::new(x, y),
@@ -127,7 +127,7 @@ fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
         alive: true,
         data:  0.0,
     }
-    self._entities.push(e)
+    self.entities.push(e)
     return e
 }
 
@@ -137,8 +137,8 @@ fn extends spawnFull(self: EntityWorld,
                      vx: Float, vy: Float,
                      w: Float, h: Float,
                      tag: String, data: Float) -> Entity {
-    let id = self._nextId
-    self._nextId = self._nextId + 1
+    let id = self.nextId
+    self.nextId = self.nextId + 1
     let e = Entity {
         id:    id,
         pos:   Vec2::new(x, y),
@@ -148,20 +148,20 @@ fn extends spawnFull(self: EntityWorld,
         alive: true,
         data:  data,
     }
-    self._entities.push(e)
+    self.entities.push(e)
     return e
 }
 
 // Mark entity with given id as dead
 fn extends kill(self: EntityWorld, id: Int) {
-    for e in self._entities {
+    for e in self.entities {
         if e.id == id { e.alive = false }
     }
 }
 
 // Kill all entities with a given tag
 fn extends killAll(self: EntityWorld, tag: String) {
-    for e in self._entities {
+    for e in self.entities {
         if e.tag == tag { e.alive = false }
     }
 }
@@ -169,25 +169,25 @@ fn extends killAll(self: EntityWorld, tag: String) {
 // Integrate velocities and remove dead entities
 fn extends update(self: EntityWorld, dt: Float) {
     let alive = []: Entity
-    for e in self._entities {
+    for e in self.entities {
         if e.alive {
             e.pos.x = e.pos.x + e.vel.x * dt
             e.pos.y = e.pos.y + e.vel.y * dt
             alive.push(e)
         }
     }
-    self._entities = alive
+    self.entities = alive
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 fn extends count(self: EntityWorld) -> Int {
-    return self._entities.len()
+    return self.entities.len()
 }
 
 fn extends countAlive(self: EntityWorld, tag: String) -> Int {
     let n = 0
-    for e in self._entities {
+    for e in self.entities {
         if e.alive && e.tag == tag { n += 1 }
     }
     return n
@@ -195,7 +195,7 @@ fn extends countAlive(self: EntityWorld, tag: String) -> Int {
 
 fn extends query(self: EntityWorld, tag: String) -> [Entity] {
     let out = []: Entity
-    for e in self._entities {
+    for e in self.entities {
         if e.alive && e.tag == tag { out.push(e) }
     }
     return out
@@ -203,31 +203,31 @@ fn extends query(self: EntityWorld, tag: String) -> [Entity] {
 
 fn extends all(self: EntityWorld) -> [Entity] {
     let out = []: Entity
-    for e in self._entities {
+    for e in self.entities {
         if e.alive { out.push(e) }
     }
     return out
 }
 
 fn extends getById(self: EntityWorld, id: Int) -> Option(Entity) {
-    for e in self._entities {
+    for e in self.entities {
         if e.id == id { return Some(e) }
     }
     return None(Entity)
 }
 
 fn extends forEach(self: EntityWorld, f: fn(Entity)) {
-    for e in self._entities {
+    for e in self.entities {
         if e.alive { f(e) }
     }
 }
 
 fn extends forEachTagged(self: EntityWorld, tag: String, f: fn(Entity)) {
-    for e in self._entities {
+    for e in self.entities {
         if e.alive && e.tag == tag { f(e) }
     }
 }
 
 fn extends clear(self: EntityWorld) {
-    self._entities = []: Entity
+    self.entities = []: Entity
 }

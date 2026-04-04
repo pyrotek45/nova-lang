@@ -37,39 +37,42 @@ A comprehensive guide to writing Nova — from first program to full games.
 27. [Syntax Sugar Reference](#27-syntax-sugar-reference)
 28. [Tips and Tricks](#28-tips-and-tricks)
 29. [Common Mistakes](#29-common-mistakes)
+30. [Built-in Functions](#30-built-in-functions)
+31. [CLI and REPL](#31-cli-and-repl)
+32. [Novel Feature Combinations](#32-novel-feature-combinations)
 
 ### Part II — Game Development
 
-30. [Quick Start — Your First Window](#30-quick-start--your-first-window)
-31. [Critical Rules for Game Dev](#31-critical-rules-for-game-dev)
-32. [Scene Management](#32-scene-management)
-33. [Entity System](#33-entity-system)
-34. [Input Handling](#34-input-handling)
-35. [Physics and Collision](#35-physics-and-collision)
-36. [Camera](#36-camera)
-37. [Timers and Tweens](#37-timers-and-tweens)
-38. [Vec2 Math](#38-vec2-math)
-39. [Tilemaps and Noise](#39-tilemaps-and-noise)
-40. [Sprites and Audio](#40-sprites-and-audio)
-41. [HUD and UI](#41-hud-and-ui)
-42. [Advanced Game Patterns](#42-advanced-game-patterns)
-43. [Game Dev Tips and Tricks](#43-game-dev-tips-and-tricks)
-44. [Performance Tips](#44-performance-tips)
-45. [Complete Example — Breakout](#45-complete-example--breakout)
-46. [Complete Example — Top-Down Shooter](#46-complete-example--top-down-shooter)
+33. [Quick Start — Your First Window](#33-quick-start--your-first-window)
+34. [Critical Rules for Game Dev](#34-critical-rules-for-game-dev)
+35. [Scene Management](#35-scene-management)
+36. [Entity System](#36-entity-system)
+37. [Input Handling](#37-input-handling)
+38. [Physics and Collision](#38-physics-and-collision)
+39. [Camera](#39-camera)
+40. [Timers and Tweens](#40-timers-and-tweens)
+41. [Vec2 Math](#41-vec2-math)
+42. [Tilemaps and Noise](#42-tilemaps-and-noise)
+43. [Sprites and Audio](#43-sprites-and-audio)
+44. [HUD and UI](#44-hud-and-ui)
+45. [Advanced Game Patterns](#45-advanced-game-patterns)
+46. [Game Dev Tips and Tricks](#46-game-dev-tips-and-tricks)
+47. [Performance Tips](#47-performance-tips)
+48. [Complete Example — Breakout](#48-complete-example--breakout)
+49. [Complete Example — Top-Down Shooter](#49-complete-example--top-down-shooter)
 
 ### Part III — Terminal Applications
 
-47. [Terminal Quick Start](#47-terminal-quick-start)
-48. [Raw Mode and Key Input](#48-raw-mode-and-key-input)
-49. [Colours and Cursor](#49-colours-and-cursor)
-50. [Terminal Menu System](#50-terminal-menu-system)
-51. [Terminal Game Loop](#51-terminal-game-loop)
-52. [Terminal Patterns](#52-terminal-patterns)
+50. [Terminal Quick Start](#50-terminal-quick-start)
+51. [Raw Mode and Key Input](#51-raw-mode-and-key-input)
+52. [Colours and Cursor](#52-colours-and-cursor)
+53. [Terminal Menu System](#53-terminal-menu-system)
+54. [Terminal Game Loop](#54-terminal-game-loop)
+55. [Terminal Patterns](#55-terminal-patterns)
 
 ### Part IV — For Python Developers
 
-53. [Nova for Python Developers](#53-nova-for-python-developers)
+56. [Nova for Python Developers](#56-nova-for-python-developers)
 
 ---
 
@@ -79,11 +82,15 @@ A comprehensive guide to writing Nova — from first program to full games.
 
 ## 1. Hello World
 
+Every Nova file begins with a `module` declaration, then your code:
+
 ```nova
+module hello
+
 println("Hello, world!")
 ```
 
-Run with `nova run hello.nv`.
+Save as `hello.nv` and run with `nova run hello.nv`. See [§31 CLI and REPL](#31-cli-and-repl) for all commands, or the [Getting Started](getting_started.md) guide for project setup.
 
 ---
 
@@ -96,23 +103,101 @@ module my_program
 ```
 
 The module name registers the file so the parser can deduplicate imports.
-Files can import each other:
+If two files import the same module, it is only parsed once.
+
+### Import Syntax
+
+Nova uses dot-separated names to navigate the folder structure. Each dot
+becomes a `/`, and `.nv` is appended automatically. The keyword `super`
+means "go up one directory" (like `..` on the filesystem).
 
 ```nova
-import super.std.core      // parent-relative import
-import sibling             // same-directory import
+import helper              // → ./helper.nv            (same directory)
+import utils.math          // → ./utils/math.nv        (subfolder)
+import super.std.core      // → ../std/core.nv         (up one, then into std/)
+import super.super.std.io  // → ../../std/io.nv        (up two directories)
 ```
 
-### The `::` Operator — Three Uses
+All paths are relative to the file that contains the `import` statement.
+
+You can also use a **string literal** if you prefer a raw path:
+
+```nova
+import "libs/helper.nv"        // same as: import libs.helper
+import "../std/core.nv"        // same as: import super.std.core
+```
+
+All imports flatten into the caller's scope — you call imported functions
+by name, not with a prefix.
+
+### How `super` Works
+
+`super` translates to `..` (parent directory). You can chain it:
+
+| Import statement | Filesystem path (relative to current file) |
+|---|---|
+| `import helper` | `./helper.nv` |
+| `import libs.helper` | `./libs/helper.nv` |
+| `import super.std.core` | `../std/core.nv` |
+| `import super.super.std.grid` | `../../std/grid.nv` |
+
+### GitHub Imports (`import @`)
+
+You can import a file directly from a public GitHub repository using the
+`@` symbol. The module name comes from the `module` declaration inside the
+fetched file — you don't need to name it yourself:
+
+```nova
+import @ "pyrotek45/nova-lang/std/core.nv"
+```
+
+The string after `@` has the format `"owner/repo/path/to/file.nv"`.
+Nova fetches the file from GitHub's `main` branch by default.
+
+To lock to a specific commit (so your code doesn't break if the repo changes),
+add `!` followed by a commit hash:
+
+```nova
+import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d"
+```
+
+When a commit hash is given, Nova fetches that exact revision instead of `main`.
+
+**How it works under the hood:**
+
+1. Nova sees `import @` and reads the string literal
+2. It builds a URL: `https://raw.githubusercontent.com/owner/repo/branch/path`
+3. It fetches the file contents over HTTP
+4. The fetched source is parsed as if it were a local file
+5. The `module` declaration inside the file registers the module name
+6. If that module was already imported, it is skipped (no duplicates)
+7. All exported functions, structs, and enums become available in the caller's scope
+
+**Import form summary:**
+
+| Form | Example | Resolves to |
+|---|---|---|
+| Dot-path (local) | `import libs.helper` | `./libs/helper.nv` |
+| Super (local) | `import super.std.core` | `../std/core.nv` |
+| String literal (local) | `import "libs/helper.nv"` | `./libs/helper.nv` |
+| GitHub | `import @ "owner/repo/path.nv"` | fetched from GitHub |
+| GitHub + lock | `import @ "owner/repo/path.nv" ! "hash"` | fetched at commit |
+
+### The `::` Operator — Four Uses
 
 | Context | Meaning | Example |
 |---|---|---|
-| Module function | Call a function defined in a module namespace | `Cast::string(42)` |
+| Module / type namespace | Call a function in a namespace | `Cast::string(42)`, `terminal::args()` |
 | Enum variant | Construct a variant of an enum | `Color::Red()` |
 | Struct function field | Call a function stored as a struct field (no self) | `handler::process("data")` |
+| UFCS method lookup | When you call `value.method()`, Nova looks for `Type::method` where `Type` matches the value's type | `myOption.isSome()` → finds `Option::isSome` |
 
 The `::` operator is Nova's universal namespace separator. It always means "reach into
 this namespace and call/access something."
+
+The UFCS lookup is how built-in methods like `.isSome()` and `.unwrap()` work on
+Option values — they are registered as `Option::isSome` and `Option::unwrap`, and
+Nova's method resolution finds them when you call `.isSome()` on any `Option(T)` value.
 
 ### Design Pattern: Structs as Namespaces
 
@@ -169,7 +254,7 @@ x = "hello" // ERROR — cannot change type
 | `Int` | `42`, `-7`, `0` | 64-bit signed integer |
 | `Float` | `3.14`, `0.0`, `-1.5` | 64-bit floating-point |
 | `Bool` | `true`, `false` | Boolean |
-| `String` | `"hello"` | UTF-8 text |
+| `String` | `"hello"` | UTF-8 text; indexable (`"hi"[0]` → `'h'`) |
 | `Char` | `'A'`, `'\n'` | Single Unicode character |
 | `Void` | — | No return value |
 | `Option(T)` | `Some(5)`, `None(Int)` | Optional value |
@@ -240,6 +325,31 @@ let msg = if x > 0 { "positive" } else { "non-positive" }
 ```
 
 Expression `if` only supports a single `if/else` pair — no `elif` chaining.
+
+### Block Expressions
+
+A `{ }` block used in expression position evaluates to the value of its
+**last expression**:
+
+```nova
+let x = {
+    let a = 10
+    let b = 20
+    a + b          // ← this is the block's value
+}
+// x == 30
+```
+
+Block expressions can be nested, used as function arguments, or combined
+with other expressions:
+
+```nova
+let doubled = double({
+    let n = 7
+    n + 3
+})
+// doubled == 20
+```
 
 ### for Loop
 
@@ -353,6 +463,113 @@ fn isEven(n: Int) -> Bool {
 }
 ```
 
+### The `pass` Statement
+
+Use `pass` as a placeholder function body when you want to define a
+function's signature but leave the implementation empty (like Python's
+`pass`):
+
+```nova
+fn todo(x: Int) {
+    pass
+}
+```
+
+This is useful during iterative development when you want the code to
+compile before the implementation is ready.
+
+### Variadic Arguments (Varargs)
+
+Any function whose **last parameter is a typed list** can be called in
+"varargs" style — pass the trailing elements directly instead of wrapping
+them in a list literal.  The type checker automatically collects
+same-typed trailing arguments into a list when no exact signature match
+exists.
+
+```nova
+fn sum(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+
+sum([1, 2, 3])   // normal call — passes a list
+sum(1, 2, 3)     // varargs call — compiler wraps into [1, 2, 3]
+sum(1)           // single vararg — wraps into [1]
+```
+
+#### Leading parameters + varargs
+
+The list must be the **last** parameter, but you can have as many
+leading parameters of any type as you like:
+
+```nova
+fn tag_sum(label: String, xs: [Int]) -> String {
+    let total = 0
+    for x in xs { total = total + x }
+    return label + Cast::string(total)
+}
+
+tag_sum("sum=", 1, 2, 3)   // "sum=6"
+```
+
+This works with any number of leading parameters and any types — closures
+included:
+
+```nova
+fn apply_all(f: fn(Int) -> Int, xs: [Int]) -> [Int] {
+    let result = []: Int
+    for x in xs { result.push(f(x)) }
+    return result
+}
+
+apply_all(|x: Int| x * 2, 10, 20, 30)   // [20, 40, 60]
+```
+
+#### Varargs and the type system
+
+- **All** trailing arguments collected into the list must have the
+  **same type**, which must match the list's element type.
+- If an **exact** signature already matches the call, it takes priority.
+  Varargs resolution only kicks in when there is no direct match.
+
+```nova
+fn describe(x: Int) -> String    { return "single" }
+fn describe(xs: [Int]) -> String { return "list" }
+
+describe(42)        // "single" — exact Int overload wins
+describe(1, 2, 3)   // "list"   — no fn(Int,Int,Int) → varargs
+```
+
+- Works with **every type**: `Int`, `Float`, `String`, `Bool`, `Char`,
+  structs, and even nested lists (`[[Int]]`).
+
+#### Varargs with `fn extends` (UFCS)
+
+Extends methods follow the same rule — the last parameter can be a list:
+
+```nova
+fn extends sum_with(self: Int, xs: [Int]) -> Int {
+    let total = self
+    for x in xs { total = total + x }
+    return total
+}
+
+10.sum_with(1, 2, 3)   // 16
+10.sum_with([1, 2, 3]) // 16 — explicit list still works
+```
+
+#### Quick rules
+
+| Call style | What happens |
+|---|---|
+| `f([1,2,3])` | Normal list argument — no magic |
+| `f(1, 2, 3)` where `f(xs: [Int])` exists | Trailing args wrapped into `[1,2,3]` |
+| `f("hi", 1, 2)` where `f(s: String, xs: [Int])` exists | `"hi"` kept, `1,2` → `[1,2]` |
+| `f(5)` where both `f(Int)` and `f([Int])` exist | Exact `f(Int)` wins |
+
 ---
 
 ## 8. Extends and UFCS
@@ -384,6 +601,30 @@ fn extends area(r: Rect) -> Int {
 }
 
 myRect.area()
+```
+
+### Auto-Infer from First Parameter
+
+You can omit the `(Type)` after `extends` and the compiler will infer
+the target type from the first parameter:
+
+```nova
+// explicit target
+fn extends(Point) translate(p: Point, dx: Int, dy: Int) -> Point {
+    return Point { x: p.x + dx, y: p.y + dy }
+}
+
+// auto-infer — same result
+fn extends translate(p: Point, dx: Int, dy: Int) -> Point {
+    return Point { x: p.x + dx, y: p.y + dy }
+}
+```
+
+Auto-infer also works with built-in types:
+
+```nova
+fn extends isPositive(n: Int) -> Bool { return n > 0 }
+5.isPositive()    // true
 ```
 
 ### The `->` Dispatch Operator
@@ -443,6 +684,40 @@ let b = Button { label: "Go", onClick: fn() { println("clicked!") } }
 b::onClick()    // :: calls without passing self
 b->onClick()    // -> calls with b as first argument
 ```
+
+### `::` — Call without Self
+
+The `::` operator calls a function stored in a struct field **without**
+passing the struct as the first argument. Use it when the closure doesn't
+need to know about its owner:
+
+```nova
+struct Config { transform: fn(Int) -> Int }
+
+let cfg = Config { transform: fn(x: Int) -> Int { return x * 2 } }
+cfg::transform(5)   // 10  —  transform receives only x
+```
+
+### `->` — Call with Self
+
+The `->` operator calls a function stored in a struct field **and
+prepends the struct itself** as the first argument. Use it when the
+closure needs access to the struct's data:
+
+```nova
+struct Entity { name: String, greet: fn(Entity) -> String }
+
+let e = Entity {
+    name: "Nova",
+    greet: fn(self: Entity) -> String {
+        return "Hi, I'm " + self.name
+    }
+}
+
+e->greet()   // "Hi, I'm Nova"  —  greet(e) is called
+```
+
+Both operators also work through `Dyn` types (see section 18).
 
 ### The `type` Field
 
@@ -528,6 +803,27 @@ fn identity(x: $T) -> $T { return x }
 fn extends(Wrapper) unwrap(self: Wrapper($T)) -> $T {
     return self.inner
 }
+```
+
+### Generic Constructors
+
+Use `@[T: ConcreteType]` to specify the type parameter at construction:
+
+```nova
+struct Grid(T) { cells: [$T], cols: Int, rows: Int }
+
+fn extends(Grid) new(cols: Int, rows: Int, default: $T) -> Grid($T) {
+    let cells = []: $T
+    let total = cols * rows
+    for let i = 0; i < total; i += 1 {
+        cells.push(default)
+    }
+    return Grid { cells: cells, cols: cols, rows: rows }
+}
+
+let intGrid  = Grid::new(10, 10, 0)     @[T: Int]     // Grid(Int)
+let boolGrid = Grid::new(5, 5, false)   @[T: Bool]    // Grid(Bool)
+let strGrid  = Grid::new(3, 3, ".")     @[T: String]  // Grid(String)
 ```
 
 ### Constraints
@@ -665,6 +961,19 @@ xs[0]            // index (0-based)
 xs[0] = 99       // assignment
 ```
 
+### Concatenation
+
+Use `+` to concatenate two lists of the same type:
+
+```nova
+let a = [1, 2, 3]
+let b = [4, 5, 6]
+let c = a + b      // [1, 2, 3, 4, 5, 6]
+```
+
+Both lists must have the same element type. The originals are not modified.
+Works reliably with value types (`Int`, `Float`, `Bool`, `Char`).
+
 ### Slicing
 
 ```nova
@@ -679,8 +988,27 @@ xs[:-1]      // [10, 20, 30, 40]
 xs[0:8$2]    // every 2nd element (step with $)
 ```
 
-> **Note:** `xs[-1]` (negative regular index) is a runtime error. Use slicing or
-> `xs[xs.len() - 1]`.
+### Negative Indexing
+
+Negative indices count from the end — just like Python:
+
+```nova
+let xs = [10, 20, 30, 40, 50]
+xs[-1]     // 50  — last element
+xs[-2]     // 40  — second-to-last
+xs[-5]     // 10  — first element
+
+xs[-1] = 99   // write to last element (xs is now [10, 20, 30, 40, 99])
+```
+
+This works for lists, strings, and tuples. Negative indices also work
+in assignment position (lists only).
+
+```nova
+let s = "hello"
+s[-1]     // 'o'
+s[-5]     // 'h'
+```
 
 ### List Comprehensions
 
@@ -755,7 +1083,40 @@ match color {
 }
 ```
 
-With data extraction:
+### Trailing Commas
+
+You can separate match arms with commas. Trailing commas after the last
+arm are also allowed:
+
+```nova
+match color {
+    Red()   => { return "red" },
+    Green() => { return "green" },
+    Blue()  => { return "blue" },
+}
+```
+
+### Expression Arms (No Braces)
+
+For short arms you can write a single expression instead of a block:
+
+```nova
+match direction {
+    Up()   => println("up")
+    Down() => println("down")
+}
+```
+
+Both styles can be mixed:
+
+```nova
+match shape {
+    Circle(r)  => println(Cast::string(r)),
+    Point()    => { println("point") },
+}
+```
+
+### With Data Extraction
 
 ```nova
 enum Tree(T) { Leaf: $T, Node: (Tree($T), Tree($T)) }
@@ -868,9 +1229,66 @@ import super.std.widget     // raylib GUI widgets
 import super.std.option     // Option extensions
 import super.std.maybe      // Maybe(T) enum
 import super.std.result     // Result(A,B) enum
+import super.std.grid       // Grid(T) — generic 2D grid
+import super.std.plot       // PlotArea — charts & graphs (raylib)
 ```
 
 All imports flatten into the caller's scope — call by name, not with a prefix.
+
+### Adding Functions to a Module (`fn mod`)
+
+After importing a module you can inject new functions into its namespace
+with `fn mod(ModuleName)`:
+
+```nova
+import super.std.math
+
+fn mod(math) clamp(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+
+math::clamp(15, 0, 10)   // 10
+```
+
+The module must already exist (imported or declared) before you can add
+functions to it.
+
+### Importing from GitHub
+
+You can pull in any `.nv` file from a public GitHub repository using `import @`:
+
+```nova
+import @ "pyrotek45/nova-lang/std/core.nv"
+```
+
+The string is `"owner/repo/path/to/file.nv"`. Nova fetches from the `main`
+branch by default. To lock to a specific commit, add `! "hash"`:
+
+```nova
+import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d4e5f6"
+```
+
+The fetched file must contain a `module` declaration — that's how Nova knows
+the module name and prevents duplicate imports. Everything the file exports
+(functions, structs, enums) becomes available in the importing file's scope.
+
+> **Note:** GitHub imports require network access. If you're working offline,
+> use `nova init myproject --with owner/repo/folder` to pre-download files
+> into your project's `libs/` folder, then import them locally with
+> `import libs.filename`.
+
+### Import Resolution Rules
+
+1. **Dot-path imports** are relative to the current file's directory.
+   Each dot becomes a `/`, and `.nv` is appended.
+2. **`super`** translates to `..` (parent directory). Chain it for deeper paths.
+3. **String literal imports** use the path as-is (relative to the current file).
+4. **`@` imports** fetch from GitHub. The path before `@` is not needed —
+   the module name comes from the `module` declaration inside the fetched file.
+5. **Duplicate prevention:** if a module with the same name was already imported,
+   the import is silently skipped regardless of import method.
 
 ---
 
@@ -893,6 +1311,53 @@ Nova's type system is strict and static. These are compile-time errors:
 - Missing `return` on any branch
 - Redefining a variable in the same scope
 - Reusing loop variable names in nested loops
+
+### The `Any` Type (Advanced)
+
+Nova has an internal `Any` type that matches any non-`None` type during
+type checking. It is used by a handful of built-in functions:
+
+| Built-in          | Signature uses `Any`                      |
+| ----------------- | ----------------------------------------- |
+| `print`           | `fn print(value: Any)`                    |
+| `println`         | `fn println(value: Any)`                  |
+| `typeof`          | `fn typeof(value: Any) -> String`         |
+| `Option::isSome`  | `fn isSome(self: Option(Any)) -> Bool`    |
+
+> **⚠ Warning:** Do **not** use `Any` in your own structs or functions.
+> It bypasses type safety, loses compile-time type information, and makes
+> code harder to reason about. If you need a container that works with
+> multiple types, **use generics** (`$T`, `struct Grid(T) { ... }`).
+
+**Wrong — using `Any`:**
+
+```nova
+// ❌ Don't do this — loses type info
+struct BadGrid { cells: [Any], cols: Int }
+fn extends set(self: BadGrid, c: Int, r: Int, val: Any) { ... }
+```
+
+**Right — using generics:**
+
+```nova
+// ✅ Correct — fully type-safe
+struct Grid(T) { cells: [$T], cols: Int, rows: Int }
+fn extends(Grid) set(self: Grid($T), col: Int, row: Int, value: $T) { ... }
+
+let g = Grid::new(10, 10, 0) @[T: Int]   // Grid(Int), type-safe
+g.set(0, 0, 42)                           // OK: 42 is Int
+// g.set(0, 0, "hello")                   // ERROR: String ≠ Int
+```
+
+Generics give you:
+
+- **Compile-time type checking** on every operation
+- **No code bloat** — Nova uses *type erasure*, not monomorphisation. The compiler emits the **same opcodes** regardless of the concrete type, so a `Grid(Int)` and a `Grid(String)` share identical bytecode. The type parameter exists only at compile time for safety; at runtime the VM handles all values uniformly.
+- **Better error messages** — the compiler knows the exact types
+- **Full IDE/editor support** — auto-complete, hover info, etc.
+
+Reserve `Any` for truly polymorphic built-in operations (printing,
+debugging) where the concrete type genuinely doesn't matter.
 
 ---
 
@@ -982,6 +1447,30 @@ import super.std.string
 "hello world".split(' ')       // ["hello", "world"]
 ```
 
+### String Indexing
+
+Strings can be indexed just like lists. Indexing returns a `Char`:
+
+```nova
+let msg = "hello"
+let first = msg[0]     // 'h'
+let last  = msg[-1]    // 'o'
+let third = msg[2]     // 'l'
+```
+
+Negative indices count from the end: `-1` is the last character, `-2` is second-to-last, etc.
+
+```nova
+let word = "Nova"
+word[0]   // 'N'
+word[-1]  // 'a'
+word[-2]  // 'v'
+```
+
+> **Note:** Indexing returns a `Char`, not a `String`. Use the `Char` type in annotations.
+
+### String Concatenation
+
 String concatenation uses `+` (String + String only):
 
 ```nova
@@ -1028,6 +1517,7 @@ Dyn types, and extends + UFCS.
 | Inclusive range | `for i in 0..=5` | Loop 0, 1, 2, 3, 4, 5 |
 | Slice | `xs[1:3]` | Elements at indices 1, 2 |
 | Negative slice | `xs[-2:]` | Last 2 elements |
+| Negative index | `xs[-1]` | Last element (read or write) |
 | Step slice | `xs[:$2]` | Every 2nd element |
 | Comprehension | `[x in xs \| x*x]` | Transformed list |
 | Guard | `[x in xs \| x \| x>0]` | Filtered list |
@@ -1039,8 +1529,17 @@ Dyn types, and extends + UFCS.
 | Empty closure | `\|\| expr` | Zero-parameter closure |
 | Function ref | `fn@(Int)` | Select overload by type |
 | Generic annotation | `Variant() @[A: Int]` | No-data variant type hint |
+| Generic construct  | `Grid::new(w,h,0) @[T: Int]` | Type parameter for generic struct |
 | `::` (no self) | `s::fn_field()` | Call stored fn without self |
 | `->` (with self) | `s->fn_field()` | Call stored fn with s as arg |
+| List concat | `[1,2] + [3,4]` | Produces `[1,2,3,4]` |
+| Block expression | `let x = { ...; expr }` | Last expression is the value |
+| `pass` body | `fn f(x: Int) -> Int { pass }` | Placeholder (returns default) |
+| `fn extends` infer | `fn extends m(s: T, ...)` | Infers extends type from first param |
+| `fn mod` | `fn mod(M) f(x: Int) -> Int { }` | Add function to module M |
+| Match commas | `A() => { ... }, B() => ...` | Optional commas between arms |
+| Match expr arm | `A() => expr` | Single-expression arm, no braces |
+| Varargs | `f(1, 2, 3)` where `f(xs: [Int])` | Trailing args auto-wrapped into list |
 | Forward decl | `fn f(x: Int) -> Int` | Signature only, no body |
 | Single-elem tuple | `(42,)` | One-element tuple |
 
@@ -1056,6 +1555,11 @@ Dyn types, and extends + UFCS.
 - No-data enum variants need `()`: `Color::Red()`
 - String concatenation: only `String + String`; use `Cast::string` to convert
 - `format` / `printf` use `{}` placeholders
+- Strings are indexable: `"hello"[0]` returns `'h'` (Char). Negative indices work: `"hello"[-1]` → `'o'`
+- Use `typeof(x)` for runtime type inspection — returns the full type as a string (e.g. `"[Int]"`, `"(Int,String)"`)
+- Use `clone(x)` to break aliasing — especially for lists and structs
+- Use `todo() @[T: ReturnType]` as a placeholder in unfinished code
+- Use `nova check file.nv` to typecheck without executing
 
 ---
 
@@ -1078,6 +1582,670 @@ Dyn types, and extends + UFCS.
 | `\|\| true && false` precedence | `\|\|` binds tighter — use parens |
 | Nested loops reusing `i` | Each loop needs a unique variable |
 | Missing return on else branch | All paths must return |
+| Varargs with mixed types `f(1, "hi")` | All trailing varargs must be the same type |
+| Varargs on non-last param | The list param must be last in the signature |
+
+---
+
+## 30. Built-in Functions
+
+Nova provides several built-in functions available in every program without imports.
+
+### I/O Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `print(x)` | `fn(Any) -> Void` | Print a value without newline |
+| `println(x)` | `fn(Any) -> Void` | Print a value with newline |
+
+`print` and `println` accept **any** type — Int, Float, String, Struct, List, etc.
+
+### Inspection
+
+| Function | Signature | Description |
+|---|---|---|
+| `typeof(x)` | `fn(Any) -> String` | Returns the runtime type name as a string |
+| `clone(x)` | `fn(T) -> T` | Deep-copy a value (breaks aliasing) |
+
+```nova
+typeof(42)          // "Int"
+typeof(3.14)        // "Float"
+typeof("hello")     // "String"
+typeof([1, 2, 3])   // "[Int]"
+typeof((1, "a"))    // "(Int,String)"
+
+struct Point { x: Float, y: Float }
+let p = Point { x: 1.0, y: 2.0 }
+typeof(p)           // "Point"
+```
+
+`clone` creates an independent copy. Without it, lists and structs are shared by reference:
+
+```nova
+let a = [1, 2, 3]
+let b = clone(a)   // independent copy
+b.push(4)           // a is still [1, 2, 3]
+```
+
+### Option Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `Some(x)` | `fn(T) -> Option(T)` | Wrap a value in an Option |
+| `Option::isSome(x)` | `fn(Any) -> Bool` | Check if an Option has a value |
+| `Option::unwrap(x)` | `fn(Option(T)) -> T` | Extract the value (panics if None) |
+
+`Option::isSome` and `Option::unwrap` are looked up via UFCS, so you call them
+as methods: `myOption.isSome()` and `myOption.unwrap()`.
+
+### Command-Line Arguments
+
+| Function | Signature | Description |
+|---|---|---|
+| `terminal::args()` | `fn() -> Option([String])` | Get command-line arguments passed after the script name |
+
+Returns `None` if no arguments were provided, or `Some([String])` with the list of
+arguments. Arguments are everything after `nova run file.nv`:
+
+```nova
+// Run with: nova run myapp.nv hello world 42
+let args = terminal::args()
+
+if let arglist = args {
+    for a in arglist {
+        println("arg: " + a)
+    }
+} else {
+    println("No arguments provided")
+}
+
+// You can also use .isSome() and .unwrap():
+if args.isSome() {
+    let arglist = args.unwrap()
+    println("Got " + Cast::string(arglist.len()) + " args")
+}
+```
+
+### Control Flow Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `exit()` | `fn() -> Void` | Terminate the program immediately |
+| `error()` | `fn() -> Void` | Trigger a runtime error and halt |
+
+### Placeholder Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `todo()` | `fn() -> T` | Marks unimplemented code; compiles as any type |
+| `unreachable()` | `fn() -> T` | Marks code that should never run; compiles as any type |
+
+`todo()` and `unreachable()` are generic — they satisfy **any** return type. This lets
+you stub out functions during development:
+
+```nova
+fn processData(data: [Int]) -> String {
+    return todo() @[T: String]
+}
+```
+
+Use `unreachable()` in match branches or conditionals that logically cannot occur:
+
+```nova
+fn safeDivide(a: Int, b: Int) -> Int {
+    if b == 0 {
+        error()
+    }
+    return a / b
+}
+
+fn getSign(x: Int) -> String {
+    if x > 0  { return "positive" }
+    if x < 0  { return "negative" }
+    return "zero"
+}
+```
+
+### The `@[T: Type]` Annotation
+
+When calling a generic function whose return type can't be inferred, provide an explicit
+type annotation with `@[T: Type]`:
+
+```nova
+return todo() @[T: String]
+return unreachable() @[T: Int]
+```
+
+The syntax is `@[GenericName: ConcreteType]`. Multiple type parameters are comma-separated:
+
+```nova
+let map = HashMap::default() @[K: String, V: Int]
+```
+
+---
+
+## 31. CLI and REPL
+
+### Command-Line Interface
+
+Nova programs are compiled and run through the `nova` CLI tool.
+
+| Command | Usage | Description |
+|---|---|---|
+| `run` | `nova run file.nv` | Compile and execute a Nova source file |
+| `run` | `nova run` | Run `main.nv` in the current directory (project mode) |
+| `run --git` | `nova run --git owner/repo/path.nv` | Fetch and run a file from GitHub |
+| `check` | `nova check file.nv` | Typecheck without executing; reports compile time |
+| `check --git` | `nova check --git owner/repo/path.nv` | Typecheck a file from GitHub |
+| `time` | `nova time file.nv` | Run and print execution time in milliseconds |
+| `time --git` | `nova time --git owner/repo/path.nv` | Time a file from GitHub |
+| `dbg` | `nova dbg file.nv` | Run in debug mode with extra runtime information |
+| `dbg --git` | `nova dbg --git owner/repo/path.nv` | Debug a file from GitHub |
+| `dis` | `nova dis file.nv` | Disassemble: show the compiled bytecode |
+| `dis --git` | `nova dis --git owner/repo/path.nv` | Disassemble a file from GitHub |
+| `init` | `nova init myproject` | Create a new project folder with `main.nv`, `libs/`, and `tests/` |
+| `init --with` | `nova init myproject --with owner/repo/folder` | Create project and fetch an entire folder from GitHub |
+| `test` | `nova test` | Run all `test_*.nv` files in `tests/` and report results |
+| `repl` | `nova repl` | Start the interactive REPL |
+| `help` | `nova help` | Show usage information |
+
+#### `nova run`
+
+The primary command. Compiles the file and all its imports, then runs the resulting bytecode:
+
+```bash
+nova run my_program.nv
+```
+
+If the file has errors, they are printed with line numbers and hints, and the process exits with code 1.
+
+**Project mode:** If you omit the file argument, Nova looks for `main.nv` in the
+current directory. This lets you `cd` into any project folder and just type `nova run`:
+
+```bash
+cd myproject
+nova run
+# (detected Nova project: running main.nv)
+# Hello from myproject!
+```
+
+This project detection also works with `check`, `time`, `dbg`, and `dis`.
+
+#### `nova run --git`
+
+Run a file directly from a public GitHub repository without downloading it first:
+
+```bash
+nova run --git pyrotek45/nova-lang/demo/fib.nv
+```
+
+The path format is `owner/repo/path/to/file.nv`. Nova fetches the file from
+the `main` branch by default. To run from a specific commit:
+
+```bash
+nova run --git pyrotek45/nova-lang/demo/fib.nv a1b2c3d
+```
+
+The `--git` flag works with all file-based commands — `check`, `time`, `dis`,
+and `dbg` — not just `run`:
+
+```bash
+nova check --git pyrotek45/nova-lang/demo/fib.nv   # type-check only
+nova time  --git pyrotek45/nova-lang/demo/fib.nv   # run with timing
+nova dis   --git pyrotek45/nova-lang/demo/fib.nv   # disassemble
+nova dbg   --git pyrotek45/nova-lang/demo/fib.nv   # debug run
+```
+
+#### `nova check`
+
+Parses and typechecks the file without executing it. Useful for catching errors quickly:
+
+```bash
+nova check my_program.nv
+# OK | Compile time: 12ms
+```
+
+#### `nova time`
+
+Runs the program and prints how long execution took:
+
+```bash
+nova time my_program.nv
+# Execution time: 45ms
+```
+
+#### `nova dis`
+
+Shows the disassembled bytecode — useful for understanding what the compiler generates:
+
+```bash
+nova dis my_program.nv
+```
+
+#### `nova dbg`
+
+Runs in debug mode, which shows additional runtime information for diagnosing issues.
+
+#### `nova init`
+
+Creates a new project folder with a ready-to-run structure:
+
+```bash
+nova init myproject
+# Created myproject/main.nv
+# Created myproject/libs/
+# Created myproject/tests/test_example.nv
+#
+# Project 'myproject' is ready!
+#   cd myproject
+#   nova run
+#   nova test
+```
+
+This creates:
+- `myproject/main.nv` — entry point with a hello-world template
+- `myproject/libs/` — directory for shared modules and dependencies
+- `myproject/tests/test_example.nv` — a starter test file
+
+Use `--with` to fetch an **entire folder** from a GitHub repository into `libs/`:
+
+```bash
+nova init mygame --with pyrotek45/nova-lang/std
+```
+
+This uses the GitHub Contents API to list all `.nv` files in the specified
+folder and downloads them into `libs/`. You can use multiple `--with` flags:
+
+```bash
+nova init mygame --with pyrotek45/nova-lang/std --with someuser/utils/helpers
+```
+
+After init, import the fetched files locally:
+
+```nova
+import libs.math
+import libs.core
+```
+
+> **Template pattern:** Use `--with` to pull your own template libraries from
+> GitHub. Keep a `template/` folder in a repo and start every project with:
+> `nova init myproject --with myuser/myrepo/template`
+
+#### `nova test`
+
+Runs all `test_*.nv` files in the `tests/` directory and reports pass/fail results:
+
+```bash
+cd myproject
+nova test
+# ========================================
+#   Nova Test Runner
+# ========================================
+# Running 3 test files from tests/
+#
+#   ✓ test_example
+#   ✓ test_math
+#   ✗ test_broken (runtime error)
+#
+# ========================================
+#   2 passed, 1 failed
+# ========================================
+```
+
+You can also specify a different test directory:
+
+```bash
+nova test path/to/tests
+```
+
+**Test file convention:**
+- Files must be named `test_*.nv` (e.g., `test_math.nv`, `test_utils.nv`)
+- Use `assert(condition, "message")` for test assertions
+- End with `println("PASS: test_name")` for the test runner
+
+Example test file (`tests/test_math.nv`):
+
+```nova
+module test_math
+
+assert(1 + 1 == 2, "basic addition")
+assert(10 / 2 == 5, "division")
+assert(2 * 3 == 6, "multiplication")
+
+println("PASS: test_math")
+```
+
+### Project Structure
+
+A Nova project is any folder with a `main.nv` file. There is no config file —
+Nova uses a simple convention:
+
+```
+myproject/
+    main.nv          ← entry point (module main)
+    libs/            ← shared modules
+        math.nv      ← import with: import libs.math
+        helper.nv    ← import with: import libs.helper
+    tests/           ← test files (run with: nova test)
+        test_math.nv ← must be named test_*.nv
+    src/             ← optional: organize your own code
+        game.nv      ← import from main: import src.game
+```
+
+When you run `nova run` (no file argument) from inside the project folder,
+Nova automatically finds and runs `main.nv`.
+
+Import paths are always relative to the importing file:
+- From `main.nv`: `import libs.math` → `./libs/math.nv`
+- From `src/game.nv`: `import super.libs.math` → `../libs/math.nv` (use `super` to go up)
+
+### The REPL
+
+Start with `nova repl`. The REPL lets you type Nova expressions and see results
+immediately. It supports multi-line input, history, and tab completion.
+
+| Command | Description |
+|---|---|
+| `help` | Show all REPL commands |
+| `show` | Print the current session's accumulated code |
+| `exit` | Quit the REPL |
+| `clear` | Clear the terminal screen |
+| `new` | Start a fresh session (discard all state) |
+| `back` | Undo — revert to the previous session state |
+| `session N` | Jump to session snapshot N |
+| `save file.nv` | Save the current session to a `.nv` file |
+| `keep CODE` | Evaluate code and always keep it in the session |
+| `ast CODE` | Evaluate code, keep it, and print the AST |
+| `banner` | Print a random ASCII banner |
+
+#### Session Model
+
+The REPL uses a **session snapshot** model. Each successful input creates a new
+snapshot. You can navigate back through snapshots:
+
+```
+Session: 1  $ let x = 42
+Session: 2  $ let y = x + 1
+Session: 3  $ back           // reverts to session 2
+Session: 2  $ session 1      // jumps to session 1
+Session: 1  $
+```
+
+`new` clears everything and starts at session 1.
+
+#### `keep` vs Regular Input
+
+Regular input is only kept in the session if it does **not** contain `print` or `println`.
+Use `keep` to force code into the session regardless:
+
+```
+Session: 1  $ keep println("debug")
+debug
+Session: 2  $ show
+println("debug")
+```
+
+#### Saving Your Work
+
+`save myfile.nv` writes the accumulated session code to a file, automatically
+prepending `module repl`. If the file already exists, you'll be asked to confirm.
+
+---
+
+## 32. Novel Feature Combinations
+
+Nova's features are designed to compose. This section shows creative ways to combine
+them into powerful, concise idioms.
+
+### Builder Pattern with Extends + Closures
+
+Combine `extends` with closures to make fluent APIs:
+
+```nova
+struct Config { width: Int, height: Int, title: String }
+
+fn extends withWidth(c: Config, w: Int) -> Config {
+    return Config { width: w, height: c.height, title: c.title }
+}
+fn extends withHeight(c: Config, h: Int) -> Config {
+    return Config { width: c.width, height: h, title: c.title }
+}
+fn extends withTitle(c: Config, t: String) -> Config {
+    return Config { width: c.width, height: c.height, title: t }
+}
+
+let cfg = Config { width: 0, height: 0, title: "" }
+    .withWidth(800)
+    .withHeight(600)
+    .withTitle("My App")
+```
+
+### Pipeline Processing with Pipe + Extends
+
+Chain transformations using the pipe operator and extends:
+
+```nova
+fn extends double(x: Int) -> Int { return x * 2 }
+fn extends addOne(x: Int) -> Int { return x + 1 }
+fn square(x: Int) -> Int { return x * x }
+fn negate(x: Int) -> Int { return 0 - x }
+
+let result = 3 |> square() |> negate()  // -9
+let chained = 5.double().addOne()        // 11
+```
+
+### Enum + Dyn for Polymorphic Dispatch
+
+Use enums with pattern matching for type-safe dispatch, or `Dyn` for structural contracts:
+
+```nova
+// Approach 1: Enum-based dispatch
+enum Shape { Circle: Float, Rect: (Float, Float) }
+
+fn extends area(s: Shape) -> Float {
+    return match s {
+        Circle(r) => 3.14159 * r * r,
+        Rect(wh) => wh.0 * wh.1,
+    }
+}
+
+// Approach 2: Dyn-based dispatch (structural)
+struct Drawable { draw: fn(Int, Int) -> Void }
+
+fn renderAll(items: [Dyn(Drawable)], x: Int, y: Int) {
+    for item in items {
+        item.draw(x, y)
+    }
+}
+```
+
+### Varargs + Extends for Natural APIs
+
+Varargs let extends methods accept flexible argument lists:
+
+```nova
+fn extends containsAll(haystack: [String], needles: [String]) -> Bool {
+    for n in needles {
+        let found = false
+        for h in haystack {
+            if h == n { found = true }
+        }
+        if !found { return false }
+    }
+    return true
+}
+
+let tags = ["nova", "lang", "vm"]
+tags.containsAll("nova", "vm")    // true — varargs pack into [String]
+```
+
+### Block Expressions + Let Bindings
+
+Use block expressions to compute complex initial values:
+
+```nova
+let direction = {
+    if angle < 90   { "north" }
+    elif angle < 180 { "east"  }
+    elif angle < 270 { "south" }
+    else             { "west"  }
+}
+```
+
+### Match Expression Arms for Inline Decisions
+
+Match expressions return values, perfect for assigning computed results:
+
+```nova
+enum Priority { High, Medium, Low }
+
+fn extends color(p: Priority) -> String {
+    return match p {
+        High()   => "red",
+        Medium() => "yellow",
+        Low()    => "green",
+    }
+}
+```
+
+### Currying + Higher-Order Functions
+
+Create specialized functions from general ones:
+
+```nova
+fn adder(n: Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int { return x + n }
+}
+
+let add5 = adder(5)
+let add10 = adder(10)
+add5(3)    // 8
+add10(3)   // 13
+
+// Use with list operations
+let nums = [1, 2, 3, 4, 5]
+let incremented = nums.map(adder(1))  // [2, 3, 4, 5, 6]
+```
+
+### Module Namespaces + Extends for Library Design
+
+Use `fn mod(Module)` to organize library functions alongside extends:
+
+```nova
+fn mod(MathUtils) clamp(val: Int, lo: Int, hi: Int) -> Int {
+    if val < lo { return lo }
+    if val > hi { return hi }
+    return val
+}
+
+fn extends clampTo(x: Int, lo: Int, hi: Int) -> Int {
+    return MathUtils::clamp(x, lo, hi)
+}
+
+// Both calling styles work:
+MathUtils::clamp(150, 0, 100)  // 100
+150.clampTo(0, 100)             // 100
+```
+
+### Generics + Dunder Operators for Reusable Types
+
+Define custom container types with operator overloading:
+
+```nova
+struct Stack(T) { data: [$T] }
+
+fn extends push(s: Stack(T), val: $T) {
+    s.data.push(val)
+}
+
+fn extends pop(s: Stack(T)) -> Option($T) {
+    if s.data.len() == 0 { return None(T) }
+    return Some(s.data.remove(s.data.len() - 1))
+}
+
+fn extends __eq__(a: Stack(T), b: Stack(T)) -> Bool {
+    return a.data == b.data
+}
+
+fn extends len(s: Stack(T)) -> Int {
+    return s.data.len()
+}
+```
+
+### If-Let Chains for Safe Nested Unwrapping
+
+Chain `if let` statements to safely unwrap nested Option values:
+
+```nova
+fn findUserName(db: Database, id: Int) -> String {
+    if let user = db.find(id) {
+        if let name = user.displayName {
+            return name
+        }
+    }
+    return "unknown"
+}
+```
+
+### Closure Capture + Extends for Stateful Methods
+
+Closures capture their environment, creating lightweight stateful objects:
+
+```nova
+fn counter(start: Int) -> fn() -> Int {
+    let n = start
+    return fn() -> Int {
+        n = n + 1
+        return n
+    }
+}
+
+let c = counter(0)
+c()  // 1
+c()  // 2
+c()  // 3
+```
+
+### Arrow Syntax for Compact Struct Field Access
+
+The `->` operator combines field access with a function call:
+
+```nova
+struct EventHandler { onClick: fn(Int) -> Void }
+
+fn fireClick(handler: EventHandler, x: Int) {
+    handler->onClick(x)    // same as handler.onClick(x) but calls the fn
+}
+```
+
+### for-in + Enumerate Pattern
+
+Use range and indexing together for index-value iteration:
+
+```nova
+let names = ["Alice", "Bob", "Carol"]
+for i in 0..names.len() {
+    println(format("{}: {}", [Cast::string(i), names[i]]))
+}
+```
+
+### Forward Declarations for Mutual Recursion
+
+Declare a function signature before defining it:
+
+```nova
+fn isEven(n: Int) -> Bool           // forward declaration
+
+fn isOdd(n: Int) -> Bool {
+    if n == 0 { return false }
+    return isEven(n - 1)
+}
+
+fn isEven(n: Int) -> Bool {         // definition
+    if n == 0 { return true }
+    return isOdd(n - 1)
+}
+```
 
 ---
 
@@ -1085,7 +2253,7 @@ Dyn types, and extends + UFCS.
 
 ---
 
-## 30. Quick Start — Your First Window
+## 33. Quick Start — Your First Window
 
 ```nova
 raylib::init("My Game", 800, 600, 60)
@@ -1126,7 +2294,7 @@ my_game/
 
 ---
 
-## 31. Critical Rules for Game Dev
+## 34. Critical Rules for Game Dev
 
 ### 31.1 Box-Wrap Mutable Scalars in Closures
 
@@ -1176,7 +2344,7 @@ Nova uses `elif` for chained conditionals. In expression context, only `if/else`
 
 ---
 
-## 32. Scene Management
+## 35. Scene Management
 
 Scenes decouple game states (title, gameplay, pause, game-over):
 
@@ -1210,7 +2378,7 @@ while raylib::rendering() {
 
 ---
 
-## 33. Entity System
+## 36. Entity System
 
 ```nova
 import super.std.entity
@@ -1261,7 +2429,7 @@ e.entityDrawCircle((255, 230, 0))     // circle
 
 ---
 
-## 34. Input Handling
+## 37. Input Handling
 
 ### Raw Raylib Input
 
@@ -1289,7 +2457,7 @@ if keys.isPressed("jump") { /* jump */ }
 
 ---
 
-## 35. Physics and Collision
+## 38. Physics and Collision
 
 ```nova
 import super.std.physics
@@ -1317,7 +2485,7 @@ if hit.hit { /* hit.point, hit.normal, hit.t */ }
 
 ---
 
-## 36. Camera
+## 39. Camera
 
 ```nova
 import super.std.camera
@@ -1344,7 +2512,7 @@ let screenPos = cam.worldToScreen(entity.pos)
 
 ---
 
-## 37. Timers and Tweens
+## 40. Timers and Tweens
 
 ### Timers
 
@@ -1371,7 +2539,7 @@ if fadeIn.isDone() { fadeIn.ping() }   // ping-pong
 
 ---
 
-## 38. Vec2 Math
+## 41. Vec2 Math
 
 ```nova
 import super.std.vec2
@@ -1388,7 +2556,7 @@ e.vel.x = dir.x * SPEED
 
 ---
 
-## 39. Tilemaps and Noise
+## 42. Tilemaps and Noise
 
 ### Grid
 
@@ -1412,7 +2580,7 @@ map.set(col, row, if h > 0.6 { 1 } else { 0 })
 
 ---
 
-## 40. Sprites and Audio
+## 43. Sprites and Audio
 
 ### Sprites
 
@@ -1449,7 +2617,7 @@ raylib::closeAudio()
 
 ---
 
-## 41. HUD and UI
+## 44. HUD and UI
 
 ### Health Bar
 
@@ -1480,7 +2648,7 @@ fn drawButton(x: Int, y: Int, w: Int, h: Int, text: String, hover: Bool) {
 
 ---
 
-## 42. Advanced Game Patterns
+## 45. Advanced Game Patterns
 
 ### Enum-Based Entity Kinds
 
@@ -1547,7 +2715,7 @@ fn popScreen() { if stack.len() > 0 { stack.pop() } }
 
 ---
 
-## 43. Game Dev Tips and Tricks
+## 46. Game Dev Tips and Tricks
 
 ### Frame Animation
 
@@ -1609,7 +2777,7 @@ if debugOn.value {
 
 ---
 
-## 44. Performance Tips
+## 47. Performance Tips
 
 | Problem | Solution |
 |---|---|
@@ -1622,7 +2790,7 @@ if debugOn.value {
 
 ---
 
-## 45. Complete Example — Breakout
+## 48. Complete Example — Breakout
 
 ```nova
 module breakout
@@ -1854,7 +3022,7 @@ while raylib::rendering() {
 
 ---
 
-## 46. Complete Example — Top-Down Shooter
+## 49. Complete Example — Top-Down Shooter
 
 ```nova
 module shooter
@@ -2092,7 +3260,7 @@ while raylib::rendering() {
 
 ---
 
-## 47. Terminal Quick Start
+## 50. Terminal Quick Start
 
 ```nova
 terminal::clearScreen()
@@ -2108,7 +3276,7 @@ Key built-in functions: `terminal::clearScreen()`, `terminal::moveTo(col, row)`,
 
 ---
 
-## 48. Raw Mode and Key Input
+## 51. Raw Mode and Key Input
 
 Raw mode disables line buffering — each keypress is available immediately:
 
@@ -2155,7 +3323,7 @@ if c == '\x1b' {
 
 ---
 
-## 49. Colours and Cursor
+## 52. Colours and Cursor
 
 ```nova
 terminal::setForeground(255, 100, 50)    // orange text
@@ -2176,7 +3344,7 @@ println(Ansi::rgb(255, 128, 0, "orange"))
 
 ---
 
-## 50. Terminal Menu System
+## 53. Terminal Menu System
 
 Use `std/tui` with `SceneManager` for multi-screen terminal apps:
 
@@ -2215,7 +3383,7 @@ fn makeMenuScene(mgr: SceneManager) -> Scene {
 
 ---
 
-## 51. Terminal Game Loop
+## 54. Terminal Game Loop
 
 A terminal game loop with frame timing:
 
@@ -2260,7 +3428,7 @@ terminal::clearScreen()
 
 ---
 
-## 52. Terminal Patterns
+## 55. Terminal Patterns
 
 ### Always Clean Up
 
@@ -2306,7 +3474,7 @@ struct AppState { x: Int, y: Int, score: Int, running: Bool }
 
 ---
 
-## 53. Nova for Python Developers
+## 56. Nova for Python Developers
 
 ### Quick Comparison
 
@@ -2370,3 +3538,83 @@ for word in words { counts.increment(word) }
 - Range loops: `for i in 0..10 { }`
 - `if let` for safe unwrapping
 - Full interactive REPL: `nova repl`
+
+---
+
+## 57. Charts and Plotting
+
+Nova ships with `std/plot` — a charting library built on raylib.
+
+### Setup
+
+```nova
+module main
+import super.std.plot
+
+raylib::init("My Chart", 800, 600, 30)
+```
+
+### PlotArea
+
+Every chart lives inside a `PlotArea` that maps data coordinates to screen pixels:
+
+```nova
+// Manual bounds
+let area = PlotArea::new(50, 50, 700, 400, 0.0, 10.0, 0.0, 100.0)
+
+// Auto-detect bounds from data
+let data = [3.0, 7.0, 2.0, 9.0, 5.0]
+let area = PlotArea::auto(50, 50, 700, 400, data)
+```
+
+### Drawing Charts
+
+All chart functions are `extends` methods on `PlotArea`, called inside
+a `while raylib::rendering() { ... }` loop:
+
+```nova
+while raylib::rendering() {
+    raylib::clear((25, 25, 30))
+
+    // Decorations
+    area.drawGrid(5, 4, (50, 50, 55))
+    area.drawAxes((150, 150, 150))
+    area.drawBorder((100, 100, 100))
+    area.drawTitle("Sales", 20, (230, 230, 230))
+
+    // Charts (overlay multiple on the same area)
+    area.barChart(data, (60, 120, 220))
+    area.lineChart(data, (220, 60, 60))
+    area.fillArea(data, (60, 200, 80))
+
+    // Scatter plot (takes list of (Float, Float) tuples)
+    let pts = [(1.0, 2.0), (3.0, 7.0), (5.0, 4.0)]
+    area.scatter(pts, 4, (200, 80, 200))
+
+    // Reference lines
+    area.hLine(5.0, (200, 60, 60))   // horizontal at y=5
+    area.vLine(3.0, (60, 200, 80))   // vertical at x=3
+}
+```
+
+### Pie Charts
+
+Pie charts are standalone functions (not PlotArea methods):
+
+```nova
+let pieData   = [35.0, 25.0, 20.0, 12.0, 8.0]
+let labels    = ["Rust", "Nova", "C", "Go", "Lua"]
+let colors    = [(220,60,60), (60,120,220), (60,200,80), (230,160,40), (160,80,200)]
+
+// Basic pie
+drawPieChart(400, 300, 100, pieData, colors)
+
+// Pie with labels
+drawPieChartLabeled(400, 300, 100, pieData, labels, colors, (230,230,230), 14)
+```
+
+### Demo
+
+See `demo/plotdemo.nv` for a complete 7-chart showcase:
+line chart, bar chart, scatter, filled area, multi-line overlay,
+thick line with reference lines, and a labeled pie chart — all in one window.

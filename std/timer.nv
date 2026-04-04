@@ -30,10 +30,10 @@ module timer
 
 struct Timer {
     duration:  Float,
-    _elapsed:  Float,
-    _repeat:   Bool,
-    _running:  Bool,
-    _fired:    Bool,
+    elapsed:  Float,
+    repeat:   Bool,
+    running:  Bool,
+    fired:    Bool,
 }
 
 // ── Constructors ─────────────────────────────────────────────────────────────
@@ -42,10 +42,10 @@ struct Timer {
 fn extends(Timer) once(duration: Float) -> Timer {
     return Timer {
         duration: duration,
-        _elapsed: 0.0,
-        _repeat:  false,
-        _running: true,
-        _fired:   false,
+        elapsed: 0.0,
+        repeat:  false,
+        running: true,
+        fired:   false,
     }
 }
 
@@ -53,10 +53,10 @@ fn extends(Timer) once(duration: Float) -> Timer {
 fn extends(Timer) repeating(duration: Float) -> Timer {
     return Timer {
         duration: duration,
-        _elapsed: 0.0,
-        _repeat:  true,
-        _running: true,
-        _fired:   false,
+        elapsed: 0.0,
+        repeat:  true,
+        running: true,
+        fired:   false,
     }
 }
 
@@ -64,10 +64,10 @@ fn extends(Timer) repeating(duration: Float) -> Timer {
 fn extends(Timer) cooldown(duration: Float) -> Timer {
     return Timer {
         duration: duration,
-        _elapsed: duration,
-        _repeat:  false,
-        _running: false,
-        _fired:   true,
+        elapsed: duration,
+        repeat:  false,
+        running: false,
+        fired:   true,
     }
 }
 
@@ -76,36 +76,36 @@ fn extends(Timer) cooldown(duration: Float) -> Timer {
 // Advance the timer by `dt` seconds.
 // Returns true the frame the timer completes (fires).
 fn extends update(self: Timer, dt: Float) -> Bool {
-    if !self._running { return false }
-    self._elapsed = self._elapsed + dt
-    if self._elapsed >= self.duration {
-        if self._repeat {
-            self._elapsed = self._elapsed - self.duration
+    if !self.running { return false }
+    self.elapsed = self.elapsed + dt
+    if self.elapsed >= self.duration {
+        if self.repeat {
+            self.elapsed = self.elapsed - self.duration
         } else {
-            self._elapsed = self.duration
-            self._running = false
+            self.elapsed = self.duration
+            self.running = false
         }
-        self._fired = true
+        self.fired = true
         return true
     }
-    self._fired = false
+    self.fired = false
     return false
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 fn extends isDone(self: Timer) -> Bool {
-    return self._elapsed >= self.duration && !self._repeat
+    return self.elapsed >= self.duration && !self.repeat
 }
 
 fn extends isRunning(self: Timer) -> Bool {
-    return self._running
+    return self.running
 }
 
 // Normalized progress from 0.0 (start) to 1.0 (done)
 fn extends progress(self: Timer) -> Float {
     if self.duration <= 0.0 { return 1.0 }
-    let p = self._elapsed / self.duration
+    let p = self.elapsed / self.duration
     if p > 1.0 { return 1.0 }
     if p < 0.0 { return 0.0 }
     return p
@@ -113,12 +113,12 @@ fn extends progress(self: Timer) -> Float {
 
 // Seconds since the last reset/start
 fn extends elapsed(self: Timer) -> Float {
-    return self._elapsed
+    return self.elapsed
 }
 
 // Seconds until the timer fires next
 fn extends remaining(self: Timer) -> Float {
-    let r = self.duration - self._elapsed
+    let r = self.duration - self.elapsed
     if r < 0.0 { return 0.0 }
     return r
 }
@@ -126,37 +126,37 @@ fn extends remaining(self: Timer) -> Float {
 // ── Control ───────────────────────────────────────────────────────────────────
 
 fn extends reset(self: Timer) {
-    self._elapsed = 0.0
-    self._running = true
-    self._fired   = false
+    self.elapsed = 0.0
+    self.running = true
+    self.fired   = false
 }
 
 fn extends stop(self: Timer) {
-    self._running = false
+    self.running = false
 }
 
 fn extends start(self: Timer) {
-    self._running = true
+    self.running = true
 }
 
 fn extends setDuration(self: Timer, d: Float) {
     self.duration = d
-    if self._elapsed > d { self._elapsed = d }
+    if self.elapsed > d { self.elapsed = d }
 }
 
 // Activate a cooldown timer (reset it so it starts counting down again)
 fn extends activate(self: Timer) {
-    self._elapsed = 0.0
-    self._running = true
-    self._fired   = false
+    self.elapsed = 0.0
+    self.running = true
+    self.fired   = false
 }
 
 // Convenient: returns true if done and immediately resets (like a cooldown check)
 fn extends ready(self: Timer) -> Bool {
-    if self._elapsed >= self.duration {
-        self._elapsed = 0.0
-        self._running = true
-        self._fired   = false
+    if self.elapsed >= self.duration {
+        self.elapsed = 0.0
+        self.running = true
+        self.fired   = false
         return true
     }
     return false

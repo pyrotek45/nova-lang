@@ -1,0 +1,152 @@
+module test_match_advanced
+
+import super.std.core
+
+// ===== GROUP 1: Match on enum variants =====
+
+let r1 = Result::Ok(42) @[B: String]
+let r2 = Result::Err("bad") @[A: Int]
+
+fn extract_result(r: Result(Int, String)) -> Int {
+    match r {
+        Ok(x) => { return x * 2 }
+        Err(e) => { return -1 }
+    }
+    return 0
+}
+
+assert(extract_result(r1) == 84, "match enum: Ok => value * 2")
+assert(extract_result(r2) == -1, "match enum: Err => -1")
+
+println("  GROUP 1 [match enum variants] OK")
+
+// ===== GROUP 2: Match with multiple enum types =====
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Custom: (Int, Int, Int)
+}
+
+fn color_name(c: Color) -> String {
+    match c {
+        Red() => { return "red" }
+        Green() => { return "green" }
+        Blue() => { return "blue" }
+        Custom(rgb) => { return "custom" }
+    }
+    return "unknown"
+}
+
+assert(color_name(Color::Red()) == "red", "match color: Red")
+assert(color_name(Color::Green()) == "green", "match color: Green")
+assert(color_name(Color::Blue()) == "blue", "match color: Blue")
+assert(color_name(Color::Custom((255, 128, 0))) == "custom", "match color: Custom")
+
+println("  GROUP 2 [match multiple variants] OK")
+
+// ===== GROUP 3: Match with computation in arms =====
+
+enum Expr {
+    Num: Int,
+    Add: (Int, Int),
+    Mul: (Int, Int),
+    Neg: Int
+}
+
+fn eval(e: Expr) -> Int {
+    match e {
+        Num(n) => { return n }
+        Add(pair) => { return pair[0] + pair[1] }
+        Mul(pair) => { return pair[0] * pair[1] }
+        Neg(n) => { return -n }
+    }
+    return 0
+}
+
+assert(eval(Expr::Num(42)) == 42, "match expr: Num")
+assert(eval(Expr::Add((3, 4))) == 7, "match expr: Add")
+assert(eval(Expr::Mul((5, 6))) == 30, "match expr: Mul")
+assert(eval(Expr::Neg(10)) == -10, "match expr: Neg")
+
+println("  GROUP 3 [match computation] OK")
+
+// ===== GROUP 4: Match with Option =====
+
+fn safe_div(a: Int, b: Int) -> Option(Int) {
+    if b == 0 {
+        return None(Int)
+    }
+    return Some(a / b)
+}
+
+fn get_or_default(o: Option(Int), default: Int) -> Int {
+    if o.isSome() {
+        return o.unwrap()
+    }
+    return default
+}
+
+assert(get_or_default(safe_div(10, 2), -1) == 5, "match option: safe_div 10/2")
+assert(get_or_default(safe_div(10, 0), -1) == -1, "match option: safe_div 10/0")
+assert(get_or_default(safe_div(100, 4), 0) == 25, "match option: safe_div 100/4")
+
+println("  GROUP 4 [match with option] OK")
+
+// ===== GROUP 5: Match with Maybe =====
+
+fn maybe_double(m: Maybe(Int)) -> Int {
+    match m {
+        Just(x) => { return x * 2 }
+        Nothing() => { return 0 }
+    }
+    return 0
+}
+
+assert(maybe_double(Maybe::Just(21)) == 42, "match maybe: Just")
+assert(maybe_double(Maybe::Nothing() @[A: Int]) == 0, "match maybe: Nothing")
+
+println("  GROUP 5 [match with Maybe] OK")
+
+// ===== GROUP 6: Match in recursive function =====
+
+fn fib(n: Int) -> Int {
+    if n <= 1 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+assert(fib(0) == 0, "recursion: fib(0)")
+assert(fib(1) == 1, "recursion: fib(1)")
+assert(fib(10) == 55, "recursion: fib(10)")
+assert(fib(15) == 610, "recursion: fib(15)")
+
+println("  GROUP 6 [recursive functions] OK")
+
+// ===== GROUP 7: Match with enum lists =====
+
+fn count_reds(colors: [Color]) -> Int {
+    let count = 0
+    for c in colors {
+        match c {
+            Red() => { count = count + 1 }
+            Green() => {}
+            Blue() => {}
+            Custom(rgb) => {}
+        }
+    }
+    return count
+}
+
+let palette = [Color::Red(), Color::Blue(), Color::Red(), Color::Green(), Color::Red()]
+assert(count_reds(palette) == 3, "match list: count 3 reds")
+
+let no_reds = [Color::Blue(), Color::Green()]
+assert(count_reds(no_reds) == 0, "match list: count 0 reds")
+
+println("  GROUP 7 [match over list] OK")
+
+println("\nAll 7 groups passed")
+println("PASS: test_match_advanced")

@@ -1,0 +1,208 @@
+module test_advanced_structs_and_enums
+
+// Comprehensive tests for structs, enums, generics, and extensions combined
+
+// ===== GROUP 1: Generic struct with methods =====
+struct Wrapper(T) {
+    value: $T,
+}
+
+fn extends unwrap_w(self: Wrapper($T)) -> $T {
+    return self.value
+}
+
+fn extends wmap(self: Wrapper($T), f: fn($T) -> $T) -> Wrapper($T) {
+    return Wrapper { value: f(self.value) }
+}
+
+let w = Wrapper { value: 42 }
+assert(w.unwrap_w() == 42, "generic struct: unwrap")
+
+let w2 = w.wmap(|x: Int| x * 2)
+assert(w2.unwrap_w() == 84, "generic struct: wmap")
+
+let ws = Wrapper { value: "hello" }
+assert(ws.unwrap_w() == "hello", "generic struct: string unwrap")
+
+println("  GROUP 1 [generic struct methods] OK")
+
+// ===== GROUP 2: Enum with data =====
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float),
+    Point
+}
+
+fn extends area(self: Shape) -> Float {
+    match self {
+        Circle(r) => { return 3.14159 * r * r }
+        Rectangle(dims) => { return dims[0] * dims[1] }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+
+fn extends describe(self: Shape) -> String {
+    match self {
+        Circle(r) => { return "circle r=" + Cast::string(r) }
+        Rectangle(dims) => { return "rect " + Cast::string(dims[0]) + "x" + Cast::string(dims[1]) }
+        Point() => { return "point" }
+    }
+    return "unknown"
+}
+
+let c = Shape::Circle(5.0)
+let rect = Shape::Rectangle((3.0, 4.0))
+let pt = Shape::Point()
+
+assert(c.area() > 78.0, "enum: circle area > 78")
+assert(c.area() < 79.0, "enum: circle area < 79")
+assert(rect.area() == 12.0, "enum: rect area")
+assert(pt.area() == 0.0, "enum: point area")
+
+assert(c.describe() == "circle r=5", "enum: circle describe")
+assert(pt.describe() == "point", "enum: point describe")
+
+println("  GROUP 2 [enum with data + methods] OK")
+
+// ===== GROUP 3: Generic enum =====
+enum Either(A, B) {
+    Left: $A,
+    Right: $B,
+}
+
+fn extends isLeft(self: Either($A, $B)) -> Bool {
+    match self {
+        Left(a) => { return true }
+        Right(b) => { return false }
+    }
+    return false
+}
+
+fn extends getLeft(self: Either($A, $B), default: $A) -> $A {
+    match self {
+        Left(a) => { return a }
+        Right(b) => { return default }
+    }
+    return default
+}
+
+fn extends getRight(self: Either($A, $B), default: $B) -> $B {
+    match self {
+        Right(b) => { return b }
+        Left(a) => { return default }
+    }
+    return default
+}
+
+let e1 = Either::Left(42) @[B: String]
+let e2 = Either::Right("hello") @[A: Int]
+
+assert(e1.isLeft(), "generic enum: Left isLeft")
+assert(!e2.isLeft(), "generic enum: Right not isLeft")
+assert(e1.getLeft(0) == 42, "generic enum: getLeft")
+assert(e2.getRight("default") == "hello", "generic enum: getRight")
+assert(e2.getLeft(99) == 99, "generic enum: getLeft default")
+
+println("  GROUP 3 [generic enum] OK")
+
+// ===== GROUP 4: Struct with struct fields =====
+struct Point2D {
+    x: Float,
+    y: Float,
+}
+
+struct Line {
+    start: Point2D,
+    end_pt: Point2D,
+}
+
+fn extends length(self: Line) -> Float {
+    let dx = self.end_pt.x - self.start.x
+    let dy = self.end_pt.y - self.start.y
+    return (dx * dx + dy * dy).sqrt()
+}
+
+let line = Line { start: Point2D { x: 0.0, y: 0.0 }, end_pt: Point2D { x: 3.0, y: 4.0 } }
+let len = line.length()
+assert(len > 4.99, "nested struct: length > 4.99")
+assert(len < 5.01, "nested struct: length < 5.01")
+
+println("  GROUP 4 [nested structs] OK")
+
+// ===== GROUP 5: Enum in list =====
+let shapes: [Shape] = [Shape::Circle(1.0), Shape::Rectangle((2.0, 3.0)), Shape::Point()]
+
+assert(shapes.len() == 3, "enum list: length")
+
+let total_area = 0.0
+for s in shapes {
+    total_area = total_area + s.area()
+}
+// Circle(1) = pi ≈ 3.14, Rect(2,3) = 6.0, Point = 0.0 → ~9.14
+assert(total_area > 9.0, "enum list: total area > 9")
+assert(total_area < 10.0, "enum list: total area < 10")
+
+println("  GROUP 5 [enum in list] OK")
+
+// ===== GROUP 6: Dunder operators =====
+struct Vec2 {
+    x: Float,
+    y: Float,
+}
+
+fn extends __add__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x + other.x, y: self.y + other.y }
+}
+
+fn extends __sub__(self: Vec2, other: Vec2) -> Vec2 {
+    return Vec2 { x: self.x - other.x, y: self.y - other.y }
+}
+
+fn extends __eq__(self: Vec2, other: Vec2) -> Bool {
+    return self.x == other.x && self.y == other.y
+}
+
+fn extends toString(self: Vec2) -> String {
+    return "(" + Cast::string(self.x) + ", " + Cast::string(self.y) + ")"
+}
+
+let a = Vec2 { x: 1.0, y: 2.0 }
+let b = Vec2 { x: 3.0, y: 4.0 }
+let c2 = a + b
+
+assert(c2.x == 4.0, "dunder: add x")
+assert(c2.y == 6.0, "dunder: add y")
+
+let d = b - a
+assert(d.x == 2.0, "dunder: sub x")
+assert(d.y == 2.0, "dunder: sub y")
+
+assert(a == Vec2 { x: 1.0, y: 2.0 }, "dunder: eq true")
+assert(!(a == b), "dunder: eq false")
+
+assert(a.toString() == "(1, 2)", "dunder: tostring")
+
+println("  GROUP 6 [dunder operators] OK")
+
+// ===== GROUP 7: Higher-order functions with structs =====
+fn apply_to_each(items: [Vec2], f: fn(Vec2) -> Vec2) -> [Vec2] {
+    let result = []: Vec2
+    for item in items {
+        result.push(f(item))
+    }
+    return result
+}
+
+let vecs = [Vec2 { x: 1.0, y: 0.0 }, Vec2 { x: 0.0, y: 1.0 }, Vec2 { x: 2.0, y: 3.0 }]
+let doubled = apply_to_each(vecs, |v: Vec2| Vec2 { x: v.x * 2.0, y: v.y * 2.0 })
+
+assert(doubled[0].x == 2.0, "HOF struct: doubled[0].x")
+assert(doubled[1].y == 2.0, "HOF struct: doubled[1].y")
+assert(doubled[2].x == 4.0, "HOF struct: doubled[2].x")
+assert(doubled[2].y == 6.0, "HOF struct: doubled[2].y")
+
+println("  GROUP 7 [HOF with structs] OK")
+
+println("\nAll 7 groups passed")
+println("PASS: test_advanced_structs_and_enums")

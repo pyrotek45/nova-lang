@@ -16,7 +16,7 @@ struct HashMap(K,V) {
 }
 
 // Internal: create an array of n empty buckets
-fn _makeBuckets(n: Int) -> [[($K,$V)]] {
+fn makeBuckets(n: Int) -> [[($K,$V)]] {
     let b: [[($K,$V)]] = []:[($K,$V)]
     for let i = 0; i < n; i += 1 {
         b.push([]:($K,$V))
@@ -28,16 +28,16 @@ fn _makeBuckets(n: Int) -> [[($K,$V)]] {
 fn extends(HashMap) default() -> HashMap($K,$V) {
     let nb = 16
     return HashMap {
-        buckets: _makeBuckets(nb) @[K: $K, V: $V],
+        buckets: makeBuckets(nb) @[K: $K, V: $V],
         numBuckets: nb,
         count: 0,
     }
 }
 
 // Internal: double the number of buckets and rehash all entries
-fn extends _resize(self: HashMap($K,$V)) {
+fn extends resize(self: HashMap($K,$V)) {
     let newSize = self.numBuckets * 2
-    let newBuckets: [[($K,$V)]] = _makeBuckets(newSize) @[K: $K, V: $V]
+    let newBuckets: [[($K,$V)]] = makeBuckets(newSize) @[K: $K, V: $V]
     for let i = 0; i < self.numBuckets; i += 1 {
         let bucket = self.buckets[i]
         for let j = 0; j < bucket.len(); j += 1 {
@@ -72,7 +72,7 @@ fn extends toString(self: HashMap($K,$V)) -> String {
 fn extends insert(self: HashMap($K,$V), k: $K, v: $V) {
     // Resize if load factor > 75%
     if self.count * 4 > self.numBuckets * 3 {
-        self._resize()
+        self.resize()
     }
     let idx = hash(k) % self.numBuckets
     let bucket = self.buckets[idx]
@@ -136,7 +136,7 @@ fn extends isEmpty(self: HashMap($K,$V)) -> Bool {
 // Clear all entries
 fn extends clear(self: HashMap($K,$V)) {
     let nb = 16
-    self.buckets = _makeBuckets(nb) @[K: $K, V: $V]
+    self.buckets = makeBuckets(nb) @[K: $K, V: $V]
     self.numBuckets = nb
     self.count = 0
 }

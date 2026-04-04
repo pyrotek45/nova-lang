@@ -92,20 +92,20 @@ match s3 {
 }
 
 // ── 30.6 Generic Stack ───────────────────────────────────────
-struct Stack305(T) { _data: [$T] }
+struct Stack305(T) { data: [$T] }
 
 fn extends(Stack305) new305() -> Stack305($T) {
-    return Stack305 { _data: []:$T }
+    return Stack305 { data: []:$T }
 }
 
 fn extends push305(self: Stack305($T), v: $T) {
-    self._data.push(v)
+    self.data.push(v)
 }
 
 fn extends pop305(self: Stack305($T)) -> Option($T) {
-    if self._data.len() == 0 { return None($T) }
-    let v = self._data[self._data.len() - 1]
-    self._data.remove(self._data.len() - 1)
+    if self.data.len() == 0 { return None($T) }
+    let v = self.data[self.data.len() - 1]
+    self.data.remove(self.data.len() - 1)
     return Some(v)
 }
 

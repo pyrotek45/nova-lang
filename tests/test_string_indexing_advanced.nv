@@ -1,0 +1,97 @@
+module test_string_indexing_advanced
+
+// ===== GROUP 1: Basic string indexing =====
+let s = "Hello"
+assert(s[0] == 'H', "str[0]")
+assert(s[1] == 'e', "str[1]")
+assert(s[4] == 'o', "str[4]")
+
+println("  GROUP 1 [basic string indexing] OK")
+
+// ===== GROUP 2: Negative string indexing =====
+assert(s[-1] == 'o', "str[-1] last")
+assert(s[-2] == 'l', "str[-2]")
+assert(s[-5] == 'H', "str[-5] first via negative")
+
+let word = "Nova"
+assert(word[-1] == 'a', "Nova[-1]")
+assert(word[-4] == 'N', "Nova[-4]")
+
+println("  GROUP 2 [negative string indexing] OK")
+
+// ===== GROUP 3: String indexing in expressions =====
+let greeting = "Hello, World!"
+assert(greeting[0] == 'H', "expr: first char")
+assert(greeting[-1] == '!', "expr: last char")
+
+// Index with variable
+let idx = 7
+assert(greeting[idx] == 'W', "expr: variable index")
+let neg = -1
+assert(greeting[neg] == '!', "expr: negative variable index")
+
+println("  GROUP 3 [index in expressions] OK")
+
+// ===== GROUP 4: String length and indexing boundaries =====
+let empty_check = "a"
+assert(empty_check[0] == 'a', "single char str[0]")
+assert(empty_check[-1] == 'a', "single char str[-1]")
+
+let two = "ab"
+assert(two[0] == 'a', "two char str[0]")
+assert(two[1] == 'b', "two char str[1]")
+assert(two[-1] == 'b', "two char str[-1]")
+assert(two[-2] == 'a', "two char str[-2]")
+
+println("  GROUP 4 [boundary cases] OK")
+
+// ===== GROUP 5: String indexing with loops =====
+let name = "Nova"
+let chars = []: Char
+for i in 0..name.len() {
+    chars.push(name[i])
+}
+assert(chars.len() == 4, "loop: collected 4 chars")
+assert(chars[0] == 'N', "loop: first char N")
+assert(chars[3] == 'a', "loop: last char a")
+
+// Reverse iteration with negative indices
+let reversed = []: Char
+for i in 1..name.len() + 1 {
+    reversed.push(name[-i])
+}
+assert(reversed[0] == 'a', "reverse loop: first is last char")
+assert(reversed[3] == 'N', "reverse loop: last is first char")
+
+println("  GROUP 5 [loop indexing] OK")
+
+// ===== GROUP 6: String char comparisons =====
+let text = "Hello123"
+assert(text[0] == 'H', "char comparison: H")
+assert(text[5] == '1', "char comparison: digit 1")
+assert(text[7] == '3', "char comparison: digit 3")
+
+// Char equality
+assert('H' == 'H', "char equality: same")
+assert(!('H' == 'X'), "char equality: different")
+
+println("  GROUP 6 [char comparisons] OK")
+
+// ===== GROUP 7: String indexing in function calls =====
+fn first_char(s: String) -> Char {
+    return s[0]
+}
+
+fn last_char(s: String) -> Char {
+    return s[-1]
+}
+
+assert(first_char("Nova") == 'N', "fn: first_char")
+assert(last_char("Nova") == 'a', "fn: last_char")
+assert(first_char("X") == 'X', "fn: single char first")
+assert(last_char("X") == 'X', "fn: single char last")
+
+println("  GROUP 7 [function string indexing] OK")
+
+println("\nAll 7 groups passed")
+println("PASS: test_string_indexing_advanced")

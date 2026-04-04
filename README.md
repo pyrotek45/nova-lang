@@ -176,11 +176,17 @@ cargo build --release
 
 ```
 nova run   <file.nv>   Run a program
+nova run               Run main.nv in current directory (project mode)
+nova run --git <path>  Fetch and run from GitHub
 nova check <file.nv>   Type-check without running
 nova time  <file.nv>   Run and show execution time
 nova dis   <file.nv>   Disassemble bytecode
+nova init  <name>      Create a new project (with --with for GitHub deps)
+nova test              Run all test_*.nv files in tests/
 nova repl              Interactive REPL
 ```
+
+See the [Getting Started](documentation/getting_started.md) guide for project setup and workflow.
 
 ---
 
@@ -195,6 +201,7 @@ nova repl              Interactive REPL
 | `demo/matmul.nv` | Matrix multiplication |
 | `demo/option_type.nv` | Option and Maybe patterns |
 | `demo/speedtest.nv` | Performance benchmark |
+| `demo/plotdemo.nv` | 7-chart showcase (line, bar, scatter, fill, pie, multi-line, thick) |
 
 ---
 
@@ -211,6 +218,8 @@ nova repl              Interactive REPL
 | `std/hashmap` | O(1) `HashMap` |
 | `std/maybe` | `Maybe(T)` — `Just`/`Nothing` with pattern matching |
 | `std/result` | `Result(A,B)` — `Ok`/`Err` for error propagation |
+| `std/grid` | Generic 2D grid — `Grid(T)` for tilemaps and pathfinding |
+| `std/plot` | Charts and graphs — line, bar, scatter, pie, fill (raylib) |
 | `std/tui` | `run`, `clear`, `printAt`, `printColor`, `drawBox`, colour presets, input polling |
 
 ---

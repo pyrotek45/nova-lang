@@ -1,0 +1,302 @@
+module test_varargs
+
+// ============================================================
+//  Nova Varargs Test Suite
+//
+//  In Nova, any function whose LAST parameter is a typed list
+//  (e.g. [Int], [String], [MyStruct]) can be called in "varargs"
+//  style — pass the trailing elements directly instead of
+//  wrapping them in a list literal.  The type checker
+//  automatically collects same-typed trailing arguments into a
+//  list when no exact signature match exists.
+// ============================================================
+
+// ---- 1. Basic varargs — list-only function --------------------
+
+fn sum(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+
+assert(sum([1, 2, 3]) == 6, "1a: normal list call")
+assert(sum(1, 2, 3) == 6,   "1b: varargs 3 args")
+assert(sum(1, 2) == 3,       "1c: varargs 2 args")
+assert(sum(1) == 1,           "1d: varargs 1 arg")
+assert(sum([]: Int) == 0,     "1e: empty list call")
+
+// ---- 2. Single leading arg + trailing varargs -----------------
+
+fn prefixed_sum(prefix: String, xs: [Int]) -> String {
+    let total = 0
+    for x in xs {
+        total = total + x
+    }
+    return prefix + Cast::string(total)
+}
+
+assert(prefixed_sum("sum=", [1, 2, 3]) == "sum=6", "2a: leading arg + normal list")
+assert(prefixed_sum("sum=", 1, 2, 3) == "sum=6",   "2b: leading arg + varargs")
+assert(prefixed_sum("sum=", 10) == "sum=10",         "2c: leading arg + single vararg")
+
+// ---- 3. Multiple leading args + trailing varargs --------------
+
+fn multi_lead(a: Int, b: String, xs: [Int]) -> String {
+    let total = a
+    for x in xs {
+        total = total + x
+    }
+    return b + Cast::string(total)
+}
+
+assert(multi_lead(100, "r=", [1, 2]) == "r=103", "3a: multi leading + normal list")
+assert(multi_lead(100, "r=", 1, 2) == "r=103",   "3b: multi leading + varargs")
+assert(multi_lead(100, "r=", 5) == "r=105",       "3c: multi leading + single vararg")
+
+// ---- 4. String varargs ----------------------------------------
+
+fn join_strings(parts: [String]) -> String {
+    let result = ""
+    for p in parts {
+        result = result + p
+    }
+    return result
+}
+
+assert(join_strings(["a", "b", "c"]) == "abc", "4a: string list normal")
+assert(join_strings("a", "b", "c") == "abc",   "4b: string varargs")
+assert(join_strings("x") == "x",               "4c: string single vararg")
+
+// ---- 5. Float varargs -----------------------------------------
+
+fn sum_floats(xs: [Float]) -> Float {
+    let total = 0.0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+
+assert(sum_floats(1.0, 2.0, 3.0) == 6.0, "5a: float varargs")
+assert(sum_floats([1.5, 2.5]) == 4.0,     "5b: float list normal")
+
+// ---- 6. Bool varargs ------------------------------------------
+
+fn all_true(xs: [Bool]) -> Bool {
+    for x in xs {
+        if !x {
+            return false
+        }
+    }
+    return true
+}
+
+assert(all_true(true, true, true) == true,   "6a: bool varargs all true")
+assert(all_true(true, false, true) == false,  "6b: bool varargs with false")
+assert(all_true(true) == true,                "6c: bool single vararg")
+
+// ---- 7. Overloading: exact match wins over varargs ------------
+
+fn describe(x: Int) -> String {
+    return "single int"
+}
+fn describe(xs: [Int]) -> String {
+    return "list of ints"
+}
+
+assert(describe(42) == "single int",        "7a: exact Int overload wins")
+assert(describe([1, 2, 3]) == "list of ints", "7b: explicit list matches list overload")
+assert(describe(1, 2, 3) == "list of ints",   "7c: multi-int falls back to varargs")
+
+// ---- 8. Priority: exact > varargs -----------------------------
+
+fn test_priority(x: Int) -> String {
+    return "exact"
+}
+fn test_priority(xs: [Int]) -> String {
+    return "varargs"
+}
+
+assert(test_priority(5) == "exact",      "8a: exact match beats varargs")
+assert(test_priority(1, 2) == "varargs", "8b: multi args use varargs")
+
+// ---- 9. Struct varargs ----------------------------------------
+
+struct Point {
+    x: Int,
+    y: Int
+}
+
+fn total_x(points: [Point]) -> Int {
+    let total = 0
+    for p in points {
+        total = total + p.x
+    }
+    return total
+}
+
+let p1 = Point { x: 1, y: 2 }
+let p2 = Point { x: 3, y: 4 }
+let p3 = Point { x: 5, y: 6 }
+
+assert(total_x(p1, p2, p3) == 9,   "9a: struct varargs")
+assert(total_x([p1, p2]) == 4,      "9b: struct normal list")
+assert(total_x(p1) == 1,            "9c: struct single vararg")
+
+// ---- 10. Extends (UFCS) with varargs --------------------------
+
+fn extends sum_with(self: Int, xs: [Int]) -> Int {
+    let total = self
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+
+assert(10.sum_with([1, 2, 3]) == 16, "10a: extends + normal list")
+assert(10.sum_with(1, 2, 3) == 16,   "10b: extends + varargs")
+assert(10.sum_with(5) == 15,          "10c: extends + single vararg")
+
+// ---- 11. Nested lists (varargs of [Int]) ----------------------
+
+fn concat_lists(xss: [[Int]]) -> [Int] {
+    let result = []: Int
+    for xs in xss {
+        for x in xs {
+            result.push(x)
+        }
+    }
+    return result
+}
+
+let nested_result = concat_lists([1, 2], [3, 4])
+assert(nested_result.len() == 4,   "11a: nested list varargs length")
+assert(nested_result[0] == 1,      "11b: nested list [0]")
+assert(nested_result[3] == 4,      "11c: nested list [3]")
+
+// ---- 12. Varargs builds a real list ---------------------------
+
+fn make_list(xs: [Int]) -> [Int] {
+    return xs
+}
+
+let built = make_list(10, 20, 30)
+assert(built.len() == 3,   "12a: varargs builds list, length")
+assert(built[0] == 10,     "12b: varargs list [0]")
+assert(built[2] == 30,     "12c: varargs list [2]")
+
+// ---- 13. Large varargs ----------------------------------------
+
+fn count(xs: [Int]) -> Int {
+    return xs.len()
+}
+
+assert(count(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) == 10, "13a: 10 varargs")
+
+// ---- 14. Varargs preserves argument order ---------------------
+
+fn first_elem(xs: [Int]) -> Int {
+    return xs[0]
+}
+fn last_elem(xs: [Int]) -> Int {
+    return xs[xs.len() - 1]
+}
+
+assert(first_elem(100, 200, 300) == 100, "14a: varargs order — first")
+assert(last_elem(100, 200, 300) == 300,  "14b: varargs order — last")
+
+// ---- 15. Return value from varargs-receiving fn ---------------
+
+fn double_all(xs: [Int]) -> [Int] {
+    let result = []: Int
+    for x in xs {
+        result.push(x * 2)
+    }
+    return result
+}
+
+let doubled = double_all(1, 2, 3)
+assert(doubled[0] == 2, "15a: varargs result [0]")
+assert(doubled[1] == 4, "15b: varargs result [1]")
+assert(doubled[2] == 6, "15c: varargs result [2]")
+
+// ---- 16. Closure/fn leading arg + trailing varargs ------------
+
+fn apply_to_all(f: fn(Int) -> Int, xs: [Int]) -> [Int] {
+    let result = []: Int
+    for x in xs {
+        result.push(f(x))
+    }
+    return result
+}
+
+let tripled = apply_to_all(|x: Int| x * 3, 10, 20, 30)
+assert(tripled[0] == 30, "16a: closure + varargs [0]")
+assert(tripled[1] == 60, "16b: closure + varargs [1]")
+assert(tripled[2] == 90, "16c: closure + varargs [2]")
+
+// ---- 17. Multiple different-typed leading args + varargs ------
+
+fn transform_and_sum(label: String, f: fn(Int) -> Int, xs: [Int]) -> String {
+    let total = 0
+    for x in xs {
+        total = total + f(x)
+    }
+    return label + Cast::string(total)
+}
+
+assert(
+    transform_and_sum("total=", |x: Int| x * 2, 1, 2, 3) == "total=12",
+    "17a: String + closure + varargs"
+)
+
+// ---- 18. Varargs with single-element and identity -------------
+
+fn identity_list(xs: [Int]) -> [Int] {
+    return xs
+}
+
+let single = identity_list(42)
+assert(single.len() == 1,  "18a: single vararg produces length-1 list")
+assert(single[0] == 42,    "18b: single vararg value preserved")
+
+let multi = identity_list(1, 2, 3, 4, 5)
+assert(multi.len() == 5,   "18c: multi vararg correct length")
+assert(multi[4] == 5,      "18d: multi vararg last element")
+
+// ---- 19. Varargs with struct method (extends on struct) ------
+
+struct Bag {
+    label: String
+}
+
+fn extends add_items(self: Bag, items: [Int]) -> String {
+    let total = 0
+    for i in items {
+        total = total + i
+    }
+    return self.label + ":" + Cast::string(total)
+}
+
+let bag = Bag { label: "bag" }
+assert(bag.add_items(1, 2, 3) == "bag:6", "19a: struct extends + varargs")
+assert(bag.add_items([10, 20]) == "bag:30", "19b: struct extends + normal list")
+
+// ---- 20. Char varargs -----------------------------------------
+
+fn join_chars(cs: [Char]) -> String {
+    let result = ""
+    for c in cs {
+        result = result + Cast::string(c)
+    }
+    return result
+}
+
+assert(join_chars('a', 'b', 'c') == "abc", "20a: char varargs")
+assert(join_chars(['x', 'y']) == "xy",      "20b: char normal list")
+
+// ============================================================
+
+println("PASS: test_varargs")

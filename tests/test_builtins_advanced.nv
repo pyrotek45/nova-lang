@@ -1,0 +1,136 @@
+module test_builtins_advanced
+
+import super.std.core
+
+// ============================================================
+// 1. unreachable() — type-safe bottom value
+// ============================================================
+
+enum Direction { North, South, East, West }
+
+fn dirToString(d: Direction) -> String {
+    match d {
+        North() => { return "north" }
+        South() => { return "south" }
+        East()  => { return "east" }
+        West()  => { return "west" }
+    }
+    return unreachable() @[T: String]
+}
+
+assert(dirToString(Direction::North()) == "north", "unreachable after match north")
+assert(dirToString(Direction::South()) == "south", "unreachable after match south")
+assert(dirToString(Direction::East()) == "east", "unreachable after match east")
+assert(dirToString(Direction::West()) == "west", "unreachable after match west")
+
+println("PASS: unreachable_basic (4 assertions)")
+
+// ============================================================
+// 2. unreachable() with different return types
+// ============================================================
+
+fn neverInt() -> Int {
+    return unreachable() @[T: Int]
+}
+
+fn neverBool() -> Bool {
+    return unreachable() @[T: Bool]
+}
+
+fn neverList() -> [Int] {
+    return unreachable() @[T: [Int]]
+}
+
+// These compile — we just don't call them (they'd crash at runtime)
+println("PASS: unreachable_types (compile-time check)")
+
+// ============================================================
+// 3. todo() — placeholder with typed return
+// ============================================================
+
+fn notYetDone() -> Float {
+    return todo() @[T: Float]
+}
+
+// Compiles fine — calling would panic at runtime
+println("PASS: todo_placeholder (compile-time check)")
+
+// ============================================================
+// 4. typeof() — runtime type inspection
+// ============================================================
+
+assert(typeof(42) == "Int", "typeof Int")
+assert(typeof(3.14) == "Float", "typeof Float")
+assert(typeof("hello") == "String", "typeof String")
+assert(typeof(true) == "Bool", "typeof Bool")
+assert(typeof('a') == "Char", "typeof Char")
+assert(typeof([1, 2]) == "[Int]", "typeof List")
+assert(typeof((1, "a")) == "(Int,String)", "typeof Tuple")
+
+struct Foo { x: Int }
+let f = Foo { x: 1 }
+assert(typeof(f) == "Foo", "typeof Struct")
+
+println("PASS: typeof (8 assertions)")
+
+// ============================================================
+// 5. clone() — deep copy
+// ============================================================
+
+let orig = [10, 20, 30]
+let copy = clone(orig)
+copy.push(40)
+assert(orig.len() == 3, "clone list: original unchanged")
+assert(copy.len() == 4, "clone list: copy modified")
+assert(copy[3] == 40, "clone list: new element")
+
+println("PASS: clone (3 assertions)")
+
+// ============================================================
+// 6. error() — custom runtime error
+// ============================================================
+
+// error() takes no args and terminates the program
+// We can't test calling it, but we verify it compiles in a branch
+fn crashIfBad(x: Int) {
+    if x < 0 {
+        error()
+    }
+}
+crashIfBad(5)  // should NOT crash — only negative triggers error()
+
+println("PASS: error_compiles (1 call)")
+
+// ============================================================
+// 7. exit() — early termination
+// ============================================================
+// exit() compiles; calling it would terminate the process
+fn earlyQuit(done: Bool) {
+    if done {
+        exit()
+    }
+}
+// Don't actually call it with true
+
+println("PASS: exit_compiles")
+
+// ============================================================
+// 8. Generic annotation @[T: Type] on function calls
+// ============================================================
+
+// unreachable with explicit type annotation
+fn getDefault(useDefault: Bool) -> String {
+    if useDefault {
+        return "default"
+    }
+    return unreachable() @[T: String]
+}
+assert(getDefault(true) == "default", "annotation in unreachable")
+
+// Some doesn't need annotation but it's allowed
+let someVal = Some(42)
+assert(Option::isSome(someVal) == true, "Some is Some")
+
+println("PASS: generic_annotation (2 assertions)")
+
+println("PASS: test_builtins_advanced — all groups passed")
