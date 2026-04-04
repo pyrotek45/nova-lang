@@ -7,3 +7,4 @@ perf_report.md
 tests/_tmp_*
 tests/tmp_*
 tests/perf/_tmp_*
+result
