@@ -123,6 +123,8 @@ nova run path/to/file.nv
 | `nova time file.nv` | Run and print execution time |
 | `nova dis file.nv` | Show the compiled bytecode |
 | `nova dbg file.nv` | Run in debug mode |
+| `nova install name repo/path` | Install a library into `libs/<name>/` |
+| `nova remove name` | Remove a library from `libs/<name>/` |
 | `nova repl` | Interactive REPL |
 | `nova help` | Show all commands |
 
@@ -344,6 +346,28 @@ pull libraries from multiple sources in one command.
 2. Every `.nv` file is downloaded into `libs/`
 3. You import them locally: `import libs.core`, `import libs.list`, etc.
 
+### Installing libraries into an existing project
+
+If you already have a project, use `nova install` to add libraries:
+
+```bash
+cd myapp
+nova install std pyrotek45/nova-lang/std
+```
+
+This creates `libs/std/` and downloads all `.nv` files into it. Import with:
+
+```nova
+import libs.std.core
+import libs.std.math
+```
+
+To remove a library:
+
+```bash
+nova remove std
+```
+
 ### Running code from GitHub
 
 You can also run a file directly from GitHub without downloading it:
@@ -512,11 +536,12 @@ import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d4e5f6"
 | Situation | Use |
 |---|---|
 | Prototyping, quick scripts | `import @` — no setup needed |
-| Production projects | `nova init --with` then `import libs.module` |
+| New projects | `nova init --with` then `import libs.module` |
+| Existing projects | `nova install name repo/path` then `import libs.name.module` |
 | Reproducible builds | `import @` with `! "commit_hash"` |
 
 > **Tip:** `import @` requires network access. For offline work, use
-> `nova init --with` to download files locally during project setup.
+> `nova init --with` or `nova install` to download files locally.
 
 ---
 

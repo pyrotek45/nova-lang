@@ -1192,6 +1192,8 @@ Duplicate detection works the same as local imports.
 | `nova dis [file.nv]` | Disassemble compiled bytecode |
 | `nova dis --git owner/repo/path.nv [commit]` | Disassemble a file from GitHub |
 | `nova init name [--with owner/repo/folder]` | Create a new project |
+| `nova install name owner/repo/folder` | Install a library into `libs/<name>/` |
+| `nova remove name` | Remove a library from `libs/<name>/` |
 | `nova test [dir]` | Run all `test_*.nv` files in `tests/` (or given dir) |
 | `nova repl` | Start interactive REPL |
 | `nova help` | Show help |
@@ -1216,5 +1218,7 @@ myproject/
 
 - `nova init myproject` creates this structure with a hello-world template and starter test.
 - `nova init myproject --with owner/repo/folder` also fetches all `.nv` files from a GitHub folder into `libs/`.
+- `nova install name owner/repo/folder` fetches a library into `libs/<name>/` in an existing project.
+- `nova remove name` removes `libs/<name>/`.
 - `cd myproject && nova run` runs the project.
 - `cd myproject && nova test` runs all tests.

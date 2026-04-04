@@ -1745,6 +1745,8 @@ Nova programs are compiled and run through the `nova` CLI tool.
 | `dis --git` | `nova dis --git owner/repo/path.nv` | Disassemble a file from GitHub |
 | `init` | `nova init myproject` | Create a new project folder with `main.nv`, `libs/`, and `tests/` |
 | `init --with` | `nova init myproject --with owner/repo/folder` | Create project and fetch an entire folder from GitHub |
+| `install` | `nova install std pyrotek45/nova-lang/std` | Install a library into `libs/<name>/` from GitHub |
+| `remove` | `nova remove std` | Remove a library from `libs/<name>/` |
 | `test` | `nova test` | Run all `test_*.nv` files in `tests/` and report results |
 | `repl` | `nova repl` | Start the interactive REPL |
 | `help` | `nova help` | Show usage information |
@@ -1870,6 +1872,50 @@ import libs.core
 > **Template pattern:** Use `--with` to pull your own template libraries from
 > GitHub. Keep a `template/` folder in a repo and start every project with:
 > `nova init myproject --with myuser/myrepo/template`
+
+#### `nova install`
+
+Installs a third-party library from a public GitHub folder into your project's `libs/` directory:
+
+```bash
+nova install std pyrotek45/nova-lang/std
+# Fetched 29 files from pyrotek45/nova-lang/std
+# Installed 'std' into libs/std.
+#   Import with:  import libs.std.modulename
+```
+
+The first argument is the **name** — this becomes the subfolder under `libs/`.
+The second argument is the **GitHub path** (`owner/repo/folder`).
+
+After installing, import the modules with a dot path:
+
+```nova
+import libs.std.core
+import libs.std.math
+```
+
+You can install multiple libraries side by side:
+
+```bash
+nova install std pyrotek45/nova-lang/std
+nova install utils someuser/somerepo/helpers
+```
+
+If a library is already installed, Nova will tell you to remove it first:
+
+```
+Library 'std' is already installed at libs/std.
+  To update it, remove it first:  nova remove std
+```
+
+#### `nova remove`
+
+Removes a previously installed library by deleting its folder from `libs/`:
+
+```bash
+nova remove std
+# Removed 'std' from libs/.
+```
 
 #### `nova test`
 
