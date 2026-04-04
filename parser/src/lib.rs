@@ -707,11 +707,11 @@ impl Parser {
         }
         // if current token is @ then parse [T: Type] and replace the generic type and inset that into the type_map
         self.modify_type_map(&mut type_map, pos.clone(), generic_list)?;
-        return_type = Box::new(self.typechecker.get_output(
+        *return_type = self.typechecker.get_output(
             *return_type,
             &mut type_map,
             pos.clone(),
-        )?);
+        )?;
 
         if let Some(subtype) = self
             .typechecker
@@ -1129,11 +1129,11 @@ impl Parser {
                         &mut type_map,
                         pos.clone(),
                     )?;
-                    return_type = Box::new(self.typechecker.get_output(
+                    *return_type = self.typechecker.get_output(
                         *return_type.clone(),
                         &mut type_map,
                         pos,
-                    )?);
+                    )?;
                     lhs = Expr::Call {
                         ttype: *return_type,
                         name: "anon".into(),
@@ -1446,11 +1446,11 @@ impl Parser {
                             &mut type_map,
                             field_position.clone(),
                         )?;
-                        return_type = Box::new(self.typechecker.get_output(
+                        *return_type = self.typechecker.get_output(
                             *return_type.clone(),
                             &mut type_map,
                             pos,
-                        )?);
+                        )?;
                         // dbg!(arguments.clone(), return_type.clone(), left_expr.clone());
 
                         Expr::Call {
@@ -2623,11 +2623,11 @@ impl Parser {
                 &mut type_map,
                 pos.clone(),
             )?;
-            return_type = Box::new(self.typechecker.get_output(
+            *return_type = self.typechecker.get_output(
                 *return_type.clone(),
                 &mut type_map,
                 pos,
-            )?);
+            )?;
             Ok(Expr::Call {
                 ttype: *return_type,
                 name: function_name,
