@@ -4272,7 +4272,7 @@ impl Parser {
                     }
                 },
                 Err(e) => {
-                    let hint = if commit.is_some() {
+                    let mut hint = if commit.is_some() {
                         format!(
                             "\n  Check that the commit hash `{}` is correct and the file exists at that revision.",
                             branch
@@ -4282,6 +4282,25 @@ impl Parser {
                          Tip: you can lock to a specific commit with `! \"commithash\"`."
                             .to_string()
                     };
+
+                    // Detect common mistake: user included the branch name in the path
+                    let common_branches = ["main/", "master/", "dev/", "develop/"];
+                    for prefix in common_branches {
+                        if file_path.starts_with(prefix) {
+                            let corrected = &file_path[prefix.len()..];
+                            hint.push_str(&format!(
+                                "\n\n  It looks like the path contains the branch name `{}`.\n  \
+                                 The branch is added automatically — try removing it:\n  \
+                                 import @ \"{}/{}/{}\"",
+                                &prefix[..prefix.len() - 1],
+                                owner,
+                                repo,
+                                corrected
+                            ));
+                            break;
+                        }
+                    }
+
                     return Err(self.generate_error_with_pos(
                         "GitHub import: could not fetch file",
                         format!(
@@ -4361,6 +4380,66 @@ impl Parser {
             None => import_filepath,
         };
         let resolved_filepath: Rc<Path> = resolved_filepath.into();
+
+        // ── If the resolved path is a github:// virtual path, fetch from GitHub ──
+        let resolved_str = resolved_filepath.to_string_lossy();
+        if resolved_str.starts_with("github://") {
+            // Parse github://owner/repo/path/to/file.nv
+            let gh_path = &resolved_str["github://".len()..];
+            let gh_parts: Vec<&str> = gh_path.splitn(3, '/').collect();
+            if gh_parts.len() >= 3 {
+                let gh_owner = gh_parts[0];
+                let gh_repo = gh_parts[1];
+                let gh_file = gh_parts[2];
+                let gh_url = format!(
+                    "https://raw.githubusercontent.com/{}/{}/main/{}",
+                    gh_owner, gh_repo, gh_file
+                );
+
+                let gh_source = match ureq::get(&gh_url).call() {
+                    Ok(resp) => match resp.into_string() {
+                        Ok(body) => body,
+                        Err(e) => {
+                            return Err(self.generate_error_with_pos(
+                                "GitHub import: failed to read response",
+                                format!(
+                                    "Could not read the response body from:\n  {}\n  Error: {}",
+                                    gh_url, e
+                                ),
+                                pos,
+                            ));
+                        }
+                    },
+                    Err(e) => {
+                        return Err(self.generate_error_with_pos(
+                            "GitHub import: could not fetch file",
+                            format!(
+                                "Failed to fetch nested import from GitHub:\n  {}\n  Error: {}\n  \
+                                 This import was triggered by a GitHub-fetched file.\n  \
+                                 Check that the file exists in the repository.",
+                                gh_url, e
+                            ),
+                            pos,
+                        ));
+                    }
+                };
+
+                let mut lexer = Lexer::new(gh_source.as_str(), Some(&resolved_filepath));
+                let tokens = lexer.tokenize()?;
+                let mut parser = self.clone();
+                parser.index = 0;
+                parser.filepath = Some(resolved_filepath.clone());
+                parser.input = tokens;
+                parser.parse()?;
+                self.typechecker.environment = parser.typechecker.environment.clone();
+                self.modules = parser.modules.clone();
+                return Ok(Some(Statement::Block {
+                    body: parser.ast.program.clone(),
+                    filepath: Some(resolved_filepath),
+                }));
+            }
+        }
+
         let tokens = Lexer::read_file(&resolved_filepath);
         let tokens = match tokens {
             Ok(tokens) => tokens,

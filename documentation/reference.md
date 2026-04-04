@@ -249,7 +249,7 @@ These functions are available without any imports.
 nova run myapp.nv hello world 42
 ```
 
-```nova
+```rust
 let args = terminal::args()         // Some(["hello", "world", "42"])
 if args.isSome() {
     let list = args.unwrap()
@@ -262,7 +262,7 @@ if args.isSome() {
 When calling `todo()`, `unreachable()`, or other generic functions where the return
 type cannot be inferred, use `@[T: Type]`:
 
-```nova
+```rust
 return todo() @[T: String]
 return unreachable() @[T: Int]
 let map = HashMap::default() @[K: String, V: Int]
@@ -280,7 +280,7 @@ full syntax details including GitHub imports.
 
 ### `std/core` — Foundation
 
-```nova
+```rust
 import super.std.core
 ```
 
@@ -316,7 +316,7 @@ import super.std.core
 
 ### `std/math` — Extended Mathematics
 
-```nova
+```rust
 import super.std.math
 ```
 
@@ -365,7 +365,7 @@ import super.std.math
 
 ### `std/string` — String Utilities
 
-```nova
+```rust
 import super.std.string
 ```
 
@@ -390,7 +390,7 @@ import super.std.string
 
 ### `std/list` — List Utilities
 
-```nova
+```rust
 import super.std.list
 ```
 
@@ -421,7 +421,7 @@ import super.std.list
 
 ### `std/option` — Option Combinators
 
-```nova
+```rust
 import super.std.option
 ```
 
@@ -444,7 +444,7 @@ Extends the built-in `Option(T)` (which has `.isSome()` and `.unwrap()`):
 
 ### `std/maybe` — Maybe Type
 
-```nova
+```rust
 import super.std.maybe
 ```
 
@@ -459,7 +459,7 @@ import super.std.maybe
 
 ### `std/result` — Error Handling
 
-```nova
+```rust
 import super.std.result
 ```
 
@@ -475,7 +475,7 @@ import super.std.result
 
 ### `std/iter` — Lazy Iterators
 
-```nova
+```rust
 import super.std.iter
 ```
 
@@ -493,7 +493,7 @@ import super.std.iter
 
 ### `std/functional` — Higher-Order Utilities
 
-```nova
+```rust
 import super.std.functional
 ```
 
@@ -514,7 +514,7 @@ import super.std.functional
 
 ### `std/tuple` — Pair and Triple
 
-```nova
+```rust
 import super.std.tuple
 ```
 
@@ -532,7 +532,7 @@ import super.std.tuple
 
 ### `std/hashmap` — Hash Map
 
-```nova
+```rust
 import super.std.hashmap
 ```
 
@@ -557,7 +557,7 @@ import super.std.hashmap
 
 ### `std/set` — Set
 
-```nova
+```rust
 import super.std.set
 ```
 
@@ -575,7 +575,7 @@ import super.std.set
 
 ### `std/vec2` — 2D Vector Math
 
-```nova
+```rust
 import super.std.vec2
 ```
 
@@ -602,7 +602,7 @@ import super.std.vec2
 
 ### `std/deque` — Double-Ended Queue
 
-```nova
+```rust
 import super.std.deque
 ```
 
@@ -619,7 +619,7 @@ import super.std.deque
 
 ### `std/io` — File and Console I/O
 
-```nova
+```rust
 import super.std.io
 ```
 
@@ -638,7 +638,7 @@ import super.std.io
 
 ### `std/ansi` — ANSI Terminal Colours
 
-```nova
+```rust
 import super.std.ansi
 ```
 
@@ -655,7 +655,7 @@ import super.std.ansi
 
 ### `std/color` — Named Colour Tuples
 
-```nova
+```rust
 import super.std.color
 ```
 
@@ -674,7 +674,7 @@ import super.std.color
 
 ### `std/tui` — Terminal UI
 
-```nova
+```rust
 import super.std.tui
 ```
 
@@ -696,7 +696,7 @@ import super.std.tui
 
 ### `std/widget` — TUI Widget Toolkit
 
-```nova
+```rust
 import super.std.widget
 ```
 
@@ -718,7 +718,7 @@ import super.std.widget
 
 ### `std/plot` — Charts & Graphs (Raylib)
 
-```nova
+```rust
 import super.std.plot
 ```
 
@@ -775,7 +775,7 @@ A `PlotArea` maps data coordinates to screen pixels.
 
 #### Example
 
-```nova
+```rust
 import super.std.plot
 
 raylib::init("Chart", 800, 600, 30)
@@ -798,7 +798,7 @@ See `demo/plotdemo.nv` for a comprehensive 7-chart demo.
 
 ### `std/timer` — Game Timers
 
-```nova
+```rust
 import super.std.timer
 ```
 
@@ -821,7 +821,7 @@ import super.std.timer
 
 ### `std/tween` — Interpolation and Easing
 
-```nova
+```rust
 import super.std.tween
 ```
 
@@ -848,7 +848,7 @@ import super.std.tween
 
 ### `std/input` — Action-Based Input
 
-```nova
+```rust
 import super.std.input
 ```
 
@@ -868,7 +868,7 @@ import super.std.input
 
 ### `std/camera` — 2D Camera
 
-```nova
+```rust
 import super.std.camera
 ```
 
@@ -890,7 +890,7 @@ import super.std.camera
 
 ### `std/physics` — 2D Physics
 
-```nova
+```rust
 import super.std.physics
 ```
 
@@ -912,7 +912,7 @@ import super.std.physics
 
 ### `std/entity` — Entity System
 
-```nova
+```rust
 import super.std.entity
 ```
 
@@ -937,7 +937,7 @@ import super.std.entity
 
 ### `std/scene` — Scene Management
 
-```nova
+```rust
 import super.std.scene
 ```
 
@@ -956,14 +956,14 @@ import super.std.scene
 
 ### `std/grid` — 2D Grid and Tilemap
 
-```nova
+```rust
 import super.std.grid
 ```
 
 `Grid(T)` is a **generic** fixed-size 2D grid. Specify the element type
 with `@[T: Type]` at construction.
 
-```nova
+```rust
 let intGrid  = Grid::new(10, 10, 0)     @[T: Int]
 let boolGrid = Grid::new(5, 5, false)   @[T: Bool]
 let strGrid  = Grid::new(3, 3, ".")     @[T: String]
@@ -990,7 +990,7 @@ let strGrid  = Grid::new(3, 3, ".")     @[T: String]
 
 ### `std/noise` — Procedural Noise
 
-```nova
+```rust
 import super.std.noise
 ```
 
@@ -1012,7 +1012,7 @@ input, sprites, and audio.
 
 ### Quick Start
 
-```nova
+```rust
 raylib::init("My Game", 800, 600, 60)
 
 while raylib::rendering() {
@@ -1155,13 +1155,13 @@ of the same module are silently skipped.
 
 Fetch a file from a public GitHub repository:
 
-```nova
+```rust
 import @ "owner/repo/path/to/file.nv"
 ```
 
 Lock to a specific commit hash:
 
-```nova
+```rust
 import @ "owner/repo/path/to/file.nv" ! "a1b2c3d"
 ```
 

@@ -90,7 +90,7 @@ A comprehensive guide to writing Nova — from first program to full games.
 
 Every Nova file begins with a `module` declaration, then your code:
 
-```nova
+```rust
 module hello
 
 println("Hello, world!")
@@ -104,7 +104,7 @@ Save as `hello.nv` and run with `nova run hello.nv`. See [§31 CLI and REPL](#31
 
 Every Nova source file starts with a `module` declaration:
 
-```nova
+```rust
 module my_program
 ```
 
@@ -117,7 +117,7 @@ Nova uses dot-separated names to navigate the folder structure. Each dot
 becomes a `/`, and `.nv` is appended automatically. The keyword `super`
 means "go up one directory" (like `..` on the filesystem).
 
-```nova
+```rust
 import helper              // → ./helper.nv            (same directory)
 import utils.math          // → ./utils/math.nv        (subfolder)
 import super.std.core      // → ../std/core.nv         (up one, then into std/)
@@ -128,7 +128,7 @@ All paths are relative to the file that contains the `import` statement.
 
 You can also use a **string literal** if you prefer a raw path:
 
-```nova
+```rust
 import "libs/helper.nv"        // same as: import libs.helper
 import "../std/core.nv"        // same as: import super.std.core
 ```
@@ -153,7 +153,7 @@ You can import a file directly from a public GitHub repository using the
 `@` symbol. The module name comes from the `module` declaration inside the
 fetched file — you don't need to name it yourself:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv"
 ```
 
@@ -163,7 +163,7 @@ Nova fetches the file from GitHub's `main` branch by default.
 To lock to a specific commit (so your code doesn't break if the repo changes),
 add `!` followed by a commit hash:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d"
 ```
 
@@ -209,7 +209,7 @@ Nova's method resolution finds them when you call `.isSome()` on any `Option(T)`
 
 Because `::` works on structs, you can group related static functions:
 
-```nova
+```rust
 struct Math {}
 
 fn extends(Math) pi() -> Float { return 3.14159 }
@@ -222,7 +222,7 @@ Math::pi()   // 3.14159
 
 When the compiler needs help resolving a generic, annotate with `@[]`:
 
-```nova
+```rust
 let empty = HashMap::default() @[K: String, V: Int]
 ```
 
@@ -230,7 +230,7 @@ let empty = HashMap::default() @[K: String, V: Int]
 
 ## 3. Variables and Types
 
-```nova
+```rust
 let x = 42              // Int
 let name = "Nova"       // String
 let pi = 3.14           // Float
@@ -245,7 +245,7 @@ Variables are declared with `let`. The type is determined at declaration. Nova h
 
 Variables can be reassigned, but only to values of the **same type**:
 
-```nova
+```rust
 let x = 10
 x = 20      // OK — same type
 x = "hello" // ERROR — cannot change type
@@ -312,7 +312,7 @@ x = "hello" // ERROR — cannot change type
 
 ### if / elif / else
 
-```nova
+```rust
 if x > 10 {
     println("big")
 } elif x > 5 {
@@ -326,7 +326,7 @@ if x > 10 {
 
 ### if as Expression
 
-```nova
+```rust
 let msg = if x > 0 { "positive" } else { "non-positive" }
 ```
 
@@ -337,7 +337,7 @@ Expression `if` only supports a single `if/else` pair — no `elif` chaining.
 A `{ }` block used in expression position evaluates to the value of its
 **last expression**:
 
-```nova
+```rust
 let x = {
     let a = 10
     let b = 20
@@ -349,7 +349,7 @@ let x = {
 Block expressions can be nested, used as function arguments, or combined
 with other expressions:
 
-```nova
+```rust
 let doubled = double({
     let n = 7
     n + 3
@@ -359,7 +359,7 @@ let doubled = double({
 
 ### for Loop
 
-```nova
+```rust
 // C-style
 for let i = 0; i < 10; i += 1 {
     println(i)
@@ -377,7 +377,7 @@ for item in myList { println(item) }
 
 ### while Loop
 
-```nova
+```rust
 while condition {
     // body
 }
@@ -385,7 +385,7 @@ while condition {
 
 ### if let / while let — Safe Option Unwrapping
 
-```nova
+```rust
 if let value = someOption {
     println(value)      // runs only if Some
 } else {
@@ -403,7 +403,7 @@ while let item = generator() {
 
 ### Basic Functions
 
-```nova
+```rust
 fn add(a: Int, b: Int) -> Int {
     return a + b
 }
@@ -419,7 +419,7 @@ Every function returning a value **must** have an explicit `return`. Nova has no
 
 Functions without `->` return `Void`:
 
-```nova
+```rust
 fn log(msg: String) {
     println("[LOG] " + msg)
 }
@@ -429,7 +429,7 @@ fn log(msg: String) {
 
 Functions can be overloaded by parameter types:
 
-```nova
+```rust
 fn describe(x: Int) -> String { return "int: " + Cast::string(x) }
 fn describe(x: String) -> String { return "str: " + x }
 ```
@@ -438,13 +438,13 @@ fn describe(x: String) -> String { return "str: " + x }
 
 Use `@` to get a reference to a function. When overloaded, specify the type:
 
-```nova
+```rust
 let f = describe@(Int)     // fn(Int) -> String
 ```
 
 ### Recursion
 
-```nova
+```rust
 fn factorial(n: Int) -> Int {
     if n <= 1 { return 1 }
     return n * factorial(n - 1)
@@ -455,7 +455,7 @@ fn factorial(n: Int) -> Int {
 
 Declare a function's signature (no body, no braces) to use it before its definition:
 
-```nova
+```rust
 fn isEven(n: Int) -> Bool     // forward declaration
 
 fn isOdd(n: Int) -> Bool {
@@ -475,7 +475,7 @@ Use `pass` as a placeholder function body when you want to define a
 function's signature but leave the implementation empty (like Python's
 `pass`):
 
-```nova
+```rust
 fn todo(x: Int) {
     pass
 }
@@ -492,7 +492,7 @@ them in a list literal.  The type checker automatically collects
 same-typed trailing arguments into a list when no exact signature match
 exists.
 
-```nova
+```rust
 fn sum(xs: [Int]) -> Int {
     let total = 0
     for x in xs {
@@ -511,7 +511,7 @@ sum(1)           // single vararg — wraps into [1]
 The list must be the **last** parameter, but you can have as many
 leading parameters of any type as you like:
 
-```nova
+```rust
 fn tag_sum(label: String, xs: [Int]) -> String {
     let total = 0
     for x in xs { total = total + x }
@@ -524,7 +524,7 @@ tag_sum("sum=", 1, 2, 3)   // "sum=6"
 This works with any number of leading parameters and any types — closures
 included:
 
-```nova
+```rust
 fn apply_all(f: fn(Int) -> Int, xs: [Int]) -> [Int] {
     let result = []: Int
     for x in xs { result.push(f(x)) }
@@ -541,7 +541,7 @@ apply_all(|x: Int| x * 2, 10, 20, 30)   // [20, 40, 60]
 - If an **exact** signature already matches the call, it takes priority.
   Varargs resolution only kicks in when there is no direct match.
 
-```nova
+```rust
 fn describe(x: Int) -> String    { return "single" }
 fn describe(xs: [Int]) -> String { return "list" }
 
@@ -556,7 +556,7 @@ describe(1, 2, 3)   // "list"   — no fn(Int,Int,Int) → varargs
 
 Extends methods follow the same rule — the last parameter can be a list:
 
-```nova
+```rust
 fn extends sum_with(self: Int, xs: [Int]) -> Int {
     let total = self
     for x in xs { total = total + x }
@@ -583,7 +583,7 @@ fn extends sum_with(self: Int, xs: [Int]) -> Int {
 `fn extends` adds methods to any type using Universal Function Call Syntax.
 The first parameter becomes the receiver:
 
-```nova
+```rust
 fn extends double(x: Int) -> Int {
     return x * 2
 }
@@ -593,7 +593,7 @@ fn extends double(x: Int) -> Int {
 
 ### Chaining
 
-```nova
+```rust
 fn extends add(x: Int, n: Int) -> Int { return x + n }
 
 5.double().add(3)   // 13
@@ -601,7 +601,7 @@ fn extends add(x: Int, n: Int) -> Int { return x + n }
 
 ### Extends on Structs
 
-```nova
+```rust
 fn extends area(r: Rect) -> Int {
     return r.w * r.h
 }
@@ -614,7 +614,7 @@ myRect.area()
 You can omit the `(Type)` after `extends` and the compiler will infer
 the target type from the first parameter:
 
-```nova
+```rust
 // explicit target
 fn extends(Point) translate(p: Point, dx: Int, dy: Int) -> Point {
     return Point { x: p.x + dx, y: p.y + dy }
@@ -628,7 +628,7 @@ fn extends translate(p: Point, dx: Int, dy: Int) -> Point {
 
 Auto-infer also works with built-in types:
 
-```nova
+```rust
 fn extends isPositive(n: Int) -> Bool { return n > 0 }
 5.isPositive()    // true
 ```
@@ -637,7 +637,7 @@ fn extends isPositive(n: Int) -> Bool { return n > 0 }
 
 When a struct has a function field, `->` calls it passing the struct as the first argument:
 
-```nova
+```rust
 struct Handler { process: fn(Handler, String) -> String }
 
 let h = Handler { process: fn(self: Handler, msg: String) -> String {
@@ -653,7 +653,7 @@ h->process("hello")   // "handled: hello"
 
 ### Basic Struct
 
-```nova
+```rust
 struct Point { x: Int, y: Int }
 
 let p = Point { x: 10, y: 20 }
@@ -662,14 +662,14 @@ println(p.x)   // 10
 
 ### Positional Construction
 
-```nova
+```rust
 struct Pair { a: Int, b: Int }
 let p = Pair(1, 2)    // same as Pair { a: 1, b: 2 }
 ```
 
 ### Generic Structs
 
-```nova
+```rust
 struct Box(T) { value: $T }
 
 let b = Box { value: 42 }            // Box(Int)
@@ -680,7 +680,7 @@ let s = Box { value: "hello" }       // Box(String)
 
 Structs can store closures:
 
-```nova
+```rust
 struct Button {
     label: String,
     onClick: fn(),
@@ -697,7 +697,7 @@ The `::` operator calls a function stored in a struct field **without**
 passing the struct as the first argument. Use it when the closure doesn't
 need to know about its owner:
 
-```nova
+```rust
 struct Config { transform: fn(Int) -> Int }
 
 let cfg = Config { transform: fn(x: Int) -> Int { return x * 2 } }
@@ -710,7 +710,7 @@ The `->` operator calls a function stored in a struct field **and
 prepends the struct itself** as the first argument. Use it when the
 closure needs access to the struct's data:
 
-```nova
+```rust
 struct Entity { name: String, greet: fn(Entity) -> String }
 
 let e = Entity {
@@ -729,7 +729,7 @@ Both operators also work through `Dyn` types (see section 18).
 
 Every struct has a built-in `type` field that returns its type name:
 
-```nova
+```rust
 println(p.type)   // "Point"
 ```
 
@@ -737,7 +737,7 @@ println(p.type)   // "Point"
 
 Define dunder methods via `extends`:
 
-```nova
+```rust
 fn extends __add__(a: Point, b: Point) -> Point {
     return Point { x: a.x + b.x, y: a.y + b.y }
 }
@@ -757,7 +757,7 @@ Available dunders: `__add__`, `__sub__`, `__mul__`, `__div__`, `__mod__`,
 
 Enums define tagged unions. Variants can carry data:
 
-```nova
+```rust
 enum Shape {
     Circle: Float,
     Rectangle: (Float, Float),
@@ -771,7 +771,7 @@ let p = Shape::Point()               // no-data variants need ()
 
 ### Pattern Matching on Enums
 
-```nova
+```rust
 match shape {
     Circle(radius) => { println("circle r=" + Cast::string(radius)) }
     Rectangle(dims) => { println("rect " + Cast::string(dims[0])) }
@@ -784,7 +784,7 @@ match shape {
 
 ### Generic Enums
 
-```nova
+```rust
 enum Maybe(A) { Just: $A, Nothing }
 
 let x = Maybe::Just(42)
@@ -797,7 +797,7 @@ let n = Maybe::Nothing() @[A: Int]   // type annotation for no-data generic vari
 
 Generic type parameters use `$T` syntax:
 
-```nova
+```rust
 struct Wrapper(T) { inner: $T }
 
 fn identity(x: $T) -> $T { return x }
@@ -805,7 +805,7 @@ fn identity(x: $T) -> $T { return x }
 
 ### Generic Extends
 
-```nova
+```rust
 fn extends(Wrapper) unwrap(self: Wrapper($T)) -> $T {
     return self.inner
 }
@@ -815,7 +815,7 @@ fn extends(Wrapper) unwrap(self: Wrapper($T)) -> $T {
 
 Use `@[T: ConcreteType]` to specify the type parameter at construction:
 
-```nova
+```rust
 struct Grid(T) { cells: [$T], cols: Int, rows: Int }
 
 fn extends(Grid) new(cols: Int, rows: Int, default: $T) -> Grid($T) {
@@ -843,7 +843,7 @@ body will work.
 
 `Option(T)` represents a value that may or may not exist:
 
-```nova
+```rust
 let found: Option(Int) = Some(42)
 let missing: Option(Int) = None(Int)
 ```
@@ -855,7 +855,7 @@ let missing: Option(Int) = None(Int)
 
 ### Safe Unwrapping with `if let`
 
-```nova
+```rust
 if let value = found {
     println(value)
 } else {
@@ -865,7 +865,7 @@ if let value = found {
 
 ### Standard Library Helpers
 
-```nova
+```rust
 import super.std.core
 
 let x: Option(Int) = None(Int)
@@ -893,7 +893,7 @@ x.isNone()              // true
 
 ### Full Syntax
 
-```nova
+```rust
 let add = fn(x: Int, y: Int) -> Int {
     return x + y
 }
@@ -901,19 +901,19 @@ let add = fn(x: Int, y: Int) -> Int {
 
 ### Short Lambda
 
-```nova
+```rust
 let square = |x: Int| x * x
 ```
 
 ### Empty Closures
 
-```nova
+```rust
 let greet = || println("hello")
 ```
 
 ### Closures as Arguments
 
-```nova
+```rust
 let doubled = [1, 2, 3].map(|x: Int| x * 2)     // [2, 4, 6]
 let evens = [1, 2, 3, 4].filter(|x: Int| x % 2 == 0)  // [2, 4]
 ```
@@ -922,7 +922,7 @@ let evens = [1, 2, 3, 4].filter(|x: Int| x % 2 == 0)  // [2, 4]
 
 When the last argument is a closure, write it after `:`:
 
-```nova
+```rust
 let big = [1, 2, 3, 4, 5].filter(): |x: Int| x > 3   // [4, 5]
 ```
 
@@ -930,7 +930,7 @@ let big = [1, 2, 3, 4, 5].filter(): |x: Int| x > 3   // [4, 5]
 
 Name an intermediate result inline:
 
-```nova
+```rust
 let len_sq = [1, 2, 3, 4, 5].len() ~> n { n * n }   // 25
 ```
 
@@ -939,7 +939,7 @@ let len_sq = [1, 2, 3, 4, 5].len() ~> n { n * n }   // 25
 Closures capture scalars **by value** and heap objects **by reference**.
 Use `Box(T)` to share mutable scalar state:
 
-```nova
+```rust
 import super.std.core
 let counter = Box(0)
 let inc = fn() { counter.value += 1 }
@@ -952,14 +952,14 @@ inc(); inc(); inc()   // counter.value == 3
 
 ### Construction
 
-```nova
+```rust
 let xs = [1, 2, 3]            // [Int]
 let empty = []: Int            // empty list — type annotation required
 ```
 
 ### Operations
 
-```nova
+```rust
 xs.push(4)       // append
 xs.pop()         // remove last → Option
 xs.len()         // length
@@ -971,7 +971,7 @@ xs[0] = 99       // assignment
 
 Use `+` to concatenate two lists of the same type:
 
-```nova
+```rust
 let a = [1, 2, 3]
 let b = [4, 5, 6]
 let c = a + b      // [1, 2, 3, 4, 5, 6]
@@ -982,7 +982,7 @@ Works reliably with value types (`Int`, `Float`, `Bool`, `Char`).
 
 ### Slicing
 
-```nova
+```rust
 let xs = [10, 20, 30, 40, 50]
 
 xs[1:3]      // [20, 30]
@@ -998,7 +998,7 @@ xs[0:8$2]    // every 2nd element (step with $)
 
 Negative indices count from the end — just like Python:
 
-```nova
+```rust
 let xs = [10, 20, 30, 40, 50]
 xs[-1]     // 50  — last element
 xs[-2]     // 40  — second-to-last
@@ -1010,7 +1010,7 @@ xs[-1] = 99   // write to last element (xs is now [10, 20, 30, 40, 99])
 This works for lists, strings, and tuples. Negative indices also work
 in assignment position (lists only).
 
-```nova
+```rust
 let s = "hello"
 s[-1]     // 'o'
 s[-5]     // 'h'
@@ -1018,7 +1018,7 @@ s[-5]     // 'h'
 
 ### List Comprehensions
 
-```nova
+```rust
 let squares = [x in [1, 2, 3, 4, 5] | x * x]           // [1, 4, 9, 16, 25]
 let evens = [x in [1,2,3,4,5,6] | x | x % 2 == 0]      // [2, 4, 6]
 let sums = [x in [1,2], y in [10,20] | x + y]            // [11, 21, 12, 22]
@@ -1026,7 +1026,7 @@ let sums = [x in [1,2], y in [10,20] | x + y]            // [11, 21, 12, 22]
 
 Guards are separated by `|` and combined with AND:
 
-```nova
+```rust
 import super.std.core
 let filtered = [x in 1.to(21) | x | x % 2 == 0 | x > 5 | x < 15]
 // [6, 8, 10, 12, 14]
@@ -1034,7 +1034,7 @@ let filtered = [x in 1.to(21) | x | x % 2 == 0 | x > 5 | x < 15]
 
 ### Standard Library Functions
 
-```nova
+```rust
 import super.std.list
 
 [1,2,3].map(|x: Int| x * 2)                               // [2, 4, 6]
@@ -1052,7 +1052,7 @@ import super.std.list
 
 Fixed-size typed collections:
 
-```nova
+```rust
 let t = (42, "hello", true)
 t[0]   // 42
 t[1]   // "hello"
@@ -1062,14 +1062,14 @@ t[1]   // "hello"
 
 Use a trailing comma:
 
-```nova
+```rust
 let single = (42,)   // tuple
 let grouped = (42)    // just the Int 42
 ```
 
 ### Functions Returning Tuples
 
-```nova
+```rust
 fn divmod(a: Int, b: Int) -> (Int, Int) {
     return (a / b, a % b)
 }
@@ -1081,7 +1081,7 @@ fn divmod(a: Int, b: Int) -> (Int, Int) {
 
 `match` works on enum values:
 
-```nova
+```rust
 match color {
     Red()   => { return "red" }
     Green() => { return "green" }
@@ -1094,7 +1094,7 @@ match color {
 You can separate match arms with commas. Trailing commas after the last
 arm are also allowed:
 
-```nova
+```rust
 match color {
     Red()   => { return "red" },
     Green() => { return "green" },
@@ -1106,7 +1106,7 @@ match color {
 
 For short arms you can write a single expression instead of a block:
 
-```nova
+```rust
 match direction {
     Up()   => println("up")
     Down() => println("down")
@@ -1115,7 +1115,7 @@ match direction {
 
 Both styles can be mixed:
 
-```nova
+```rust
 match shape {
     Circle(r)  => println(Cast::string(r)),
     Point()    => { println("point") },
@@ -1124,7 +1124,7 @@ match shape {
 
 ### With Data Extraction
 
-```nova
+```rust
 enum Tree(T) { Leaf: $T, Node: (Tree($T), Tree($T)) }
 
 fn depth(t: Tree(Int)) -> Int {
@@ -1147,7 +1147,7 @@ fn depth(t: Tree(Int)) -> Int {
 
 `|>` passes the left value as the first argument:
 
-```nova
+```rust
 fn square(x: Int) -> Int { return x * x }
 fn inc(x: Int) -> Int { return x + 1 }
 
@@ -1162,7 +1162,7 @@ let r = 4 |> inc() |> square()   // 25
 
 Dyn types provide structural, duck-typed dispatch:
 
-```nova
+```rust
 fn get_name(thing: Dyn(T = name: String)) -> String {
     return thing.name
 }
@@ -1176,14 +1176,14 @@ get_name(Robot { name: "R2D2", model: 2 }) // "R2D2"
 
 ### Type Aliases
 
-```nova
+```rust
 type named = Dyn(T = name: String)
 type renderable = Dyn(T = render: fn($T) -> String + label: String)
 ```
 
 ### Multi-Field Dyn
 
-```nova
+```rust
 fn full_info(x: Dyn(T = name: String + age: Int)) -> String {
     return x.name + " (age " + Cast::string(x.age) + ")"
 }
@@ -1191,7 +1191,7 @@ fn full_info(x: Dyn(T = name: String + age: Int)) -> String {
 
 ### Dyn with Function Fields (`->` dispatch)
 
-```nova
+```rust
 type drawable = Dyn(T = draw: fn($T))
 
 fn drawAll(items: [drawable]) {
@@ -1205,7 +1205,7 @@ fn drawAll(items: [drawable]) {
 
 `Box(T)` wraps a value on the heap. Multiple closures can share and mutate it:
 
-```nova
+```rust
 import super.std.core
 
 let shared = Box(0)
@@ -1220,7 +1220,7 @@ get()   // 3
 
 ## 20. Imports and the Standard Library
 
-```nova
+```rust
 import super.std.core       // Box, Gen, Maybe, Result, range(), .orDefault()
 import super.std.list       // map, filter, reduce, sort, flatten, ...
 import super.std.iter       // Iter type: fromVec, map, filter, collect
@@ -1246,7 +1246,7 @@ All imports flatten into the caller's scope — call by name, not with a prefix.
 After importing a module you can inject new functions into its namespace
 with `fn mod(ModuleName)`:
 
-```nova
+```rust
 import super.std.math
 
 fn mod(math) clamp(x: Int, lo: Int, hi: Int) -> Int {
@@ -1265,14 +1265,14 @@ functions to it.
 
 You can pull in any `.nv` file from a public GitHub repository using `import @`:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv"
 ```
 
 The string is `"owner/repo/path/to/file.nv"`. Nova fetches from the `main`
 branch by default. To lock to a specific commit, add `! "hash"`:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d4e5f6"
 ```
 
@@ -1337,7 +1337,7 @@ type checking. It is used by a handful of built-in functions:
 
 **Wrong — using `Any`:**
 
-```nova
+```rust
 // ❌ Don't do this — loses type info
 struct BadGrid { cells: [Any], cols: Int }
 fn extends set(self: BadGrid, c: Int, r: Int, val: Any) { ... }
@@ -1345,7 +1345,7 @@ fn extends set(self: BadGrid, c: Int, r: Int, val: Any) { ... }
 
 **Right — using generics:**
 
-```nova
+```rust
 // ✅ Correct — fully type-safe
 struct Grid(T) { cells: [$T], cols: Int, rows: Int }
 fn extends(Grid) set(self: Grid($T), col: Int, row: Int, value: $T) { ... }
@@ -1378,7 +1378,7 @@ Enum (with data), Closure.
 
 ### Aliasing
 
-```nova
+```rust
 let a = [1, 2, 3]
 let b = a           // alias — same object
 b.push(4)
@@ -1387,7 +1387,7 @@ println(a.len())    // 4 — visible through a!
 
 ### `clone()` — Deep Copy
 
-```nova
+```rust
 let copy = clone(original)
 copy.push(4)
 println(original.len())   // unchanged
@@ -1405,7 +1405,7 @@ Use `clone()` when you need an independent snapshot.
 
 Closures capture the variable binding. In loops, rebind to freeze the value:
 
-```nova
+```rust
 for let i = 0; i < 5; i += 1 {
     let captured = i
     fns.push(fn() -> Int { return captured })
@@ -1416,7 +1416,7 @@ for let i = 0; i < 5; i += 1 {
 
 ## 23. Cast and Type Conversion
 
-```nova
+```rust
 Cast::string(42)        // "42"
 Cast::int("42")         // Some(42)
 Cast::float(42)         // Some(42.0)
@@ -1429,7 +1429,7 @@ Always handle the `Option` — use `.unwrap()`, `.orDefault()`, or `if let`.
 
 ## 24. Iterators
 
-```nova
+```rust
 import super.std.iter
 
 let result = Iter::fromVec([1, 2, 3, 4, 5])
@@ -1443,7 +1443,7 @@ let result = Iter::fromVec([1, 2, 3, 4, 5])
 
 ## 25. String Operations
 
-```nova
+```rust
 import super.std.string
 
 "hello".len()                  // 5
@@ -1457,7 +1457,7 @@ import super.std.string
 
 Strings can be indexed just like lists. Indexing returns a `Char`:
 
-```nova
+```rust
 let msg = "hello"
 let first = msg[0]     // 'h'
 let last  = msg[-1]    // 'o'
@@ -1466,7 +1466,7 @@ let third = msg[2]     // 'l'
 
 Negative indices count from the end: `-1` is the last character, `-2` is second-to-last, etc.
 
-```nova
+```rust
 let word = "Nova"
 word[0]   // 'N'
 word[-1]  // 'a'
@@ -1479,13 +1479,13 @@ word[-2]  // 'v'
 
 String concatenation uses `+` (String + String only):
 
-```nova
+```rust
 let msg = "Count: " + Cast::string(42)
 ```
 
 Use `format` for placeholders:
 
-```nova
+```rust
 let msg = format("Hello, {}! Age: {}", [name, Cast::string(age)])
 ```
 
@@ -1613,7 +1613,7 @@ Nova provides several built-in functions available in every program without impo
 | `typeof(x)` | `fn(Any) -> String` | Returns the runtime type name as a string |
 | `clone(x)` | `fn(T) -> T` | Deep-copy a value (breaks aliasing) |
 
-```nova
+```rust
 typeof(42)          // "Int"
 typeof(3.14)        // "Float"
 typeof("hello")     // "String"
@@ -1627,7 +1627,7 @@ typeof(p)           // "Point"
 
 `clone` creates an independent copy. Without it, lists and structs are shared by reference:
 
-```nova
+```rust
 let a = [1, 2, 3]
 let b = clone(a)   // independent copy
 b.push(4)           // a is still [1, 2, 3]
@@ -1653,7 +1653,7 @@ as methods: `myOption.isSome()` and `myOption.unwrap()`.
 Returns `None` if no arguments were provided, or `Some([String])` with the list of
 arguments. Arguments are everything after `nova run file.nv`:
 
-```nova
+```rust
 // Run with: nova run myapp.nv hello world 42
 let args = terminal::args()
 
@@ -1689,7 +1689,7 @@ if args.isSome() {
 `todo()` and `unreachable()` are generic — they satisfy **any** return type. This lets
 you stub out functions during development:
 
-```nova
+```rust
 fn processData(data: [Int]) -> String {
     return todo() @[T: String]
 }
@@ -1697,7 +1697,7 @@ fn processData(data: [Int]) -> String {
 
 Use `unreachable()` in match branches or conditionals that logically cannot occur:
 
-```nova
+```rust
 fn safeDivide(a: Int, b: Int) -> Int {
     if b == 0 {
         error()
@@ -1717,14 +1717,14 @@ fn getSign(x: Int) -> String {
 When calling a generic function whose return type can't be inferred, provide an explicit
 type annotation with `@[T: Type]`:
 
-```nova
+```rust
 return todo() @[T: String]
 return unreachable() @[T: Int]
 ```
 
 The syntax is `@[GenericName: ConcreteType]`. Multiple type parameters are comma-separated:
 
-```nova
+```rust
 let map = HashMap::default() @[K: String, V: Int]
 ```
 
@@ -1870,7 +1870,7 @@ nova init mygame --with pyrotek45/nova-lang/std --with someuser/utils/helpers
 
 After init, import the fetched files locally:
 
-```nova
+```rust
 import libs.math
 import libs.core
 ```
@@ -1895,7 +1895,7 @@ The second argument is the **GitHub path** (`owner/repo/folder`).
 
 After installing, import the modules with a dot path:
 
-```nova
+```rust
 import libs.std.core
 import libs.std.math
 ```
@@ -1957,7 +1957,7 @@ nova test path/to/tests
 
 Example test file (`tests/test_math.nv`):
 
-```nova
+```rust
 module test_math
 
 assert(1 + 1 == 2, "basic addition")
@@ -2064,7 +2064,7 @@ myapp/
         test_math.nv
 ```
 
-```nova
+```rust
 // main.nv
 import libs.math
 import libs.utils
@@ -2096,7 +2096,7 @@ mygame/
         test_enemy.nv
 ```
 
-```nova
+```rust
 // main.nv
 import libs.std.core
 import libs.std.math
@@ -2125,7 +2125,7 @@ what's yours (`src/`) and what's imported (`libs/`).
 
 Files inside subfolders need `super` to reach sibling folders:
 
-```nova
+```rust
 // src/player.nv
 module player
 
@@ -2150,7 +2150,7 @@ the project root. From `src/deep/nested.nv`, you'd need `super.super.libs.math`.
 Every `.nv` file must start with `module name`. The module name should match
 the filename (without `.nv`):
 
-```nova
+```rust
 // libs/engine/physics.nv
 module physics
 
@@ -2179,7 +2179,7 @@ libs/engine/
     audio.nv
 ```
 
-```nova
+```rust
 // libs/engine/engine.nv
 module engine
 
@@ -2190,7 +2190,7 @@ import super.engine.audio
 
 Now `main.nv` only needs one import:
 
-```nova
+```rust
 import libs.engine.engine
 // physics, renderer, audio functions are all in scope
 ```
@@ -2208,7 +2208,7 @@ tests/
 
 Each test file can import the module it tests:
 
-```nova
+```rust
 // tests/test_player.nv
 module test_player
 
@@ -2247,7 +2247,7 @@ my-nova-lib/
 
 Every file needs a `module` declaration. Use clear, descriptive module names:
 
-```nova
+```rust
 // core.nv
 module core
 
@@ -2287,7 +2287,7 @@ extends Stack(T) {
 }
 ```
 
-```nova
+```rust
 // helpers.nv
 module helpers
 
@@ -2318,7 +2318,7 @@ fn pad_right(s: String, width: Int, fill: String) -> String {
 
 Add a header comment to each file explaining what it provides:
 
-```nova
+```rust
 // ============================================================
 // core.nv — Core data structures for my-nova-lib
 // ============================================================
@@ -2373,7 +2373,7 @@ my-nova-lib/
         test_helpers.nv
 ```
 
-```nova
+```rust
 // tests/test_core.nv
 module test_core
 
@@ -2413,7 +2413,7 @@ nova install mylib yourname/my-nova-lib
 
 This fetches all `.nv` files into `libs/mylib/` and they can import with:
 
-```nova
+```rust
 import libs.mylib.core
 import libs.mylib.helpers
 ```
@@ -2427,7 +2427,7 @@ with shared type definitions is better than one giant `everything.nv`.
 **Use `extends` for method-style APIs.** Instead of standalone functions,
 extend your types so users get a fluent interface:
 
-```nova
+```rust
 // Prefer this:
 let s = Stack::new().push(1).push(2)
 
@@ -2438,7 +2438,7 @@ let s = push(push(Stack::new(), 1), 2)
 **Document with comments.** Nova doesn't have a doc generator yet, but clear
 header comments go a long way. The standard library uses this pattern:
 
-```nova
+```rust
 // ============================================================
 // modulename.nv — Short description
 // ============================================================
@@ -2453,7 +2453,7 @@ module modulename
 **Provide a barrel import.** If your library has many modules, add an
 `all.nv` that imports everything:
 
-```nova
+```rust
 // all.nv
 module all
 
@@ -2500,7 +2500,7 @@ them into powerful, concise idioms.
 
 Combine `extends` with closures to make fluent APIs:
 
-```nova
+```rust
 struct Config { width: Int, height: Int, title: String }
 
 fn extends withWidth(c: Config, w: Int) -> Config {
@@ -2523,7 +2523,7 @@ let cfg = Config { width: 0, height: 0, title: "" }
 
 Chain transformations using the pipe operator and extends:
 
-```nova
+```rust
 fn extends double(x: Int) -> Int { return x * 2 }
 fn extends addOne(x: Int) -> Int { return x + 1 }
 fn square(x: Int) -> Int { return x * x }
@@ -2537,7 +2537,7 @@ let chained = 5.double().addOne()        // 11
 
 Use enums with pattern matching for type-safe dispatch, or `Dyn` for structural contracts:
 
-```nova
+```rust
 // Approach 1: Enum-based dispatch
 enum Shape { Circle: Float, Rect: (Float, Float) }
 
@@ -2562,7 +2562,7 @@ fn renderAll(items: [Dyn(Drawable)], x: Int, y: Int) {
 
 Varargs let extends methods accept flexible argument lists:
 
-```nova
+```rust
 fn extends containsAll(haystack: [String], needles: [String]) -> Bool {
     for n in needles {
         let found = false
@@ -2582,7 +2582,7 @@ tags.containsAll("nova", "vm")    // true — varargs pack into [String]
 
 Use block expressions to compute complex initial values:
 
-```nova
+```rust
 let direction = {
     if angle < 90   { "north" }
     elif angle < 180 { "east"  }
@@ -2595,7 +2595,7 @@ let direction = {
 
 Match expressions return values, perfect for assigning computed results:
 
-```nova
+```rust
 enum Priority { High, Medium, Low }
 
 fn extends color(p: Priority) -> String {
@@ -2611,7 +2611,7 @@ fn extends color(p: Priority) -> String {
 
 Create specialized functions from general ones:
 
-```nova
+```rust
 fn adder(n: Int) -> fn(Int) -> Int {
     return fn(x: Int) -> Int { return x + n }
 }
@@ -2630,7 +2630,7 @@ let incremented = nums.map(adder(1))  // [2, 3, 4, 5, 6]
 
 Use `fn mod(Module)` to organize library functions alongside extends:
 
-```nova
+```rust
 fn mod(MathUtils) clamp(val: Int, lo: Int, hi: Int) -> Int {
     if val < lo { return lo }
     if val > hi { return hi }
@@ -2650,7 +2650,7 @@ MathUtils::clamp(150, 0, 100)  // 100
 
 Define custom container types with operator overloading:
 
-```nova
+```rust
 struct Stack(T) { data: [$T] }
 
 fn extends push(s: Stack(T), val: $T) {
@@ -2675,7 +2675,7 @@ fn extends len(s: Stack(T)) -> Int {
 
 Chain `if let` statements to safely unwrap nested Option values:
 
-```nova
+```rust
 fn findUserName(db: Database, id: Int) -> String {
     if let user = db.find(id) {
         if let name = user.displayName {
@@ -2690,7 +2690,7 @@ fn findUserName(db: Database, id: Int) -> String {
 
 Closures capture their environment, creating lightweight stateful objects:
 
-```nova
+```rust
 fn counter(start: Int) -> fn() -> Int {
     let n = start
     return fn() -> Int {
@@ -2709,7 +2709,7 @@ c()  // 3
 
 The `->` operator combines field access with a function call:
 
-```nova
+```rust
 struct EventHandler { onClick: fn(Int) -> Void }
 
 fn fireClick(handler: EventHandler, x: Int) {
@@ -2721,7 +2721,7 @@ fn fireClick(handler: EventHandler, x: Int) {
 
 Use range and indexing together for index-value iteration:
 
-```nova
+```rust
 let names = ["Alice", "Bob", "Carol"]
 for i in 0..names.len() {
     println(format("{}: {}", [Cast::string(i), names[i]]))
@@ -2732,7 +2732,7 @@ for i in 0..names.len() {
 
 Declare a function signature before defining it:
 
-```nova
+```rust
 fn isEven(n: Int) -> Bool           // forward declaration
 
 fn isOdd(n: Int) -> Bool {
@@ -2754,7 +2754,7 @@ fn isEven(n: Int) -> Bool {         // definition
 
 ## 35. Quick Start — Your First Window
 
-```nova
+```rust
 raylib::init("My Game", 800, 600, 60)
 
 while raylib::rendering() {
@@ -2767,7 +2767,7 @@ while raylib::rendering() {
 
 The game loop follows **Input → Update → Draw**:
 
-```nova
+```rust
 while raylib::rendering() {
     let dt = raylib::getFrameTime()
     // 1. INPUT
@@ -2803,13 +2803,13 @@ Closures capture scalars (`Int`, `Float`, `Bool`) **by value**. Mutations inside
 closure are invisible outside it.
 
 **Wrong:**
-```nova
+```rust
 let score = 0
 let update = fn(dt: Float) { score += 10 }  // writes to a COPY
 ```
 
 **Right:**
-```nova
+```rust
 let score = Box(0)
 let update = fn(dt: Float) { score.value += 10 }  // mutates heap cell
 ```
@@ -2828,7 +2828,7 @@ If you move entities manually, call `world.update(0.0)` to only purge dead.
 
 Scene factory functions often reference each other. Declare signatures first:
 
-```nova
+```rust
 fn makeMenuScene() -> Scene      // forward declaration
 fn makePlayScene() -> Scene
 
@@ -2847,7 +2847,7 @@ Nova uses `elif` for chained conditionals. In expression context, only `if/else`
 
 Scenes decouple game states (title, gameplay, pause, game-over):
 
-```nova
+```rust
 import super.std.scene
 
 fn makeGameplayScene(mgr: SceneManager) -> Scene {
@@ -2879,7 +2879,7 @@ while raylib::rendering() {
 
 ## 38. Entity System
 
-```nova
+```rust
 import super.std.entity
 import super.std.vec2
 
@@ -2903,7 +2903,7 @@ player.size = Vec2::new(32.0, 32.0)
 
 ### Querying and Iterating
 
-```nova
+```rust
 let pList = world.query("player")
 world.forEachTagged("enemy", fn(e: Entity) { /* mutate e */ })
 world.forEach(fn(e: Entity) { /* all entities */ })
@@ -2912,7 +2912,7 @@ let count = world.countAlive("enemy")
 
 ### Collision
 
-```nova
+```rust
 if bullet.overlapsAABB(enemy) {
     bullet.alive = false
     enemy.data -= 1.0
@@ -2921,7 +2921,7 @@ if bullet.overlapsAABB(enemy) {
 
 ### Draw Helpers
 
-```nova
+```rust
 e.entityDrawRect((60, 200, 100))      // filled rectangle
 e.entityDrawCircle((255, 230, 0))     // circle
 ```
@@ -2932,7 +2932,7 @@ e.entityDrawCircle((255, 230, 0))     // circle
 
 ### Raw Raylib Input
 
-```nova
+```rust
 raylib::isKeyPressed("A")        // held down (true every frame)
 raylib::isKeyDown("A")           // alias for isKeyPressed
 raylib::isKeyJustPressed("A")    // fires once when key first goes down
@@ -2946,7 +2946,7 @@ Use `isKeyJustPressed` for single-fire actions (turn-based, menus, toggles).
 
 ### InputMap — Action Bindings
 
-```nova
+```rust
 import super.std.input
 
 let keys = InputMap::new()
@@ -2963,7 +2963,7 @@ if keys.isPressed("jump") { /* jump */ }
 
 ## 40. Physics and Collision
 
-```nova
+```rust
 import super.std.physics
 
 let ball = Body2D::new(400.0, 100.0, 1.0)
@@ -2981,7 +2981,7 @@ while raylib::rendering() {
 
 ### Raycasting
 
-```nova
+```rust
 let ray = Ray2::new(px, py, dirX, dirY)
 let hit = ray.castAABB(wall)
 if hit.hit { /* hit.point, hit.normal, hit.t */ }
@@ -2991,7 +2991,7 @@ if hit.hit { /* hit.point, hit.normal, hit.t */ }
 
 ## 41. Camera
 
-```nova
+```rust
 import super.std.camera
 
 let cam = Camera2D::new(800, 600)
@@ -3009,7 +3009,7 @@ while raylib::rendering() {
 
 ### Coordinate Conversion
 
-```nova
+```rust
 let worldMouse = cam.screenToWorld(Vec2::new(mx, my))
 let screenPos = cam.worldToScreen(entity.pos)
 ```
@@ -3020,7 +3020,7 @@ let screenPos = cam.worldToScreen(entity.pos)
 
 ### Timers
 
-```nova
+```rust
 import super.std.timer
 
 let fireRate = Timer::cooldown(0.15)
@@ -3032,7 +3032,7 @@ if keys.isHeld("fire") && fireRate.ready() { spawnBullet() }
 
 ### Tweens
 
-```nova
+```rust
 import super.std.tween
 
 let fadeIn = Tween::smooth(0.0, 255.0, 1.0)
@@ -3045,7 +3045,7 @@ if fadeIn.isDone() { fadeIn.ping() }   // ping-pong
 
 ## 43. Vec2 Math
 
-```nova
+```rust
 import super.std.vec2
 
 let v = Vec2::new(3.0, 4.0)
@@ -3064,7 +3064,7 @@ e.vel.x = dir.x * SPEED
 
 ### Grid
 
-```nova
+```rust
 import super.std.grid
 
 let map = Grid::new(30, 20, 0)
@@ -3075,7 +3075,7 @@ let path = map.bfs(sx, sy, gx, gy, fn(v: Any) -> Bool { v == 0 })
 
 ### Procedural Noise
 
-```nova
+```rust
 import super.std.noise
 
 let h = fbm(nx, ny, SEED, 5, 2.0, 0.5)
@@ -3088,14 +3088,14 @@ map.set(col, row, if h > 0.6 { 1 } else { 0 })
 
 ### Sprites
 
-```nova
+```rust
 let hero = raylib::loadSprite("assets/hero.png", 32, 1)
 raylib::drawSprite(hero, px, py)
 ```
 
 Procedural sprites:
 
-```nova
+```rust
 let pixels = []: (Int, Int, Int)
 // ... fill pixels ...
 let sprite = raylib::buildSprite(size, size, 1, pixels)
@@ -3103,7 +3103,7 @@ let sprite = raylib::buildSprite(size, size, 1, pixels)
 
 ### Audio
 
-```nova
+```rust
 raylib::initAudio()
 let sfx = raylib::loadSound("assets/jump.wav")
 raylib::playSound(sfx)
@@ -3125,7 +3125,7 @@ raylib::closeAudio()
 
 ### Health Bar
 
-```nova
+```rust
 fn drawHealthBar(x: Int, y: Int, w: Int, h: Int, current: Int, maxHp: Int) {
     raylib::drawRectangle(x, y, w, h, (60, 60, 60))
     let fillW = (w * current) / maxHp
@@ -3139,7 +3139,7 @@ fn drawHealthBar(x: Int, y: Int, w: Int, h: Int, current: Int, maxHp: Int) {
 
 ### Centered Button
 
-```nova
+```rust
 fn drawButton(x: Int, y: Int, w: Int, h: Int, text: String, hover: Bool) {
     let bg = if hover { (80, 120, 200) } else { (50, 80, 150) }
     raylib::drawRoundedRectangle(x, y, w, h, 0.3, bg)
@@ -3156,7 +3156,7 @@ fn drawButton(x: Int, y: Int, w: Int, h: Int, text: String, hover: Bool) {
 
 ### Enum-Based Entity Kinds
 
-```nova
+```rust
 enum Tag { Player, Enemy: Int, Pickup: Int, Bullet }
 
 match a.tag {
@@ -3178,7 +3178,7 @@ match a.tag {
 
 Store `draw` / `update` closures as struct fields. Use `->` for type-dispatched calls:
 
-```nova
+```rust
 struct PlayerEntity {
     x: Int, y: Int, hp: Int,
     draw: fn(PlayerEntity),
@@ -3194,7 +3194,7 @@ for item in allDrawables { item->draw() }
 
 Pre-allocate a fixed pool; reuse slots with an `active` flag:
 
-```nova
+```rust
 let bulletPool = []: Bullet
 for let i = 0; i < 256; i += 1 {
     bulletPool.push(Bullet { x: 0, y: 0, vx: 0, vy: -8, active: 0 })
@@ -3209,7 +3209,7 @@ fn spawnBullet(px: Int, py: Int) {
 
 ### Screen Stack Without SceneManager
 
-```nova
+```rust
 enum Screen { MainMenu, Playing, Paused, GameOver: Int }
 let stack = []: Screen
 
@@ -3223,7 +3223,7 @@ fn popScreen() { if stack.len() > 0 { stack.pop() } }
 
 ### Frame Animation
 
-```nova
+```rust
 let frame = Box(0)
 let frameTimer = Timer::cooldown(0.1)
 
@@ -3238,7 +3238,7 @@ Use `Camera2D::shake(intensity, duration)` or manually offset draws.
 
 ### Hit Flash
 
-```nova
+```rust
 let flashTimer = Tween::linear(1.0, 0.0, 0.4)
 // On hit: flashTimer.reset()
 // In draw: tint based on flashTimer.value()
@@ -3246,7 +3246,7 @@ let flashTimer = Tween::linear(1.0, 0.0, 0.4)
 
 ### Wave Spawner
 
-```nova
+```rust
 let wave = Box(1)
 let waveTimer = Timer::repeating(5.0)
 
@@ -3259,7 +3259,7 @@ if waveTimer.ready() {
 
 ### Floating Score Popups
 
-```nova
+```rust
 struct Popup { x: Float, y: Float, text: String, life: Float, active: Bool }
 
 fn spawnPopup(x: Float, y: Float, pts: Int) {
@@ -3270,7 +3270,7 @@ fn spawnPopup(x: Float, y: Float, pts: Int) {
 
 ### Debug Overlay
 
-```nova
+```rust
 let debugOn = Box(false)
 if raylib::isKeyReleased("F3") { debugOn.value = !debugOn.value }
 
@@ -3296,7 +3296,7 @@ if debugOn.value {
 
 ## 50. Complete Example — Breakout
 
-```nova
+```rust
 module breakout
 
 import super.std.scene
@@ -3528,7 +3528,7 @@ while raylib::rendering() {
 
 ## 51. Complete Example — Top-Down Shooter
 
-```nova
+```rust
 module shooter
 
 import super.std.scene
@@ -3766,7 +3766,7 @@ while raylib::rendering() {
 
 ## 52. Terminal Quick Start
 
-```nova
+```rust
 terminal::clearScreen()
 terminal::moveTo(0, 0)
 terminal::print("Hello from the terminal!")
@@ -3784,7 +3784,7 @@ Key built-in functions: `terminal::clearScreen()`, `terminal::moveTo(col, row)`,
 
 Raw mode disables line buffering — each keypress is available immediately:
 
-```nova
+```rust
 terminal::rawmode(true)
 terminal::hideCursor()
 
@@ -3808,7 +3808,7 @@ terminal::showCursor()
 
 Arrow keys produce escape sequences. Check for `'\x1b'` then read follow-up bytes:
 
-```nova
+```rust
 if c == '\x1b' {
     let c2 = terminal::rawread(10)
     if let b = c2 {
@@ -3829,7 +3829,7 @@ if c == '\x1b' {
 
 ## 54. Colours and Cursor
 
-```nova
+```rust
 terminal::setForeground(255, 100, 50)    // orange text
 terminal::setBackground(0, 0, 80)        // dark blue bg
 terminal::print("coloured!")
@@ -3839,7 +3839,7 @@ terminal::flush()
 
 Or use `std/ansi` for styled strings:
 
-```nova
+```rust
 import super.std.ansi
 
 println(Ansi::bold(Ansi::red("ERROR")))
@@ -3852,7 +3852,7 @@ println(Ansi::rgb(255, 128, 0, "orange"))
 
 Use `std/tui` with `SceneManager` for multi-screen terminal apps:
 
-```nova
+```rust
 import super.std.tui
 import super.std.scene
 
@@ -3891,7 +3891,7 @@ fn makeMenuScene(mgr: SceneManager) -> Scene {
 
 A terminal game loop with frame timing:
 
-```nova
+```rust
 terminal::rawmode(true)
 terminal::hideCursor()
 
@@ -3936,7 +3936,7 @@ terminal::clearScreen()
 
 ### Always Clean Up
 
-```nova
+```rust
 terminal::rawmode(true)
 terminal::hideCursor()
 // ... app logic ...
@@ -3949,7 +3949,7 @@ terminal::clearScreen()
 
 Write everything, then flush once:
 
-```nova
+```rust
 // draw all elements
 terminal::moveTo(0, 0)
 terminal::print(buffer)
@@ -3958,7 +3958,7 @@ terminal::flush()       // single flush at end
 
 ### Use Structs for State
 
-```nova
+```rust
 struct AppState { x: Int, y: Int, score: Int, running: Bool }
 ```
 
@@ -3997,7 +3997,7 @@ struct AppState { x: Int, y: Int, score: Int, running: Bool }
 
 ### From Classes to Structs + Extends
 
-```nova
+```rust
 struct Point { x: Float, y: Float }
 
 fn extends distance(self: Point, other: Point) -> Float {
@@ -4013,7 +4013,7 @@ fn extends __add__(a: Point, b: Point) -> Point {
 
 ### From None to Option
 
-```nova
+```rust
 // Combinator style
 let name = findUser(db, 42)
     .map(|u: User| u.name.toUpper())
@@ -4027,7 +4027,7 @@ if let user = findUser(db, 42) {
 
 ### From Dict to HashMap
 
-```nova
+```rust
 import super.std.hashmap
 
 let counts = HashMap::default() @[K: String, V: Int]
@@ -4055,7 +4055,7 @@ Nova ships with `std/plot` — a charting library built on raylib.
 
 ### Setup
 
-```nova
+```rust
 module main
 import super.std.plot
 
@@ -4066,7 +4066,7 @@ raylib::init("My Chart", 800, 600, 30)
 
 Every chart lives inside a `PlotArea` that maps data coordinates to screen pixels:
 
-```nova
+```rust
 // Manual bounds
 let area = PlotArea::new(50, 50, 700, 400, 0.0, 10.0, 0.0, 100.0)
 
@@ -4080,7 +4080,7 @@ let area = PlotArea::auto(50, 50, 700, 400, data)
 All chart functions are `extends` methods on `PlotArea`, called inside
 a `while raylib::rendering() { ... }` loop:
 
-```nova
+```rust
 while raylib::rendering() {
     raylib::clear((25, 25, 30))
 
@@ -4109,7 +4109,7 @@ while raylib::rendering() {
 
 Pie charts are standalone functions (not PlotArea methods):
 
-```nova
+```rust
 let pieData   = [35.0, 25.0, 20.0, 12.0, 8.0]
 let labels    = ["Rust", "Nova", "C", "Go", "Lua"]
 let colors    = [(220,60,60), (60,120,220), (60,200,80), (230,160,40), (160,80,200)]

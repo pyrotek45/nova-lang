@@ -1,13 +1,14 @@
 # Getting Started with Nova
 
-This guide walks you through creating, structuring, and running a Nova project
-from scratch. By the end you'll know how to use `nova init`, organise your
+This guide walks you through installing Nova, creating your first project,
+and running it. By the end you'll know how to use `nova init`, organise your
 code with modules, pull in libraries, and run tests.
 
 ---
 
 ## Table of Contents
 
+0. [Installation](#0-installation)
 1. [Your First Project](#1-your-first-project)
 2. [Project Structure](#2-project-structure)
 3. [Running Your Code](#3-running-your-code)
@@ -21,6 +22,66 @@ code with modules, pull in libraries, and run tests.
 11. [Command-Line Arguments](#11-command-line-arguments)
 12. [Common Errors and Fixes](#12-common-errors-and-fixes)
 13. [What Next?](#13-what-next)
+
+---
+
+## 0. Installation
+
+Before you can use `nova`, you need to build it from source.
+For detailed platform-specific instructions, see the full
+[Installation Guide](installation.md).
+
+### Quick install (Linux / macOS)
+
+```bash
+# 1. Install Rust (if you don't have it)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 2. Install system dependencies
+#    Debian / Ubuntu:
+sudo apt install gcc cmake pkg-config libgl-dev libx11-dev \
+     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+#    Fedora:
+sudo dnf install gcc cmake pkg-config mesa-libGL-devel libX11-devel \
+     libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel
+#    Arch:
+sudo pacman -S gcc cmake pkg-config mesa libx11 libxrandr libxinerama libxcursor libxi
+
+# 3. Clone and build
+git clone https://github.com/pyrotek45/nova-lang
+cd nova-lang
+cargo build --release
+
+# 4. (Optional) Add to your PATH
+cp target/release/nova ~/.local/bin/
+# or
+sudo cp target/release/nova /usr/local/bin/
+```
+
+### NixOS
+
+```bash
+# Option A: Install directly from the repo
+nix-env -if default.nix
+
+# Option B: Build inside nix-shell
+git clone https://github.com/pyrotek45/nova-lang
+cd nova-lang
+nix-shell
+cargo build --release
+```
+
+### Verify the installation
+
+```bash
+nova run demo/fib.nv
+```
+
+If you see fibonacci numbers printed, you're ready to go.
+
+> **Note:** Programs that use graphics (games, demos, plots) need OpenGL and
+> X11 libraries at runtime. On NixOS, run them from inside `nix-shell`.
+> Console programs work anywhere.
 
 ---
 
@@ -75,7 +136,7 @@ simple convention: if a folder has a `main.nv`, it's a project.
 
 ### The generated `main.nv`
 
-```nova
+```rust
 module main
 
 fn main() {
@@ -148,7 +209,7 @@ As your project grows, split your code into modules inside `libs/`.
 
 **Create `libs/math_utils.nv`:**
 
-```nova
+```rust
 module math_utils
 
 fn square(x: Int) -> Int {
@@ -164,7 +225,7 @@ fn clamp(x: Int, lo: Int, hi: Int) -> Int {
 
 **Create `libs/greetings.nv`:**
 
-```nova
+```rust
 module greetings
 
 fn hello(name: String) -> String {
@@ -192,7 +253,7 @@ myapp/
 
 Import files from `libs/` using dot-path syntax:
 
-```nova
+```rust
 module main
 import libs.math_utils
 import libs.greetings
@@ -222,7 +283,7 @@ always **relative to the file containing the import statement**.
 `super` means "go up one directory" (like `..`). Use it when the file you
 want is in a parent or sibling directory:
 
-```nova
+```rust
 // From libs/math_utils.nv, import another file in libs/:
 import helper              // → ./helper.nv (same directory)
 
@@ -234,7 +295,7 @@ import super.data.records  // → ../data/records.nv
 
 If you prefer, you can use a string literal as the path:
 
-```nova
+```rust
 import "libs/math_utils.nv"     // same as: import libs.math_utils
 import "../std/core.nv"         // same as: import super.std.core
 ```
@@ -243,7 +304,7 @@ import "../std/core.nv"         // same as: import super.std.core
 
 If you have a nested file like `libs/utils/strings.nv`:
 
-```nova
+```rust
 // From main.nv:
 import libs.utils.strings
 
@@ -268,7 +329,7 @@ nova-lang/
         main.nv
 ```
 
-```nova
+```rust
 module main
 import super.std.core      // → ../std/core.nv
 import super.std.list      // → ../std/list.nv
@@ -289,7 +350,7 @@ nova init myapp --with pyrotek45/nova-lang/std
 This downloads all `.nv` files from the `std/` folder on GitHub into `libs/`.
 Then import locally:
 
-```nova
+```rust
 module main
 import libs.core
 import libs.list
@@ -357,7 +418,7 @@ nova install std pyrotek45/nova-lang/std
 
 This creates `libs/std/` and downloads all `.nv` files into it. Import with:
 
-```nova
+```rust
 import libs.std.core
 import libs.std.math
 ```
@@ -412,7 +473,7 @@ myapp/
 A test file is a normal Nova program that uses `assert()` and ends with
 a `PASS:` message:
 
-```nova
+```rust
 module test_math
 import super.libs.math_utils
 
@@ -442,7 +503,7 @@ tests/test_math.nv  →  import super.libs.math_utils
 `assert(condition, message)` is a built-in function. If the condition is false,
 it halts the program with the message and a non-zero exit code.
 
-```nova
+```rust
 assert(1 + 1 == 2, "basic math works")
 assert(true != false, "booleans work")
 ```
@@ -515,7 +576,7 @@ bash tests/run_tests.sh
 You can import a file directly from GitHub inside your Nova source code
 using `import @`:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv"
 ```
 
@@ -527,7 +588,7 @@ branch by default.
 To ensure your code doesn't break if the repo changes, lock to a specific
 commit hash with `!`:
 
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv" ! "a1b2c3d4e5f6"
 ```
 
@@ -551,7 +612,7 @@ Nova programs can receive command-line arguments using `terminal::args()`.
 
 ### Basic usage
 
-```nova
+```rust
 module main
 
 let args = terminal::args()   // Option([String])
@@ -587,7 +648,7 @@ arg: 42
 
 ### Using `if let` for cleaner code
 
-```nova
+```rust
 if let arglist = terminal::args() {
     println("First arg: " + arglist[0])
 } else {
@@ -599,7 +660,7 @@ if let arglist = terminal::args() {
 
 Arguments arrive as strings. Use `Cast::int` or `Cast::float` to convert:
 
-```nova
+```rust
 if let arglist = terminal::args() {
     if let n = Cast::int(arglist[0]) {
         println("Got number: " + Cast::string(n))
@@ -658,7 +719,7 @@ expected "owner/repo/path/to/file.nv", got "badpath"
 **Cause:** The GitHub path needs at least three segments separated by `/`.
 
 **Fix:** Use the format `owner/repo/path/to/file.nv`:
-```nova
+```rust
 import @ "pyrotek45/nova-lang/std/core.nv"
 ```
 
