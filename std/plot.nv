@@ -237,7 +237,8 @@ fn drawPieChart(cx: Int, cy: Int, radius: Int, data: [Float], colors: [(Int, Int
             let y1 = cy + Cast::int(Float::sin(a1) * Cast::float(radius).unwrap()).unwrap()
             let x2 = cx + Cast::int(Float::cos(a2) * Cast::float(radius).unwrap()).unwrap()
             let y2 = cy + Cast::int(Float::sin(a2) * Cast::float(radius).unwrap()).unwrap()
-            raylib::drawTriangle(cx, cy, x1, y1, x2, y2, c)
+            // raylib expects counter-clockwise winding in screen coords (Y-down)
+            raylib::drawTriangle(cx, cy, x2, y2, x1, y1, c)
         }
         startAngle = startAngle + sweep
     }
@@ -251,7 +252,7 @@ fn drawPieChartLabeled(cx: Int, cy: Int, radius: Int, data: [Float], labels: [St
     if total <= 0.0 { return }
     let pi = 3.14159265358979
     let startAngle = 0.0
-    let labelR = Cast::float(radius + 20).unwrap()
+    let labelR = Cast::float(radius).unwrap() + 14.0
     for let i = 0; i < data.len(); i += 1 {
         let sweep = data[i] / total * 2.0 * pi
         let midAngle = startAngle + sweep / 2.0
@@ -259,7 +260,15 @@ fn drawPieChartLabeled(cx: Int, cy: Int, radius: Int, data: [Float], labels: [St
         let ly = cy + Cast::int(Float::sin(midAngle) * labelR).unwrap()
         if i < labels.len() {
             let tw = raylib::measureText(labels[i], fontSize)
-            raylib::drawText(labels[i], lx - tw / 2, ly - fontSize / 2, fontSize, labelColor)
+            // Nudge label away from pie edge based on quadrant
+            let drawX = lx
+            let drawY = ly - fontSize / 2
+            if Float::cos(midAngle) >= 0.0 {
+                drawX = lx + 2
+            } else {
+                drawX = lx - tw - 2
+            }
+            raylib::drawText(labels[i], drawX, drawY, fontSize, labelColor)
         }
         startAngle = startAngle + sweep
     }
