@@ -1,0 +1,113 @@
+module test_import_forms
+
+// ===== GROUP 1: Dot-path imports (most common form) =====
+// import module.path resolves relative to current file's directory
+
+import super.std.core
+import super.std.math
+import super.std.string
+
+// Verify core functions
+let b = Box(42)
+assert(b.value == 42, "dot-path import: core Box")
+
+let g = Gen(0)
+assert(g() == 0, "dot-path import: core Gen first")
+assert(g() == 1, "dot-path import: core Gen second")
+
+// Verify math functions
+assert(5.abs() == 5, "dot-path import: math abs positive")
+assert((-3).abs() == 3, "dot-path import: math abs negative")
+assert(2.pow(8) == 256, "dot-path import: math pow")
+
+// Verify string functions
+let parts = "hello,world".split(',')
+assert(parts.len() == 2, "dot-path import: string split length")
+assert(parts[0] == "hello", "dot-path import: string split 0")
+
+println("  GROUP 1 [dot-path imports] OK")
+
+// ===== GROUP 2: Super navigation =====
+// `super` in import path means ".." (parent directory)
+// import super.std.core => ../std/core.nv from tests/ directory
+
+// Already imported above via super — verify they actually came from parent dir
+let r = range(3)
+assert(r.len() == 3, "super import: range works")
+assert(r[0] == 0, "super import: range start")
+assert(r[2] == 2, "super import: range end")
+
+let opt = Some(42)
+let val = opt.orDefault(0)
+assert(val == 42, "super import: orDefault with Some")
+
+let none_opt : Option(Int) = None(Int)
+let def = none_opt.orDefault(-1)
+assert(def == -1, "super import: orDefault with None")
+
+println("  GROUP 2 [super navigation] OK")
+
+// ===== GROUP 3: String literal import =====
+// import "path/to/file.nv" resolves relative to current file
+
+import "../std/list.nv"
+import "../std/iter.nv"
+
+// Verify list functions from string import
+let xs = [3, 1, 4, 1, 5]
+let sorted = xs.bubblesort()
+assert(sorted[0] == 1, "string-literal import: sorted[0]")
+assert(sorted[-1] == 5, "string-literal import: sorted[-1]")
+
+println("  GROUP 3 [string literal imports] OK")
+
+// ===== GROUP 4: Import deduplication =====
+// Importing the same module twice should not cause errors
+
+import super.std.core
+import super.std.math
+import "../std/list.nv"
+
+// Everything should still work after re-import
+assert(Box(99).value == 99, "re-import: Box still works")
+assert(3.min(5) == 3, "re-import: math still works")
+
+println("  GROUP 4 [import deduplication] OK")
+
+// ===== GROUP 5: Mixed import forms in one file =====
+// Dot-path and string-literal imports can be mixed freely
+// core.nv already defines Maybe and Result, so we test with those
+
+// Verify Maybe (from core, already imported)
+let mj = Maybe::Just(42)
+assert(mj.isJust(), "mixed imports: Maybe::Just isJust")
+let mn = Maybe::Nothing() @[A: Int]
+assert(mn.isNothing(), "mixed imports: Maybe::Nothing isNothing")
+
+// Verify Result (from core)
+let ok = Result::Ok(100) @[B: String]
+assert(ok.isOk(), "mixed imports: Result::Ok")
+let err = Result::Err("fail") @[A: Int]
+assert(!err.isOk(), "mixed imports: Result::Err")
+
+println("  GROUP 5 [mixed import forms] OK")
+
+// ===== GROUP 6: Imported extensions compose =====
+// Extensions from different modules should work together
+
+let nums = [10, -3, 7, -1, 5]
+let total = 0
+for i in range(nums.len()) {
+    total = total + nums[i].abs()
+}
+assert(total == 26, "compose: abs + range from different modules")
+
+// String split + list operations
+let csv = "1,2,3,4,5"
+let fields = csv.split(',')
+assert(fields.len() == 5, "compose: string.split + list.len")
+
+println("  GROUP 6 [cross-module composition] OK")
+
+println("\nAll 6 groups passed")
+println("PASS: test_import_forms")

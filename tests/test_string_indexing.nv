@@ -1,0 +1,96 @@
+module test_string_indexing
+
+import super.std.core
+
+// ============================================================
+// 1. Basic indexing
+// ============================================================
+let s = "hello"
+assert(s[0] == 'h', "basic index 0")
+assert(s[1] == 'e', "basic index 1")
+assert(s[2] == 'l', "basic index 2")
+assert(s[3] == 'l', "basic index 3")
+assert(s[4] == 'o', "basic index 4")
+
+println("PASS: basic_indexing (5 assertions)")
+
+// ============================================================
+// 2. Negative indexing
+// ============================================================
+assert(s[-1] == 'o', "negative -1")
+assert(s[-2] == 'l', "negative -2")
+assert(s[-3] == 'l', "negative -3")
+assert(s[-4] == 'e', "negative -4")
+assert(s[-5] == 'h', "negative -5")
+
+println("PASS: negative_indexing (5 assertions)")
+
+// ============================================================
+// 3. Variable index
+// ============================================================
+let idx = 2
+assert(s[idx] == 'l', "variable index")
+
+fn getChar(str: String, i: Int) -> Char {
+    return str[i]
+}
+assert(getChar("world", 0) == 'w', "function index 0")
+assert(getChar("world", -1) == 'd', "function index -1")
+
+println("PASS: variable_index (3 assertions)")
+
+// ============================================================
+// 4. Single character string
+// ============================================================
+let single = "x"
+assert(single[0] == 'x', "single char string index")
+assert(single[-1] == 'x', "single char string neg index")
+
+println("PASS: single_char_string (2 assertions)")
+
+// ============================================================
+// 5. Computed expressions as index
+// ============================================================
+let msg = "abcdef"
+assert(msg[1 + 1] == 'c', "computed index 1+1")
+assert(msg[msg.len() - 1] == 'f', "len-based index")
+
+println("PASS: computed_index (2 assertions)")
+
+// ============================================================
+// 6. Indexing result used in comparisons and operations
+// ============================================================
+let word = "Nova"
+assert(word[0] == 'N', "char comparison")
+
+// Use in if
+if word[0] == 'N' {
+    println("PASS: char_in_if")
+} else {
+    assert(false, "char_in_if should be true")
+}
+
+// ============================================================
+// 7. Loop over string by index
+// ============================================================
+let greeting = "hi"
+let chars = []: Char
+for i in 0..greeting.len() {
+    chars.push(greeting[i])
+}
+assert(chars.len() == 2, "loop over string length")
+assert(chars[0] == 'h', "loop char 0")
+assert(chars[1] == 'i', "loop char 1")
+
+println("PASS: loop_over_string (3 assertions)")
+
+// ============================================================
+// 8. Indexing string returned from function
+// ============================================================
+fn makeStr() -> String { return "test" }
+assert(makeStr()[0] == 't', "index fn result")
+assert(makeStr()[-1] == 't', "neg index fn result")
+
+println("PASS: index_fn_result (2 assertions)")
+
+println("PASS: test_string_indexing — all groups passed")

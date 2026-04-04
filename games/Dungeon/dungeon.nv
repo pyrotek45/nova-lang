@@ -1,0 +1,487 @@
+module dungeon_crawler
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Dungeon Crawler  —  a grid-based roguelike demo
+//
+//  Std modules used:
+//    grid   — Grid(T) generic 2D tilemap
+//    color  — Named RGB colour tuples
+//
+//  Features:
+//    - Procedurally generated dungeon (rooms + corridors)
+//    - Player movement with arrow keys / WASD
+//    - Simple mobs that chase the player each turn
+//    - Health, attack, and a goal (stairs) to reach
+//    - Fog of war (limited visibility via raycasting)
+//    - Multiple levels with increasing difficulty
+//
+//  Controls:
+//    WASD / Arrow keys  — move player
+//    SPACE              — wait a turn
+//    Q                  — quit
+//    R                  — restart
+//
+//  Run:  nova run games/Dungeon/dungeon.nv
+// ─────────────────────────────────────────────────────────────────────────────
+
+import super.super.std.grid
+import super.super.std.color
+
+// ── Window ───────────────────────────────────────────────────────────────────
+let SCREEN_W = 960
+let SCREEN_H = 700
+raylib::init("Dungeon Crawler", SCREEN_W, SCREEN_H, 60)
+
+// ── Map constants ────────────────────────────────────────────────────────────
+let MAP_W     = 48
+let MAP_H     = 32
+let TILE_SIZE = 18
+let MAP_OX    = 10
+let MAP_OY    = 50
+
+// ── Tile codes ───────────────────────────────────────────────────────────────
+let T_WALL  = 0
+let T_FLOOR = 1
+let T_STAIR = 2
+
+// ── Colors ───────────────────────────────────────────────────────────────────
+let C_BG        = (10, 8, 18)
+let C_WALL      = (40, 35, 55)
+let C_WALL_LIT  = (60, 50, 80)
+let C_FLOOR     = (25, 22, 35)
+let C_FLOOR_LIT = (50, 45, 65)
+let C_STAIR     = (255, 220, 60)
+let C_PLAYER    = (80, 200, 120)
+let C_MOB       = (220, 60, 60)
+let C_HUD       = (200, 200, 200)
+let C_HP_BAR    = (80, 200, 80)
+let C_HP_BG     = (60, 20, 20)
+let C_FOG       = (5, 4, 10)
+
+// ── Player State ─────────────────────────────────────────────────────────────
+let playerX     = 0
+let playerY     = 0
+let playerHP    = 20
+let playerMaxHP = 20
+let playerAtk   = 3
+let playerLevel = 1
+let playerScore = 0
+
+// ── Mob struct ───────────────────────────────────────────────────────────────
+struct Mob {
+    x: Int,
+    y: Int,
+    hp: Int,
+    atk: Int,
+    alive: Bool
+}
+
+// ── Game State (using generic Grid) ──────────────────────────────────────────
+let tiles    = Grid::new(MAP_W, MAP_H, T_WALL)  @[T: Int]
+let vis      = Grid::new(MAP_W, MAP_H, false)   @[T: Bool]
+let explored = Grid::new(MAP_W, MAP_H, false)   @[T: Bool]
+let mobs     = []: Mob
+let turnCount  = 0
+let gameState  = "playing"
+let msgLog     = "Welcome to the dungeon. Find the stairs."
+
+// ── Dungeon Generation ───────────────────────────────────────────────────────
+
+struct Room { x: Int, y: Int, w: Int, h: Int }
+
+fn extends centerX(r: Room) -> Int { return r.x + r.w / 2 }
+fn extends centerY(r: Room) -> Int { return r.y + r.h / 2 }
+
+fn extends overlaps(a: Room, b: Room) -> Bool {
+    return a.x - 1 < b.x + b.w && a.x + a.w + 1 > b.x &&
+           a.y - 1 < b.y + b.h && a.y + a.h + 1 > b.y
+}
+
+fn carveRoom(g: Grid(Int), r: Room) {
+    for let row = r.y; row < r.y + r.h; row += 1 {
+        for let col = r.x; col < r.x + r.w; col += 1 {
+            if g.inBounds(col, row) { g.set(col, row, T_FLOOR) }
+        }
+    }
+}
+
+fn carveCorridor(g: Grid(Int), x1: Int, y1: Int, x2: Int, y2: Int) {
+    let cx = x1
+    let cy = y1
+    while cx != x2 {
+        if g.inBounds(cx, cy) { g.set(cx, cy, T_FLOOR) }
+        if cx < x2 { cx = cx + 1 } else { cx = cx - 1 }
+    }
+    while cy != y2 {
+        if g.inBounds(cx, cy) { g.set(cx, cy, T_FLOOR) }
+        if cy < y2 { cy = cy + 1 } else { cy = cy - 1 }
+    }
+    if g.inBounds(cx, cy) { g.set(cx, cy, T_FLOOR) }
+}
+
+fn generateDungeon(level: Int) {
+    tiles.fill(T_WALL)
+    vis.fill(false)
+    explored.fill(false)
+    mobs.clear()
+
+    let numRooms = 6 + level * 2
+    if numRooms > 16 { numRooms = 16 }
+    let rooms = []: Room
+
+    for let attempt = 0; attempt < 200; attempt += 1 {
+        if rooms.len() >= numRooms { break }
+
+        let rw = random(4, 8)
+        let rh = random(3, 6)
+        let rx = random(1, MAP_W - rw - 1)
+        let ry = random(1, MAP_H - rh - 1)
+        let newRoom = Room { x: rx, y: ry, w: rw, h: rh }
+
+        let valid = true
+        for existing in rooms {
+            if existing.overlaps(newRoom) { valid = false }
+        }
+
+        if valid {
+            carveRoom(tiles, newRoom)
+            if rooms.len() > 0 {
+                let prev = rooms[rooms.len() - 1]
+                if randomBool() {
+                    carveCorridor(tiles, prev.centerX(), prev.centerY(),
+                                         newRoom.centerX(), prev.centerY())
+                    carveCorridor(tiles, newRoom.centerX(), prev.centerY(),
+                                         newRoom.centerX(), newRoom.centerY())
+                } else {
+                    carveCorridor(tiles, prev.centerX(), prev.centerY(),
+                                         prev.centerX(), newRoom.centerY())
+                    carveCorridor(tiles, prev.centerX(), newRoom.centerY(),
+                                         newRoom.centerX(), newRoom.centerY())
+                }
+            }
+            rooms.push(newRoom)
+        }
+    }
+
+    if rooms.len() < 2 {
+        let r1 = Room { x: 2, y: 2, w: 6, h: 4 }
+        let r2 = Room { x: MAP_W - 10, y: MAP_H - 8, w: 6, h: 4 }
+        carveRoom(tiles, r1)
+        carveRoom(tiles, r2)
+        carveCorridor(tiles, 5, 4, MAP_W - 7, MAP_H - 6)
+        rooms.push(r1)
+        rooms.push(r2)
+    }
+
+    // Place player in first room
+    let startRoom = rooms[0]
+    playerX = startRoom.centerX()
+    playerY = startRoom.centerY()
+
+    // Place stairs in last room
+    let endRoom = rooms[rooms.len() - 1]
+    tiles.set(endRoom.centerX(), endRoom.centerY(), T_STAIR)
+
+    // Place mobs in other rooms
+    let numMobs = 2 + level * 2
+    if numMobs > rooms.len() * 2 { numMobs = rooms.len() * 2 }
+    let mobHP  = 3 + level
+    let mobAtk = 1 + level / 2
+
+    for let i = 0; i < numMobs; i += 1 {
+        let ri = random(1, rooms.len() - 1)
+        let room = rooms[ri]
+        let mx = random(room.x + 1, room.x + room.w - 2)
+        let my = random(room.y + 1, room.y + room.h - 2)
+        if mx != playerX || my != playerY {
+            mobs.push(Mob { x: mx, y: my, hp: mobHP, atk: mobAtk, alive: true })
+        }
+    }
+}
+
+// ── Visibility (simple radius + ray check) ──────────────────────────────────
+
+fn updateVisibility() {
+    vis.fill(false)
+    let radius = 6
+    for let dy = 0 - radius; dy <= radius; dy += 1 {
+        for let dx = 0 - radius; dx <= radius; dx += 1 {
+            if dx * dx + dy * dy <= radius * radius {
+                let tx = playerX + dx
+                let ty = playerY + dy
+                if tiles.inBounds(tx, ty) {
+                    let adx = dx
+                    if adx < 0 { adx = 0 - adx }
+                    let ady = dy
+                    if ady < 0 { ady = 0 - ady }
+                    let steps = adx
+                    if ady > steps { steps = ady }
+                    if steps == 0 { steps = 1 }
+
+                    let blocked = false
+                    for let s = 1; s < steps; s += 1 {
+                        let cx = playerX + dx * s / steps
+                        let cy = playerY + dy * s / steps
+                        if tiles.inBounds(cx, cy) {
+                            if tiles.get(cx, cy) == T_WALL { blocked = true }
+                        }
+                    }
+                    if !blocked {
+                        vis.set(tx, ty, true)
+                        explored.set(tx, ty, true)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Mob AI ───────────────────────────────────────────────────────────────────
+
+fn mobAt(mx: Int, my: Int) -> Int {
+    for let i = 0; i < mobs.len(); i += 1 {
+        if mobs[i].alive && mobs[i].x == mx && mobs[i].y == my {
+            return i
+        }
+    }
+    return -1
+}
+
+fn moveMobs() {
+    for let i = 0; i < mobs.len(); i += 1 {
+        if !mobs[i].alive { continue }
+        let mx = mobs[i].x
+        let my = mobs[i].y
+
+        let dx = playerX - mx
+        let dy = playerY - my
+        let adx = dx
+        let ady = dy
+        if adx < 0 { adx = 0 - adx }
+        if ady < 0 { ady = 0 - ady }
+
+        // Only chase if within 10 tiles
+        if adx + ady > 10 { continue }
+
+        let stepX = 0
+        let stepY = 0
+        if playerX > mx { stepX = 1 }
+        elif playerX < mx { stepX = -1 }
+        if playerY > my { stepY = 1 }
+        elif playerY < my { stepY = -1 }
+
+        // Adjacent to player — attack
+        if adx + ady == 1 {
+            playerHP = playerHP - mobs[i].atk
+            msgLog = "A monster hits you for " + Cast::string(mobs[i].atk) + "!"
+            if playerHP <= 0 {
+                gameState = "dead"
+                msgLog = "You have been slain..."
+            }
+            continue
+        }
+
+        // Try to move closer (horizontal first, then vertical)
+        let nx = mx + stepX
+        let ny = my
+        if tiles.inBounds(nx, ny) && tiles.get(nx, ny) != T_WALL &&
+           mobAt(nx, ny) == -1 && !(nx == playerX && ny == playerY) {
+            mobs[i].x = nx
+        } else {
+            nx = mx
+            ny = my + stepY
+            if tiles.inBounds(nx, ny) && tiles.get(nx, ny) != T_WALL &&
+               mobAt(nx, ny) == -1 && !(nx == playerX && ny == playerY) {
+                mobs[i].y = ny
+            }
+        }
+    }
+}
+
+// ── Player Actions ───────────────────────────────────────────────────────────
+
+fn tryMove(dx: Int, dy: Int) {
+    if gameState != "playing" { return }
+
+    let nx = playerX + dx
+    let ny = playerY + dy
+
+    if !tiles.inBounds(nx, ny) { return }
+    if tiles.get(nx, ny) == T_WALL { return }
+
+    // Check for mob at target
+    let mi = mobAt(nx, ny)
+    if mi >= 0 {
+        mobs[mi].hp = mobs[mi].hp - playerAtk
+        if mobs[mi].hp <= 0 {
+            mobs[mi].alive = false
+            playerScore = playerScore + 10
+            msgLog = "You defeated a monster! (+10 pts)"
+        } else {
+            msgLog = "You hit the monster for " + Cast::string(playerAtk) + "."
+        }
+        turnCount = turnCount + 1
+        moveMobs()
+        updateVisibility()
+        return
+    }
+
+    // Move player
+    playerX = nx
+    playerY = ny
+    turnCount = turnCount + 1
+
+    // Check stairs
+    if tiles.get(playerX, playerY) == T_STAIR {
+        playerLevel = playerLevel + 1
+        playerScore = playerScore + 50
+        playerHP = playerHP + 5
+        if playerHP > playerMaxHP { playerHP = playerMaxHP }
+        msgLog = "Level " + Cast::string(playerLevel) + "! (+50 pts, +5 HP)"
+        generateDungeon(playerLevel)
+        updateVisibility()
+        return
+    }
+
+    // Mob turn
+    moveMobs()
+    updateVisibility()
+    if gameState == "playing" {
+        msgLog = "Turn " + Cast::string(turnCount)
+    }
+}
+
+fn restartGame() {
+    playerHP = 20
+    playerMaxHP = 20
+    playerAtk = 3
+    playerLevel = 1
+    playerScore = 0
+    turnCount = 0
+    gameState = "playing"
+    msgLog = "Welcome to the dungeon. Find the stairs."
+    generateDungeon(1)
+    updateVisibility()
+}
+
+// ── Drawing ──────────────────────────────────────────────────────────────────
+
+fn drawMap() {
+    for let row = 0; row < MAP_H; row += 1 {
+        for let col = 0; col < MAP_W; col += 1 {
+            let tile  = tiles.get(col, row)
+            let isVis = vis.get(col, row)
+            let isExp = explored.get(col, row)
+            let c = C_FOG
+            if isExp {
+                if tile == T_WALL {
+                    if isVis { c = C_WALL_LIT } else { c = C_WALL }
+                } elif tile == T_STAIR {
+                    if isVis { c = C_STAIR } else { c = (120, 100, 30) }
+                } else {
+                    if isVis { c = C_FLOOR_LIT } else { c = C_FLOOR }
+                }
+            }
+            raylib::drawRectangle(
+                MAP_OX + col * TILE_SIZE,
+                MAP_OY + row * TILE_SIZE,
+                TILE_SIZE, TILE_SIZE, c)
+        }
+    }
+}
+
+fn drawMobs() {
+    for m in mobs {
+        if !m.alive { continue }
+        if !vis.get(m.x, m.y) { continue }
+        let sx = MAP_OX + m.x * TILE_SIZE + TILE_SIZE / 2
+        let sy = MAP_OY + m.y * TILE_SIZE + TILE_SIZE / 2
+        raylib::drawCircle(sx, sy, TILE_SIZE / 2 - 2, C_MOB)
+        // Mob HP bar
+        let bw = TILE_SIZE - 4
+        let maxMobHP = 3 + playerLevel
+        let filled = bw * m.hp / maxMobHP
+        if filled < 1 { filled = 1 }
+        raylib::drawRectangle(MAP_OX + m.x * TILE_SIZE + 2,
+                              MAP_OY + m.y * TILE_SIZE - 4, bw, 3, C_HP_BG)
+        raylib::drawRectangle(MAP_OX + m.x * TILE_SIZE + 2,
+                              MAP_OY + m.y * TILE_SIZE - 4, filled, 3, C_HP_BAR)
+    }
+}
+
+fn drawPlayer() {
+    let px = MAP_OX + playerX * TILE_SIZE + TILE_SIZE / 2
+    let py = MAP_OY + playerY * TILE_SIZE + TILE_SIZE / 2
+    raylib::drawCircle(px, py, TILE_SIZE / 2 - 1, C_PLAYER)
+    raylib::drawText("@", px - 5, py - 7, 16, (255, 255, 255))
+}
+
+fn drawHUD() {
+    let info = "Level: " + Cast::string(playerLevel) +
+               "  Score: " + Cast::string(playerScore) +
+               "  Turn: " + Cast::string(turnCount)
+    raylib::drawText(info, 10, 10, 20, C_HUD)
+
+    // HP bar
+    let barX = 10
+    let barY = 35
+    let barW = 200
+    let barH = 12
+    let hpFrac = barW * playerHP / playerMaxHP
+    if hpFrac < 0 { hpFrac = 0 }
+    raylib::drawRectangle(barX, barY, barW, barH, C_HP_BG)
+    raylib::drawRectangle(barX, barY, hpFrac, barH, C_HP_BAR)
+    let hpText = "HP: " + Cast::string(playerHP) + "/" + Cast::string(playerMaxHP)
+    raylib::drawText(hpText, barX + barW + 10, barY - 2, 16, C_HUD)
+    raylib::drawText("ATK: " + Cast::string(playerAtk), barX + barW + 120, barY - 2, 16, C_HUD)
+
+    // Message log
+    let logY = MAP_OY + MAP_H * TILE_SIZE + 10
+    raylib::drawText(msgLog, 10, logY, 18, (180, 180, 140))
+    raylib::drawText("WASD/Arrows: Move   SPACE: Wait   R: Restart   Q: Quit",
+                     10, logY + 25, 14, (100, 100, 120))
+}
+
+fn drawGameOver() {
+    raylib::drawRectangle(SCREEN_W / 2 - 180, SCREEN_H / 2 - 60, 360, 120, (20, 10, 10))
+    raylib::drawRectangleLines(SCREEN_W / 2 - 180, SCREEN_H / 2 - 60, 360, 120, (200, 50, 50))
+
+    if gameState == "dead" {
+        raylib::drawText("YOU DIED", SCREEN_W / 2 - 80, SCREEN_H / 2 - 40, 36, (220, 50, 50))
+    } else {
+        raylib::drawText("YOU WIN!", SCREEN_W / 2 - 80, SCREEN_H / 2 - 40, 36, C_STAIR)
+    }
+    let scoreText = "Score: " + Cast::string(playerScore) + "  Level: " + Cast::string(playerLevel)
+    raylib::drawText(scoreText, SCREEN_W / 2 - 100, SCREEN_H / 2, 20, C_HUD)
+    raylib::drawText("Press R to restart", SCREEN_W / 2 - 80, SCREEN_H / 2 + 30, 16, (150, 150, 150))
+}
+
+// ── Main Loop ────────────────────────────────────────────────────────────────
+
+generateDungeon(1)
+updateVisibility()
+
+while raylib::rendering() {
+    if raylib::isKeyReleased("Q") { break }
+    if raylib::isKeyReleased("R") { restartGame() }
+
+    if gameState == "playing" {
+        if raylib::isKeyReleased("W") || raylib::isKeyReleased("Up")    { tryMove(0, -1) }
+        if raylib::isKeyReleased("S") || raylib::isKeyReleased("Down")  { tryMove(0, 1)  }
+        if raylib::isKeyReleased("A") || raylib::isKeyReleased("Left")  { tryMove(-1, 0) }
+        if raylib::isKeyReleased("D") || raylib::isKeyReleased("Right") { tryMove(1, 0)  }
+        if raylib::isKeyReleased("Space") {
+            turnCount = turnCount + 1
+            moveMobs()
+            updateVisibility()
+        }
+    }
+
+    raylib::clear(C_BG)
+    drawMap()
+    drawMobs()
+    drawPlayer()
+    drawHUD()
+    if gameState != "playing" { drawGameOver() }
+    raylib::drawFPS(SCREEN_W - 80, 10)
+}

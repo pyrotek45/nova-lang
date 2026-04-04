@@ -1363,10 +1363,34 @@ impl Parser {
                     ));
                 }
             }
+            TType::String => {
+                self.consume_symbol(LeftSquareBracket)?;
+                let position = self.get_current_token_position();
+                let start_expr = Box::new(self.expr()?);
+                self.consume_symbol(RightSquareBracket)?;
+
+                if start_expr.get_type() != TType::Int {
+                    return Err(self.generate_error_with_pos(
+                        "String index must be an Int",
+                        format!(
+                            "Cannot index into String with {}",
+                            start_expr.get_type()
+                        ),
+                        position,
+                    ));
+                }
+                lhs = Expr::Indexed {
+                    ttype: TType::Char,
+                    name: identifier.clone(),
+                    index: start_expr,
+                    container: Box::new(lhs),
+                    position,
+                };
+            }
             _ => {
                 return Err(self.generate_error(
                     "Cannot index into this type",
-                    format!("Only lists and tuples can be indexed with `[...]`.\n  Lists: `my_list[i]`\n  Tuples: `my_tuple[0]`, `my_tuple[1]`"),
+                    format!("Only lists, tuples, and strings can be indexed with `[...]`.\n  Lists: `my_list[i]`\n  Tuples: `my_tuple[0]`, `my_tuple[1]`\n  Strings: `my_string[i]`"),
                 ));
             }
         }
@@ -4172,6 +4196,123 @@ impl Parser {
     fn import_file(&mut self) -> NovaResult<Option<Statement>> {
         self.consume_identifier(Some("import"))?;
         let pos = self.get_current_token_position();
+
+        // ── GitHub import: `import @ "owner/repo/path/file.nv" ! "commit"` ──
+        if self.current_token().is_some_and(|t| t.is_symbol(At)) {
+            self.advance(); // consume @
+            let repo_path = match self.current_token_value() {
+                Some(StringLiteral(s)) => s.to_string(),
+                _ => {
+                    return Err(self.generate_error_with_pos(
+                        "Expected GitHub path after `@`",
+                        "expected a string literal like `\"owner/repo/path/to/file.nv\"`\n  \
+                         Example: import @ \"pyrotek45/nova-lang/std/core.nv\"",
+                        self.get_current_token_position(),
+                    ));
+                }
+            };
+            self.advance();
+
+            // Optional commit lock: ! "commithash"
+            let commit = if self.current_token().is_some_and(|t| t.is_op(Operator::Not)) {
+                self.advance(); // consume !
+                let hash = match self.current_token_value() {
+                    Some(StringLiteral(s)) => s.to_string(),
+                    _ => {
+                        return Err(self.generate_error_with_pos(
+                            "Expected commit hash after `!`",
+                            "expected a string literal like `\"abc123\"` for version locking\n  \
+                             Example: import @ \"pyrotek45/nova-lang/std/core.nv\" ! \"a1b2c3d\"",
+                            self.get_current_token_position(),
+                        ));
+                    }
+                };
+                self.advance();
+                Some(hash)
+            } else {
+                None
+            };
+
+            // Parse the repo path: "owner/repo/path/to/file.nv"
+            let parts: Vec<&str> = repo_path.splitn(3, '/').collect();
+            if parts.len() < 3 {
+                return Err(self.generate_error_with_pos(
+                    "Invalid GitHub path",
+                    format!(
+                        "expected `\"owner/repo/path/to/file.nv\"`, got `\"{}\"`\n  \
+                         The path must have at least three segments: owner, repository, and file path.\n  \
+                         Example: `\"pyrotek45/nova-lang/std/core.nv\"`",
+                        repo_path
+                    ),
+                    pos,
+                ));
+            }
+            let owner = parts[0];
+            let repo = parts[1];
+            let file_path = parts[2];
+            let branch = commit.as_deref().unwrap_or("main");
+
+            let url = format!(
+                "https://raw.githubusercontent.com/{}/{}/{}/{}",
+                owner, repo, branch, file_path
+            );
+
+            let source = match ureq::get(&url).call() {
+                Ok(resp) => match resp.into_string() {
+                    Ok(body) => body,
+                    Err(e) => {
+                        return Err(self.generate_error_with_pos(
+                            "GitHub import: failed to read response",
+                            format!(
+                                "Could not read the response body from:\n  {}\n  Error: {}",
+                                url, e
+                            ),
+                            pos,
+                        ));
+                    }
+                },
+                Err(e) => {
+                    let hint = if commit.is_some() {
+                        format!(
+                            "\n  Check that the commit hash `{}` is correct and the file exists at that revision.",
+                            branch
+                        )
+                    } else {
+                        "\n  Check that the repository is public and the file path is correct.\n  \
+                         Tip: you can lock to a specific commit with `! \"commithash\"`."
+                            .to_string()
+                    };
+                    return Err(self.generate_error_with_pos(
+                        "GitHub import: could not fetch file",
+                        format!(
+                            "Failed to fetch from GitHub:\n  {}\n  Error: {}{}",
+                            url, e, hint
+                        ),
+                        pos,
+                    ));
+                }
+            };
+
+            // Use a virtual filepath for error reporting
+            let virtual_path: Rc<Path> =
+                PathBuf::from(format!("github://{}/{}/{}", owner, repo, file_path)).into();
+
+            let mut lexer = Lexer::new(source.as_str(), Some(&virtual_path));
+            let tokens = lexer.tokenize()?;
+            let mut parser = self.clone();
+            parser.index = 0;
+            parser.filepath = Some(virtual_path.clone());
+            parser.input = tokens;
+            parser.parse()?;
+            self.typechecker.environment = parser.typechecker.environment.clone();
+            self.modules = parser.modules.clone();
+            return Ok(Some(Statement::Block {
+                body: parser.ast.program.clone(),
+                filepath: Some(virtual_path),
+            }));
+        }
+
+        // ── Local import: dot-path or string literal ──
         let import_filepath: PathBuf = match self.current_token_value() {
             Some(StringLiteral(path)) => {
                 let path = PathBuf::from_str(path).unwrap();
@@ -4197,11 +4338,16 @@ impl Parser {
             _ => {
                 return Err(self.generate_error_with_pos(
                     "Expected import path",
-                    "expected a module path or string literal after 'import'",
+                    "expected a module path, string literal, or `@` for GitHub import after 'import'\n  \
+                     Examples:\n  \
+                     import utils.math          // local: ./utils/math.nv\n  \
+                     import super.std.core      // local: ../std/core.nv\n  \
+                     import @ \"owner/repo/path/file.nv\"  // GitHub",
                     pos,
                 ));
             }
         };
+
         let resolved_filepath = match self
             .filepath
             .as_ref()
@@ -4221,7 +4367,13 @@ impl Parser {
             Err(_) => {
                 return Err(self.generate_error_with_pos(
                     "Error Importing file",
-                    format!("Could not import file: {}", resolved_filepath.display()),
+                    format!(
+                        "Could not find file: {}\n  \
+                         Import paths are relative to the current file's directory.\n  \
+                         Use `super` to go up a directory: import super.folder.module\n  \
+                         Check that the file exists and the path is spelled correctly.",
+                        resolved_filepath.display()
+                    ),
                     pos,
                 ));
             }

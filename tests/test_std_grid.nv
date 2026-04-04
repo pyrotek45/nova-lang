@@ -3,22 +3,37 @@ module test_std_grid
 import super.std.grid
 import super.std.core
 
-// Grid stores Any values; use direct struct construction to avoid
-// Any coercion issues with Grid::new
-let g = Grid { _cells: []:Any, _cols: 5, _rows: 4 }
+// ── Construction with type annotation ────────────────────────
+let g = Grid::new(5, 4, 0) @[T: Int]
 assert(g.width() == 5, "width")
 assert(g.height() == 4, "height")
 
-// inBounds
+// ── inBounds ─────────────────────────────────────────────────
 assert(g.inBounds(0, 0), "inBounds top-left")
 assert(g.inBounds(4, 3), "inBounds bottom-right")
 assert(!g.inBounds(5, 0), "inBounds out col")
 assert(!g.inBounds(0, 4), "inBounds out row")
 
-// 6x6 grid for neighbor tests
-let g2 = Grid { _cells: []:Any, _cols: 6, _rows: 6 }
-for let i = 0; i < 36; i += 1 { g2._cells.push(0) }
+// ── set / get ────────────────────────────────────────────────
+g.set(2, 1, 42)
+assert(g.get(2, 1) == 42, "set/get basic")
+g.set(0, 0, 99)
+assert(g.get(0, 0) == 99, "set/get corner")
 
+// ── fill ─────────────────────────────────────────────────────
+g.fill(7)
+assert(g.get(0, 0) == 7, "fill 0,0")
+assert(g.get(4, 3) == 7, "fill 4,3")
+
+// ── fillRect ─────────────────────────────────────────────────
+g.fill(0)
+g.fillRect(1, 1, 2, 2, 5)
+assert(g.get(1, 1) == 5, "fillRect inside")
+assert(g.get(2, 2) == 5, "fillRect inside2")
+assert(g.get(0, 0) == 0, "fillRect outside")
+
+// ── neighbors ────────────────────────────────────────────────
+let g2 = Grid::new(6, 6, 0) @[T: Int]
 let n4 = g2.neighbors4(2, 2)
 assert(n4.len() == 4, "neighbors4 interior count")
 let n4edge = g2.neighbors4(0, 0)
@@ -29,29 +44,36 @@ assert(n8.len() == 8, "neighbors8 interior count")
 let n8edge = g2.neighbors8(0, 0)
 assert(n8edge.len() == 3, "neighbors8 corner count")
 
-// forEach
-let g3 = Grid { _cells: []:Any, _cols: 3, _rows: 3 }
-for let i = 0; i < 9; i += 1 { g3._cells.push(i) }
+// ── forEach ──────────────────────────────────────────────────
+let g3 = Grid::new(3, 3, 0) @[T: Int]
+for let i = 0; i < 9; i += 1 { g3.cells[i] = i }
 let visitCount = Box(0)
-g3.forEach(fn(col: Int, row: Int, v: Any) { visitCount.value += 1 })
+g3.forEach(fn(col: Int, row: Int, v: Int) { visitCount.value += 1 })
 assert(visitCount.value == 9, "forEach visits all 9 cells")
 
-// BFS on a flat passable grid
-let maze = Grid { _cells: []:Any, _cols: 5, _rows: 1 }
-for let i = 0; i < 5; i += 1 { maze._cells.push(1) }
-let path = maze.bfs(0, 0, 4, 0, fn(v: Any) -> Bool { return true })
+// ── BFS on a flat passable grid ──────────────────────────────
+let maze = Grid::new(5, 1, 1) @[T: Int]
+let path = maze.bfs(0, 0, 4, 0, fn(v: Int) -> Bool { return v == 1 })
 assert(path.len() == 5, "BFS path length on 5x1 open")
 assert(path[0][0] == 0 && path[0][1] == 0, "BFS start")
 assert(path[4][0] == 4 && path[4][1] == 0, "BFS end")
 
-// BFS: goal unreachable
-let blocked = Grid { _cells: []:Any, _cols: 3, _rows: 1 }
-blocked._cells.push(1)
-blocked._cells.push(0)
-blocked._cells.push(1)
-let noPath = blocked.bfs(0, 0, 2, 0, fn(v: Any) -> Bool {
-    return Cast::string(v) == "1"
-})
+// ── BFS: goal unreachable ────────────────────────────────────
+let blocked = Grid::new(3, 1, 1) @[T: Int]
+blocked.set(1, 0, 0)
+let noPath = blocked.bfs(0, 0, 2, 0, fn(v: Int) -> Bool { return v == 1 })
 assert(noPath.len() == 0, "BFS blocked returns empty path")
+
+// ── Grid with Bool type ──────────────────────────────────────
+let boolGrid = Grid::new(3, 3, false) @[T: Bool]
+boolGrid.set(1, 1, true)
+assert(boolGrid.get(1, 1) == true, "Bool grid set/get")
+assert(boolGrid.get(0, 0) == false, "Bool grid default")
+
+// ── Grid with String type ────────────────────────────────────
+let strGrid = Grid::new(2, 2, ".") @[T: String]
+strGrid.set(0, 0, "#")
+assert(strGrid.get(0, 0) == "#", "String grid set")
+assert(strGrid.get(1, 1) == ".", "String grid default")
 
 println("PASS: test_std_grid")

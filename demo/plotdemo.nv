@@ -1,0 +1,150 @@
+module plotdemo
+
+// ─────────────────────────────────────────────────────────
+// Plot Library Demo — bar, line, scatter, fill, and pie charts
+//
+// Demonstrates every function in std/plot.nv using raylib.
+// Each chart type is shown in its own panel inside a single window.
+//
+// Controls:  None (static display)
+// ─────────────────────────────────────────────────────────
+
+import super.std.plot
+import super.std.math
+
+let WIDTH  = 1100
+let HEIGHT = 750
+
+raylib::init("Nova Plot Demo", WIDTH, HEIGHT, 30)
+
+// ── Shared palette ──────────────────────────────────────
+let white  = (230, 230, 230)
+let gray   = (100, 100, 100)
+let dark   = (50,  50,  50)
+let red    = (220, 60,  60)
+let green  = (60,  200, 80)
+let blue   = (60,  120, 220)
+let orange = (230, 160, 40)
+let purple = (160, 80,  200)
+let cyan   = (40,  200, 210)
+
+// ── 1. Line Chart Data ─────────────────────────────────
+let sineData = []: Float
+for let i = 0; i < 40; i += 1 {
+    let t = Cast::float(i).unwrap() * 0.16
+    sineData.push(Float::sin(t) * 3.0 + 5.0)
+}
+let lineArea = PlotArea::auto(50, 40, 300, 180, sineData)
+
+// ── 2. Bar Chart Data ───────────────────────────────────
+let barData = [4.0, 7.0, 2.5, 9.0, 5.5, 3.0, 8.0]
+let barLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+let barArea = PlotArea::auto(420, 40, 280, 180, barData)
+
+// ── 3. Scatter Plot Data ────────────────────────────────
+let scatterPts = []: (Float, Float)
+for let i = 0; i < 30; i += 1 {
+    let x = Cast::float(i).unwrap() * 0.35
+    let y = x * 0.6 + Float::sin(x * 2.0) * 1.5 + 2.0
+    scatterPts.push((x, y))
+}
+// Collect y-values for auto-range
+let scatterY = []: Float
+for p in scatterPts { scatterY.push(p[1]) }
+let scatterArea = PlotArea::auto(770, 40, 280, 180, scatterY)
+// Fix x-range to match scatter x values
+scatterArea.xMin = 0.0
+scatterArea.xMax = 10.5
+
+// ── 4. Filled Area Chart ───────────────────────────────
+let fillData = []: Float
+for let i = 0; i < 25; i += 1 {
+    let t = Cast::float(i).unwrap() * 0.25
+    fillData.push(Float::cos(t) * 2.0 + 3.0)
+}
+let fillArea = PlotArea::auto(50, 310, 300, 180, fillData)
+
+// ── 5. Multi-line Overlay ───────────────────────────────
+let lineA = []: Float
+let lineB = []: Float
+for let i = 0; i < 30; i += 1 {
+    let t = Cast::float(i).unwrap() * 0.22
+    lineA.push(Float::sin(t) * 2.0 + 4.0)
+    lineB.push(Float::cos(t) * 1.5 + 4.0)
+}
+let multiArea = PlotArea::auto(420, 310, 280, 180, lineA)
+
+// ── 6. Pie Chart Data ───────────────────────────────────
+let pieData   = [35.0, 25.0, 20.0, 12.0, 8.0]
+let pieLabels = ["Rust", "Nova", "C", "Go", "Lua"]
+let pieColors = [red, blue, green, orange, purple]
+
+// ── 7. Thick Line + Horizontal/Vertical reference lines ─
+let thickData = []: Float
+for let i = 0; i < 20; i += 1 {
+    let t = Cast::float(i).unwrap() * 0.3
+    thickData.push(Float::sin(t) * 4.0)
+}
+let thickArea = PlotArea::auto(420, 540, 280, 170, thickData)
+
+// ── Render ──────────────────────────────────────────────
+while raylib::rendering() {
+    raylib::clear((25, 25, 30))
+
+    // ─── 1. Line Chart ─────────────────────────────────
+    lineArea.drawGrid(8, 4, (40, 40, 45))
+    lineArea.drawAxes(gray)
+    lineArea.drawBorder(gray)
+    lineArea.lineChart(sineData, cyan)
+    lineArea.drawTitle("Sine Wave", 16, white)
+    lineArea.drawYLabels(4, 10, gray)
+
+    // ─── 2. Bar Chart ──────────────────────────────────
+    barArea.drawGrid(7, 4, (40, 40, 45))
+    barArea.drawAxes(gray)
+    barArea.drawBorder(gray)
+    barArea.barChartLabeled(barData, barLabels, orange, white)
+    barArea.drawTitle("Weekly Sales", 16, white)
+    barArea.drawYLabels(4, 10, gray)
+
+    // ─── 3. Scatter ────────────────────────────────────
+    scatterArea.drawGrid(5, 4, (40, 40, 45))
+    scatterArea.drawAxes(gray)
+    scatterArea.drawBorder(gray)
+    scatterArea.scatter(scatterPts, 3, green)
+    scatterArea.drawTitle("Scatter Plot", 16, white)
+
+    // ─── 4. Filled Area ────────────────────────────────
+    fillArea.drawGrid(5, 4, (40, 40, 45))
+    fillArea.drawAxes(gray)
+    fillArea.drawBorder(gray)
+    fillArea.fillArea(fillData, (60, 120, 220))
+    fillArea.lineChart(fillData, blue)
+    fillArea.drawTitle("Cosine Fill", 16, white)
+    fillArea.drawYLabels(4, 10, gray)
+
+    // ─── 5. Multi-line Overlay ─────────────────────────
+    multiArea.drawGrid(6, 4, (40, 40, 45))
+    multiArea.drawAxes(gray)
+    multiArea.drawBorder(gray)
+    multiArea.lineChart(lineA, red)
+    multiArea.lineChart(lineB, cyan)
+    multiArea.drawTitle("Multi-line", 16, white)
+
+    // ─── 6. Pie Chart ──────────────────────────────────
+    drawPieChartLabeled(910, 420, 80, pieData, pieLabels, pieColors, white, 14)
+    raylib::drawText("Language Share", 845, 310, 16, white)
+
+    // ─── 7. Thick Line + Reference Lines ───────────────
+    thickArea.drawGrid(5, 4, (40, 40, 45))
+    thickArea.drawAxes(gray)
+    thickArea.drawBorder(gray)
+    thickArea.lineChartThick(thickData, 2.5, purple)
+    thickArea.hLine(2.0, (200, 60, 60))
+    thickArea.hLine(-2.0, (200, 60, 60))
+    thickArea.vLine(10.0, (60, 200, 80))
+    thickArea.drawTitle("Thick + Refs", 16, white)
+
+    // ─── Legend / credits ──────────────────────────────
+    raylib::drawText("Nova Plot Demo  —  std/plot.nv", 30, HEIGHT - 26, 14, gray)
+}

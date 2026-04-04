@@ -1,0 +1,320 @@
+module test_feature_combos
+
+import super.std.core
+
+// ============================================================
+// Novel Feature Combinations
+// Tests creative mixing of Nova features that individually work
+// but exercise unusual interactions between subsystems.
+// ============================================================
+
+// ============================================================
+// 1. Generic struct + closure returning generic type
+// ============================================================
+
+struct Wrap(T) {
+    value: $T,
+}
+
+fn extends(Wrap) new(v: $T) -> Wrap($T) {
+    return Wrap { value: v } @[T: $T]
+}
+
+fn extends unwrapW(self: Wrap($T)) -> $T {
+    return self.value
+}
+
+fn extends mapW(self: Wrap($T), f: fn($T) -> $T) -> Wrap($T) {
+    return Wrap::new(f(self.value)) @[T: $T]
+}
+
+let b1 = Wrap::new(10) @[T: Int]
+let b2 = b1.mapW(fn(x: Int) -> Int { return x * 3 })
+assert(b2.unwrapW() == 30, "PASS: generic struct + closure map")
+
+let bs = Wrap::new("hi") @[T: String]
+let bs2 = bs.mapW(fn(s: String) -> String { return s + "!" })
+assert(bs2.unwrapW() == "hi!", "PASS: generic Wrap(String) map")
+
+println("PASS: generic_struct_closure_map (2 assertions)")
+
+// ============================================================
+// 2. Negative indexing inside closures
+// ============================================================
+
+let data = [10, 20, 30, 40, 50]
+
+let getLast = fn(xs: [Int]) -> Int { return xs[-1] }
+let getSecondLast = fn(xs: [Int]) -> Int { return xs[-2] }
+
+assert(getLast(data) == 50, "PASS: negative index in closure last")
+assert(getSecondLast(data) == 40, "PASS: negative index in closure second-last")
+
+// Negative index in higher-order pipeline
+fn applyToList(xs: [Int], f: fn([Int]) -> Int) -> Int {
+    return f(xs)
+}
+let result = applyToList([100, 200, 300], fn(xs: [Int]) -> Int { return xs[-1] + xs[-2] })
+assert(result == 500, "PASS: negative index in higher-order function")
+
+println("PASS: negative_indexing_in_closures (3 assertions)")
+
+// ============================================================
+// 3. Enum + extends + match inside function
+// ============================================================
+
+enum Shape {
+    Circle: Float,
+    Rect: (Float, Float),
+    Point
+}
+
+fn extends area(self: Shape) -> Float {
+    match self {
+        Circle(r) => { return r * r * 3.0 }
+        Rect(dims) => { return dims[0] * dims[1] }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+
+fn extends describe(self: Shape) -> String {
+    match self {
+        Circle(_) => { return "circle" }
+        Rect(_) => { return "rect" }
+        Point() => { return "point" }
+    }
+    return "?"
+}
+
+fn extends isLargerThan(self: Shape, threshold: Float) -> Bool {
+    return self.area() > threshold
+}
+
+let shapes = [Shape::Circle(5.0), Shape::Rect((4.0, 6.0)), Shape::Point()]
+assert(shapes[0].area() == 75.0, "PASS: enum extends area circle")
+assert(shapes[1].area() == 24.0, "PASS: enum extends area rect")
+assert(shapes[2].area() == 0.0, "PASS: enum extends area point")
+assert(shapes[0].describe() == "circle", "PASS: enum extends describe")
+assert(shapes[0].isLargerThan(50.0), "PASS: enum extends chained method")
+assert(!shapes[2].isLargerThan(0.0), "PASS: enum extends chained false")
+
+println("PASS: enum_extends_match (6 assertions)")
+
+// ============================================================
+// 4. Closure capturing + negative indexing + list mutation
+// ============================================================
+
+fn makeAccumulator() -> fn(Int) -> [Int] {
+    let history = []: Int
+    return fn(x: Int) -> [Int] {
+        history.push(x)
+        return history
+    }
+}
+
+let acc = makeAccumulator()
+acc(10)
+acc(20)
+let hist = acc(30)
+assert(hist.len() == 3, "PASS: closure accumulator length")
+assert(hist[-1] == 30, "PASS: closure accumulator negative index last")
+assert(hist[-3] == 10, "PASS: closure accumulator negative index first")
+
+println("PASS: closure_capture_negative_index (3 assertions)")
+
+// ============================================================
+// 5. Generic struct with enum field
+// ============================================================
+
+enum Opt2(T) {
+    Some2: $T,
+    None2
+}
+
+struct Pair(T) {
+    first: Opt2($T),
+    second: Opt2($T),
+}
+
+fn extends(Pair) make(a: Opt2($T), b: Opt2($T)) -> Pair($T) {
+    return Pair { first: a, second: b } @[T: $T]
+}
+
+fn extends countPresent(self: Pair($T)) -> Int {
+    let c = 0
+    match self.first {
+        Some2(_) => { c = c + 1 }
+        None2() => {}
+    }
+    match self.second {
+        Some2(_) => { c = c + 1 }
+        None2() => {}
+    }
+    return c
+}
+
+let p1 = Pair::make(Opt2::Some2(42), Opt2::None2() @[T: Int]) @[T: Int]
+let p2 = Pair::make(Opt2::Some2("a"), Opt2::Some2("b")) @[T: String]
+assert(p1.countPresent() == 1, "PASS: generic pair one present")
+assert(p2.countPresent() == 2, "PASS: generic pair both present")
+
+println("PASS: generic_struct_with_enum (2 assertions)")
+
+// ============================================================
+// 6. List of closures with varied captures
+// ============================================================
+
+fn makeMultipliers() -> [fn(Int) -> Int] {
+    let fns = []: fn(Int) -> Int
+    let factors = [2, 3, 5]
+    for f in factors {
+        let captured = f
+        fns.push(fn(x: Int) -> Int { return x * captured })
+    }
+    return fns
+}
+
+let muls = makeMultipliers()
+assert(muls[0](10) == 20, "PASS: closure list first")
+assert(muls[1](10) == 30, "PASS: closure list second")
+assert(muls[-1](10) == 50, "PASS: closure list negative index call")
+
+println("PASS: list_of_closures (3 assertions)")
+
+// ============================================================
+// 7. Match result feeding into function
+// ============================================================
+
+fn double(x: Float) -> Float { return x * 2.0 }
+
+fn extractRadius(s: Shape) -> Float {
+    match s {
+        Circle(r) => { return r }
+        Rect(d) => { return d[0] }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+
+let val = double(extractRadius(Shape::Circle(4.0)))
+assert(val == 8.0, "PASS: match-based extract feeding into function")
+
+println("PASS: match_extract_to_function (1 assertion)")
+
+// ============================================================
+// 8. Block expression + negative index in computation
+// ============================================================
+
+let computedSum = {
+    let xs = [1, 2, 3, 4, 5]
+    xs[-1] + xs[-2] + xs[0]
+}
+assert(computedSum == 10, "PASS: block expr with negative index sum")
+
+let blockVal = { let xs = [10, 20, 30]; xs[-1] * 2 }
+assert(blockVal == 60, "PASS: block expr negative index inline")
+
+println("PASS: block_negative_index (2 assertions)")
+
+// ============================================================
+// 9. Enum in a list sorted by match-computed key
+// ============================================================
+
+fn priority(s: Shape) -> Int {
+    match s {
+        Point() => { return 0 }
+        Circle(_) => { return 1 }
+        Rect(_) => { return 2 }
+    }
+    return -1
+}
+
+let items = [Shape::Rect((2.0, 3.0)), Shape::Point(), Shape::Circle(1.0)]
+// Manual sort by priority (bubble sort)
+for let i = 0; i < items.len(); i += 1 {
+    for let j = 0; j < items.len() - 1 - i; j += 1 {
+        if priority(items[j]) > priority(items[j + 1]) {
+            let tmp = items[j]
+            items[j] = items[j + 1]
+            items[j + 1] = tmp
+        }
+    }
+}
+assert(priority(items[0]) == 0, "PASS: enum sort first is Point")
+assert(priority(items[1]) == 1, "PASS: enum sort second is Circle")
+assert(priority(items[2]) == 2, "PASS: enum sort third is Rect")
+
+println("PASS: enum_sort_by_match_key (3 assertions)")
+
+// ============================================================
+// 10. Curried function with closure + negative index
+// ============================================================
+
+fn adder(a: Int) -> fn(Int) -> Int {
+    return fn(b: Int) -> Int { return a + b }
+}
+
+let add10 = adder(10)
+let nums = [1, 2, 3, 4, 5]
+assert(add10(nums[-1]) == 15, "PASS: curried + negative index")
+assert(add10(nums[-5]) == 11, "PASS: curried + negative index first elem")
+
+println("PASS: curried_negative_index (2 assertions)")
+
+// ============================================================
+// 11. String negative indexing in char comparisons
+// ============================================================
+
+let word = "Hello!"
+assert(word[-1] == '!', "PASS: string negative index char last")
+assert(word[-6] == 'H', "PASS: string negative index char first")
+
+// Build reversed string using negative indices
+let reversed = ""
+for let i = 1; i <= word.len(); i += 1 {
+    reversed = reversed + Cast::string(word[0 - i])
+}
+assert(reversed == "!olleH", "PASS: string reverse via negative index loop")
+
+println("PASS: string_negative_index_chars (3 assertions)")
+
+// ============================================================
+// 12. Generic enum as return type + map pipeline
+// ============================================================
+
+fn safeDiv(a: Int, b: Int) -> Opt2(Int) {
+    if b == 0 { return Opt2::None2() @[T: Int] }
+    return Opt2::Some2(a / b)
+}
+
+fn opt2Map(o: Opt2(Int), f: fn(Int) -> Int) -> Opt2(Int) {
+    match o {
+        Some2(v) => { return Opt2::Some2(f(v)) }
+        None2() => { return Opt2::None2() @[T: Int] }
+    }
+    return Opt2::None2() @[T: Int]
+}
+
+fn opt2Or(o: Opt2(Int), default: Int) -> Int {
+    match o {
+        Some2(v) => { return v }
+        None2() => { return default }
+    }
+    return default
+}
+
+let r1 = opt2Map(safeDiv(10, 2), fn(x: Int) -> Int { return x * 10 })
+let r2 = opt2Map(safeDiv(10, 0), fn(x: Int) -> Int { return x * 10 })
+assert(opt2Or(r1, -1) == 50, "PASS: generic enum pipeline success")
+assert(opt2Or(r2, -1) == -1, "PASS: generic enum pipeline failure")
+
+println("PASS: generic_enum_pipeline (2 assertions)")
+
+// ============================================================
+// Summary
+// ============================================================
+
+println("")
+println("=== All feature combination tests passed ===")
+println("Total: 32 assertions across 12 groups")

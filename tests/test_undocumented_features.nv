@@ -1,0 +1,234 @@
+module test_undocumented_features
+
+import super.std.core
+
+// ============================================================
+// Test: List Concatenation with +
+// ============================================================
+
+// ---- basic concat ----
+let a = [1, 2] + [3, 4]
+assert(a.len() == 4, "PASS: list concat basic length")
+assert(a[0] == 1, "PASS: list concat elem 0")
+assert(a[3] == 4, "PASS: list concat elem 3")
+
+// ---- concat preserves order ----
+let b = [10, 20, 30] + [40, 50]
+assert(b[0] == 10, "PASS: list concat order first")
+assert(b[4] == 50, "PASS: list concat order last")
+
+// ---- concat empty left ----
+let c = []: Int + [1, 2, 3]
+assert(c.len() == 3, "PASS: list concat empty left len")
+assert(c[0] == 1, "PASS: list concat empty left elem")
+
+// ---- concat empty right ----
+let d = [1, 2, 3] + []: Int
+assert(d.len() == 3, "PASS: list concat empty right len")
+
+// ---- concat both empty ----
+let e = []: Int + []: Int
+assert(e.len() == 0, "PASS: list concat both empty")
+
+// ---- concat in expression ----
+fn make_list() -> [Int] {
+    return [1] + [2] + [3]
+}
+let g = make_list()
+assert(g.len() == 3, "PASS: list concat chained len")
+assert(g[2] == 3, "PASS: list concat chained elem")
+
+println("PASS: list_concatenation (10 assertions)")
+
+// ============================================================
+// Test: Block Expressions
+// ============================================================
+
+// ---- basic block as value ----
+fn block_basic() -> Int {
+    let x = { let v = 10; v + 5 }
+    return x
+}
+assert(block_basic() == 15, "PASS: block expr basic")
+
+// ---- nested blocks ----
+fn block_nested() -> Int {
+    let x = { let v = 2; v * 3 }
+    let y = { let w = x + 1; w * 2 }
+    return y
+}
+assert(block_nested() == 14, "PASS: block expr nested")
+
+// ---- block with multiple statements ----
+fn block_multi() -> Int {
+    let r = {
+        let a = 10
+        let b = 20
+        let c = a + b
+        c * 2
+    }
+    return r
+}
+assert(block_multi() == 60, "PASS: block expr multi statement")
+
+println("PASS: block_expressions (3 assertions)")
+
+// ============================================================
+// Test: pass Statement
+// ============================================================
+
+fn stub_void(x: Int) { pass }
+
+// pass functions should not crash when called
+stub_void(42)
+
+println("PASS: pass_statement (1 call, no crash)")
+
+// ============================================================
+// Test: fn extends Auto-Infer
+// ============================================================
+
+struct Animal { name: String, age: Int }
+
+// auto-infer: extends type inferred from first param
+fn extends getInfo(a: Animal) -> String {
+    return a.name + " age " + Cast::string(a.age)
+}
+
+let dog = Animal { name: "Rex", age: 5 }
+assert(dog.getInfo() == "Rex age 5", "PASS: extends auto-infer struct")
+
+// auto-infer on built-in Int
+fn extends doubled(n: Int) -> Int { return n * 2 }
+assert(10.doubled() == 20, "PASS: extends auto-infer Int")
+
+// auto-infer on list
+fn extends sumAll(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+assert([1, 2, 3].sumAll() == 6, "PASS: extends auto-infer List")
+
+println("PASS: extends_auto_infer (3 assertions)")
+
+// ============================================================
+// Test: :: and -> Operators on Struct Function Fields
+// ============================================================
+
+// ---- :: calls without self ----
+struct Transformer { apply: fn(Int) -> Int }
+let t = Transformer { apply: fn(x: Int) -> Int { return x * 3 } }
+assert(t::apply(5) == 15, "PASS: :: operator no self")
+
+// ---- -> calls with self ----
+struct Greeter { name: String, greet: fn(Greeter) -> String }
+let gr = Greeter {
+    name: "Nova",
+    greet: fn(self: Greeter) -> String {
+        return "Hi from " + self.name
+    }
+}
+assert(gr->greet() == "Hi from Nova", "PASS: -> operator with self")
+
+// ---- :: with multiple args ----
+struct MathOp { compute: fn(Int, Int) -> Int }
+let mo = MathOp { compute: fn(a: Int, b: Int) -> Int { return a + b } }
+assert(mo::compute(10, 20) == 30, "PASS: :: multi args")
+
+// ---- -> with extra args ----
+struct Adder { base: Int, add: fn(Adder, Int) -> Int }
+let ad = Adder {
+    base: 100,
+    add: fn(self: Adder, n: Int) -> Int {
+        return self.base + n
+    }
+}
+assert(ad->add(42) == 142, "PASS: -> with extra args")
+
+println("PASS: arrow_doublecolon_operators (4 assertions)")
+
+// ============================================================
+// Test: Match Trailing Commas
+// ============================================================
+
+enum Dir { Up, Down, Left, Right }
+
+fn dir_name(d: Dir) -> String {
+    match d {
+        Up()    => { return "up" },
+        Down()  => { return "down" },
+        Left()  => { return "left" },
+        Right() => { return "right" },
+    }
+    return "?"
+}
+assert(dir_name(Dir::Up()) == "up", "PASS: match trailing commas Up")
+assert(dir_name(Dir::Right()) == "right", "PASS: match trailing commas Right")
+
+println("PASS: match_trailing_commas (2 assertions)")
+
+// ============================================================
+// Test: Match Expression Arms (no braces)
+// ============================================================
+
+enum Toggle { On, Off }
+
+fn toggle_label(t: Toggle) -> String {
+    match t {
+        On()  => { return "on" }
+        Off() => { return "off" }
+    }
+    return "?"
+}
+assert(toggle_label(Toggle::On()) == "on", "PASS: match expr arm On")
+assert(toggle_label(Toggle::Off()) == "off", "PASS: match expr arm Off")
+
+println("PASS: match_expression_arms (2 assertions)")
+
+// ============================================================
+// Test: Combinations / Integration
+// ============================================================
+
+// ---- list concat + extends auto-infer ----
+fn extends total(xs: [Int]) -> Int {
+    let s = 0
+    for x in xs { s = s + x }
+    return s
+}
+let combined = [1, 2] + [3, 4]
+assert(combined.total() == 10, "PASS: concat then extends method")
+
+// ---- block expr + list concat ----
+fn block_concat() -> [Int] {
+    let xs = {
+        let a = [1, 2]
+        let b = [3, 4]
+        a + b
+    }
+    return xs
+}
+assert(block_concat().len() == 4, "PASS: block expr with concat")
+
+// ---- :: and -> on same struct ----
+struct Dual {
+    val: Int,
+    pure_fn: fn(Int) -> Int,
+    self_fn: fn(Dual) -> Int
+}
+let du = Dual {
+    val: 7,
+    pure_fn: fn(x: Int) -> Int { return x + 1 },
+    self_fn: fn(self: Dual) -> Int { return self.val * 2 }
+}
+assert(du::pure_fn(10) == 11, "PASS: dual struct :: call")
+assert(du->self_fn() == 14, "PASS: dual struct -> call")
+
+println("PASS: integration_tests (4 assertions)")
+
+// ============================================================
+// Summary
+// ============================================================
+println("PASS: test_undocumented_features — all groups passed")

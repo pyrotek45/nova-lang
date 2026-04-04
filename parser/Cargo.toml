@@ -9,3 +9,4 @@ edition = "2021"
 common ={ path = "../common"}
 lexer = { path = "../lexer" }
 typechecker = { path = "../typechecker" }
+ureq = "2"

@@ -160,10 +160,10 @@ struct Tween {
     from:     Float,
     to:       Float,
     duration: Float,
-    _elapsed: Float,
-    _done:    Bool,
-    _forward: Bool,
-    _easeFn:  fn(Float) -> Float,
+    elapsed: Float,
+    done:    Bool,
+    forward: Bool,
+    easeFn:  fn(Float) -> Float,
 }
 
 // Create a tween with a custom easing function
@@ -172,10 +172,10 @@ fn extends(Tween) new(from: Float, to: Float, duration: Float, easeFn: fn(Float)
         from:     from,
         to:       to,
         duration: duration,
-        _elapsed: 0.0,
-        _done:    false,
-        _forward: true,
-        _easeFn:  easeFn,
+        elapsed: 0.0,
+        done:    false,
+        forward: true,
+        easeFn:  easeFn,
     }
 }
 
@@ -198,7 +198,7 @@ fn extends(Tween) smooth(from: Float, to: Float, duration: Float) -> Tween {
 // Normalized progress 0.0..1.0
 fn extends progress(self: Tween) -> Float {
     if self.duration <= 0.0 { return 1.0 }
-    let p = self._elapsed / self.duration
+    let p = self.elapsed / self.duration
     if p > 1.0 { return 1.0 }
     if p < 0.0 { return 0.0 }
     return p
@@ -207,43 +207,43 @@ fn extends progress(self: Tween) -> Float {
 // Current interpolated value (does not advance time)
 fn extends tweenValue(self: Tween) -> Float {
     let t = self.progress()
-    let f = self._easeFn
+    let f = self.easeFn
     let et = f(t)
     return self.from + (self.to - self.from) * et
 }
 
 // Advance by dt and return the current interpolated value
 fn extends update(self: Tween, dt: Float) -> Float {
-    if self._done { return self.tweenValue() }
-    self._elapsed = self._elapsed + dt
-    if self._elapsed >= self.duration {
-        self._elapsed = self.duration
-        self._done = true
+    if self.done { return self.tweenValue() }
+    self.elapsed = self.elapsed + dt
+    if self.elapsed >= self.duration {
+        self.elapsed = self.duration
+        self.done = true
     }
     return self.tweenValue()
 }
 
 fn extends isDone(self: Tween) -> Bool {
-    return self._done
+    return self.done
 }
 
 fn extends remaining(self: Tween) -> Float {
-    let r = self.duration - self._elapsed
+    let r = self.duration - self.elapsed
     if r < 0.0 { return 0.0 }
     return r
 }
 
 fn extends reset(self: Tween) {
-    self._elapsed = 0.0
-    self._done    = false
+    self.elapsed = 0.0
+    self.done    = false
 }
 
 // Change endpoints and restart
 fn extends restart(self: Tween, from: Float, to: Float) {
     self.from     = from
     self.to       = to
-    self._elapsed = 0.0
-    self._done    = false
+    self.elapsed = 0.0
+    self.done    = false
 }
 
 // Swap from/to so the tween plays in reverse (ping-pong)
@@ -251,6 +251,6 @@ fn extends ping(self: Tween) {
     let tmp   = self.from
     self.from = self.to
     self.to   = tmp
-    self._elapsed = 0.0
-    self._done    = false
+    self.elapsed = 0.0
+    self.done    = false
 }

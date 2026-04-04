@@ -54,6 +54,21 @@ impl NovaCore {
         })
     }
 
+    /// Create a NovaCore instance from source text (e.g. fetched from GitHub).
+    /// `virtual_path` is used for error reporting and import resolution.
+    pub fn from_source(source: &str, virtual_path: &Path) -> NovaCore {
+        NovaCore {
+            filepath: Some(virtual_path.into()),
+            lexer: Lexer::new(source, Some(virtual_path)),
+            parser: parser::new(virtual_path),
+            compiler: compiler::new(),
+            _optimizer: optimizer::new(),
+            assembler: Assembler::empty(),
+            vm: vm::new(),
+            current_repl: String::new(),
+        }
+    }
+
     pub fn add_function(
         &mut self,
         function_id: &str,

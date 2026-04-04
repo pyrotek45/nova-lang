@@ -1,0 +1,394 @@
+module test_structural_patterns
+
+import super.std.list
+
+// ============================================================
+// Structural Patterns
+// Demonstrates how Nova's syntax sugars compose to organise
+// code the way a real project would: modules, namespaces,
+// method APIs, pipelines, comprehensions, bind, and closures
+// used as pluggable strategies.
+// ============================================================
+
+// ============================================================
+// 1. fn mod() — extending your own module namespace
+//    Use fn mod(Module) to group related free functions under
+//    a :: namespace without needing a struct.
+// ============================================================
+
+fn mod(test_structural_patterns) version() -> String {
+    return "1.0.0"
+}
+
+fn mod(test_structural_patterns) greet(name: String) -> String {
+    return "Hello, " + name + "!"
+}
+
+let v = test_structural_patterns::version()
+assert(v == "1.0.0", "1a mod::version")
+
+let g = test_structural_patterns::greet("Nova")
+assert(g == "Hello, Nova!", "1b mod::greet")
+
+println("  GROUP 1 [mod_namespace] OK (2 assertions)")
+
+// ============================================================
+// 2. struct + extends — building a method API
+//    :: for constructors, dot for methods.
+// ============================================================
+
+struct Counter {
+    value: Int,
+    step:  Int,
+}
+
+fn extends(Counter) new(step: Int) -> Counter {
+    return Counter { value: 0, step: step }
+}
+
+fn extends inc(self: Counter) -> Counter {
+    return Counter { value: self.value + self.step, step: self.step }
+}
+
+fn extends dec(self: Counter) -> Counter {
+    return Counter { value: self.value - self.step, step: self.step }
+}
+
+fn extends getVal(self: Counter) -> Int {
+    return self.value
+}
+
+let c = Counter::new(5).inc().inc().inc().dec()
+assert(c.getVal() == 10, "2a counter chain: +5+5+5-5 = 10")
+
+println("  GROUP 2 [struct_method_api] OK (1 assertion)")
+
+// ============================================================
+// 3. Pipe operator (|>) — data transformation pipelines
+//    Feed a value through a chain of free functions.
+// ============================================================
+
+fn double(x: Int) -> Int { return x * 2 }
+fn addTen(x: Int) -> Int { return x + 10 }
+fn negate(x: Int) -> Int { return 0 - x }
+
+let piped = 3 |> double() |> addTen() |> double()
+assert(piped == 32, "3a pipe: (3*2+10)*2 = 32")
+
+let piped2 = 7 |> double() |> negate()
+assert(piped2 == -14, "3b pipe negate: -(7*2) = -14")
+
+// Pipe into a multi-arg function (value becomes first arg)
+fn scale(x: Int, factor: Int) -> Int { return x * factor }
+let piped3 = 5 |> scale(3)
+assert(piped3 == 15, "3c pipe multi-arg: 5*3 = 15")
+
+println("  GROUP 3 [pipe_pipelines] OK (3 assertions)")
+
+// ============================================================
+// 4. List comprehensions — declarative collection building
+//    [var in source | transform] and
+//    [var in source | transform | guard]
+// ============================================================
+
+let squares = [x in 1.to(6) | x * x]
+assert(squares.len() == 5, "4a comprehension len")
+assert(squares[0] == 1, "4b first square")
+assert(squares[4] == 25, "4c last square")
+
+// Comprehension with guard (filter)
+let evens = [x in 1.to(11) | x | x % 2 == 0]
+assert(evens.len() == 5, "4d even count")
+assert(evens[0] == 2, "4e first even")
+assert(evens[4] == 10, "4f last even")
+
+// Nested comprehension — flat cartesian product
+let grid = [r in 0.to(3), c in 0.to(3) | r * 10 + c]
+assert(grid.len() == 9, "4g 3x3 grid size")
+assert(grid[0] == 0, "4h grid (0,0)")
+assert(grid[4] == 11, "4i grid (1,1)")
+assert(grid[8] == 22, "4j grid (2,2)")
+
+println("  GROUP 4 [comprehensions] OK (10 assertions)")
+
+// ============================================================
+// 5. Bind operator (~>) — name an intermediate result inline
+//    expr ~> name { body using name }
+// ============================================================
+
+let result = (3 + 4) ~> sum {
+    sum * sum
+}
+assert(result == 49, "5a bind: (3+4)^2 = 49")
+
+// Bind chains — pipeline-like, each step names its input
+let chain = (10 ~> a { a * 2 }) ~> b { b + 5 }
+assert(chain == 25, "5b bind chain: 10*2+5 = 25")
+
+// Bind with list — compute then use
+let total = [1, 2, 3, 4, 5].len() ~> n {
+    n * n
+}
+assert(total == 25, "5c bind list len squared")
+
+println("  GROUP 5 [bind_operator] OK (3 assertions)")
+
+// ============================================================
+// 6. Closures as strategies — plug behaviour into structs
+//    Struct stores a fn field; callers supply different
+//    strategies at construction time.
+// ============================================================
+
+struct Processor {
+    name:    String,
+    execute: fn(Int) -> Int,
+}
+
+fn extends(Processor) new(name: String, f: fn(Int) -> Int) -> Processor {
+    return Processor { name: name, execute: f }
+}
+
+fn extends run(self: Processor, input: Int) -> Int {
+    let f = self.execute
+    return f(input)
+}
+
+let doubler  = Processor::new("doubler",  fn(x: Int) -> Int { return x * 2 })
+let squarer  = Processor::new("squarer",  fn(x: Int) -> Int { return x * x })
+let negator  = Processor::new("negator",  fn(x: Int) -> Int { return 0 - x })
+
+assert(doubler.run(5)  == 10,  "6a strategy doubler")
+assert(squarer.run(5)  == 25,  "6b strategy squarer")
+assert(negator.run(5)  == -5,  "6c strategy negator")
+
+// Run a list of strategies on the same input
+let strategies = [doubler, squarer, negator]
+let results = []: Int
+for s in strategies {
+    results.push(s.run(7))
+}
+assert(results[0] == 14, "6d batch doubler(7)")
+assert(results[1] == 49, "6e batch squarer(7)")
+assert(results[2] == -7, "6f batch negator(7)")
+
+println("  GROUP 6 [closures_as_strategies] OK (6 assertions)")
+
+// ============================================================
+// 7. Combining extends + pipe + comprehension
+//    Build a data pipeline mixing method syntax and pipes.
+// ============================================================
+
+struct IntList {
+    items: [Int],
+}
+
+fn extends(IntList) from(xs: [Int]) -> IntList {
+    return IntList { items: xs }
+}
+
+fn extends doubled(self: IntList) -> IntList {
+    return IntList { items: [x in self.items | x * 2] }
+}
+
+fn extends filtered(self: IntList, limit: Int) -> IntList {
+    let out = []: Int
+    for x in self.items {
+        if x <= limit { out.push(x) }
+    }
+    return IntList { items: out }
+}
+
+fn extends sum(self: IntList) -> Int {
+    let s = 0
+    for x in self.items { s = s + x }
+    return s
+}
+
+fn extends count(self: IntList) -> Int {
+    return self.items.len()
+}
+
+// Method chaining: build, transform, query
+let total2 = IntList::from([1, 2, 3, 4, 5])
+    .doubled()
+    .filtered(8)
+    .sum()
+// doubled: [2, 4, 6, 8, 10], filtered <= 8: [2, 4, 6, 8], sum = 20
+assert(total2 == 20, "7a chain: doubled then filtered<=8 sum=20")
+
+// Pipe a result into a free function
+fn stringify(n: Int) -> String { return Cast::string(n) }
+let label = IntList::from([10, 20, 30]).sum() |> stringify()
+assert(label == "60", "7b pipe method result into fn")
+
+println("  GROUP 7 [extends_pipe_comprehension] OK (2 assertions)")
+
+// ============================================================
+// 8. :: constructors + extends methods + ~> bind
+//    Construct via ::, call methods, bind intermediate results.
+// ============================================================
+
+struct Pair {
+    a: Int,
+    b: Int,
+}
+
+fn extends(Pair) make(a: Int, b: Int) -> Pair {
+    return Pair { a: a, b: b }
+}
+
+fn extends sumP(self: Pair) -> Int {
+    return self.a + self.b
+}
+
+fn extends scale(self: Pair, f: Int) -> Pair {
+    return Pair { a: self.a * f, b: self.b * f }
+}
+
+let answer = Pair::make(3, 7).scale(2).sumP() ~> s {
+    s * 10
+}
+assert(answer == 200, "8a ::new -> .scale -> .sum ~> *10 = 200")
+
+println("  GROUP 8 [constructor_methods_bind] OK (1 assertion)")
+
+// ============================================================
+// 9. Enum + :: + match + extends — tagged union API
+//    Define an enum, construct via ::, match to dispatch,
+//    extends to add methods.
+// ============================================================
+
+enum Shape {
+    Circle: Float,
+    Rect: (Float, Float),
+    Point,
+}
+
+fn extends area(self: Shape) -> Float {
+    match self {
+        Circle(r) => { return 3.14159 * r * r }
+        Rect(dims) => { return dims[0] * dims[1] }
+        Point() => { return 0.0 }
+    }
+    return 0.0
+}
+
+fn extends describe(self: Shape) -> String {
+    match self {
+        Circle(r)   => { return "circle" }
+        Rect(dims)   => { return "rect" }
+        Point()      => { return "point" }
+    }
+    return "unknown"
+}
+
+let shapes = [
+    Shape::Circle(5.0),
+    Shape::Rect((3.0, 4.0)),
+    Shape::Point(),
+]
+
+assert(shapes[0].describe() == "circle", "9a describe circle")
+assert(shapes[1].describe() == "rect",   "9b describe rect")
+assert(shapes[2].describe() == "point",  "9c describe point")
+
+// Compute areas via comprehension
+let areas = [s in shapes | s.area()]
+assert(areas[1] == 12.0, "9d rect area 3*4=12")
+assert(areas[2] == 0.0,  "9e point area 0")
+
+println("  GROUP 9 [enum_match_extends] OK (5 assertions)")
+
+// ============================================================
+// 10. Higher-order pipeline — compose via closures + pipe
+//    Build a transformation pipeline from a list of closures,
+//    then pipe a value through it.
+// ============================================================
+
+fn applyAll(value: Int, fns: [fn(Int) -> Int]) -> Int {
+    let v = value
+    for f in fns {
+        v = f(v)
+    }
+    return v
+}
+
+let pipeline = [
+    fn(x: Int) -> Int { return x + 1 },
+    fn(x: Int) -> Int { return x * 3 },
+    fn(x: Int) -> Int { return x - 2 },
+]
+
+let out = applyAll(10, pipeline)
+assert(out == 31, "10a closure pipeline: (10+1)*3-2 = 31")
+
+// Same pipeline expressed with pipe + individual fns
+fn inc(x: Int) -> Int { return x + 1 }
+fn triple(x: Int) -> Int { return x * 3 }
+fn subTwo(x: Int) -> Int { return x - 2 }
+
+let out2 = 10 |> inc() |> triple() |> subTwo()
+assert(out2 == 31, "10b equivalent pipe chain = 31")
+
+println("  GROUP 10 [higher_order_pipeline] OK (2 assertions)")
+
+// ============================================================
+// 11. Comprehension + bind + pipe — one-liner data flow
+//    Generate data, name it, then pipe the result.
+// ============================================================
+
+fn sumList(xs: [Int]) -> Int {
+    let s = 0
+    for x in xs { s = s + x }
+    return s
+}
+
+let final = sumList([x in 1.to(6) | x * x]) |> double()
+assert(final == 110, "11a comp sum pipe double = 110")
+// [1,4,9,16,25], sum=55, doubled=110
+
+println("  GROUP 11 [comprehension_bind_pipe] OK (1 assertion)")
+
+// ============================================================
+// 12. fn mod + extends + :: — library-style organisation
+//    Module-level utilities + struct API coexisting cleanly.
+// ============================================================
+
+struct Config {
+    maxRetries: Int,
+    timeout:    Float,
+    label:      String,
+}
+
+fn extends(Config) defaults() -> Config {
+    return Config { maxRetries: 3, timeout: 5.0, label: "default" }
+}
+
+fn extends withLabel(self: Config, lbl: String) -> Config {
+    return Config { maxRetries: self.maxRetries, timeout: self.timeout, label: lbl }
+}
+
+fn extends withTimeout(self: Config, t: Float) -> Config {
+    return Config { maxRetries: self.maxRetries, timeout: t, label: self.label }
+}
+
+// Module-level helper via fn mod()
+fn mod(test_structural_patterns) configSummary(cfg: Config) -> String {
+    return cfg.label + " (retries=" + Cast::string(cfg.maxRetries) + ")"
+}
+
+let cfg = Config::defaults().withLabel("production").withTimeout(30.0)
+assert(cfg.label == "production", "12a builder pattern label")
+assert(cfg.timeout == 30.0, "12b builder pattern timeout")
+
+let summary = test_structural_patterns::configSummary(cfg)
+assert(summary == "production (retries=3)", "12c mod fn + struct method")
+
+println("  GROUP 12 [mod_extends_builder] OK (3 assertions)")
+
+// ============================================================
+// Summary
+// ============================================================
+
+println("")
+println("PASS: test_structural_patterns")

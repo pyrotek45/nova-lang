@@ -1,0 +1,98 @@
+module test_negative_indexing
+
+import super.std.core
+
+// ============================================================
+// Tests for Negative Indexing on Lists, Strings, and Tuples
+//
+// Negative indices count from the end:
+//   -1 = last element, -2 = second-to-last, etc.
+// ============================================================
+
+// ── Group 1: List Negative Index Read ────────────────────────
+
+let xs = [10, 20, 30, 40, 50]
+
+assert(xs[-1] == 50, "PASS: list[-1] last element")
+assert(xs[-2] == 40, "PASS: list[-2] second-to-last")
+assert(xs[-3] == 30, "PASS: list[-3] middle")
+assert(xs[-4] == 20, "PASS: list[-4] second element")
+assert(xs[-5] == 10, "PASS: list[-5] first element")
+
+println("PASS: list_negative_index_read (5 assertions)")
+
+// ── Group 2: List Negative Index Write ───────────────────────
+
+let ys = [0, 0, 0, 0]
+ys[-1] = 99
+ys[-4] = 11
+assert(ys[-1] == 99, "PASS: list[-1] write last")
+assert(ys[3]  == 99, "PASS: list[3] after write via -1")
+assert(ys[-4] == 11, "PASS: list[-4] write first")
+assert(ys[0]  == 11, "PASS: list[0] after write via -4")
+
+println("PASS: list_negative_index_write (4 assertions)")
+
+// ── Group 3: String Negative Index ───────────────────────────
+
+let s = "hello"
+assert(s[-1] == 'o', "PASS: string[-1] last char")
+assert(s[-2] == 'l', "PASS: string[-2] second-to-last")
+assert(s[-5] == 'h', "PASS: string[-5] first char")
+
+let word = "Nova"
+assert(word[-1] == 'a', "PASS: string Nova[-1]")
+assert(word[-4] == 'N', "PASS: string Nova[-4]")
+
+println("PASS: string_negative_index (5 assertions)")
+
+// ── Group 4: Negative Index in Expressions ───────────────────
+
+let nums = [100, 200, 300]
+let last_plus_first = nums[-1] + nums[-3]
+assert(last_plus_first == 400, "PASS: negative index in expression")
+
+let doubled = nums[-2] * 2
+assert(doubled == 400, "PASS: negative index multiply")
+
+fn get_last(data: [Int]) -> Int {
+    return data[-1]
+}
+assert(get_last([5, 10, 15]) == 15, "PASS: negative index in function")
+
+println("PASS: negative_index_expressions (3 assertions)")
+
+// ── Group 5: Negative Index with Loop Build ──────────────────
+
+let built = []: Int
+for let i = 0; i < 5; i += 1 {
+    built.push(i * 10)
+}
+assert(built[-1] == 40, "PASS: neg idx on loop-built list")
+assert(built[-5] == 0,  "PASS: neg idx first on loop-built list")
+
+println("PASS: negative_index_loop_built (2 assertions)")
+
+// ── Group 6: Single-Element Lists ────────────────────────────
+
+let single = [42]
+assert(single[-1] == 42, "PASS: single element list[-1]")
+single[-1] = 99
+assert(single[-1] == 99, "PASS: single element write via [-1]")
+assert(single[0] == 99,  "PASS: single element read via [0] after write")
+
+println("PASS: single_element_negative_index (3 assertions)")
+
+// ── Group 7: Negative Index on Longer Strings ────────────────
+
+let longStr = "abcdefghij"
+assert(longStr[-1]  == 'j', "PASS: long string[-1]")
+assert(longStr[-10] == 'a', "PASS: long string[-10]")
+assert(longStr[-5]  == 'f', "PASS: long string[-5]")
+
+println("PASS: long_string_negative_index (3 assertions)")
+
+// ============================================================
+// Summary
+// ============================================================
+println("PASS: test_negative_indexing — all 7 groups passed (25 assertions)")

@@ -7,7 +7,7 @@
 //
 // Struct:
 //   Camera2D { pos, target, zoom, rotation, screenW, screenH,
-//               _shakeTimer, _shakeMag }
+//               shakeTimer, shakeMag }
 //
 // Constructors:
 //   Camera2D::new(screenW, screenH)             -- centered, zoom=1
@@ -52,10 +52,10 @@ struct Camera2D {
     rotation:     Float,   // degrees
     screenW:      Int,
     screenH:      Int,
-    _shakeTimer:  Float,
-    _shakeMag:    Float,
-    _shakeOffX:   Float,
-    _shakeOffY:   Float,
+    shakeTimer:  Float,
+    shakeMag:    Float,
+    shakeOffX:   Float,
+    shakeOffY:   Float,
 }
 
 // ── Constructors ─────────────────────────────────────────────────────────────
@@ -69,10 +69,10 @@ fn extends(Camera2D) new(screenW: Int, screenH: Int) -> Camera2D {
         rotation:    0.0,
         screenW:     screenW,
         screenH:     screenH,
-        _shakeTimer: 0.0,
-        _shakeMag:   0.0,
-        _shakeOffX:  0.0,
-        _shakeOffY:  0.0,
+        shakeTimer: 0.0,
+        shakeMag:   0.0,
+        shakeOffX:  0.0,
+        shakeOffY:  0.0,
     }
 }
 
@@ -84,10 +84,10 @@ fn extends(Camera2D) at(x: Float, y: Float, screenW: Int, screenH: Int) -> Camer
         rotation:    0.0,
         screenW:     screenW,
         screenH:     screenH,
-        _shakeTimer: 0.0,
-        _shakeMag:   0.0,
-        _shakeOffX:  0.0,
-        _shakeOffY:  0.0,
+        shakeTimer: 0.0,
+        shakeMag:   0.0,
+        shakeOffX:  0.0,
+        shakeOffY:  0.0,
     }
 }
 
@@ -95,15 +95,15 @@ fn extends(Camera2D) at(x: Float, y: Float, screenW: Int, screenH: Int) -> Camer
 
 // Advance the shake effect. Call once per frame before drawing.
 fn extends update(self: Camera2D, dt: Float) {
-    if self._shakeTimer > 0.0 {
-        self._shakeTimer = self._shakeTimer - dt
-        let mag = self._shakeMag * (self._shakeTimer / (self._shakeTimer + dt + 0.001))
-        self._shakeOffX = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
-        self._shakeOffY = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
-        if self._shakeTimer <= 0.0 {
-            self._shakeTimer = 0.0
-            self._shakeOffX  = 0.0
-            self._shakeOffY  = 0.0
+    if self.shakeTimer > 0.0 {
+        self.shakeTimer = self.shakeTimer - dt
+        let mag = self.shakeMag * (self.shakeTimer / (self.shakeTimer + dt + 0.001))
+        self.shakeOffX = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
+        self.shakeOffY = Cast::float(random(-100, 100)).unwrap() / 100.0 * mag
+        if self.shakeTimer <= 0.0 {
+            self.shakeTimer = 0.0
+            self.shakeOffX  = 0.0
+            self.shakeOffY  = 0.0
         }
     }
 }
@@ -112,15 +112,15 @@ fn extends update(self: Camera2D, dt: Float) {
 
 // Convert a world-space Vec2 to screen-space pixels
 fn extends worldToScreen(self: Camera2D, wp: Vec2) -> Vec2 {
-    let sx = (wp.x - self.pos.x + self._shakeOffX) * self.zoom
-    let sy = (wp.y - self.pos.y + self._shakeOffY) * self.zoom
+    let sx = (wp.x - self.pos.x + self.shakeOffX) * self.zoom
+    let sy = (wp.y - self.pos.y + self.shakeOffY) * self.zoom
     return Vec2::new(sx, sy)
 }
 
 // Convert screen-space pixels to world-space coordinates
 fn extends screenToWorld(self: Camera2D, sp: Vec2) -> Vec2 {
-    let wx = sp.x / self.zoom + self.pos.x - self._shakeOffX
-    let wy = sp.y / self.zoom + self.pos.y - self._shakeOffY
+    let wx = sp.x / self.zoom + self.pos.x - self.shakeOffX
+    let wy = sp.y / self.zoom + self.pos.y - self.shakeOffY
     return Vec2::new(wx, wy)
 }
 
@@ -164,8 +164,8 @@ fn extends setRotation(self: Camera2D, degrees: Float) {
 
 // Start a screen shake effect
 fn extends shake(self: Camera2D, magnitude: Float, duration: Float) {
-    self._shakeMag   = magnitude
-    self._shakeTimer = duration
+    self.shakeMag   = magnitude
+    self.shakeTimer = duration
 }
 
 // ── Drawing helpers ───────────────────────────────────────────────────────────

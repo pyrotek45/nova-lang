@@ -45,16 +45,16 @@ module input
 import hashmap
 
 struct InputMap {
-    _keys:   HashMap(String, String),   // action -> key name string
-    _mouse:  HashMap(String, String),   // action -> mouse button name string
+    keys:   HashMap(String, String),   // action -> key name string
+    mouse:  HashMap(String, String),   // action -> mouse button name string
 }
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 fn extends(InputMap) new() -> InputMap {
     return InputMap {
-        _keys:  HashMap::default() @[K: String, V: String],
-        _mouse: HashMap::default() @[K: String, V: String],
+        keys:  HashMap::default() @[K: String, V: String],
+        mouse: HashMap::default() @[K: String, V: String],
     }
 }
 
@@ -62,32 +62,32 @@ fn extends(InputMap) new() -> InputMap {
 
 // Bind an action name to a raylib key name (e.g. "KEY_SPACE", "KEY_W", "KEY_UP")
 fn extends bindKey(self: InputMap, action: String, key: String) {
-    self._keys.insert(action, key)
+    self.keys.insert(action, key)
 }
 
 // Bind an action name to a raylib mouse button ("Left", "Right", "Middle")
 fn extends bindMouse(self: InputMap, action: String, button: String) {
-    self._mouse.insert(action, button)
+    self.mouse.insert(action, button)
 }
 
 // Remove all bindings for an action
 fn extends unbind(self: InputMap, action: String) {
-    self._keys.delete(action)
-    self._mouse.delete(action)
+    self.keys.delete(action)
+    self.mouse.delete(action)
 }
 
 // ── Querying ──────────────────────────────────────────────────────────────────
 
 // True every frame while the key action is held down (isKeyPressed = held in Nova)
 fn extends isHeld(self: InputMap, action: String) -> Bool {
-    if self._keys.has(action) {
-        let key = self._keys.get(action)
+    if self.keys.has(action) {
+        let key = self.keys.get(action)
         if key.isSome() {
             return raylib::isKeyPressed(key.unwrap())
         }
     }
-    if self._mouse.has(action) {
-        let btn = self._mouse.get(action)
+    if self.mouse.has(action) {
+        let btn = self.mouse.get(action)
         if btn.isSome() {
             return raylib::isMousePressed(btn.unwrap())
         }
@@ -97,14 +97,14 @@ fn extends isHeld(self: InputMap, action: String) -> Bool {
 
 // True only on the frame the action is released
 fn extends isReleased(self: InputMap, action: String) -> Bool {
-    if self._keys.has(action) {
-        let key = self._keys.get(action)
+    if self.keys.has(action) {
+        let key = self.keys.get(action)
         if key.isSome() {
             return raylib::isKeyReleased(key.unwrap())
         }
     }
-    if self._mouse.has(action) {
-        let btn = self._mouse.get(action)
+    if self.mouse.has(action) {
+        let btn = self.mouse.get(action)
         if btn.isSome() {
             return raylib::isMouseReleased(btn.unwrap())
         }
@@ -114,8 +114,8 @@ fn extends isReleased(self: InputMap, action: String) -> Bool {
 
 // True when the action key is NOT pressed
 fn extends isUp(self: InputMap, action: String) -> Bool {
-    if self._keys.has(action) {
-        let key = self._keys.get(action)
+    if self.keys.has(action) {
+        let key = self.keys.get(action)
         if key.isSome() {
             return raylib::isKeyUp(key.unwrap())
         }

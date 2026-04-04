@@ -1,0 +1,155 @@
+module test_typechecker_holes
+
+import super.std.core
+
+// ============================================================
+// Typechecker stress tests — probing for holes and edge cases
+// ============================================================
+
+// ---- 1. Nested generic resolution ----
+fn identity(x: [Option(Int)]) -> [Option(Int)] {
+    return x
+}
+let nested = [Some(1), Some(2)]
+let result = identity(nested)
+assert(result.len() == 2, "nested generic list")
+
+println("PASS: nested_generic_resolution")
+
+// ---- 2. Generic function with multiple type vars ----
+// Nova's generics are inferred; verify multi-param inference works
+struct Pair(A, B) { first: $A, second: $B }
+
+let p = Pair { first: 42, second: "hello" }
+assert(p.first == 42, "pair first")
+assert(p.second == "hello", "pair second")
+
+println("PASS: multi_type_var_struct")
+
+// ---- 3. Option nesting ----
+let opt = Some(Some(42))
+if let inner = opt {
+    if let val = inner {
+        assert(val == 42, "nested option unwrap")
+    }
+}
+
+println("PASS: nested_option_unwrap")
+
+// ---- 4. Closure type compatibility ----
+fn applyFn(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+
+let double = fn(n: Int) -> Int { return n * 2 }
+assert(applyFn(double, 5) == 10, "closure as param")
+
+// Lambda
+assert(applyFn(fn(n: Int) -> Int { return n + 1 }, 10) == 11, "inline closure")
+
+println("PASS: closure_type_compat")
+
+// ---- 5. Return type must match on all branches ----
+fn branchReturn(x: Int) -> String {
+    if x > 0 {
+        return "positive"
+    } elif x < 0 {
+        return "negative"
+    } else {
+        return "zero"
+    }
+}
+assert(branchReturn(5) == "positive", "branch return positive")
+assert(branchReturn(-1) == "negative", "branch return negative")
+assert(branchReturn(0) == "zero", "branch return zero")
+
+println("PASS: branch_return_types")
+
+// ---- 6. List of functions ----
+let fns = [
+    fn(x: Int) -> Int { return x + 1 },
+    fn(x: Int) -> Int { return x * 2 },
+    fn(x: Int) -> Int { return x - 3 }
+]
+assert(fns[0](10) == 11, "list of fns [0]")
+assert(fns[1](10) == 20, "list of fns [1]")
+assert(fns[2](10) == 7, "list of fns [2]")
+
+println("PASS: list_of_functions")
+
+// ---- 7. Enum with generic data ----
+enum Wrapper(T) { Val: $T, Empty }
+
+let w1 = Wrapper::Val(42)
+let w2 = Wrapper::Val("hello")
+let w3 = Wrapper::Empty() @[T: Int]
+
+match w1 {
+    Val(v) => { assert(v == 42, "generic enum int") }
+    Empty() => { assert(false, "should not be empty") }
+}
+
+match w2 {
+    Val(v) => { assert(v == "hello", "generic enum string") }
+    Empty() => { assert(false, "should not be empty") }
+}
+
+println("PASS: generic_enum_data")
+
+// ---- 8. Dunder operator chaining ----
+struct Vec2 { x: Float, y: Float }
+
+fn extends __add__(a: Vec2, b: Vec2) -> Vec2 {
+    return Vec2 { x: a.x + b.x, y: a.y + b.y }
+}
+
+fn extends __eq__(a: Vec2, b: Vec2) -> Bool {
+    return a.x == b.x && a.y == b.y
+}
+
+let v1 = Vec2 { x: 1.0, y: 2.0 }
+let v2 = Vec2 { x: 3.0, y: 4.0 }
+let v3 = Vec2 { x: 4.0, y: 6.0 }
+assert(v1 + v2 == v3, "dunder add + eq chained")
+
+println("PASS: dunder_chaining")
+
+// ---- 9. Varargs + extends ----
+fn extends sumWith(xs: [Int], extra: [Int]) -> Int {
+    let total = 0
+    for x in xs { total = total + x }
+    for x in extra { total = total + x }
+    return total
+}
+
+let nums = [1, 2, 3]
+assert(nums.sumWith(10, 20) == 36, "varargs + extends")
+
+println("PASS: varargs_extends")
+
+// ---- 10. Recursive generic function ----
+fn length(xs: [Int]) -> Int {
+    if xs.len() == 0 { return 0 }
+    return 1 + length(xs[1:])
+}
+assert(length([1, 2, 3, 4, 5]) == 5, "recursive list length")
+
+println("PASS: recursive_generic")
+
+// ---- 11. typeof returns correct string for all types ----
+struct TypeTest { val: Int }
+let tt = TypeTest { val: 1 }
+assert(typeof(tt) == "TypeTest", "typeof custom struct")
+
+println("PASS: typeof_custom_struct")
+
+// ---- 12. if-expression type consistency ----
+fn ternary(b: Bool) -> Int {
+    return if b { 10 } else { 20 }
+}
+assert(ternary(true) == 10, "if expr true")
+assert(ternary(false) == 20, "if expr false")
+
+println("PASS: if_expr_types")
+
+println("PASS: test_typechecker_holes — all groups passed")

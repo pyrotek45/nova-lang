@@ -65,31 +65,31 @@ fn extends(Scene) empty() -> Scene {
 // ── SceneManager ──────────────────────────────────────────────────────────────
 
 struct SceneManager {
-    _stack: [Scene],
+    stack: [Scene],
 }
 
 fn extends(SceneManager) new(initial: Scene) -> SceneManager {
     let s = []: Scene
     s.push(initial)
-    return SceneManager { _stack: s }
+    return SceneManager { stack: s }
 }
 
 fn extends(SceneManager) empty() -> SceneManager {
-    return SceneManager { _stack: []: Scene }
+    return SceneManager { stack: []: Scene }
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 fn extends update(self: SceneManager, dt: Float) {
-    if self._stack.len() == 0 { return }
-    let top = self._stack[self._stack.len() - 1]
+    if self.stack.len() == 0 { return }
+    let top = self.stack[self.stack.len() - 1]
     let f = top.update
     f(dt)
 }
 
 fn extends draw(self: SceneManager) {
-    if self._stack.len() == 0 { return }
-    let top = self._stack[self._stack.len() - 1]
+    if self.stack.len() == 0 { return }
+    let top = self.stack[self.stack.len() - 1]
     let f = top.draw
     f()
 }
@@ -100,27 +100,27 @@ fn extends draw(self: SceneManager) {
 fn extends switch(self: SceneManager, scene: Scene) {
     let s = []: Scene
     s.push(scene)
-    self._stack = s
+    self.stack = s
 }
 
 // Push a new scene on top (the current one is paused but preserved)
 fn extends push(self: SceneManager, scene: Scene) {
-    self._stack.push(scene)
+    self.stack.push(scene)
 }
 
 // Pop the current scene and return to the previous one
 fn extends pop(self: SceneManager) {
-    if self._stack.len() > 0 {
-        self._stack.pop()
+    if self.stack.len() > 0 {
+        self.stack.pop()
     }
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 fn extends has(self: SceneManager) -> Bool {
-    return self._stack.len() > 0
+    return self.stack.len() > 0
 }
 
 fn extends depth(self: SceneManager) -> Int {
-    return self._stack.len()
+    return self.stack.len()
 }
