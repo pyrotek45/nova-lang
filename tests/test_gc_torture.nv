@@ -172,7 +172,7 @@ group("hashmap_alloc")
 
 // Create and discard many HashMaps
 for let i = 0; i < 100; i += 1 {
-    let hm = HashMap::default() @[K: String, V: Int]
+    let hm = HashMap::new() @[K: String, V: Int]
     hm.insert("a", 1)
     hm.insert("b", 2)
     hm.insert("c", 3)
@@ -180,7 +180,7 @@ for let i = 0; i < 100; i += 1 {
 check(true, "100 hashmap alloc/dealloc")
 
 // Large hashmap with many entries
-let large_hm = HashMap::default() @[K: String, V: Int]
+let large_hm = HashMap::new() @[K: String, V: Int]
 for let i = 0; i < 200; i += 1 {
     large_hm.insert("key_" + Cast::string(i), i)
 }
@@ -457,7 +457,7 @@ for let i = 0; i < 100; i += 1 {
     // Tuple
     let tp = (i, ss)
     // HashMap
-    let hm = HashMap::default() @[K: String, V: Int]
+    let hm = HashMap::new() @[K: String, V: Int]
     hm.insert("k", i)
     // Verify one thing survived
     stress_total = stress_total + cf()

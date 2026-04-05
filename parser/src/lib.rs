@@ -2384,9 +2384,51 @@ impl Parser {
                         }
                         _ => identifier,
                     };
+                    // Check that pipe target is actually called with ()
+                    if !self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                        return Err(self.generate_error_with_pos(
+                            format!("Pipe `|>` requires a function call — add `()` after `{}`", identifier),
+                            format!(
+                                "The pipe operator passes the left-hand value as the first argument\n  \
+                                 to the function on the right, but the function must be called with `()`.\n  \
+                                 Example: `value |> {}()`\n  \
+                                 Not:     `value |> {}`",
+                                identifier, identifier
+                            ),
+                            pos.clone(),
+                        ));
+                    }
                     left = self.call(identifier, pos, Some(left))?;
                 }
                 _ => {
+                    // Detect `tuple.0` pattern: `.N` is lexed as float (e.g. .0→0.0, .1→0.1),
+                    // not as dot + int
+                    if let TType::Tuple { .. } = left.get_type() {
+                        if let Some(Float(f)) = self.current_token_value() {
+                            // Any float following a tuple is likely `tuple.N` syntax
+                            // since `.N` is lexed as a float literal
+                            if *f >= 0.0 && *f < 100.0 {
+                                // Try to recover the intended index
+                                // .0 → 0.0, .1 → 0.1, .2 → 0.2, etc.
+                                let idx = if *f < 1.0 {
+                                    // .0 → 0.0, .1 → 0.1, .2 → 0.2
+                                    (*f * 10.0).round() as usize
+                                } else {
+                                    // Whole floats like when user somehow gets 1.0, 2.0
+                                    *f as usize
+                                };
+                                let pos = self.get_current_token_position();
+                                return Err(self.generate_error_with_pos(
+                                    format!("Cannot use dot-index on a tuple — use `[{idx}]` instead"),
+                                    format!(
+                                        "Nova does not support dot-index syntax for tuples.\n  \
+                                         Use bracket indexing: `my_tuple[{idx}]`"
+                                    ),
+                                    pos,
+                                ));
+                            }
+                        }
+                    }
                     break;
                 }
             }
@@ -2480,6 +2522,17 @@ impl Parser {
             };
         }
         let output: TType;
+        // Detect `|| -> Type { ... }` pattern and give helpful error
+        if self.current_token().is_some_and(|t| t.is_op(Operator::RightArrow)) {
+            return Err(self.generate_error_with_pos(
+                "Closure with `||` cannot have a return type annotation",
+                "The `||` closure syntax does not support `-> Type` annotations.\n  \
+                 Use the `fn()` form for typed zero-argument closures:\n  \
+                 Example: `fn() -> Int { return 42 }`\n  \
+                 Or for closures with arguments: `fn(x: Int) -> Int { return x + 1 }`",
+                pos.clone(),
+            ));
+        }
         let statement = if let Some(StructuralSymbol(LeftBrace)) = self.current_token_value() {
             //println!("its a block");
             let expression = self.block_expr()?;
@@ -2901,12 +2954,12 @@ impl Parser {
             }
             _ => {}
         }
-        let mut left_expr = self.logical_top_expr()?;
+        let mut left_expr = self.logical_or_expr()?;
         let current_pos = self.get_current_token_position();
         while self.current_token().is_some_and(|t| t.is_assign()) {
             if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
-                let right_expr = self.logical_top_expr()?;
+                let right_expr = self.logical_or_expr()?;
                 match left_expr.clone() {
                     Expr::ListConstructor { .. }
                     | Expr::Binop { .. }
@@ -2973,7 +3026,7 @@ impl Parser {
             }
         }
 
-        if let Some(Operator(Operator::RightTilde)) = self.current_token_value() {
+        while let Some(Operator(Operator::RightTilde)) = self.current_token_value() {
             // the syntax is expr ~> id { statements }
             self.consume_operator(Operator::RightTilde)?;
             let (identifier, pos) = self.get_identifier()?;
@@ -3443,205 +3496,223 @@ impl Parser {
         Ok(left_expr)
     }
 
-    fn logical_top_expr(&mut self) -> NovaResult<Expr> {
-        let mut left_expr = self.top_expr()?;
+    // ── logical_or_expr: handles `||` (lower precedence) ──
+    fn logical_or_expr(&mut self) -> NovaResult<Expr> {
+        let mut left_expr = self.logical_and_expr()?;
         let current_pos = self.get_current_token_position();
-        while self.current_token().is_some_and(|t| t.is_logical_op()) {
+        while self.current_token().is_some_and(|t| t.is_logical_or()) {
             if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
                 self.advance();
-                let right_expr = self.top_expr()?;
-                // check if void
-                if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
-                    return Err(self.generate_error_with_pos(
-                        "Cannot use logical operators on Void values",
-                        "One or both sides of `&&`/`||` do not return a value (Void).\n  Make sure both sides are expressions that produce a Bool.",
-                        current_pos.clone(),
-                    ));
-                }
-                match operation {
-                    Operator::And | Operator::Or => {
-                        if (left_expr.get_type() != TType::Bool)
-                            || (right_expr.get_type() != TType::Bool)
-                        {
-                            // check dunder method
-                            let function_id: String = match operation {
-                                Operator::And => {
-                                    if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                        format!("{}::__and__", custom)
-                                    } else {
-                                        // error if no custom method
-                                        return Err(self.typechecker.create_type_error(
-                                            left_expr.clone(),
-                                            right_expr.clone(),
-                                            operation,
-                                            current_pos.clone(),
-                                        ));
-                                    }
-                                }
-                                Operator::Or => {
-                                    if let Some(custom) = left_expr.get_type().custom_to_string() {
-                                        format!("{}::__or__", custom)
-                                    } else {
-                                        // error if no custom method
-                                        return Err(self.typechecker.create_type_error(
-                                            left_expr.clone(),
-                                            right_expr.clone(),
-                                            operation,
-                                            current_pos.clone(),
-                                        ));
-                                    }
-                                }
-                                _ => {
-                                    return Err(self.generate_error(
-                                        "No matching operator overload found",
-                                        "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
-                                    ))
-                                }
-                            };
-
-                            if let Some(overload) =
-                                self.typechecker.environment.get(&generate_unique_string(
-                                    &function_id,
-                                    &[left_expr.get_type(), right_expr.get_type()],
-                                ))
-                            {
-                                // get return type of function call
-                                let pos = self.get_current_token_position();
-                                let arguments = vec![left_expr.clone(), right_expr.clone()];
-                                let typelist = vec![left_expr.get_type(), right_expr.get_type()];
-                                let returntype = match overload.ttype {
-                                    TType::Function {
-                                        return_type,
-                                        parameters,
-                                    } => {
-                                        match self.typechecker.check_and_map_types(
-                                            &parameters,
-                                            &typelist,
-                                            &mut HashMap::default(),
-                                            pos.clone(),
-                                        ) {
-                                            Ok(_) => *return_type,
-                                            Err(_) => {
-                                                return Ok(self.create_binop_expr(
-                                                    left_expr,
-                                                    right_expr,
-                                                    operation,
-                                                    TType::Bool,
-                                                ))
-                                            }
-                                        }
-                                    }
-                                    _ => {
-                                        return Err(self.generate_error(
-                                            "No matching operator overload found",
-                                            "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
-                                        ))
-                                    }
-                                };
-                                // check if return type is bool
-                                if returntype != TType::Bool {
-                                    return Err(self.generate_error_with_pos(
-                                        "Comparison operator must return Bool",
-                                        format!(
-                                            "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
-                                            returntype,
-                                            
-                                        ),
-                                        current_pos.clone(),
-                                    ));
-                                }
-                                // return function call expression
-                                left_expr = Expr::Literal {
-                                    ttype: TType::Bool,
-                                    value: Atom::Call {
-                                        name: generate_unique_string(
-                                            &function_id,
-                                            &[left_expr.get_type(), right_expr.get_type()],
-                                        )
-                                        .into(),
-                                        arguments,
-                                        position: pos.clone(),
-                                    },
-                                };
-                            } else if let Some(overload) =
-                                self.typechecker.environment.get(&function_id)
-                            {
-                                // get return type of function call
-                                let pos = self.get_current_token_position();
-                                let arguments = vec![left_expr.clone(), right_expr.clone()];
-                                let typelist = vec![left_expr.get_type(), right_expr.get_type()];
-                                let returntype = match overload.ttype {
-                                    TType::Function {
-                                        return_type,
-                                        parameters,
-                                    } => {
-                                        match self.typechecker.check_and_map_types(
-                                            &parameters,
-                                            &typelist,
-                                            &mut HashMap::default(),
-                                            pos.clone(),
-                                        ) {
-                                            Ok(_) => *return_type,
-                                            Err(_) => {
-                                                return Ok(self.create_binop_expr(
-                                                    left_expr,
-                                                    right_expr,
-                                                    operation,
-                                                    TType::Bool,
-                                                ))
-                                            }
-                                        }
-                                    }
-                                    _ => {
-                                        return Err(self.generate_error(
-                                            "No matching operator overload found",
-                                            "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
-                                        ))
-                                    }
-                                };
-                                // check if return type is bool
-                                if returntype != TType::Bool {
-                                    return Err(self.generate_error_with_pos(
-                                        "Comparison operator must return Bool",
-                                        format!(
-                                            "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
-                                            returntype,
-                                            
-                                        ),
-                                        current_pos.clone(),
-                                    ));
-                                }
-                                // return function call expression
-                                left_expr = Expr::Literal {
-                                    ttype: TType::Bool,
-                                    value: Atom::Call {
-                                        name: function_id.into(),
-                                        arguments,
-                                        position: pos.clone(),
-                                    },
-                                };
-                            } else {
-                                left_expr = self.create_binop_expr(
-                                    left_expr,
-                                    right_expr,
-                                    operation,
-                                    TType::Bool,
-                                );
-                            }
-                        } else {
-                            left_expr = self.create_binop_expr(
-                                left_expr,
-                                right_expr,
-                                operation,
-                                TType::Bool,
-                            );
-                        }
-                    }
-                    _ => {}
-                }
+                let right_expr = self.logical_and_expr()?;
+                left_expr =
+                    self.build_logical_expr(left_expr, right_expr, operation, &current_pos)?;
             }
         }
         Ok(left_expr)
+    }
+
+    // ── logical_and_expr: handles `&&` (higher precedence than `||`) ──
+    fn logical_and_expr(&mut self) -> NovaResult<Expr> {
+        let mut left_expr = self.top_expr()?;
+        let current_pos = self.get_current_token_position();
+        while self.current_token().is_some_and(|t| t.is_logical_and()) {
+            if let Some(operation) = self.current_token().and_then(|t| t.get_operator()) {
+                self.advance();
+                let right_expr = self.top_expr()?;
+                left_expr =
+                    self.build_logical_expr(left_expr, right_expr, operation, &current_pos)?;
+            }
+        }
+        Ok(left_expr)
+    }
+
+    // ── shared logic for && and || (dunder overloads, type checking) ──
+    fn build_logical_expr(
+        &mut self,
+        left_expr: Expr,
+        right_expr: Expr,
+        operation: Operator,
+        current_pos: &FilePosition,
+    ) -> NovaResult<Expr> {
+        // check if void
+        if left_expr.get_type() == TType::Void || right_expr.get_type() == TType::Void {
+            return Err(self.generate_error_with_pos(
+                "Cannot use logical operators on Void values",
+                "One or both sides of `&&`/`||` do not return a value (Void).\n  Make sure both sides are expressions that produce a Bool.",
+                current_pos.clone(),
+            ));
+        }
+        match operation {
+            Operator::And | Operator::Or => {
+                if (left_expr.get_type() != TType::Bool)
+                    || (right_expr.get_type() != TType::Bool)
+                {
+                    // check dunder method
+                    let function_id: String = match operation {
+                        Operator::And => {
+                            if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                format!("{}::__and__", custom)
+                            } else {
+                                return Err(self.typechecker.create_type_error(
+                                    left_expr.clone(),
+                                    right_expr.clone(),
+                                    operation,
+                                    current_pos.clone(),
+                                ));
+                            }
+                        }
+                        Operator::Or => {
+                            if let Some(custom) = left_expr.get_type().custom_to_string() {
+                                format!("{}::__or__", custom)
+                            } else {
+                                return Err(self.typechecker.create_type_error(
+                                    left_expr.clone(),
+                                    right_expr.clone(),
+                                    operation,
+                                    current_pos.clone(),
+                                ));
+                            }
+                        }
+                        _ => {
+                            return Err(self.generate_error(
+                                "No matching operator overload found",
+                                "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
+                            ))
+                        }
+                    };
+
+                    if let Some(overload) =
+                        self.typechecker.environment.get(&generate_unique_string(
+                            &function_id,
+                            &[left_expr.get_type(), right_expr.get_type()],
+                        ))
+                    {
+                        let pos = self.get_current_token_position();
+                        let arguments = vec![left_expr.clone(), right_expr.clone()];
+                        let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                        let returntype = match overload.ttype {
+                            TType::Function {
+                                return_type,
+                                parameters,
+                            } => {
+                                match self.typechecker.check_and_map_types(
+                                    &parameters,
+                                    &typelist,
+                                    &mut HashMap::default(),
+                                    pos.clone(),
+                                ) {
+                                    Ok(_) => *return_type,
+                                    Err(_) => {
+                                        return Ok(self.create_binop_expr(
+                                            left_expr,
+                                            right_expr,
+                                            operation,
+                                            TType::Bool,
+                                        ))
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(self.generate_error(
+                                    "No matching operator overload found",
+                                    "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
+                                ))
+                            }
+                        };
+                        if returntype != TType::Bool {
+                            return Err(self.generate_error_with_pos(
+                                "Comparison operator must return Bool",
+                                format!(
+                                    "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                    returntype,
+                                ),
+                                current_pos.clone(),
+                            ));
+                        }
+                        Ok(Expr::Literal {
+                            ttype: TType::Bool,
+                            value: Atom::Call {
+                                name: generate_unique_string(
+                                    &function_id,
+                                    &[left_expr.get_type(), right_expr.get_type()],
+                                )
+                                .into(),
+                                arguments,
+                                position: pos.clone(),
+                            },
+                        })
+                    } else if let Some(overload) =
+                        self.typechecker.environment.get(&function_id)
+                    {
+                        let pos = self.get_current_token_position();
+                        let arguments = vec![left_expr.clone(), right_expr.clone()];
+                        let typelist = vec![left_expr.get_type(), right_expr.get_type()];
+                        let returntype = match overload.ttype {
+                            TType::Function {
+                                return_type,
+                                parameters,
+                            } => {
+                                match self.typechecker.check_and_map_types(
+                                    &parameters,
+                                    &typelist,
+                                    &mut HashMap::default(),
+                                    pos.clone(),
+                                ) {
+                                    Ok(_) => *return_type,
+                                    Err(_) => {
+                                        return Ok(self.create_binop_expr(
+                                            left_expr,
+                                            right_expr,
+                                            operation,
+                                            TType::Bool,
+                                        ))
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(self.generate_error(
+                                    "No matching operator overload found",
+                                    "The operator is not defined for these types.\n  Define a matching dunder method (e.g. __add__, __eq__) for the types involved.",
+                                ))
+                            }
+                        };
+                        if returntype != TType::Bool {
+                            return Err(self.generate_error_with_pos(
+                                "Comparison operator must return Bool",
+                                format!(
+                                    "The dunder method for this comparison returned `{}` instead of `Bool`. Make sure the operator overload returns Bool.",
+                                    returntype,
+                                ),
+                                current_pos.clone(),
+                            ));
+                        }
+                        Ok(Expr::Literal {
+                            ttype: TType::Bool,
+                            value: Atom::Call {
+                                name: function_id.into(),
+                                arguments,
+                                position: pos.clone(),
+                            },
+                        })
+                    } else {
+                        Ok(self.create_binop_expr(
+                            left_expr,
+                            right_expr,
+                            operation,
+                            TType::Bool,
+                        ))
+                    }
+                } else {
+                    Ok(self.create_binop_expr(
+                        left_expr,
+                        right_expr,
+                        operation,
+                        TType::Bool,
+                    ))
+                }
+            }
+            _ => Ok(left_expr),
+        }
     }
 
     fn mid_expr(&mut self) -> NovaResult<Expr> {
@@ -4160,7 +4231,7 @@ impl Parser {
     }
 
     fn alternative(&mut self) -> NovaResult<Vec<Statement>> {
-        let test = self.top_expr()?;
+        let test = self.logical_or_expr()?;
         let pos = self.get_current_token_position();
         if test.get_type() != TType::Bool {
             return Err(self.generate_error_with_pos(
@@ -4180,7 +4251,15 @@ impl Parser {
             self.advance();
             alternative = Some(self.alternative()?);
         } else if self.current_token().is_some_and(|t| t.is_id("else")) {
+            let else_pos = self.get_current_token_position();
             self.advance();
+            if self.current_token().is_some_and(|t| t.is_id("if")) {
+                return Err(self.generate_error_with_pos(
+                    "Unexpected `else if` — Nova uses `elif`",
+                    "Nova does not support `else if`. Use `elif` instead.\n  Example: `elif condition { ... }`",
+                    else_pos,
+                ));
+            }
             self.typechecker.environment.push_block();
             alternative = Some(self.block()?);
             self.typechecker.environment.pop_block();
@@ -5365,7 +5444,7 @@ impl Parser {
             }
         } else {
             let testpos = self.get_current_token_position();
-            let test = self.top_expr()?;
+            let test = self.logical_or_expr()?;
             if test.get_type() != TType::Bool && test.get_type() != TType::Void {
                 return Err(self.generate_error_with_pos(
                     format!("While-loop condition must be a Bool, found `{}`", test.get_type()),
@@ -5431,7 +5510,15 @@ impl Parser {
                     self.advance();
                     alternative = Some(self.alternative()?);
                 } else if self.current_token().is_some_and(|t| t.is_id("else")) {
+                    let else_pos = self.get_current_token_position();
                     self.advance();
+                    if self.current_token().is_some_and(|t| t.is_id("if")) {
+                        return Err(self.generate_error_with_pos(
+                            "Unexpected `else if` — Nova uses `elif`",
+                            "Nova does not support `else if`. Use `elif` instead.\n  Example: `elif condition { ... }`",
+                            else_pos,
+                        ));
+                    }
                     self.typechecker.environment.push_block();
                     alternative = Some(self.block()?);
                     self.typechecker.environment.pop_block();
@@ -5469,7 +5556,15 @@ impl Parser {
                 self.advance();
                 alternative = Some(self.alternative()?);
             } else if self.current_token().is_some_and(|t| t.is_id("else")) {
+                let else_pos = self.get_current_token_position();
                 self.advance();
+                if self.current_token().is_some_and(|t| t.is_id("if")) {
+                    return Err(self.generate_error_with_pos(
+                        "Unexpected `else if` — Nova uses `elif`",
+                        "Nova does not support `else if`. Use `elif` instead.\n  Example: `elif condition { ... }`",
+                        else_pos,
+                    ));
+                }
                 self.typechecker.environment.push_block();
                 alternative = Some(self.block()?);
                 self.typechecker.environment.pop_block();
@@ -6064,24 +6159,77 @@ impl Parser {
         Ok(statements)
     }
 
+    /// Determine the result type produced by the last statement of a block.
+    ///
+    /// Returns `Some(ttype)` when the tail statement is an expression, an
+    /// if/else whose branches both produce the same type, or a match
+    /// whose arms all produce the same type.  Returns `None` when the
+    /// block cannot be used as an expression (Void).
+    fn tail_type(stmts: &[Statement]) -> Option<TType> {
+        match stmts.last() {
+            Some(Statement::Expression { ttype, .. }) => {
+                if *ttype == TType::None {
+                    None
+                } else {
+                    Some(ttype.clone())
+                }
+            }
+            Some(Statement::If {
+                body,
+                alternative: Some(alt),
+                ..
+            }) => {
+                let body_ty = Self::tail_type(body)?;
+                let alt_ty = Self::tail_type(alt)?;
+                if body_ty == alt_ty {
+                    Some(body_ty)
+                } else {
+                    None
+                }
+            }
+            Some(Statement::Match {
+                arms,
+                default,
+                ..
+            }) => {
+                let mut iter_type: Option<TType> = None;
+                for (_, _, arm_body) in arms {
+                    let arm_ty = Self::tail_type(arm_body)?;
+                    if let Some(ref prev) = iter_type {
+                        if *prev != arm_ty {
+                            return None;
+                        }
+                    } else {
+                        iter_type = Some(arm_ty);
+                    }
+                }
+                if let Some(def) = default {
+                    let def_ty = Self::tail_type(def)?;
+                    if let Some(ref prev) = iter_type {
+                        if *prev != def_ty {
+                            return None;
+                        }
+                    } else {
+                        iter_type = Some(def_ty);
+                    }
+                }
+                iter_type
+            }
+            _ => None,
+        }
+    }
+
     fn block_expr(&mut self) -> NovaResult<Expr> {
         self.consume_symbol(LeftBrace)?;
         self.typechecker.environment.push_block();
         let statements = self.compound_statement()?;
         self.typechecker.environment.pop_block();
         self.consume_symbol(RightBrace)?;
-        // check if last statement is a statement expression
-        let mut ttype = match statements.last().cloned() {
-            Some(Statement::Expression { ttype, .. }) => ttype,
-            _ => TType::Void,
-        };
-        // check if type is None
-        if ttype == TType::None {
-            ttype = TType::Void;
-        }
+        // Determine the block's result type from the last statement
+        let ttype = Self::tail_type(&statements).unwrap_or(TType::Void);
         Ok(Expr::Block {
             body: statements,
-            ttype: ttype.clone(),
+            ttype,
         })
     }
 

@@ -42,7 +42,7 @@ struct Set(T) {
 // ── Constructors ─────────────────────────────────────────────────────────────
 
 fn extends(Set) empty() -> Set($T) {
-    return Set { data: HashMap::default() @[K: $T, V: Bool] }
+    return Set { data: HashMap::new() @[K: $T, V: Bool] }
 }
 
 // ── Core operations ───────────────────────────────────────────────────────────

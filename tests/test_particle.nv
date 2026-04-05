@@ -1,0 +1,165 @@
+module test_particle
+
+import super.std.particle
+import super.std.vec2
+
+// ============================================================
+// Particle module tests — test creation, emission, update,
+// count, clear, presets.  Does NOT test draw (needs raylib).
+// ============================================================
+
+// ── 1. Particle struct & isAlive ──────────────────────────────
+let p1 = Particle {
+    pos: Vec2::new(0.0, 0.0),
+    vel: Vec2::new(10.0, -5.0),
+    life: 1.0,
+    maxLife: 2.0,
+    size: 3.0,
+    r: 255, g: 128, b: 64,
+}
+assert(p1.isAlive(), "particle with positive life is alive")
+assert(p1.lifeRatio() == 0.5, "lifeRatio = 1/2")
+
+let p2 = Particle {
+    pos: Vec2::new(0.0, 0.0),
+    vel: Vec2::new(0.0, 0.0),
+    life: 0.0,
+    maxLife: 1.0,
+    size: 1.0,
+    r: 0, g: 0, b: 0,
+}
+assert(!p2.isAlive(), "particle with 0 life is dead")
+assert(p2.lifeRatio() == 0.0, "dead particle lifeRatio = 0")
+println("  1 [particle_basic] OK")
+
+// ── 2. Emitter creation ──────────────────────────────────────
+let em = Emitter::new(100.0, 200.0)
+assert(em.x == 100.0, "emitter x")
+assert(em.y == 200.0, "emitter y")
+assert(em.count() == 0, "new emitter has 0 particles")
+assert(em.maxParticles == 1000, "default maxParticles")
+println("  2 [emitter_new] OK")
+
+// ── 3. Emit particles ────────────────────────────────────────
+em.emit(10)
+assert(em.count() == 10, "emitted 10 particles")
+em.emit(5)
+assert(em.count() == 15, "emitted 5 more = 15")
+println("  3 [emitter_emit] OK")
+
+// ── 4. Clear ─────────────────────────────────────────────────
+em.clear()
+assert(em.count() == 0, "clear removes all particles")
+println("  4 [emitter_clear] OK")
+
+// ── 5. Update kills old particles ────────────────────────────
+let em2 = Emitter::new(0.0, 0.0)
+em2.minLife = 0.1
+em2.maxLife = 0.1
+em2.gravityY = 0.0
+em2.emit(5)
+assert(em2.count() == 5, "5 short-lived particles")
+
+// Advance by 0.2 seconds — all should die (life 0.1 - 0.2 < 0)
+em2.update(0.2)
+assert(em2.count() == 0, "all dead after update past maxLife")
+println("  5 [emitter_update_prune] OK")
+
+// ── 6. Update moves particles ────────────────────────────────
+let em3 = Emitter::new(50.0, 50.0)
+em3.gravityX = 0.0
+em3.gravityY = 0.0
+em3.minLife = 10.0
+em3.maxLife = 10.0
+em3.minSpeed = 100.0
+em3.maxSpeed = 100.0
+em3.spreadAngle = 0.0
+em3.baseAngle = 0.0
+em3.emit(1)
+assert(em3.count() == 1, "1 particle emitted")
+
+let before = em3.particles[0].pos.x
+em3.update(0.1)
+let after = em3.particles[0].pos.x
+assert(after > before, "particle moved in +x direction")
+assert(em3.particles[0].isAlive(), "particle still alive after 0.1s")
+println("  6 [emitter_update_move] OK")
+
+// ── 7. emitAt ────────────────────────────────────────────────
+let em4 = Emitter::new(10.0, 20.0)
+em4.gravityY = 0.0
+em4.minLife = 5.0
+em4.maxLife = 5.0
+em4.emitAt(300.0, 400.0, 3)
+assert(em4.count() == 3, "emitAt spawned 3")
+// Position should still be original
+assert(em4.x == 10.0, "emitAt restores x")
+assert(em4.y == 20.0, "emitAt restores y")
+// Particles should be near 300, 400
+let px = em4.particles[0].pos.x
+let py = em4.particles[0].pos.y
+assert(px >= 299.0 && px <= 301.0, "emitAt particle x near 300")
+assert(py >= 399.0 && py <= 401.0, "emitAt particle y near 400")
+println("  7 [emitter_emitAt] OK")
+
+// ── 8. maxParticles cap ──────────────────────────────────────
+let em5 = Emitter::new(0.0, 0.0)
+em5.maxParticles = 20
+em5.minLife = 99.0
+em5.maxLife = 99.0
+em5.emit(100)
+assert(em5.count() == 20, "capped at maxParticles")
+println("  8 [emitter_maxParticles] OK")
+
+// ── 9. setColor / setColorRange ──────────────────────────────
+let em6 = Emitter::new(0.0, 0.0)
+em6.setColor(100, 150, 200)
+assert(em6.colorR1 == 100, "setColor R1")
+assert(em6.colorG1 == 150, "setColor G1")
+assert(em6.colorB1 == 200, "setColor B1")
+assert(em6.colorR2 == 100, "setColor R2 = R1")
+
+em6.setColorRange(10, 20, 30, 40, 50, 60)
+assert(em6.colorR1 == 10, "setColorRange R1")
+assert(em6.colorR2 == 40, "setColorRange R2")
+println("  9 [emitter_colors] OK")
+
+// ── 10. Presets ──────────────────────────────────────────────
+let ftn = Emitter::fountain(100.0, 100.0)
+assert(ftn.gravityY == 300.0, "fountain gravity")
+assert(ftn.count() == 0, "preset starts empty")
+
+let exp = Emitter::explosion(50.0, 50.0)
+assert(exp.shrink, "explosion shrinks")
+
+let fire = Emitter::fire(0.0, 0.0)
+assert(fire.gravityY == -50.0, "fire negative gravity")
+
+let snw = Emitter::snow(0.0, 0.0)
+assert(snw.gravityY == 20.0, "snow light gravity")
+
+let spk = Emitter::sparks(0.0, 0.0)
+assert(spk.minSpeed == 200.0, "sparks fast")
+println("  10 [presets] OK")
+
+// ── 11. lifeRatio edge cases ─────────────────────────────────
+let pe1 = Particle {
+    pos: Vec2::new(0.0, 0.0), vel: Vec2::new(0.0, 0.0),
+    life: 5.0, maxLife: 5.0, size: 1.0, r: 0, g: 0, b: 0,
+}
+assert(pe1.lifeRatio() == 1.0, "full life ratio = 1.0")
+
+let pe2 = Particle {
+    pos: Vec2::new(0.0, 0.0), vel: Vec2::new(0.0, 0.0),
+    life: -1.0, maxLife: 1.0, size: 1.0, r: 0, g: 0, b: 0,
+}
+assert(pe2.lifeRatio() == 0.0, "negative life ratio clamped to 0")
+
+let pe3 = Particle {
+    pos: Vec2::new(0.0, 0.0), vel: Vec2::new(0.0, 0.0),
+    life: 1.0, maxLife: 0.0, size: 1.0, r: 0, g: 0, b: 0,
+}
+assert(pe3.lifeRatio() == 0.0, "zero maxLife ratio = 0")
+println("  11 [lifeRatio_edges] OK")
+
+println("PASS: test_particle")

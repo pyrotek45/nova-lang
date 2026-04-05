@@ -10,7 +10,9 @@ and raylib bindings.
 1. [Built-in Types](#1-built-in-types)
 2. [Built-in Functions](#2-built-in-functions)
    — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program)
-3. [Standard Library](#3-standard-library)
+3. [Language Syntax Notes](#3-language-syntax-notes)
+   — [Semicolons](#semicolons) · [Pipe Operator](#pipe-operator-) · [Closures](#closure-syntax) · [Logical Operators](#logical-operators--and-) · [Literal Formats](#literal-formats) · [Comments](#comments) · [Conventions](#conventions)
+4. [Standard Library](#4-standard-library)
    - [`std/core`](#stdcore--foundation) — Box, Maybe, Result, range, Gen
    - [`std/math`](#stdmath--extended-mathematics) — Int/Float extensions, primes, fib
    - [`std/string`](#stdstring--string-utilities) — pad, slug, wrap, between
@@ -29,20 +31,26 @@ and raylib bindings.
    - [`std/ansi`](#stdansi--ansi-terminal-colours) — bold, red, rgb, clearScreen
    - [`std/color`](#stdcolor--named-colour-tuples) — named RGB tuples, lerp, darken
    - [`std/tui`](#stdtui--terminal-ui) — printAt, drawBox, poll
-   - [`std/widget`](#stdwidget--tui-widget-toolkit) — Button, Label, Panel, ProgressBar
+   - [`std/widget`](#stdwidget--gui-widget-toolkit) — Button, Label, Panel, Toggle, ProgressBar, Checkbox, Slider, TextField, RadioGroup, Dropdown
+   - [`std/container`](#stdcontainer--layout-containers) — VBox, HBox, GridBox, PanelBox, MarginBox (Godot-style)
    - [`std/plot`](#stdplot--charts--graphs-raylib) — line, bar, scatter, pie charts
    - [`std/timer`](#stdtimer--game-timers) — cooldown, repeating, once
    - [`std/tween`](#stdtween--interpolation-and-easing) — easeIn, easeOut, bounce, elastic
    - [`std/input`](#stdinput--action-based-input) — InputMap, bindKey, axis
    - [`std/camera`](#stdcamera--2d-camera) — follow, shake, zoom, worldToScreen
    - [`std/physics`](#stdphysics--2d-physics) — Body2D, AABB, Circle, raycasting
-   - [`std/entity`](#stdentity--entity-system) — EntityWorld, spawn, query, update
-   - [`std/scene`](#stdscene--scene-management) — SceneManager, push, pop, switch
+   - [`std/entity`](#stdentity--generic-entity-system) — Entity(T), EntityWorld(T), spawn, query, signals
+   - [`std/scene`](#stdscene--scene-management) — SceneManager, push, pop, switch, signals
    - [`std/grid`](#stdgrid--2d-grid-and-tilemap) — Grid(T), get, set, bfs, draw, printGrid (terminal)
+   - [`std/signal`](#stdsignal--signals) — Signal(T), VoidSignal, SignalBus
    - [`std/noise`](#stdnoise--procedural-noise) — fbm, ridged, domain warp
-4. [Raylib API](#4-raylib-api)
-5. [Import System](#5-import-system)
-6. [CLI Reference](#6-cli-reference)
+   - [`std/particle`](#stdparticle--particle-system) — Emitter, Particle, presets (fountain, fire, snow)
+   - [`std/log`](#stdlog--structured-logging) — Logger, levels, colored output, tables, timers
+   - [`std/datetime`](#stddatetime--date-and-time) — DateTime, Stopwatch, formatting
+   - [`std/gameloop`](#stdgameloop--automatic-update-system) — Updater, Dyn-based tick-all pattern
+5. [Raylib API](#5-raylib-api)
+6. [Import System](#6-import-system)
+7. [CLI Reference](#7-cli-reference)
 
 ---
 
@@ -295,12 +303,190 @@ type cannot be inferred, use `@[T: Type]`:
 ```rust
 return todo() @[T: String]
 return unreachable() @[T: Int]
-let map = HashMap::default() @[K: String, V: Int]
+let map = HashMap::new() @[K: String, V: Int]
 ```
 
 ---
 
-## 3. Standard Library
+## 3. Language Syntax Notes
+
+### Semicolons
+
+Semicolons serve two purposes in Nova:
+
+**1. Statement separator on a single line:**
+
+```rust
+let x = 1; let y = 2; println(x + y)
+```
+
+Multiple statements can share one line when separated by `;`. This is
+optional — putting each statement on its own line is preferred.
+
+**2. C-style for loops:**
+
+```rust
+for let i = 0; i < 10; i += 1 {
+    println(i)
+}
+```
+
+Semicolons separate the initializer, condition, and increment clauses.
+Range-based `for i in 0..10` is usually cleaner, but C-style loops allow
+non-integer stepping or custom iteration logic.
+
+### Pipe Operator (`|>`)
+
+`|>` passes the left-hand value as the **first argument** to the right-hand
+function call:
+
+```rust
+fn double(x: Int) -> Int { return x * 2 }
+fn inc(x: Int) -> Int { return x + 1 }
+
+let r = 5 |> double() |> inc()   // 11
+```
+
+Chains work with module-scoped functions:
+
+```rust
+10 |> Cast::string() |> println()   // prints "10"
+```
+
+> **The function call MUST include `()`.** Writing `5 |> println` is a
+> syntax error. Always write `5 |> println()`.
+
+> **Extends functions cannot be piped.** Use UFCS (method-style) chaining
+> instead: `xs.filter(pred).map(f)`.
+
+### Closure Syntax
+
+Nova has two closure forms:
+
+| Form | Syntax | Notes |
+|---|---|---|
+| Full closure | `fn(x: Int) -> Int { return x + 1 }` | Supports control flow, multi-line, explicit return |
+| Short lambda | `\|x: Int\| x + 1` | Single expression only — no `return`, `if`, `while` |
+
+**Bar closures (`||`) cannot have return-type annotations.** If you need
+`-> Type`, use the `fn()` form:
+
+```rust
+// ✗ won't compile
+let f = |x: Int| -> Int { return x + 1 }
+
+// ✓ correct
+let f = fn(x: Int) -> Int { return x + 1 }
+```
+
+**Zero-parameter closures** omit the parameter list entirely:
+
+```rust
+let greet = || println("hello")
+greet()
+```
+
+### Logical Operators (`&&` and `||`)
+
+`&&` (logical AND) and `||` (logical OR) work in all contexts including
+`if`, `elif`, `while`, and expression position:
+
+```rust
+while running && !paused {
+    update(dt)
+}
+
+if x > 0 && x < 100 {
+    println("in range")
+}
+```
+
+> **Precedence:** `&&` binds **tighter** than `||`, matching
+> Python / C / Rust.  `a || b && c` is parsed as `a || (b && c)`.
+
+### Literal Formats
+
+Nova supports several numeric literal formats:
+
+| Format | Example | Value |
+|---|---|---|
+| Decimal | `42` | 42 |
+| Binary | `0b1010` | 10 |
+| Octal | `0o17` | 15 |
+| Hexadecimal | `0xFF` | 255 |
+| Underscores | `1_000_000` | 1000000 |
+| Float | `3.14` | 3.14 |
+| Float + underscores | `1_000.50` | 1000.5 |
+| Negative | `-7` | −7 |
+
+Underscores can appear anywhere within the digit sequence (including hex,
+binary, octal, and float literals) and are ignored during parsing. They are
+useful for making large numbers more readable: `0xFF_FF`, `0b1010_0101`,
+`1_000_000.123_456`.
+
+**String literals:**
+
+| Form | Example | Notes |
+|---|---|---|
+| Double-quoted | `"hello\nworld"` | Standard, escape sequences processed |
+| Raw string | `r#"no \n escapes"#` | Backslash is literal (Rust-style) |
+| Char literal | `'a'` | Single character |
+
+### Comments
+
+```rust
+// Line comment
+
+/* Block comment
+   spanning multiple
+   lines */
+```
+
+### Block Expressions
+
+A `{ }` block in expression position evaluates to the value of its last
+expression:
+
+```rust
+let x = {
+    let a = 10
+    let b = 20
+    a + b          // ← block's value
+}
+// x == 30
+```
+
+If the last statement is an `if`/`elif`/`else` chain where every branch
+ends with an expression of the same type, the block produces that value:
+
+```rust
+let abs_val = {
+    if x >= 0 { x } else { 0 - x }
+}
+
+let label = {
+    if score > 90 { "A" }
+    elif score > 80 { "B" }
+    else { "C" }
+}
+```
+
+### Conventions
+
+Nova follows these naming conventions:
+
+| Kind | Style | Example |
+|---|---|---|
+| Types, structs, enums | PascalCase | `Player`, `Color` |
+| Variables, functions, methods | camelCase | `playerScore`, `getHealth()` |
+| Modules | snake\_case | `module my_utils` |
+| Constants (static methods) | UPPER\_CASE | `Color::RED()` |
+
+See [`documentation/conventions.md`](conventions.md) for the full style guide.
+
+---
+
+## 4. Standard Library
 
 All modules live in `nova-lang/std/`. Import with `import super.std.<name>`
 (dot-path relative to your file). See [Import System](#5-import-system) for
@@ -1007,7 +1193,7 @@ O(1) average-case hash map using bucket chaining. Automatically resizes at 75% l
 
 ```rust
 // Create and populate
-let m = HashMap::default() @[K: String, V: Int]
+let m = HashMap::new() @[K: String, V: Int]
 m.insert("apples", 5)
 m.insert("bananas", 3)
 
@@ -1022,7 +1208,7 @@ m.delete("bananas")
 m.size()                  // 1
 
 // Counting pattern
-let freq = HashMap::default() @[K: String, V: Int]
+let freq = HashMap::new() @[K: String, V: Int]
 freq.increment("hello")
 freq.increment("hello")
 freq.increment("world")
@@ -1051,7 +1237,7 @@ m.update("apples", 0, |v: Int| v + 10)  // apples = 15
 
 | Method | Description |
 |---|---|
-| `HashMap::default()` | Empty map (16-bucket initial) |
+| `HashMap::new()` | Empty map (16-bucket initial) |
 | `HashMap::fromPairs(list)` | Build from `[(K,V)]` |
 | `.insert(k, v)` | Insert or update |
 | `.get(k)` → `Option(V)` | Lookup |
@@ -1356,13 +1542,17 @@ fn main() {
 
 ---
 
-### `std/widget` — TUI Widget Toolkit
+### `std/widget` — GUI Widget Toolkit
 
 ```rust
 import super.std.widget
+import super.std.signal
 ```
 
-Higher-level widgets for terminal UIs (built on `std/tui`).
+Higher-level widgets for raylib game UIs.  Interactive widgets emit
+**Godot-style signals** so you can wire up reactions once and keep the
+game loop clean.  Every widget has a `drawAt(x, y, w, h)` method for
+integration with layout containers (see `std/container`).
 
 | Widget | Description |
 |---|---|
@@ -1371,12 +1561,249 @@ Higher-level widgets for terminal UIs (built on `std/tui`).
 | `Panel` | Rectangular container with border |
 | `ProgressBar` | Horizontal progress indicator |
 | `Toggle` | On/off toggle switch |
+| `Checkbox` | Check/uncheck box with label |
+| `Slider` | Draggable horizontal slider (Float value) |
+| `TextField` | Single-line text input with cursor |
+| `RadioGroup` | Mutually exclusive radio buttons |
+| `Dropdown` | Expandable drop-down menu |
+
+#### Core Widgets
 
 | Method | Description |
 |---|---|
 | `.draw()` | Render the widget |
-| `.isClicked()` | True if widget was clicked (interactive) |
-| `.isHovered()` | True if cursor is over widget (interactive) |
+| `.drawAt(x, y, w, h)` | Render at arbitrary position (for containers) |
+| `.isClicked()` | True if widget was clicked (also emits signals) |
+| `.isHovered()` | True if cursor is over widget |
+| `Toggle.isOn()` | Current on/off state |
+| `ProgressBar.setValue(v)` | Set value and emit `onValueChanged` |
+
+#### New Widgets
+
+**Checkbox** — check/uncheck with label:
+
+```rust
+let cb = Checkbox::new(100, 200, 20, "Enable sound")
+cb.onToggle.connect(|v: Bool| { println("Sound: " + Cast::string(v)) })
+
+// In game loop:
+cb.isClicked()
+cb.draw()
+println(Cast::string(cb.checked))  // true or false
+```
+
+**Slider** — horizontal draggable slider:
+
+```rust
+let vol = Slider::new(100, 300, 200, 0.0, 1.0, 0.5)  // x, y, w, min, max, value
+vol.onChanged.connect(|v: Float| { println("Volume: " + Cast::string(v)) })
+
+// In game loop:
+vol.update()   // handles mouse drag
+vol.draw()
+```
+
+**TextField** — single-line text input:
+
+```rust
+let name = TextField::new(100, 400, 200, 30)
+name.placeholder = "Enter name..."
+name.onSubmit.connect(|| { println("Submitted: " + name.text) })
+
+// In game loop:
+name.update()   // handles keyboard input, cursor, backspace
+name.draw()
+```
+
+**RadioGroup** — mutually exclusive options:
+
+```rust
+let diff = RadioGroup::new(100, 500, ["Easy", "Normal", "Hard"], 1)  // default index 1
+diff.onChanged.connect(|idx: Int| { println("Difficulty: " + Cast::string(idx)) })
+
+// In game loop:
+diff.isClicked()
+diff.draw()
+println(Cast::string(diff.selected))  // 0, 1, or 2
+```
+
+**Dropdown** — expandable selection menu:
+
+```rust
+let weapon = Dropdown::new(100, 600, 160, 30, ["Sword", "Bow", "Staff"])
+weapon.onChanged.connect(|idx: Int| { println("Weapon: " + Cast::string(idx)) })
+
+// In game loop:
+weapon.update()
+weapon.draw()
+```
+
+#### Widget Signals
+
+| Widget | Signal | Type | Fires when |
+|---|---|---|---|
+| `Button` | `onClick` | `VoidSignal` | `isClicked()` detects a click |
+| `Button` | `onHover` | `VoidSignal` | `isHovered()` detects cursor over the button |
+| `Toggle` | `onToggle` | `Signal(Bool)` | `isClicked()` flips state — carries new on/off value |
+| `ProgressBar` | `onValueChanged` | `Signal(Float)` | `setValue(v)` is called — carries the new value |
+| `Checkbox` | `onToggle` | `Signal(Bool)` | `isClicked()` flips checked state |
+| `Slider` | `onChanged` | `Signal(Float)` | `update()` detects value change via drag |
+| `TextField` | `onSubmit` | `VoidSignal` | Enter key is pressed |
+| `TextField` | `onChanged` | `Signal(String)` | Text content changes |
+| `RadioGroup` | `onChanged` | `Signal(Int)` | `isClicked()` selects a different option |
+| `Dropdown` | `onChanged` | `Signal(Int)` | User selects a different item |
+
+#### Container Integration
+
+All widgets can be wrapped into a `Slot` for use with layout containers:
+
+```rust
+import super.std.container
+
+let btn = Button::new(0, 0, 160, 40, "OK")
+let slot = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| { btn.drawAt(x, y, w, h) },
+    fn() -> (Int, Int) { return (160, 40) }
+)
+
+let vbox = VBox::new(50, 50, 200)
+vbox.add(slot)
+vbox.draw()
+```
+
+---
+
+### `std/container` — Layout Containers
+
+```rust
+import super.std.container
+```
+
+Godot-style layout containers that automatically position child **slots**.
+Each slot is a pair of closures — `draw(x, y, w, h)` and `preferredSize() -> (Int, Int)` —
+so containers stay generic and work with any widget type.
+
+#### Slot — Universal Wrapper
+
+```rust
+let slot = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        raylib::drawRectangle(x, y, w, h, (200, 200, 200))
+    },
+    fn() -> (Int, Int) { return (100, 30) }
+)
+
+slot.draw(10, 20, 100, 30)     // invoke drawFn
+let sz = slot.preferredSize()   // invoke sizeFn → (100, 30)
+```
+
+| Method | Description |
+|---|---|
+| `Slot::new(drawFn, sizeFn)` | Create a slot |
+| `.draw(x, y, w, h)` | Invoke the draw closure |
+| `.preferredSize()` → `(Int, Int)` | Invoke the size closure |
+
+#### VBox — Vertical Container
+
+Stacks children top-to-bottom with spacing and padding.
+
+```rust
+let vbox = VBox::new(50, 50, 300)   // x, y, width
+vbox.spacing = 8
+vbox.padding = 10
+vbox.add(slot1)
+vbox.add(slot2)
+vbox.draw()
+
+let h = vbox.totalHeight()
+```
+
+| Method | Description |
+|---|---|
+| `VBox::new(x, y, w)` | Create vertical container |
+| `.add(slot)` | Append a slot |
+| `.draw()` | Lay out and draw all children |
+| `.totalHeight()` → `Int` | `padding*2 + sum(heights) + (n-1)*spacing` |
+
+#### HBox — Horizontal Container
+
+Stacks children left-to-right.
+
+```rust
+let hbox = HBox::new(50, 50, 60)   // x, y, height
+hbox.spacing = 5
+hbox.add(slotA)
+hbox.add(slotB)
+hbox.draw()
+
+let w = hbox.totalWidth()
+```
+
+| Method | Description |
+|---|---|
+| `HBox::new(x, y, h)` | Create horizontal container |
+| `.add(slot)` | Append a slot |
+| `.draw()` | Lay out and draw all children |
+| `.totalWidth()` → `Int` | `padding*2 + sum(widths) + (n-1)*spacing` |
+
+#### GridBox — Grid Container
+
+Arranges children in rows/columns with fixed cell sizes.
+
+```rust
+let grid = GridBox::new(50, 50, 4, 80, 40)  // x, y, cols, cellW, cellH
+grid.spacingX = 5
+grid.spacingY = 5
+grid.padding = 10
+for let i = 0; i < 12; i += 1 {
+    grid.add(mySlot)
+}
+grid.draw()
+```
+
+| Method | Description |
+|---|---|
+| `GridBox::new(x, y, cols, cellW, cellH)` | Create grid |
+| `.add(slot)` | Append a slot (fills left-to-right, top-to-bottom) |
+| `.draw()` | Lay out and draw all children |
+| `.totalWidth()` → `Int` | `padding*2 + cols*cellW + (cols-1)*spacingX` |
+| `.totalHeight()` → `Int` | `padding*2 + rows*cellH + (rows-1)*spacingY` |
+
+#### PanelBox — Background + Border + Children
+
+```rust
+let panel = PanelBox::new(100, 100, 300, 200)
+panel.bgColor = color::darkGray()
+panel.borderColor = color::gray()
+panel.padding = 10
+panel.add(slot)
+panel.draw()
+```
+
+| Method | Description |
+|---|---|
+| `PanelBox::new(x, y, w, h)` | Create panel |
+| `.add(slot)` | Add child slot |
+| `.draw()` | Draw background, border, then children in VBox layout |
+
+#### MarginBox — Margin Wrapper
+
+Wraps a single child with configurable margins.
+
+```rust
+let inner = Slot::new(myDrawFn, mySizeFn)
+let margin = MarginBox::new(inner, 10, 20, 10, 20)  // top, right, bottom, left
+margin.draw(0, 0, 300, 200)
+
+let ps = margin.preferredSize()  // child size + margins
+```
+
+| Method | Description |
+|---|---|
+| `MarginBox::new(child, top, right, bottom, left)` | Create margin wrapper |
+| `.draw(x, y, w, h)` | Draw child at inset position |
+| `.preferredSize()` → `(Int, Int)` | Child preferred size + margins |
+| `.toSlot()` → `Slot` | Wrap as a Slot for nesting in other containers |
 
 ---
 
@@ -1673,58 +2100,80 @@ while raylib::rendering() {
 
 ---
 
-### `std/entity` — Entity System
+### `std/entity` — Generic Entity System
 
 ```rust
 import super.std.entity
+import super.std.vec2
+import super.std.signal
 ```
 
-A lightweight entity system for games. Entities have position, velocity, size,
-a tag string, and a data float.
+A lightweight **generic** entity system for games.  `Entity(T)` takes a type
+parameter for its user data, so you can attach any struct, Int, Float, or
+String to an entity — no casts required.
 
 ```rust
-let world = EntityWorld::new()
+// Simple float data (like the old entity):
+let world = EntityWorld::new() @[T: Float]
+let player = world.spawn(100.0, 200.0, "player", 0.0)
 
-// Spawn entities
-let player = world.spawn(100.0, 200.0, "player")
-let e1 = world.spawn(300.0, 200.0, "enemy")
-let e2 = world.spawn(500.0, 200.0, "enemy")
+// Custom struct data:
+struct EnemyData { hp: Int, speed: Float }
+let world = EntityWorld::new() @[T: EnemyData]
+let e = world.spawn(300.0, 200.0, "enemy", EnemyData { hp: 50, speed: 120.0 })
+e.data.hp -= 10  // direct mutation
 
 // Query by tag
-let enemies = world.query("enemy")  // [Entity, Entity]
+let enemies = world.query("enemy")
 
-// Update all entities (pos += vel * dt)
-world.update(dt)
-
-// Iterate with mutation
-world.forEachTagged("enemy", |e: Entity| {
-    if e.overlapsAABB(player) {
-        e.alive = false  // mark for removal
-    }
+// Listen for spawns via signals
+world.onSpawn.connect(|id: Int| {
+    println("Entity " + Cast::string(id) + " spawned!")
 })
 
-// Purge dead entities
-world.update(0.0)
-
-// Count living entities
-let remaining = world.countAlive("enemy")
+// Update all entities (pos += vel * dt) and purge dead
+world.update(dt)
 ```
 
-**Entity fields:** `id: Int`, `pos: Vec2`, `vel: Vec2`, `size: Vec2`,
-`tag: String`, `alive: Bool`, `data: Float`.
+**Entity(T) fields:** `id: Int`, `pos: Vec2`, `vel: Vec2`, `size: Vec2`,
+`tag: String`, `alive: Bool`, `data: T`.
+
+#### EntityWorld(T) Methods
 
 | Method | Description |
 |---|---|
-| `EntityWorld::new()` | Create entity manager |
-| `.spawn(x, y, tag)` | Create entity at position |
-| `.query(tag)` | Get `[Entity]` with matching tag |
-| `.forEachTagged(tag, fn)` | Iterate entities with tag |
-| `.forEach(fn)` | Iterate ALL entities |
-| `.countAlive(tag)` | Count living entities with tag |
-| `.update(dt)` | Move all entities and purge dead |
-| `e.overlapsAABB(other)` | AABB overlap test |
-| `e.center()` | Center point |
-| `e.entityDrawRect(color)` / `e.entityDrawCircle(color)` | Draw helpers |
+| `EntityWorld::new() @[T: Type]` | Create entity manager (specify data type) |
+| `.spawn(x, y, tag, data)` → `Entity(T)` | Create entity at position with user data |
+| `.spawnFull(x, y, vx, vy, w, h, tag, data)` → `Entity(T)` | Full control over all fields |
+| `.kill(id)` | Mark entity dead by id |
+| `.killAll(tag)` | Mark all entities with tag dead |
+| `.query(tag)` → `[Entity(T)]` | Get living entities with matching tag |
+| `.all()` → `[Entity(T)]` | Get all living entities |
+| `.getById(id)` → `Option` | Lookup entity by id |
+| `.forEach(fn)` | Iterate ALL living entities |
+| `.forEachTagged(tag, fn)` | Iterate entities with matching tag |
+| `.count()` → `Int` | Total number of living entities |
+| `.countAlive(tag)` → `Int` | Count living entities with tag |
+| `.update(dt)` | Integrate velocity and purge dead |
+| `.clear()` | Kill everything |
+
+#### Entity(T) Helpers
+
+| Method | Description |
+|---|---|
+| `e.overlapsAABB(other)` → `Bool` | Axis-aligned bounding box overlap |
+| `e.overlapCircle(other)` → `Bool` | Circle-based overlap (uses size.x/2) |
+| `e.center()` → `Vec2` | Center point of the entity |
+| `e.drawRect(color)` | Draw filled rectangle (raylib) |
+| `e.drawCircle(color)` | Draw filled circle (raylib) |
+
+#### Built-in Signals
+
+| Signal | Type | Fires when |
+|---|---|---|
+| `world.onSpawn` | `Signal(Int)` | After `spawn()` or `spawnFull()` — carries entity id |
+| `world.onKill` | `Signal(Int)` | After `kill()` or `killAll()` — carries entity id |
+| `world.onClear` | `VoidSignal` | After `clear()` |
 
 ---
 
@@ -1732,9 +2181,11 @@ let remaining = world.countAlive("enemy")
 
 ```rust
 import super.std.scene
+import super.std.signal
 ```
 
 Manage game scenes (menus, gameplay, pause screens) with a stack-based system.
+The SceneManager fires **VoidSignal** events on every transition.
 
 ```rust
 let menu = Scene::new(
@@ -1748,12 +2199,15 @@ let game = Scene::new(
 
 let mgr = SceneManager::new(menu)
 
+// Listen for transitions
+mgr.onSwitch.connect(|| { println("Scene switched!") })
+
 // Switch scenes
-mgr.switch(game)   // replaces current, clears stack
+mgr.switch(game)   // replaces current, clears stack, fires onSwitch
 
 // Overlay (pause menu on top of game)
-mgr.push(menu)     // game still exists underneath
-mgr.pop()          // return to game
+mgr.push(menu)     // game still exists underneath, fires onPush
+mgr.pop()          // return to game, fires onPop
 
 // In game loop:
 mgr.update(dt)
@@ -1763,6 +2217,7 @@ mgr.draw()
 | Method | Description |
 |---|---|
 | `Scene::new(updateFn, drawFn)` | Create scene from two closures |
+| `Scene::empty()` | No-op placeholder scene |
 | `SceneManager::empty()` | Create with no scene |
 | `SceneManager::new(scene)` | Create with initial scene |
 | `.switch(scene)` | Replace current, clear stack |
@@ -1770,6 +2225,16 @@ mgr.draw()
 | `.pop()` | Return to previous scene |
 | `.update(dt)` | Tick current scene |
 | `.draw()` | Draw current scene |
+| `.has()` → `Bool` | True if there is an active scene |
+| `.depth()` → `Int` | Number of scenes on the stack |
+
+#### Built-in Signals
+
+| Signal | Type | Fires when |
+|---|---|---|
+| `mgr.onSwitch` | `VoidSignal` | After `switch()` is called |
+| `mgr.onPush` | `VoidSignal` | After `push()` is called |
+| `mgr.onPop` | `VoidSignal` | After `pop()` is called |
 
 ---
 
@@ -1910,7 +2375,368 @@ let color = noiseToColor(h, (0, 50, 200), (255, 255, 255))
 
 ---
 
-## 4. Raylib API
+### `std/particle` — Particle System
+
+```rust
+import super.std.particle
+```
+
+Simple particle system for game effects — explosions, fire, rain, snow,
+sparks, fountains.  Each `Emitter` manages a pool of `Particle` structs,
+handles spawning, aging, physics, and rendering.
+
+#### Particle Struct
+
+```rust
+struct Particle {
+    x: Float, y: Float,       // position
+    vx: Float, vy: Float,     // velocity
+    life: Float,               // remaining life (seconds)
+    maxLife: Float,            // initial life (for ratio)
+    size: Float,               // draw radius
+    r: Int, g: Int, b: Int,   // colour
+}
+```
+
+| Method | Description |
+|---|---|
+| `Particle::new(x, y, vx, vy, life, size, r, g, b)` | Create a particle |
+| `.lifeRatio()` → `Float` | `life / maxLife` (1.0 → 0.0 as it ages) |
+
+#### Emitter — Configurable Particle Source
+
+```rust
+let em = Emitter::new(400.0, 300.0)
+em.minSpeed = 50.0
+em.maxSpeed = 200.0
+em.minLife = 0.5
+em.maxLife = 2.0
+em.gravity = 300.0
+
+// In game loop:
+em.emit(5)          // spawn 5 particles at emitter position
+em.update(dt)       // age, move, remove dead particles
+em.draw()           // render all alive particles as circles
+```
+
+| Constructor | Description |
+|---|---|
+| `Emitter::new(x, y)` | Create emitter at position |
+
+| Configuration Field | Default | Description |
+|---|---|---|
+| `minSpeed` / `maxSpeed` | `50.0` / `200.0` | Speed range |
+| `minLife` / `maxLife` | `0.5` / `2.0` | Lifetime range (seconds) |
+| `minSize` / `maxSize` | `2.0` / `6.0` | Particle size range |
+| `gravity` | `0.0` | Downward acceleration |
+| `r`, `g`, `b` | `255, 200, 50` | Particle colour |
+| `r2`, `g2`, `b2` | `-1, -1, -1` | End colour (-1 = same as start) |
+| `maxParticles` | `500` | Pool limit |
+| `angleMin` / `angleMax` | `0.0` / `6.2832` | Emission angle range (radians) |
+| `fadeOut` | `true` | Fade alpha as life decreases |
+
+| Method | Description |
+|---|---|
+| `.emit(count)` | Spawn particles at emitter (x, y) |
+| `.emitAt(x, y, count)` | Spawn particles at custom position |
+| `.update(dt)` | Age, apply gravity, prune dead |
+| `.draw()` | Render all alive particles |
+| `.count()` → `Int` | Number of alive particles |
+| `.clear()` | Remove all particles |
+| `.setColor(r, g, b)` | Set start colour |
+| `.setColorRange(r1,g1,b1, r2,g2,b2)` | Set start → end colour gradient |
+
+#### Presets
+
+| Preset | Description |
+|---|---|
+| `Emitter::fountain(x, y)` | Upward stream with gravity |
+| `Emitter::explosion(x, y)` | Burst in all directions |
+| `Emitter::fire(x, y)` | Flickering upward flame |
+| `Emitter::snow(x, y)` | Gentle downward drift |
+| `Emitter::sparks(x, y)` | Fast bright sparks |
+
+```rust
+// One-shot explosion
+let boom = Emitter::explosion(player.pos.x, player.pos.y)
+boom.emit(50)
+
+// Continuous fire
+let fire = Emitter::fire(torch.x, torch.y)
+// In loop:
+fire.emit(3)
+fire.update(dt)
+fire.draw()
+```
+
+---
+
+### `std/signal` — Signals
+
+```rust
+import super.std.signal
+```
+
+Godot-style signal system for decoupled communication.  An emitter
+defines signals; listeners `connect()` callbacks.  When the signal
+fires, every connected callback runs.
+
+Three flavours:
+
+| Type | Purpose |
+|---|---|
+| `Signal(T)` | Typed signal — carries a payload of type `T` |
+| `VoidSignal` | Fire-and-forget — no payload |
+| `SignalBus` | Named registry of void signals (global event bus) |
+
+#### Signal(T) — Typed Signal
+
+```rust
+import super.std.signal
+import super.std.core    // Box
+
+let onDamage = Signal::new() @[T: Int]
+let hp = Box(100)
+
+onDamage.connect(|dmg: Int| {
+    hp.value -= dmg
+})
+
+onDamage.emit(25)   // hp.value == 75
+onDamage.emit(10)   // hp.value == 65
+```
+
+| Method | Description |
+|---|---|
+| `Signal::new() @[T: Type]` | Create a typed signal |
+| `.connect(f: fn(T))` | Add a listener callback |
+| `.emit(payload: T)` | Fire all listeners with payload |
+| `.clear()` | Remove all listeners |
+| `.count()` → `Int` | Number of connected listeners |
+
+#### VoidSignal — No Payload
+
+```rust
+let onReady = VoidSignal::new()
+onReady.connect(|| { println("Ready!") })
+onReady.emit()   // "Ready!"
+```
+
+| Method | Description |
+|---|---|
+| `VoidSignal::new()` | Create a void signal |
+| `.connect(f: fn())` | Add a listener callback |
+| `.emit()` | Fire all listeners |
+| `.clear()` | Remove all listeners |
+| `.count()` → `Int` | Number of connected listeners |
+
+#### SignalBus — Named Event Bus
+
+```rust
+let bus = SignalBus::new()
+bus.register("game_over")
+bus.register("level_up")
+
+bus.connect("game_over", || { println("Game Over!") })
+bus.connect("level_up",  || { println("Level Up!") })
+
+bus.emit("game_over")   // "Game Over!"
+bus.emit("level_up")    // "Level Up!"
+```
+
+| Method | Description |
+|---|---|
+| `SignalBus::new()` | Create an empty signal bus |
+| `.register(name: String)` | Register a named signal |
+| `.connect(name, f: fn())` | Connect listener to named signal |
+| `.emit(name: String)` | Fire all listeners on named signal |
+| `.has(name)` → `Bool` | True if signal name is registered |
+| `.clear(name: String)` | Remove listeners on one signal |
+| `.clearAll()` | Remove all signals and listeners |
+| `.signalCount(name)` → `Int` | Number of listeners on one signal |
+
+> **When to use which?**
+> - `Signal(T)` — event carries data (damage amount, new position, toggle state).
+> - `VoidSignal` — event is a pure notification (game over, scene changed).
+> - `SignalBus` — many unrelated systems need a shared event bus by string name.
+
+---
+
+### `std/log` — Structured Logging
+
+```rust
+import super.std.log
+```
+
+A full-featured logging system with coloured output, level filtering, and
+debugging utilities designed for game development.
+
+#### Log Levels
+
+| Constant | Value | Colour |
+|---|---|---|
+| `Log::TRACE` | 0 | dim grey |
+| `Log::DEBUG` | 1 | cyan |
+| `Log::INFO` | 2 | green |
+| `Log::WARN` | 3 | yellow |
+| `Log::ERROR` | 4 | bold red |
+| `Log::OFF` | 5 | (silent) |
+
+Only messages **at or above** the logger's level are printed.
+
+#### Logger
+
+```rust
+let log = Logger::new("MyGame")       // INFO level, colours on
+log.info("Player spawned")
+log.warn("Low health")
+log.error("Collision failed")
+log.debug("pos = " + Cast::string(x)) // hidden at INFO level
+```
+
+| Constructor | Description |
+|---|---|
+| `Logger::new(name)` | INFO level, colours enabled |
+| `Logger::withLevel(name, level)` | Custom level |
+| `Logger::all(name)` | TRACE level (show everything) |
+| `Logger::quiet(name)` | ERROR only |
+| `Logger::silent(name)` | OFF (suppress all) |
+
+| Method | Description |
+|---|---|
+| `.trace(msg)` `.debug(msg)` `.info(msg)` `.warn(msg)` `.error(msg)` | Log at level |
+| `.setLevel(l)` `.getLevel()` | Change/read level |
+| `.setColors(on)` | Toggle ANSI colours |
+| `.sep()` | Print a separator line |
+| `.header(title)` | Print a boxed header |
+| `.dump(label, value)` | Print `label = value` at INFO |
+| `.table(headers, rows)` | Print an ASCII table |
+| `.assert(cond, msg)` | Log ERROR if `cond` is false |
+| `.timer(label) → Int` | Start a timer (returns `now()`) |
+| `.elapsed(label, start)` | Print ms elapsed since `start` |
+| `.group(label)` / `.groupEnd()` | Indented output grouping |
+| `.count(label)` | Increment + print a named counter |
+| `.resetCount(label)` | Reset a named counter |
+
+---
+
+### `std/datetime` — Date and Time
+
+```rust
+import super.std.datetime
+```
+
+Date/time utilities built on the native `now()` (ms) and `nowSec()` builtins.
+
+#### DateTime
+
+```rust
+let dt = DateTime::now()
+println(dt.format())        // "2026-04-05 14:30:22"
+println(dt.weekdayName())   // "Sunday"
+```
+
+| Constructor | Description |
+|---|---|
+| `DateTime::now()` | Current UTC date & time |
+| `DateTime::fromEpoch(ms)` | From milliseconds since Unix epoch |
+
+| Method | Return | Description |
+|---|---|---|
+| `.year()` `.month()` `.day()` | `Int` | Date components |
+| `.hour()` `.minute()` `.second()` `.millis()` | `Int` | Time components |
+| `.weekday()` | `Int` | 0=Sunday .. 6=Saturday |
+| `.weekdayName()` | `String` | e.g. `"Monday"` |
+| `.monthName()` | `String` | e.g. `"January"` |
+| `.format()` | `String` | `"YYYY-MM-DD HH:MM:SS"` |
+| `.formatDate()` | `String` | `"YYYY-MM-DD"` |
+| `.formatTime()` | `String` | `"HH:MM:SS"` |
+| `.toEpoch()` | `Int` | Milliseconds since epoch |
+| `.diffMs(other)` | `Int` | Difference in ms |
+| `.diffSec(other)` | `Float` | Difference in seconds |
+
+#### Stopwatch
+
+```rust
+let sw = Stopwatch::start()
+// ... do work ...
+println(Cast::string(sw.elapsedMs()) + " ms")
+```
+
+| Method | Return | Description |
+|---|---|---|
+| `Stopwatch::start()` | `Stopwatch` | Create a running stopwatch |
+| `.elapsedMs()` | `Int` | Milliseconds since start |
+| `.elapsedSec()` | `Float` | Seconds since start |
+| `.reset()` | | Restart from now |
+| `.lap()` | `Int` | Ms since last lap, resets lap counter |
+
+---
+
+### `std/gameloop` — Automatic Update System
+
+```rust
+import super.std.gameloop
+```
+
+Collects game objects with `update(self, Float)` function fields into a single
+list, then updates them all with one call. Uses Nova's `Dyn` structural typing.
+
+#### How It Works
+
+Any struct with an `update: fn(Self, Float)` field matches the `updatable` Dyn type:
+
+```rust
+type updatable = Dyn(T = update: fn($T, Float))
+```
+
+```rust
+struct Spinner {
+    angle: Float,
+    speed: Float,
+    update: fn(Spinner, Float),
+}
+
+let spinner = Spinner {
+    angle: 0.0,
+    speed: 90.0,
+    update: fn(self: Spinner, dt: Float) {
+        self.angle = self.angle + self.speed * dt
+    },
+}
+
+let u = Updater::new()
+u.add(spinner)
+
+// In your game loop:
+u.tick(dt)  // spinner.angle advances automatically!
+```
+
+| Method | Description |
+|---|---|
+| `Updater::new()` | Create an empty updater |
+| `.add(obj)` | Register any object with an `update` field |
+| `.tick(dt)` | Call `update(dt)` on everything |
+| `.count()` | Number of registered objects |
+| `.clear()` | Remove all objects |
+
+> **Tip**: For existing std types (Timer, Tween) that use `extends` methods
+> rather than function fields, create a thin adapter struct:
+> ```rust
+> struct ManagedTimer {
+>     timer: Timer,
+>     update: fn(ManagedTimer, Float),
+> }
+> let mt = ManagedTimer {
+>     timer: Timer::repeating(2.0),
+>     update: fn(self: ManagedTimer, dt: Float) { self.timer.update(dt) },
+> }
+> updater.add(mt)
+> ```
+
+---
+
+## 5. Raylib API
 
 Nova's raylib bindings provide 2D game development with window management, drawing,
 input, sprites, and audio.
@@ -1993,11 +2819,16 @@ Key names: `"A"`–`"Z"`, `"0"`–`"9"`, `"Space"`, `"Enter"`, `"Escape"`,
 | Signature | Description |
 |---|---|
 | `raylib::mousePosition() -> (Int, Int)` | Current mouse position. |
-| `raylib::isMousePressed(String) -> Bool` | Button held? |
+| `raylib::isMousePressed(String) -> Bool` | Button just pressed this frame? (fires once) |
+| `raylib::isMouseDown(String) -> Bool` | Button held down? (true every frame while held) |
 | `raylib::isMouseReleased(String) -> Bool` | Button released this frame? |
 | `raylib::getMouseWheel() -> Float` | Wheel movement (positive = up). |
 
 Button names: `"Left"`, `"Right"`, `"Middle"`.
+
+> **`isMousePressed` vs `isMouseDown`:** Use `isMousePressed` for single
+> clicks (button, menu). Use `isMouseDown` for continuous actions (dragging,
+> holding to shoot).
 
 ### Audio
 
@@ -2033,7 +2864,7 @@ before exit.
 
 ---
 
-## 5. Import System
+## 6. Import System
 
 Every Nova file begins with `module <name>`. The module name is used for
 deduplication — if a module has already been imported, subsequent imports
@@ -2081,7 +2912,7 @@ Duplicate detection works the same as local imports.
 
 ---
 
-## 6. CLI Reference
+## 7. CLI Reference
 
 ### Commands
 
@@ -2094,9 +2925,9 @@ Duplicate detection works the same as local imports.
 | `nova check --git owner/repo/path.nv [commit]` | Typecheck a file from GitHub |
 | `nova time [file.nv]` | Run and print execution time |
 | `nova time --git owner/repo/path.nv [commit]` | Time a file from GitHub |
-| `nova dbg [file.nv]` | Run in debug mode |
+| `nova dbg [file.nv]` | Run in interactive step debugger (TUI) |
 | `nova dbg --git owner/repo/path.nv [commit]` | Debug a file from GitHub |
-| `nova dis [file.nv]` | Disassemble compiled bytecode |
+| `nova dis [file.nv]` | Disassemble to color-coded instruction listing |
 | `nova dis --git owner/repo/path.nv [commit]` | Disassemble a file from GitHub |
 | `nova init name [--with owner/repo/folder]` | Create a new project |
 | `nova install name owner/repo/folder` | Install a library into `libs/<name>/` |
@@ -2129,3 +2960,56 @@ myproject/
 - `nova remove name` removes `libs/<name>/`.
 - `cd myproject && nova run` runs the project.
 - `cd myproject && nova test` runs all tests.
+
+### Debugger Controls
+
+The `nova dbg` command opens a full-screen TUI step debugger with a
+split-panel layout:
+
+| Key | Action |
+|---|---|
+| `↓` / `j` / `Space` | Step forward one instruction |
+| `↑` / `k` | Step back (browse history) |
+| `PgDn` | Step forward 20 instructions |
+| `PgUp` | Step back 20 instructions |
+| `r` | Run to end (execute all remaining) |
+| `n` | Step over (run until callstack returns to current depth) |
+| `Home` | Jump to first step |
+| `End` | Jump to latest step |
+| `?` | Toggle help screen |
+| `q` / `Esc` | Quit debugger |
+
+The debugger layout:
+
+- **Left panel** — Scrolling bytecode listing with `►` marking the current
+  instruction. The view auto-scrolls to keep the current instruction centered.
+  Instructions show resolved names (function names, variable names, native
+  function names) instead of raw indices.
+- **Right panel (top)** — Variables panel showing named local variables and
+  their current values, plus any globals that hold non-function values.
+- **Right panel (bottom)** — Stack with all entries. Top-of-stack marked with
+  `►`, local-frame entries marked with `•`. Entries are color-coded: green for
+  TOS, white for locals, grey for globals/below-offset.
+- **Output** — Last 2 lines of program output captured from `print`/`println`.
+- **Header** — Step counter, instruction pointer, callstack depth, and offset.
+
+### Disassembler Output
+
+The `nova dis` command shows a color-coded listing of the compiled
+instructions with control-flow visualization:
+
+- **Flow arrows** on the left margin show jumps and loops:
+  - **Magenta** arrows — backward jumps (loops)
+  - **Yellow** arrows — conditional jumps (`jif`)
+  - **Cyan** arrows — forward jumps
+  - Arrows use box-drawing characters (`┌`, `└`, `│`) and are assigned
+    non-overlapping columns so multiple arrows remain readable.
+- **Function / closure nesting** — indented with `│  ` to show body boundaries.
+- **Resolved names** — variable names on `STORE`/`GET`, function names on
+  `DCALL`/`STOREGLOBAL`/`GETGLOBAL`, native names on `NATIVE`, label names on
+  jumps.
+- **Color categories**: memory (green), arithmetic (yellow), control flow
+  (red), comparisons (magenta), I/O (blue), stack ops (white).
+- **Summary** at the bottom showing instruction counts, a globals table
+  mapping slot numbers to names, and a reading guide explaining the arrow
+  colors.

@@ -1,307 +1,443 @@
+use std::collections::HashMap;
+
 use common::{
-    code::{Asm, Code},
-    table::Table,
+    code::Asm,
+    debug_info::DebugInfo,
 };
 
 pub fn new() -> Disassembler {
-    Disassembler {
-        depth: vec![],
-        native_functions: Table::new(),
-        ip: 0,
+    Disassembler
+}
+
+pub struct Disassembler;
+
+// ── ANSI helpers ──────────────────────────────────────────────────────
+const RESET: &str = "\x1b[0m";
+const BOLD: &str = "\x1b[1m";
+const DIM: &str = "\x1b[2m";
+const CYAN: &str = "\x1b[36m";
+const GREEN: &str = "\x1b[32m";
+const YELLOW: &str = "\x1b[33m";
+const MAGENTA: &str = "\x1b[35m";
+const RED: &str = "\x1b[31m";
+const BLUE: &str = "\x1b[34m";
+const WHITE: &str = "\x1b[97m";
+
+/// Instruction category for color coding
+#[derive(Clone, Copy)]
+enum Category {
+    Section,
+    Memory,
+    Stack,
+    Arith,
+    Compare,
+    Control,
+    IO,
+    Data,
+}
+
+fn cat_color(cat: Category) -> &'static str {
+    match cat {
+        Category::Section => CYAN,
+        Category::Memory => GREEN,
+        Category::Stack => WHITE,
+        Category::Arith => YELLOW,
+        Category::Compare => MAGENTA,
+        Category::Control => RED,
+        Category::IO => BLUE,
+        Category::Data => GREEN,
     }
 }
 
-pub struct Disassembler {
-    depth: Vec<u64>,
-    pub native_functions: Table<String>,
-    ip: u64,
+// ── Flow arrow in the left margin ────────────────────────────────────
+#[derive(Clone)]
+struct FlowArrow {
+    from: usize,
+    to: usize,
+    column: usize,
+    is_loop: bool,      // backward jump
+    is_conditional: bool,
 }
 
 impl Disassembler {
-    pub fn dis_asm(&mut self, asm: Vec<Asm>) {
-        println!("main:");
-        for instruction in asm {
-            match instruction {
-                Asm::EXIT => println!("    exit"),
-                Asm::ALLOCGLOBBALS(v) => println!("    global: {v}"),
-                Asm::ALLOCLOCALS(v) => println!("    local: {v}"),
-                Asm::OFFSET(v, l) => println!("    offset: {v} {l}"),
-                Asm::STORE(v) => println!("    storel: {v}"),
-                Asm::STOREGLOBAL(v) => println!("    storeg: {v}"),
-                Asm::GET(v) => println!("    getl: {v}"),
-                Asm::GETGLOBAL(v) => println!("    getg: {v}"),
-                Asm::STACKREF(v) => println!("    Ref: {v}"),
-                Asm::FUNCTION(v) => println!("function: {v}"),
-                Asm::CLOSURE(v) => println!("closure: {v}"),
-                Asm::RET(v) => println!("    Ret: {v}"),
-                Asm::LABEL(v) => println!("lbl: {v}"),
-                Asm::JUMPIFFALSE(v) => println!("    jif: {v}"),
-                Asm::JMP(v) => println!("    jmp: {v}"),
-                Asm::BJMP(v) => println!("    bjmp: {v}"),
-                Asm::INTEGER(v) => println!("    pushi: {v}"),
-                Asm::BOOL(v) => println!("    pushb: {v}"),
-                Asm::STRING(v) => println!("    pushs: {v}"),
-                Asm::LIST(v) => println!("    list: {v}"),
-                Asm::FLOAT(v) => println!("    pushf: {v}"),
-                Asm::IADD => println!("    iadd"),
-                Asm::ISUB => println!("    isub"),
-                Asm::IDIV => println!("    idiv"),
-                Asm::IMUL => println!("    imul"),
-                Asm::FADD => println!("    fadd"),
-                Asm::FSUB => println!("    fsub"),
-                Asm::FDIV => println!("    fdiv"),
-                Asm::FMUL => println!("    fmul"),
-                Asm::PRINT => println!("    print"),
-                Asm::ASSIGN => println!("    assign"),
-                Asm::DCALL(v) => println!("    dcall: {v}"),
-                Asm::CALL => println!("    call"),
-                Asm::ILSS => println!("    ilss"),
-                Asm::IGTR => println!("    igtr"),
-                Asm::FLSS => println!("    flss"),
-                Asm::FGTR => println!("    fgtr"),
-                Asm::EQUALS => println!("    equ"),
-                Asm::FREE => println!("    free"),
-                Asm::CLONE => println!("    clone"),
-                Asm::IMODULO => println!("    imod"),
-                Asm::NOT => println!("    not"),
-                Asm::NEG => println!("    neg"),
-                Asm::PIN(_) => println!("    pin"),
-                Asm::LIN(_) => println!("    lin"),
-                Asm::TCALL(v) => println!("    tcall: {v}"),
-                Asm::AND => println!("    and"),
-                Asm::OR => println!("    or"),
-                Asm::NATIVE(v, _) => println!("    native: {v}"),
-                Asm::DUP => println!("    dup"),
-                Asm::POP => println!("    pop"),
-                Asm::NONE => println!("    none"),
-                Asm::ISSOME => println!("    issome"),
-                Asm::UNWRAP(_) => println!("    unwrap"),
-                Asm::CONCAT => println!("    concat"),
-                Asm::Char(v) => println!("    char: {v}"),
-                Asm::ERROR(_) => println!("    error"),
-                Asm::NEWSTRUCT(v) => println!("    newstruct: {v}"),
-                Asm::GETF(_) => println!("    getf"),
-                Asm::PINF(_) => println!("    pinf"),
-                Asm::LEN => println!("    len"),
+    // ══════════════════════════════════════════════════════════════════
+    //  Pretty ASM-level disassembly with control flow arrows
+    // ══════════════════════════════════════════════════════════════════
+
+    pub fn dis_asm(&self, asm: Vec<Asm>, info: &DebugInfo) {
+        // ── Phase 1: Build label → line-index map ────────────────
+        let mut label_line: HashMap<u64, usize> = HashMap::new();
+        for (i, inst) in asm.iter().enumerate() {
+            if let Asm::LABEL(id) = inst {
+                label_line.insert(*id, i);
             }
         }
-        println!();
-    }
 
-    fn out(&self, output: &str) {
-        for _ in 0..self.depth.len() {
-            print!("  ")
-        }
-        println!("{}", output)
-    }
-
-    fn next(&mut self, mut input: impl Iterator<Item = u8>) -> Option<u8> {
-        if let Some(index) = self.depth.last() {
-            if self.ip == *index {
-                self.depth.pop();
+        // ── Phase 2: Collect jump arrows ─────────────────────────
+        let mut arrows: Vec<FlowArrow> = Vec::new();
+        for (i, inst) in asm.iter().enumerate() {
+            let (target_label, conditional) = match inst {
+                Asm::JMP(lbl) => (Some(*lbl), false),
+                Asm::BJMP(lbl) => (Some(*lbl), false),
+                Asm::JUMPIFFALSE(lbl) => (Some(*lbl), true),
+                _ => (None, false),
+            };
+            if let Some(lbl) = target_label {
+                if let Some(&target_line) = label_line.get(&lbl) {
+                    arrows.push(FlowArrow {
+                        from: i,
+                        to: target_line,
+                        column: 0,
+                        is_loop: target_line < i,
+                        is_conditional: conditional,
+                    });
+                }
             }
         }
-        //println!("ip: {}", self.ip);
-        self.ip += 1;
-        input.next()
-    }
 
-    fn next_arr<const LEN: usize>(
-        &mut self,
-        mut input: impl Iterator<Item = u8>,
-    ) -> Option<[u8; LEN]> {
-        let mut out = [0; LEN];
-        for slot in &mut out {
-            *slot = self.next(&mut input)?;
+        // ── Phase 3: Assign non-overlapping columns ──────────────
+        arrows.sort_by_key(|a| {
+            let lo = a.from.min(a.to);
+            let hi = a.from.max(a.to);
+            hi - lo
+        });
+        let max_col = assign_columns(&mut arrows);
+
+        // ── Phase 4: Build margin lookup per line ────────────────
+        let n = asm.len();
+        let mut margin: Vec<Vec<(usize, char, &str)>> = vec![Vec::new(); n];
+
+        for arrow in &arrows {
+            let lo = arrow.from.min(arrow.to);
+            let hi = arrow.from.max(arrow.to);
+            let col = arrow.column;
+            let color = if arrow.is_loop {
+                MAGENTA
+            } else if arrow.is_conditional {
+                YELLOW
+            } else {
+                CYAN
+            };
+
+            // vertical bars in between
+            for idx in (lo + 1)..hi {
+                margin[idx].push((col, '│', color));
+            }
+
+            // corners at endpoints
+            if arrow.from < arrow.to {
+                // forward (downward) jump
+                margin[arrow.from].push((col, '┌', color));
+                margin[arrow.to].push((col, '└', color));
+            } else {
+                // backward (upward / loop) jump
+                margin[arrow.from].push((col, '└', color));
+                margin[arrow.to].push((col, '┌', color));
+            }
         }
-        Some(out)
-    }
 
-    pub fn dis(&mut self, mut input: std::vec::IntoIter<u8>) -> common::error::NovaResult<()> {
-        while let Some(code) = self.next(&mut input) {
-            print!("{} : ", self.ip);
-            match code {
-                Code::NONE => {
-                    self.out("None");
-                }
-                Code::LINDEX => self.out("LINDEX"),
-                Code::PINDEX => self.out("PINDEX"),
-                Code::JMP => {
-                    let int = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("JMP {}", int))
-                }
-                Code::BJMP => {
-                    let int = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("BJMP {}", int))
-                }
-                Code::RET => {
-                    let wr = self.next(&mut input).unwrap();
-                    self.out(&format!("Return with {}", wr));
-                }
-                Code::INTEGER => {
-                    let int = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Push I{}", int))
-                }
-                Code::STACKREF => {
-                    let int = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Stack ref {}", int))
-                }
-                Code::BYTE => {
-                    let int = self.next(&mut input).unwrap() as i64;
-                    self.out(&format!("Push I{}", int))
-                }
-                Code::FLOAT => {
-                    let fl = f64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Push Float {}", fl))
-                }
-                Code::IADD => self.out("iAdd"),
-                Code::ISUB => self.out("iSub"),
-                Code::IMUL => self.out("iMul"),
-                Code::IDIV => self.out("iDiv"),
-                Code::FADD => self.out("fAdd"),
-                Code::FSUB => self.out("fSub"),
-                Code::FMUL => self.out("fMul"),
-                Code::FDIV => self.out("fDiv"),
-                Code::STORE => {
-                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Store ID {}", index))
-                }
-                Code::GET => {
-                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("ID {}", index))
-                }
-                Code::ASSIGN => self.out("Assign"),
-                Code::ALLOCLOCALS => {
-                    let allocations = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Register allocation {}", allocations))
-                }
-                Code::OFFSET => {
-                    let allocations = i32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    let locals = i32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Offset {}, locals {}", allocations, locals))
-                }
-                Code::BLOCK => {
-                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.depth.push(self.ip + jump);
-                    self.out("Block:")
-                }
-                Code::CALL => self.out("Call"),
-                Code::DIRECTCALL => {
-                    let target = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Direct call {}", target))
-                }
-                Code::NEWLIST => {
-                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Create list: size of {}", size))
-                }
-                Code::TRUE => self.out("Push True"),
-                Code::FALSE => self.out("Push False"),
-                Code::STOREFAST => {
-                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("StoreFast ID {}", index))
-                }
-                Code::FUNCTION => {
-                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.depth.push(self.ip + jump);
-                    self.out("Function:")
-                }
-                Code::IGTR => self.out("Greater than"),
-                Code::ILSS => self.out("Less than"),
-                Code::JUMPIFFALSE => {
-                    let jump = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Jump if false: {}", jump))
-                }
-                Code::REC => self.out("Recursive call"),
-                Code::WHEN => self.out("When"),
-                Code::IF => self.out("If"),
-                Code::EQUALS => self.out("Equals"),
-                Code::IMODULO => self.out("Modulo"),
-                Code::REFID => {
-                    let index = u16::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Referance ID {}", index))
-                }
-
-                Code::CLOSURE => {
-                    let jump = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.depth.push(self.ip + jump);
-                    self.out("Closure:")
-                }
-
-                Code::CID => {
-                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Closure ID {}", index))
-                }
-                Code::PRINT => self.out("Print"),
-
-                Code::STRING => {
-                    let mut string = vec![];
-                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    for _ in 0..size {
-                        string.push(self.next(&mut input).unwrap());
-                    }
-                    let string = match String::from_utf8(string) {
-                        Ok(ok) => ok,
-                        Err(e) => format!("<invalid UTF-8: {}>", e),
-                    };
-                    self.out(&format!("Push String: {}", string))
-                }
-
-                Code::FOR => self.out("For"),
-
-                Code::RANGE => self.out("Range"),
-                Code::NATIVE => {
-                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-
-                    if let Some(function) = self.native_functions.retreive(index as usize) {
-                        self.out(&format!("Function: {}", function))
+        // ── Phase 5: Identify function body ranges ───────────────
+        let mut fn_ranges: Vec<(usize, usize, u64, bool)> = Vec::new();
+        for (i, inst) in asm.iter().enumerate() {
+            match inst {
+                Asm::FUNCTION(lbl) => {
+                    if let Some(&end) = label_line.get(lbl) {
+                        fn_ranges.push((i, end, *lbl, false));
                     }
                 }
-                Code::ALLOCATEGLOBAL => {
-                    let size = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Global allocation {}", size))
+                Asm::CLOSURE(lbl) => {
+                    if let Some(&end) = label_line.get(lbl) {
+                        fn_ranges.push((i, end, *lbl, true));
+                    }
                 }
-
-                Code::GETGLOBAL => {
-                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-
-                    self.out(&format!("Global ID {}", index))
-                }
-
-                Code::STOREGLOBAL => {
-                    let index = u32::from_le_bytes(self.next_arr(&mut input).unwrap());
-
-                    self.out(&format!("Store Global ID {}", index))
-                }
-
-                Code::CHAR => {
-                    let c = self.next(&mut input).unwrap();
-
-                    self.out(&format!("Push Char {}", c as char))
-                }
-
-                Code::POP => self.out("Pop"),
-                Code::NEG => self.out("Neg"),
-                Code::BREAK => self.out("Break"),
-                Code::NEWBINDING => self.out("Create Bindings"),
-                Code::POPBINDING => self.out("Remove Bindings"),
-                Code::GETBIND => {
-                    let index = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-
-                    self.out(&format!("Get Binding {}", index))
-                }
-                Code::STOREBIND => self.out("Store New Binding"),
-                Code::LOOP => self.out("Loop"),
-                Code::NEWSTRUCT => {
-                    let size = u64::from_le_bytes(self.next_arr(&mut input).unwrap());
-                    self.out(&format!("Create struct: {} fields", size))
-                }
-                Code::GETF => self.out("Get Field"),
-                Code::PINF => self.out("Put In Field"),
-                Code::LEN => self.out("Len"),
                 _ => {}
             }
         }
 
-        Ok(())
+        // ── Phase 6: Print ───────────────────────────────────────
+        let margin_width = if max_col == 0 { 0 } else { max_col + 1 };
+
+        println!(
+            "\n{}{}══════════════════════════════════════════════════════════════{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}  Nova Disassembly  ({} instructions){}",
+            BOLD, CYAN, asm.len(), RESET
+        );
+        println!(
+            "{}{}══════════════════════════════════════════════════════════════{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}  Legend: {}│{} loop   {}│{} branch   {}│{} jump{}",
+            DIM, MAGENTA, RESET, YELLOW, RESET, CYAN, RESET, RESET
+        );
+        println!();
+
+        for (i, inst) in asm.iter().enumerate() {
+            let m = render_margin(&margin[i], margin_width);
+            let depth = fn_ranges.iter().filter(|(s, e, _, _)| i > *s && i < *e).count();
+            let nest = "│  ".repeat(depth);
+
+            match inst {
+                Asm::LABEL(id) => {
+                    let name = info.label_name(*id);
+                    let is_fn_end = fn_ranges.iter().any(|(_, end, lbl, _)| *lbl == *id && *end == i);
+                    if is_fn_end {
+                        let close = "│  ".repeat(depth.saturating_sub(1));
+                        println!(
+                            "{}  {}{}{}└── end {}{}",
+                            m, DIM, CYAN, close, name, RESET
+                        );
+                    } else {
+                        println!(
+                            "{}  {}{}{}{}:{} {}; label {}{}",
+                            m, BOLD, CYAN, nest, name, RESET, DIM, id, RESET
+                        );
+                    }
+                }
+                Asm::FUNCTION(lbl) => {
+                    let name = info.label_name(*lbl);
+                    println!(
+                        "{}  {}{}{}┌── fn {} ──────────────────{}",
+                        m, BOLD, CYAN, nest, name, RESET
+                    );
+                }
+                Asm::CLOSURE(lbl) => {
+                    let name = info.label_name(*lbl);
+                    println!(
+                        "{}  {}{}{}┌── closure {} ─────────────{}",
+                        m, BOLD, MAGENTA, nest, name, RESET
+                    );
+                }
+                _ => {
+                    let (mnemonic, operand, cat) = decode_asm(inst, info);
+                    let color = cat_color(cat);
+                    if operand.is_empty() {
+                        println!(
+                            "{} {}{}{:>4}  {}{:<16}{}",
+                            m, DIM, nest, i, color, mnemonic, RESET
+                        );
+                    } else {
+                        println!(
+                            "{} {}{}{:>4}  {}{:<16} {}{}{}",
+                            m, DIM, nest, i, color, mnemonic, WHITE, operand, RESET
+                        );
+                    }
+                }
+            }
+        }
+
+        // ── Summary ──────────────────────────────────────────────
+        println!(
+            "\n{}{}──────────────────────────────────────────────────────────────{}",
+            DIM, CYAN, RESET
+        );
+        let (mut n_fn, mut n_cls, mut n_nat, mut n_lbl) = (0, 0, 0, 0);
+        for inst in &asm {
+            match inst {
+                Asm::FUNCTION(_) => n_fn += 1,
+                Asm::CLOSURE(_) => n_cls += 1,
+                Asm::NATIVE(_, _) => n_nat += 1,
+                Asm::LABEL(_) => n_lbl += 1,
+                _ => {}
+            }
+        }
+        println!(
+            "  {}functions: {}  {}closures: {}  {}natives: {}  {}labels: {}{}",
+            WHITE, n_fn, DIM, n_cls, DIM, n_nat, DIM, n_lbl, RESET
+        );
+        println!("  {}total instructions: {}{}", WHITE, asm.len(), RESET);
+
+        // Global table
+        if !info.global_names.is_empty() {
+            println!("\n{}{}  Globals:{}",  BOLD, CYAN, RESET);
+            let mut globals: Vec<_> = info.global_names.iter().collect();
+            globals.sort_by_key(|(k, _)| *k);
+            for (idx, name) in &globals {
+                println!("    {}[{:>3}]{} {}", DIM, idx, RESET, name);
+            }
+        }
+
+        // Reading guide
+        println!("\n{}{}  How to read:{}", BOLD, CYAN, RESET);
+        println!("{}  Left margin: control flow arrows show where jumps go.", DIM);
+        println!("    {}│{} = loop (backward)   {}│{} = conditional branch   {}│{} = forward jump",
+            MAGENTA, RESET, YELLOW, RESET, CYAN, RESET);
+        println!("{}  Nesting: {}│  {}= function/closure body boundary", DIM, CYAN, RESET);
+        println!("{}  Operands show variable/function names when known.", DIM);
+        println!("  {}store/get{}  show local variable names", GREEN, RESET);
+        println!("  {}storeg/getg/dcall{}  show global names (functions, variables)", GREEN, RESET);
+        println!("  {}jmp/bjmp/jif{}  show target label names with arrows{}", RED, RESET, RESET);
+        println!();
+    }
+}
+
+// ── Column assignment ────────────────────────────────────────────────
+fn assign_columns(arrows: &mut [FlowArrow]) -> usize {
+    let mut max_col = 0usize;
+    let mut used: Vec<(usize, usize, usize)> = Vec::new();
+
+    for arrow in arrows.iter_mut() {
+        let lo = arrow.from.min(arrow.to);
+        let hi = arrow.from.max(arrow.to);
+        let mut col = 0;
+        loop {
+            let conflicts = used.iter().any(|&(ulo, uhi, ucol)| {
+                ucol == col && !(hi < ulo || lo > uhi)
+            });
+            if !conflicts { break; }
+            col += 1;
+        }
+        arrow.column = col;
+        if col > max_col { max_col = col; }
+        used.push((lo, hi, col));
+    }
+    max_col
+}
+
+// ── Render the margin for one line ──────────────────────────────────
+fn render_margin(
+    chars_at_line: &[(usize, char, &str)],
+    total_slots: usize,
+) -> String {
+    if total_slots == 0 {
+        return String::new();
+    }
+    let mut slots: Vec<Option<(char, &str)>> = vec![None; total_slots];
+    for &(col, ch, color) in chars_at_line {
+        if col < total_slots {
+            slots[col] = Some((ch, color));
+        }
+    }
+    let mut out = String::new();
+    for i in (0..total_slots).rev() {
+        if let Some((ch, color)) = slots[i] {
+            out.push_str(color);
+            out.push(ch);
+            out.push_str(RESET);
+        } else {
+            out.push(' ');
+        }
+    }
+    out
+}
+
+// ── Decode ASM instruction to (mnemonic, operand, category) ─────────
+fn decode_asm(inst: &Asm, info: &DebugInfo) -> (&'static str, String, Category) {
+    match inst {
+        Asm::EXIT => ("exit", String::new(), Category::Control),
+        Asm::ALLOCGLOBBALS(v) => ("alloc_global", format!("{}", v), Category::Memory),
+        Asm::ALLOCLOCALS(v) => ("alloc_locals", format!("{}", v), Category::Memory),
+        Asm::OFFSET(args, locals) => (
+            "offset",
+            format!("args={}, locals={}", args, locals),
+            Category::Memory,
+        ),
+        Asm::STORE(v) => {
+            let name = info.local_name(0, *v).unwrap_or_default();
+            if name.is_empty() {
+                ("store", format!("local[{}]", v), Category::Memory)
+            } else {
+                ("store", format!("{} {}(local[{}]){}", name, DIM, v, RESET), Category::Memory)
+            }
+        }
+        Asm::STOREGLOBAL(v) => {
+            let name = info.global_name(*v);
+            ("storeg", format!("{} {}(global[{}]){}", name, DIM, v, RESET), Category::Memory)
+        }
+        Asm::GET(v) => {
+            let name = info.local_name(0, *v).unwrap_or_default();
+            if name.is_empty() {
+                ("get", format!("local[{}]", v), Category::Memory)
+            } else {
+                ("get", format!("{} {}(local[{}]){}", name, DIM, v, RESET), Category::Memory)
+            }
+        }
+        Asm::GETGLOBAL(v) => {
+            let name = info.global_name(*v);
+            ("getg", format!("{} {}(global[{}]){}", name, DIM, v, RESET), Category::Memory)
+        }
+        Asm::STACKREF(v) => ("stackref", format!("{}", v), Category::Memory),
+        Asm::ASSIGN => ("assign", String::new(), Category::Memory),
+        Asm::FUNCTION(_) => ("function", String::new(), Category::Section),
+        Asm::CLOSURE(_) => ("closure", String::new(), Category::Section),
+        Asm::RET(true) => ("ret", "(value)".into(), Category::Control),
+        Asm::RET(false) => ("ret", String::new(), Category::Control),
+        Asm::LABEL(v) => ("label", format!("{}", v), Category::Section),
+        Asm::JUMPIFFALSE(v) => {
+            let name = info.label_name(*v);
+            ("jif", format!("→ {}", name), Category::Control)
+        }
+        Asm::JMP(v) => {
+            let name = info.label_name(*v);
+            ("jmp", format!("→ {}", name), Category::Control)
+        }
+        Asm::BJMP(v) => {
+            let name = info.label_name(*v);
+            ("bjmp", format!("↺ {}", name), Category::Control)
+        }
+        Asm::INTEGER(v) => ("push_i", format!("{}", v), Category::Stack),
+        Asm::BOOL(true) => ("push_true", String::new(), Category::Stack),
+        Asm::BOOL(false) => ("push_false", String::new(), Category::Stack),
+        Asm::STRING(v) => {
+            let display = if v.len() > 40 {
+                format!("\"{}...\"", &v[..37])
+            } else {
+                format!("\"{}\"", v)
+            };
+            ("push_s", display, Category::Stack)
+        }
+        Asm::LIST(v) => ("newlist", format!("size={}", v), Category::Data),
+        Asm::FLOAT(v) => ("push_f", format!("{}", v), Category::Stack),
+        Asm::Char(v) => ("push_c", format!("'{}'", v), Category::Stack),
+        Asm::IADD => ("iadd", String::new(), Category::Arith),
+        Asm::ISUB => ("isub", String::new(), Category::Arith),
+        Asm::IDIV => ("idiv", String::new(), Category::Arith),
+        Asm::IMUL => ("imul", String::new(), Category::Arith),
+        Asm::IMODULO => ("imod", String::new(), Category::Arith),
+        Asm::FADD => ("fadd", String::new(), Category::Arith),
+        Asm::FSUB => ("fsub", String::new(), Category::Arith),
+        Asm::FDIV => ("fdiv", String::new(), Category::Arith),
+        Asm::FMUL => ("fmul", String::new(), Category::Arith),
+        Asm::ILSS => ("ilss", String::new(), Category::Compare),
+        Asm::IGTR => ("igtr", String::new(), Category::Compare),
+        Asm::FLSS => ("flss", String::new(), Category::Compare),
+        Asm::FGTR => ("fgtr", String::new(), Category::Compare),
+        Asm::EQUALS => ("equals", String::new(), Category::Compare),
+        Asm::NOT => ("not", String::new(), Category::Compare),
+        Asm::NEG => ("neg", String::new(), Category::Arith),
+        Asm::AND => ("and", String::new(), Category::Compare),
+        Asm::OR => ("or", String::new(), Category::Compare),
+        Asm::CONCAT => ("concat", String::new(), Category::IO),
+        Asm::DUP => ("dup", String::new(), Category::Stack),
+        Asm::POP => ("pop", String::new(), Category::Stack),
+        Asm::PRINT => ("print", String::new(), Category::IO),
+        Asm::DCALL(v) => {
+            let name = info.global_name(*v);
+            ("dcall", format!("{}", name), Category::Control)
+        }
+        Asm::TCALL(v) => {
+            let name = info.global_name(*v);
+            ("tcall", format!("{}", name), Category::Control)
+        }
+        Asm::CALL => ("call", String::new(), Category::Control),
+        Asm::PIN(_) => ("pindex", String::new(), Category::Data),
+        Asm::LIN(_) => ("lindex", String::new(), Category::Data),
+        Asm::NATIVE(v, _) => {
+            let name = info.native_name(*v);
+            ("native", format!("{}()", name), Category::IO)
+        }
+        Asm::NONE => ("none", String::new(), Category::Stack),
+        Asm::ISSOME => ("issome", String::new(), Category::Compare),
+        Asm::UNWRAP(_) => ("unwrap", String::new(), Category::Stack),
+        Asm::FREE => ("free", String::new(), Category::Memory),
+        Asm::CLONE => ("clone", String::new(), Category::Memory),
+        Asm::NEWSTRUCT(v) => ("newstruct", format!("fields={}", v), Category::Data),
+        Asm::GETF(_) => ("getf", String::new(), Category::Data),
+        Asm::PINF(_) => ("setf", String::new(), Category::Data),
+        Asm::LEN => ("len", String::new(), Category::IO),
+        Asm::ERROR(_) => ("error", String::new(), Category::Control),
     }
 }

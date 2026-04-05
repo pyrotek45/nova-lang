@@ -21,6 +21,7 @@ import super.super.std.tween
 import super.super.std.vec2
 import super.super.std.input
 import super.super.std.camera
+import super.super.std.particle
 
 // ── Window / world ────────────────────────────────────────────────────────────
 let SW = 800      // screen width
@@ -69,6 +70,57 @@ let waveTimer  = Timer::repeating(3.0)
 // Tween: red screen-flash alpha on taking damage
 let hitFlash   = Tween::linear(180.0, 0.0, 0.35)
 
+// ── Signals — decoupled event handling ────────────────────────────────────────
+// Game events: connect once, fire from wherever they happen.
+let onEnemyKill = VoidSignal::new()       // fires when an enemy is destroyed
+let onWaveStart = VoidSignal::new()       // fires when a new wave begins
+let onPlayerHit = VoidSignal::new()       // fires when player takes damage
+
+// Score: +10 per kill + wave bonus
+onEnemyKill.connect(|| {
+    score.value += 10 + wave.value * 2
+})
+
+// Camera shake on every enemy kill
+onEnemyKill.connect(|| {
+    cam.shake(8.0, 0.2)
+})
+
+// ── Particle emitters ─────────────────────────────────────────────────────────
+// Explosion burst — reused for each enemy kill (moveTo + emit)
+let deathFx = Emitter::explosion(0.0, 0.0)
+deathFx.maxParticles = 800
+deathFx.setColorRange(255, 80, 30, 255, 220, 80)
+
+// Muzzle flash — tiny fast sparks when shooting
+let muzzleFx = Emitter::sparks(0.0, 0.0)
+muzzleFx.maxParticles = 200
+muzzleFx.minSpeed = 80.0
+muzzleFx.maxSpeed = 250.0
+muzzleFx.minLife = 0.05
+muzzleFx.maxLife = 0.15
+muzzleFx.minSize = 1.0
+muzzleFx.maxSize = 2.0
+muzzleFx.gravityY = 0.0
+muzzleFx.setColor(255, 220, 60)
+
+// Player thruster — gentle trail behind the player
+let thrusterFx = Emitter::new(0.0, 0.0)
+thrusterFx.maxParticles = 300
+thrusterFx.gravityY = 0.0
+thrusterFx.gravityX = 0.0
+thrusterFx.baseAngle = 1.5708
+thrusterFx.spreadAngle = 0.6
+thrusterFx.minSpeed = 20.0
+thrusterFx.maxSpeed = 60.0
+thrusterFx.minLife = 0.1
+thrusterFx.maxLife = 0.4
+thrusterFx.minSize = 1.0
+thrusterFx.maxSize = 3.0
+thrusterFx.fadeOut = true
+thrusterFx.shrink = true
+thrusterFx.setColorRange(60, 150, 255, 120, 220, 255)
+
 // ── InputMap bindings ─────────────────────────────────────────────────────────
 let keys = InputMap::new()
 keys.bindKey("up",    "KEY_W")
@@ -104,6 +156,31 @@ fn drawGrid(ox: Int, oy: Int) {
 }
 
 // ── Helper: reset / init game state ──────────────────────────────────────────
+
+// ── Helper: spawn scattered brick walls ──────────────────────────────────────
+fn spawnWalls() {
+    // Place wall clusters around the world
+    let wallW = 80.0
+    let wallH = 20.0
+
+    // A few strategic walls spread through the map
+    let i = 0
+    while i < 20 {
+        let wx = Cast::float(random(200, WW - 200)).unwrap()
+        let wy = Cast::float(random(200, WH - 200)).unwrap()
+        // Random orientation: horizontal or vertical
+        let bw = wallW
+        let bh = wallH
+        if random(0, 1) == 1 {
+            bw = wallH
+            bh = wallW
+        }
+        let w = world.spawnFull(wx, wy, 0.0, 0.0, bw, bh, "brick_wall", 0.0)
+        let _ = w
+        i += 1
+    }
+}
+
 fn resetGame() {
     score.value       = 0
     wave.value        = 1
@@ -121,6 +198,9 @@ fn resetGame() {
     // Point camera at player
     cam.pos.x = cx - Cast::float(SW / 2).unwrap()
     cam.pos.y = cy - Cast::float(SH / 2).unwrap()
+
+    // Place some walls around the world
+    spawnWalls()
 }
 
 // ── Helper: spawn a wave of enemies ──────────────────────────────────────────
@@ -207,6 +287,14 @@ fn makePlayScene() -> Scene {
                 let p = getPlayer()
                 p.pos.x += move.x
                 p.pos.y += move.y
+
+                // Thruster trail behind player
+                let pc = p.center()
+                thrusterFx.moveTo(pc.x, pc.y)
+                let moveAngle = dir.normalized().angle()
+                thrusterFx.baseAngle = moveAngle + 3.14159
+                thrusterFx.emit(2)
+
                 // Clamp to world bounds
                 if p.pos.x < 0.0 { p.pos.x = 0.0 }
                 if p.pos.y < 0.0 { p.pos.y = 0.0 }
@@ -239,6 +327,10 @@ fn makePlayScene() -> Scene {
                     let b     = world.spawnFull(pPos.x, pPos.y, vel.x, vel.y,
                                                br, br, "bullet", 0.0)
                     let _ = b
+                    // Muzzle flash at player position
+                    muzzleFx.moveTo(pPos.x, pPos.y)
+                    muzzleFx.baseAngle = aimDir.normalized().angle()
+                    muzzleFx.emit(5)
                 }
             }
 
@@ -273,10 +365,14 @@ fn makePlayScene() -> Scene {
                 for ei in 0..enemies.len() {
                     if !enemies[ei].alive { continue }
                     if bullets[bi].overlapCircle(enemies[ei]) {
+                        // Death explosion particles at enemy center
+                        let eDead = enemies[ei].center()
+                        deathFx.moveTo(eDead.x, eDead.y)
+                        deathFx.emit(20)
+
                         bullets[bi].alive = false
                         enemies[ei].alive = false
-                        score.value += 10 + wave.value * 2
-                        cam.shake(8.0, 0.2)
+                        onEnemyKill.emit()
                     }
                 }
             }
@@ -288,6 +384,7 @@ fn makePlayScene() -> Scene {
                 if allEnemies[ei].overlapCircle(p) {
                     allEnemies[ei].alive = false
                     playerHp.value -= 1
+                    onPlayerHit.emit()
                     hitFlash.reset()
                     cam.shake(14.0, 0.35)
                     if playerHp.value <= 0 {
@@ -298,17 +395,23 @@ fn makePlayScene() -> Scene {
                 }
             }
 
-            // ── Wave timer — spawn next wave ──────────────────────────────
+            // ── Wave check — spawn next wave when all enemies cleared ────
             waveTimer.update(dt)
             if waveTimer.ready() {
                 if world.countAlive("enemy") == 0 {
                     wave.value += 1
+                    spawnWave()
+                    onWaveStart.emit()
                 }
-                spawnWave()
             }
 
             // ── Purge dead entities ───────────────────────────────────────
             world.update(0.0)
+
+            // ── Update all particle emitters ──────────────────────────────
+            deathFx.update(dt)
+            muzzleFx.update(dt)
+            thrusterFx.update(dt)
 
             // ── Draw ──────────────────────────────────────────────────────
             let ox = Cast::int(cam.pos.x).unwrap()
@@ -350,6 +453,11 @@ fn makePlayScene() -> Scene {
             let psy = Cast::int(pSp.y).unwrap() + PLAYER_RADIUS
             raylib::drawCircle(psx, psy, PLAYER_RADIUS, PLAYER_COLOR)
             raylib::drawCircleLines(psx, psy, PLAYER_RADIUS + 3, (120, 230, 255))
+
+            // ── Draw particles (world-space, offset by camera) ────────────
+            deathFx.drawOffset(cam.pos.x, cam.pos.y)
+            muzzleFx.drawOffset(cam.pos.x, cam.pos.y)
+            thrusterFx.drawOffset(cam.pos.x, cam.pos.y)
 
             // Player aim line toward mouse
             let mx = Cast::float(InputMap::mouseX()).unwrap()

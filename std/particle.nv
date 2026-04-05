@@ -1,0 +1,392 @@
+// ============================================================
+// std/particle.nv  — Simple particle system for games
+// ============================================================
+//
+// Usage:  import super.std.particle
+//         import super.std.vec2
+//
+// A reusable particle system built on Vec2 and the entity
+// pattern. Particles are simple structs with position,
+// velocity, color, and lifetime. An Emitter manages a pool
+// of particles and handles spawning, updating, and drawing.
+//
+// ── Particle ──────────────────────────────────────────────
+//
+//   Particle fields:
+//     pos:   Vec2       -- current position
+//     vel:   Vec2       -- velocity per second
+//     life:  Float      -- remaining lifetime in seconds
+//     maxLife: Float     -- initial lifetime (for fade calc)
+//     size:  Float      -- draw radius
+//     r, g, b: Int      -- base color (0–255)
+//
+// ── Emitter ───────────────────────────────────────────────
+//
+//   Emitter manages a pool of particles.
+//
+//   Emitter::new(x, y) -> Emitter
+//     .maxParticles      -- Int, pool cap (default 1000)
+//     .gravityX          -- Float, gravity X per second (default 0)
+//     .gravityY          -- Float, gravity Y per second (default 200)
+//     .minLife / .maxLife -- Float, lifetime range (0.3–1.5)
+//     .minSpeed / .maxSpeed -- Float, initial speed range
+//     .minSize / .maxSize -- Float, particle size range
+//     .spreadAngle       -- Float, spread in radians (default PI*2)
+//     .baseAngle         -- Float, center direction (default -PI/2 = up)
+//     .fadeOut            -- Bool, alpha-fade as life expires (default true)
+//     .shrink            -- Bool, shrink size as life expires (default false)
+//
+//   Methods:
+//     .emit(count)       -- spawn count particles
+//     .emitAt(x, y, n)   -- spawn at specific position
+//     .update(dt)        -- advance physics, prune dead
+//     .draw()            -- draw all living particles
+//     .count() -> Int    -- number of living particles
+//     .clear()           -- kill all
+//     .setColor(r,g,b)   -- set base color for new particles
+//     .setColorRange(r1,g1,b1,r2,g2,b2)  -- random color range
+//
+// ── Presets ───────────────────────────────────────────────
+//
+//   Emitter::fountain(x, y)    -- upward spray
+//   Emitter::explosion(x, y)   -- omni-directional burst
+//   Emitter::fire(x, y)        -- flame effect
+//   Emitter::snow(x, y)        -- slow falling
+//   Emitter::sparks(x, y)      -- fast bright sparks
+//
+// ── Example ───────────────────────────────────────────────
+//
+//   import super.std.particle
+//   import super.std.vec2
+//
+//   raylib::init("Particles", 800, 600, 60)
+//   let em = Emitter::fountain(400.0, 500.0)
+//
+//   while raylib::rendering() {
+//       let dt = Cast::float(raylib::getFrameTime()).unwrap()
+//       raylib::clear((10, 10, 20))
+//       em.emit(5)
+//       em.update(dt)
+//       em.draw()
+//   }
+//
+// ============================================================
+
+module particle
+
+import vec2
+import math
+
+// ── Particle ──────────────────────────────────────────────────────────────────
+
+struct Particle {
+    pos:     Vec2,
+    vel:     Vec2,
+    life:    Float,
+    maxLife: Float,
+    size:    Float,
+    r:       Int,
+    g:       Int,
+    b:       Int,
+}
+
+fn extends isAlive(p: Particle) -> Bool {
+    return p.life > 0.0
+}
+
+// Returns 1.0 at birth, 0.0 at death
+fn extends lifeRatio(p: Particle) -> Float {
+    if p.maxLife <= 0.0 { return 0.0 }
+    let ratio = p.life / p.maxLife
+    if ratio < 0.0 { return 0.0 }
+    if ratio > 1.0 { return 1.0 }
+    return ratio
+}
+
+// ── Emitter ───────────────────────────────────────────────────────────────────
+
+struct Emitter {
+    x: Float,
+    y: Float,
+    particles: [Particle],
+    maxParticles: Int,
+    gravityX: Float,
+    gravityY: Float,
+    minLife: Float,
+    maxLife: Float,
+    minSpeed: Float,
+    maxSpeed: Float,
+    minSize: Float,
+    maxSize: Float,
+    spreadAngle: Float,
+    baseAngle: Float,
+    fadeOut: Bool,
+    shrink: Bool,
+    colorR1: Int, colorG1: Int, colorB1: Int,
+    colorR2: Int, colorG2: Int, colorB2: Int,
+}
+
+fn extends(Emitter) new(x: Float, y: Float) -> Emitter {
+    return Emitter {
+        x: x, y: y,
+        particles: []: Particle,
+        maxParticles: 1000,
+        gravityX: 0.0,
+        gravityY: 200.0,
+        minLife: 0.3,
+        maxLife: 1.5,
+        minSpeed: 50.0,
+        maxSpeed: 200.0,
+        minSize: 2.0,
+        maxSize: 5.0,
+        spreadAngle: 6.2832,
+        baseAngle: -1.5708,
+        fadeOut: true,
+        shrink: false,
+        colorR1: 255, colorG1: 100, colorB1: 50,
+        colorR2: 255, colorG2: 200, colorB2: 100,
+    }
+}
+
+fn extends setColor(em: Emitter, r: Int, g: Int, b: Int) {
+    em.colorR1 = r
+    em.colorG1 = g
+    em.colorB1 = b
+    em.colorR2 = r
+    em.colorG2 = g
+    em.colorB2 = b
+}
+
+fn extends setColorRange(em: Emitter, r1: Int, g1: Int, b1: Int, r2: Int, g2: Int, b2: Int) {
+    em.colorR1 = r1
+    em.colorG1 = g1
+    em.colorB1 = b1
+    em.colorR2 = r2
+    em.colorG2 = g2
+    em.colorB2 = b2
+}
+
+// Helper: random float in [lo, hi]
+fn randF(lo: Float, hi: Float) -> Float {
+    let scale = 10000
+    let r = random(0, scale)
+    let t = Cast::float(r).unwrap() / Cast::float(scale).unwrap()
+    return lo + t * (hi - lo)
+}
+
+// Spawn count particles at emitter position
+fn extends emit(em: Emitter, count: Int) {
+    for i in 0..count {
+        if em.particles.len() >= em.maxParticles { break }
+
+        let angle = em.baseAngle + randF(0.0 - em.spreadAngle / 2.0, em.spreadAngle / 2.0)
+        let speed = randF(em.minSpeed, em.maxSpeed)
+        let life = randF(em.minLife, em.maxLife)
+        let size = randF(em.minSize, em.maxSize)
+
+        let vx = speed * angle.cos()
+        let vy = speed * angle.sin()
+
+        let r = random(em.colorR1.min(em.colorR2), em.colorR1.max(em.colorR2))
+        let g = random(em.colorG1.min(em.colorG2), em.colorG1.max(em.colorG2))
+        let b = random(em.colorB1.min(em.colorB2), em.colorB1.max(em.colorB2))
+
+        em.particles.push(Particle {
+            pos: Vec2::new(em.x, em.y),
+            vel: Vec2::new(vx, vy),
+            life: life,
+            maxLife: life,
+            size: size,
+            r: r, g: g, b: b,
+        })
+    }
+}
+
+// Spawn at a specific position
+fn extends emitAt(em: Emitter, x: Float, y: Float, count: Int) {
+    let oldX = em.x
+    let oldY = em.y
+    em.x = x
+    em.y = y
+    em.emit(count)
+    em.x = oldX
+    em.y = oldY
+}
+
+// Update all particles: integrate velocity, apply gravity, age, prune dead
+fn extends update(em: Emitter, dt: Float) {
+    let i = 0
+    while i < em.particles.len() {
+        let p = em.particles[i]
+
+        // Physics
+        p.vel.x += em.gravityX * dt
+        p.vel.y += em.gravityY * dt
+        p.pos.x += p.vel.x * dt
+        p.pos.y += p.vel.y * dt
+        p.life -= dt
+
+        // Remove dead
+        if p.life <= 0.0 {
+            em.particles.remove(i)
+        } else {
+            i += 1
+        }
+    }
+}
+
+// Draw all living particles as circles
+fn extends draw(em: Emitter) {
+    for p in em.particles {
+        let ratio = p.lifeRatio()
+
+        // Fade color
+        let dr = if em.fadeOut { Cast::int(Cast::float(p.r).unwrap() * ratio).unwrap() } else { p.r }
+        let dg = if em.fadeOut { Cast::int(Cast::float(p.g).unwrap() * ratio).unwrap() } else { p.g }
+        let db = if em.fadeOut { Cast::int(Cast::float(p.b).unwrap() * ratio).unwrap() } else { p.b }
+
+        // Shrink size
+        let sz = if em.shrink { p.size * ratio } else { p.size }
+        let drawSize = Cast::int(sz).unwrap()
+        if drawSize < 1 { drawSize = 1 }
+
+        let px = Cast::int(p.pos.x).unwrap()
+        let py = Cast::int(p.pos.y).unwrap()
+        raylib::drawCircle(px, py, drawSize, (dr, dg, db))
+    }
+}
+
+// Number of living particles
+fn extends count(em: Emitter) -> Int {
+    return em.particles.len()
+}
+
+// Kill all particles
+fn extends clear(em: Emitter) {
+    em.particles = []: Particle
+}
+
+// ── Follow / Position — dynamic position tracking ─────────────────────────────
+
+// Move emitter to specific position (call each frame for dynamic follow)
+// Example:
+//   let p = getPlayer()
+//   em.moveTo(p.pos.x, p.pos.y)
+//   em.emit(3)
+fn extends moveTo(em: Emitter, nx: Float, ny: Float) {
+    em.x = nx
+    em.y = ny
+}
+
+// Draw with camera offset (for world-space particle systems)
+// camX, camY = camera top-left position in world coords
+fn extends drawOffset(em: Emitter, camX: Float, camY: Float) {
+    for p in em.particles {
+        let ratio = p.lifeRatio()
+
+        let dr = if em.fadeOut { Cast::int(Cast::float(p.r).unwrap() * ratio).unwrap() } else { p.r }
+        let dg = if em.fadeOut { Cast::int(Cast::float(p.g).unwrap() * ratio).unwrap() } else { p.g }
+        let db = if em.fadeOut { Cast::int(Cast::float(p.b).unwrap() * ratio).unwrap() } else { p.b }
+
+        let sz = if em.shrink { p.size * ratio } else { p.size }
+        let drawSize = Cast::int(sz).unwrap()
+        if drawSize < 1 { drawSize = 1 }
+
+        let px = Cast::int(p.pos.x - camX).unwrap()
+        let py = Cast::int(p.pos.y - camY).unwrap()
+        raylib::drawCircle(px, py, drawSize, (dr, dg, db))
+    }
+}
+
+// ── Presets ────────────────────────────────────────────────────────────────────
+
+// Upward spray — classic fountain
+fn extends(Emitter) fountain(x: Float, y: Float) -> Emitter {
+    let em = Emitter::new(x, y)
+    em.gravityY = 300.0
+    em.baseAngle = -1.5708
+    em.spreadAngle = 1.0
+    em.minSpeed = 150.0
+    em.maxSpeed = 350.0
+    em.minLife = 0.5
+    em.maxLife = 1.5
+    em.minSize = 2.0
+    em.maxSize = 5.0
+    em.fadeOut = true
+    em.shrink = false
+    em.setColorRange(50, 100, 255, 100, 200, 255)
+    return em
+}
+
+// Omni-directional burst
+fn extends(Emitter) explosion(x: Float, y: Float) -> Emitter {
+    let em = Emitter::new(x, y)
+    em.gravityY = 50.0
+    em.baseAngle = 0.0
+    em.spreadAngle = 6.2832
+    em.minSpeed = 100.0
+    em.maxSpeed = 400.0
+    em.minLife = 0.3
+    em.maxLife = 1.0
+    em.minSize = 2.0
+    em.maxSize = 6.0
+    em.fadeOut = true
+    em.shrink = true
+    em.setColorRange(255, 100, 30, 255, 220, 80)
+    return em
+}
+
+// Flame effect — upward, warm colors
+fn extends(Emitter) fire(x: Float, y: Float) -> Emitter {
+    let em = Emitter::new(x, y)
+    em.gravityY = -50.0
+    em.baseAngle = -1.5708
+    em.spreadAngle = 0.8
+    em.minSpeed = 30.0
+    em.maxSpeed = 100.0
+    em.minLife = 0.3
+    em.maxLife = 0.8
+    em.minSize = 3.0
+    em.maxSize = 8.0
+    em.fadeOut = true
+    em.shrink = true
+    em.setColorRange(255, 60, 0, 255, 200, 0)
+    return em
+}
+
+// Slow falling snow
+fn extends(Emitter) snow(x: Float, y: Float) -> Emitter {
+    let em = Emitter::new(x, y)
+    em.gravityY = 20.0
+    em.gravityX = 0.0
+    em.baseAngle = 1.5708
+    em.spreadAngle = 1.0
+    em.minSpeed = 10.0
+    em.maxSpeed = 40.0
+    em.minLife = 2.0
+    em.maxLife = 5.0
+    em.minSize = 2.0
+    em.maxSize = 4.0
+    em.fadeOut = false
+    em.shrink = false
+    em.setColor(220, 230, 255)
+    return em
+}
+
+// Fast bright sparks
+fn extends(Emitter) sparks(x: Float, y: Float) -> Emitter {
+    let em = Emitter::new(x, y)
+    em.gravityY = 400.0
+    em.baseAngle = -1.5708
+    em.spreadAngle = 2.0
+    em.minSpeed = 200.0
+    em.maxSpeed = 500.0
+    em.minLife = 0.1
+    em.maxLife = 0.5
+    em.minSize = 1.0
+    em.maxSize = 3.0
+    em.fadeOut = true
+    em.shrink = false
+    em.setColorRange(255, 200, 50, 255, 255, 200)
+    return em
+}

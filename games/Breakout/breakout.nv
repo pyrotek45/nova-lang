@@ -29,6 +29,7 @@ import super.super.std.timer
 import super.super.std.tween
 import super.super.std.vec2
 import super.super.std.input
+import super.super.std.particle
 
 // ── Window ───────────────────────────────────────────────────────────────────
 let W = 800
@@ -96,6 +97,32 @@ let world = EntityWorld::new() @[T: Float]
 
 // Tween for score flash — heap object, captured by reference
 let scoreFlash = Tween::linear(255.0, 0.0, 0.4)
+
+// ── Signals — decoupled brick-break event ─────────────────────────────────────
+// Signal(Int) carries the brick's row for point calculation.
+let onBrickBreak = Signal::new() @[T: Int]
+
+onBrickBreak.connect(|row: Int| {
+    score.value += rowPoints(row)
+    hitCount.value += 1
+    scoreFlash.reset()
+})
+
+// ── Particle emitters ─────────────────────────────────────────────────────────
+// Brick break burst — small colorful explosion per brick
+let brickFx = Emitter::new(0.0, 0.0)
+brickFx.maxParticles = 500
+brickFx.gravityY = 300.0
+brickFx.gravityX = 0.0
+brickFx.spreadAngle = 6.2832
+brickFx.minSpeed = 60.0
+brickFx.maxSpeed = 200.0
+brickFx.minLife = 0.2
+brickFx.maxLife = 0.6
+brickFx.minSize = 1.0
+brickFx.maxSize = 4.0
+brickFx.fadeOut = true
+brickFx.shrink = true
 
 // InputMap — heap object, captured by reference
 let keys = InputMap::new()
@@ -329,9 +356,14 @@ fn makePlayScene() -> Scene {
                                     brick.alive    = false
                                     hitBrick.value = true
                                     let row = Cast::int(brick.data).unwrap()
-                                    score.value    += rowPoints(row)
-                                    hitCount.value += 1
-                                    scoreFlash.reset()
+
+                                    // Brick break particles at brick center
+                                    let bcx = bl + bww / 2.0
+                                    let bcy = bt + bhh / 2.0
+                                    brickFx.moveTo(bcx, bcy)
+                                    brickFx.emit(12)
+
+                                    onBrickBreak.emit(row)
 
                                     // Speed up every 5 hits
                                     if hitCount.value % 5 == 0 {
@@ -369,6 +401,9 @@ fn makePlayScene() -> Scene {
                 // Remove dead bricks
                 world.update(0.0)
 
+                // Update particles
+                brickFx.update(dt)
+
                 // Win condition
                 if world.countAlive("brick") == 0 {
                     mgr.switch(makeWinScene())
@@ -377,6 +412,9 @@ fn makePlayScene() -> Scene {
 
             // ── Draw (runs every frame whether ball is in air or not) ──
             drawBricks()
+
+            // Draw brick break particles
+            brickFx.draw()
 
             raylib::drawRoundedRectangle(paddleX.value, PADDLE_Y, PADDLE_W, PADDLE_H, 0.4, PADDLE_COLOR)
 

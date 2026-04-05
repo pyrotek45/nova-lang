@@ -144,7 +144,11 @@ impl Iterator for Lexer {
             out.into()
         }
         fn capture_int_digits(scanner: &mut Lexer) {
-            while scanner.consume_if(|c| matches!(c, '0'..='9' | 'a'..='f' )) {}
+            while scanner.consume_if(|c| matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F' | '_')) {}
+        }
+        /// Strip underscores from a numeric literal before parsing.
+        fn strip_underscores(s: &str) -> String {
+            s.chars().filter(|&c| c != '_').collect()
         }
         fn try_parse_int(
             scanner: &Lexer,
@@ -152,7 +156,8 @@ impl Iterator for Lexer {
             radix: u32,
             kind: &str,
         ) -> NovaResult<TokenValue> {
-            match i64::from_str_radix(body, radix) {
+            let clean = strip_underscores(body);
+            match i64::from_str_radix(&clean, radix) {
                 Ok(n) => Ok(Integer(n)),
                 Err(err) => Err(Box::new(NovaError::Lexing {
                     msg: format!("Invalid integer literal {body}").into(),
@@ -359,12 +364,13 @@ impl Iterator for Lexer {
                         self.advance_if(|c| c == '.');
                         // Capture rest of the digits
                         capture_int_digits(self);
-                        let float = self.consumed_from(&span);
-                        match float.parse() {
+                        let float_raw = self.consumed_from(&span);
+                        let float_clean = strip_underscores(float_raw);
+                        match float_clean.parse() {
                             Ok(f) => Float(f),
                             Err(err) => {
                                 return Some(Err(Box::new(NovaError::Lexing {
-                                    msg: format!("Invalid float literal {float}").into(),
+                                    msg: format!("Invalid float literal {float_raw}").into(),
                                     note: format!("Error while attempting to parse float: {err}",)
                                         .into(),
                                     position: self.current_position(),
@@ -412,7 +418,6 @@ impl Iterator for Lexer {
                 '%' => Operator(Modulo),
                 '!' if self.match_literal("=") => Operator(NotEqual),
                 '!' => Operator(Not),
-                '~' if self.match_literal(">") => Operator(RightTilde),
                 '~' if self.match_literal(">") => Operator(RightTilde),
                 '.' if self.match_literal(".=") => Operator(InclusiveRange),
                 '.' if self.match_literal(".") => Operator(ExclusiveRange),

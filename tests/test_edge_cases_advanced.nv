@@ -420,7 +420,7 @@ println("  GROUP 8 [option_type] OK")
 // ═══════════════════════════════════════════════
 group("hashmap_ops")
 
-let hm = HashMap::default() @[K: String, V: Int]
+let hm = HashMap::new() @[K: String, V: Int]
 check(hm.isEmpty(), "new map isEmpty")
 check(hm.size() == 0, "new map size")
 
@@ -469,7 +469,7 @@ check(hm2.size() == 2, "fromPairs size")
 check(hm2.get("x").unwrap() == 10, "fromPairs get x")
 
 // increment
-let counter = HashMap::default() @[K: String, V: Int]
+let counter = HashMap::new() @[K: String, V: Int]
 counter.insert("hits", 0)
 counter.increment("hits")
 counter.increment("hits")

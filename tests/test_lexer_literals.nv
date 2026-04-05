@@ -1,0 +1,143 @@
+// ============================================================
+// test_lexer_literals.nv — Tests for all lexer literal features
+// ============================================================
+// Tests: integer bases, float formats, raw strings, char escapes,
+//        string escapes, block comments, and edge cases.
+
+module test_lexer_literals
+
+// ── Binary literals (0b) ─────────────────────────────────────────────────────
+
+assert(0b0 == 0,     "binary: 0b0 == 0")
+assert(0b1 == 1,     "binary: 0b1 == 1")
+assert(0b10 == 2,    "binary: 0b10 == 2")
+assert(0b1010 == 10, "binary: 0b1010 == 10")
+assert(0b11111111 == 255, "binary: 0b11111111 == 255")
+assert(0b100000000 == 256, "binary: 0b100000000 == 256")
+
+// ── Octal literals (0o) ──────────────────────────────────────────────────────
+
+assert(0o0 == 0,     "octal: 0o0 == 0")
+assert(0o7 == 7,     "octal: 0o7 == 7")
+assert(0o10 == 8,    "octal: 0o10 == 8")
+assert(0o77 == 63,   "octal: 0o77 == 63")
+assert(0o100 == 64,  "octal: 0o100 == 64")
+assert(0o377 == 255, "octal: 0o377 == 255")
+
+// ── Hex literals (0x) ────────────────────────────────────────────────────────
+
+assert(0x0 == 0,       "hex: 0x0 == 0")
+assert(0xf == 15,      "hex: 0xf == 15")
+assert(0xff == 255,    "hex: 0xff == 255")
+assert(0x10 == 16,     "hex: 0x10 == 16")
+assert(0x100 == 256,   "hex: 0x100 == 256")
+assert(0xdead == 57005, "hex: 0xdead")
+assert(0xbeef == 48879, "hex: 0xbeef")
+assert(0xabcdef == 11259375, "hex: 0xabcdef")
+
+// ── Decimal integers ─────────────────────────────────────────────────────────
+
+assert(0 == 0,             "decimal: 0")
+assert(42 == 42,           "decimal: 42")
+assert(1000000 == 1000000, "decimal: million")
+
+// ── Float literals ───────────────────────────────────────────────────────────
+
+assert(0.0 == 0.0,   "float: 0.0")
+assert(1.5 == 1.5,   "float: 1.5")
+assert(3.14 == 3.14, "float: 3.14")
+assert(0.001 == 0.001, "float: 0.001")
+
+// Float starting with dot
+assert(.5 == 0.5,    "float: .5 == 0.5")
+assert(.25 == 0.25,  "float: .25 == 0.25")
+assert(.0 == 0.0,    "float: .0 == 0.0")
+
+// Large floats
+assert(1234567.89 == 1234567.89, "float: large")
+
+// ── String escape sequences ──────────────────────────────────────────────────
+
+assert("\n".len() == 1, "escape: \\n is 1 char")
+assert("\t".len() == 1, "escape: \\t is 1 char")
+assert("\r".len() == 1, "escape: \\r is 1 char")
+assert("\0".len() == 1, "escape: \\0 is 1 char")
+assert("\\".len() == 1, "escape: \\\\ is 1 char")
+assert("\"".len() == 1, "escape: \\\" is 1 char")
+
+// Escapes in context
+let hello = "hello\nworld"
+assert(hello.len() == 11, "escape: hello\\nworld is 11 chars")
+
+let tabbed = "a\tb"
+assert(tabbed.len() == 3, "escape: a\\tb is 3 chars")
+
+// ── Char literals ────────────────────────────────────────────────────────────
+
+let a = 'a'
+let z = 'z'
+let newline = '\n'
+let tab = '\t'
+let null = '\0'
+let backslash = '\\'
+let quote = '\''
+
+assert(a == 'a',         "char: 'a'")
+assert(z == 'z',         "char: 'z'")
+assert(newline == '\n',  "char: newline")
+assert(tab == '\t',      "char: tab")
+assert(backslash == '\\', "char: backslash")
+assert(quote == '\'',    "char: single quote")
+
+// ── Raw strings (r#"..."#) ───────────────────────────────────────────────────
+// Raw strings do NOT process escape sequences
+
+let raw = r#"hello\nworld"#
+assert(raw.len() == 12, "raw: hello\\nworld is 12 chars (no escape)")
+
+let raw2 = r#"she said "hi""#
+assert(raw2.contains("\""), "raw: contains literal quote")
+
+// Multiple pound signs
+let raw3 = r##"contains a # sign"##
+assert(raw3.contains("#"), "raw ##: contains pound")
+
+// Raw string with backslashes
+let path = r#"C:\Users\test\file.txt"#
+assert(path.contains("\\"), "raw: preserves backslashes")
+
+// ── Block comments ───────────────────────────────────────────────────────────
+// Just verifying that block comments don't interfere with parsing
+
+let before = 1
+/* This is a block comment */
+let after = 2
+assert(before == 1, "block comment: before preserved")
+assert(after == 2, "block comment: after preserved")
+
+/*
+  Multi-line
+  block
+  comment
+*/
+let multi = 3
+assert(multi == 3, "block comment: multi-line ok")
+
+// ── Line comments ────────────────────────────────────────────────────────────
+
+let val = 42 // inline comment
+assert(val == 42, "line comment: inline doesn't break")
+
+// ── Boolean literals ─────────────────────────────────────────────────────────
+
+assert(true == true, "bool: true")
+assert(false == false, "bool: false")
+assert(true != false, "bool: true != false")
+
+// ── Integer arithmetic with different bases ──────────────────────────────────
+
+assert(0xff + 1 == 256,    "mixed: hex + decimal")
+assert(0b1000 - 0o10 == 0, "mixed: binary 8 - octal 8 == 0")
+assert(0x10 * 2 == 32,     "mixed: hex 16 * 2")
+
+println("PASS: All lexer literal tests passed!")

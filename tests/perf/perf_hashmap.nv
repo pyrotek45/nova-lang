@@ -12,7 +12,7 @@ import super.super.std.set
 
 // ── BENCH 1: HashMap insert throughput ──────────────────────
 let t1 = now()
-let m1 = HashMap::default() @[K: Int, V: Int]
+let m1 = HashMap::new() @[K: Int, V: Int]
 for i in 0..10000 {
     m1.insert(i, i * 2)
 }
@@ -45,7 +45,7 @@ assert(s3 == 10000, "has all")
 println("  BENCH 3 [hm_has_10k]          " + Cast::string(t3e - t3) + "ms")
 
 // ── BENCH 4: HashMap delete throughput ──────────────────────
-let m4 = HashMap::default() @[K: Int, V: Int]
+let m4 = HashMap::new() @[K: Int, V: Int]
 for i in 0..5000 {
     m4.insert(i, i)
 }
@@ -58,7 +58,7 @@ assert(m4.size() == 0, "delete all")
 println("  BENCH 4 [hm_delete_5k]        " + Cast::string(t4e - t4) + "ms")
 
 // ── BENCH 5: HashMap insert/update cycle ────────────────────
-let m5 = HashMap::default() @[K: Int, V: Int]
+let m5 = HashMap::new() @[K: Int, V: Int]
 let t5 = now()
 for i in 0..10000 {
     let key = i % 1000
@@ -70,7 +70,7 @@ assert(m5.size() == 1000, "update cycle")
 println("  BENCH 5 [hm_update_10k]       " + Cast::string(t5e - t5) + "ms")
 
 // ── BENCH 6: HashMap entries iteration ──────────────────────
-let m6 = HashMap::default() @[K: Int, V: Int]
+let m6 = HashMap::new() @[K: Int, V: Int]
 for i in 0..5000 {
     m6.insert(i, i)
 }
@@ -85,7 +85,7 @@ assert(s6 > 0, "entries sum")
 println("  BENCH 6 [hm_entries_5k]       " + Cast::string(t6e - t6) + "ms")
 
 // ── BENCH 7: HashMap string keys ────────────────────────────
-let m7 = HashMap::default() @[K: String, V: Int]
+let m7 = HashMap::new() @[K: String, V: Int]
 let t7 = now()
 for i in 0..5000 {
     m7.insert("key_" + Cast::string(i), i)

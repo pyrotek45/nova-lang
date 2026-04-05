@@ -1,0 +1,185 @@
+module test_syntax_audit
+import super.std.list
+
+// ══════════════════════════════════════════
+//  Syntax Audit — closures, precedence,
+//  loops, bind, block comments, semicolons
+// ══════════════════════════════════════════
+
+// ── Block comments ──
+/* This is a block comment */
+let blockCommentWorks = true
+/* Multi-line
+   block
+   comment */
+assert(blockCommentWorks, "block comment")
+
+// ── Semicolons as statement separator ──
+let sa = 10; let sb = 20; let sc = sa + sb
+assert(sc == 30, "semicolons separator")
+
+// ── Closure: fn() form with return type ──
+let add = fn(x: Int, y: Int) -> Int { return x + y }
+assert(add(2, 3) == 5, "fn closure with return type")
+
+// ── Closure: fn() with control flow ──
+let clamp = fn(x: Int) -> Int {
+    if x < 0 { return 0 }
+    elif x > 100 { return 100 }
+    return x
+}
+assert(clamp(-5) == 0, "fn closure control flow low")
+assert(clamp(50) == 50, "fn closure control flow mid")
+assert(clamp(200) == 100, "fn closure control flow high")
+
+// ── Lambda: short expression ──
+let double = |x: Int| x * 2
+assert(double(7) == 14, "lambda expression")
+
+// ── Lambda: zero-parameter ──
+let fortyTwo = || 42
+assert(fortyTwo() == 42, "lambda zero-param")
+
+// ── Lambda: block body (multiple statements) ──
+let compute = |x: Int| {
+    let y = x + 1
+    y * 2
+}
+assert(compute(4) == 10, "lambda block body")
+
+// ── Lambda: multi-param block ──
+let multi = |a: Int, b: Int| {
+    let sum = a + b
+    sum
+}
+assert(multi(3, 4) == 7, "lambda multi-param block")
+
+// ── Lambda: zero-param block ──
+let blockAction = || {
+    let x = 10
+    let y = 20
+    x + y
+}
+assert(blockAction() == 30, "lambda zero-param block")
+
+// ── Lambda as argument ──
+let nums = [1, 2, 3, 4, 5]
+let evens = nums.filter(|x: Int| x % 2 == 0)
+assert(evens.len() == 2, "lambda as argument")
+
+// ── Lambda: if expression (no block wrapper) ──
+let absVal = |x: Int| if x >= 0 { x } else { 0 - x }
+assert(absVal(-5) == 5, "lambda if-expr negative")
+assert(absVal(3) == 3, "lambda if-expr positive")
+
+// ── && / || precedence (matches Python/C/Rust) ──
+// && binds tighter than ||
+
+// true || (true && false) => true
+assert(true || true && false, "prec: true || true && false")
+
+// (false && false) || true => true
+assert(false && false || true, "prec: false && false || true")
+
+// false || (true && true) => true
+assert(false || true && true, "prec: false || true && true")
+
+// (true && false) || false => false
+assert(!(true && false || false), "prec: true && false || false")
+
+// explicit parens override
+assert(!((true || true) && false), "prec: (true || true) && false")
+
+assert(true || (false && false), "prec: true || (false && false)")
+
+// ── Loops: for..in over list ──
+let listSum = 0
+for item in [1, 2, 3] { listSum += item }
+assert(listSum == 6, "for-in list")
+
+// ── Loops: exclusive range ──
+let rangeSum = 0
+for i in 0..5 { rangeSum += i }
+assert(rangeSum == 10, "for exclusive range 0..5")
+
+// ── Loops: inclusive range ──
+let inclSum = 0
+for i in 0..=5 { inclSum += i }
+assert(inclSum == 15, "for inclusive range 0..=5")
+
+// ── Loops: C-style for ──
+let cSum = 0
+for let ci = 0; ci < 4; ci += 1 { cSum += ci }
+assert(cSum == 6, "C-style for")
+
+// ── Loops: while ──
+let wCount = 0
+while wCount < 3 { wCount += 1 }
+assert(wCount == 3, "while loop")
+
+// ── Loops: while with && ──
+let wa = 0
+let wRunning = true
+while wRunning && wa < 5 { wa += 1 }
+assert(wa == 5, "while with &&")
+
+// ── Loops: break ──
+let breakVal = 0
+for i in 0..100 {
+    if i == 3 { break }
+    breakVal = i
+}
+assert(breakVal == 2, "break in for")
+
+// ── Loops: continue ──
+let skipSum = 0
+for i in 0..5 {
+    if i == 2 { continue }
+    skipSum += i
+}
+assert(skipSum == 8, "continue in for")
+
+// ── Bind operator ~> ──
+let bindResult = [1, 2, 3, 4, 5].len() ~> n { n * n }
+assert(bindResult == 25, "bind operator basic")
+
+// ── Bind with multi-statement block ──
+let bindMulti = 10 ~> x {
+    let doubled = x * 2
+    doubled + 1
+}
+assert(bindMulti == 21, "bind multi-statement")
+
+// ── Bind chaining ──
+let chainTwo = 10 ~> x { x * 2 } ~> y { y + 1 }
+assert(chainTwo == 21, "bind chain two")
+
+let chainThree = 5 ~> a { a + 1 } ~> b { b * 3 } ~> c { c - 2 }
+assert(chainThree == 16, "bind chain three")
+
+let chainMulti = 100 ~> x {
+    let half = x / 2
+    half
+} ~> y {
+    let doubled = y * 2
+    doubled + 10
+}
+assert(chainMulti == 110, "bind chain multi-statement")
+
+// ── Cast functions ──
+assert(Cast::string(42) == "42", "Cast::string int")
+assert(Cast::string(true) == "true", "Cast::string bool")
+assert(Cast::int("99").unwrap() == 99, "Cast::int string")
+assert(Cast::float("3.14").unwrap() == 3.14, "Cast::float string")
+
+// ── Pipe operator ──
+let pipeResult = 5 |> Cast::string()
+assert(pipeResult == "5", "pipe operator")
+
+// ── Raw strings ──
+let raw = r#"hello\nworld"#
+assert(raw.len() == 12, "raw string no escape: backslash is literal")
+let normal = "hello\nworld"
+assert(normal.len() == 11, "normal string escape: \\n is newline")
+
+println("PASS: test_syntax_audit")

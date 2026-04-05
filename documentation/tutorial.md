@@ -49,6 +49,7 @@ A comprehensive guide to writing Nova — from first program to full games.
 36. [Critical Rules for Game Dev](#36-critical-rules-for-game-dev)
 37. [Scene Management](#37-scene-management)
 38. [Entity System](#38-entity-system)
+38b. [Signals](#38b-signals)
 39. [Input Handling](#39-input-handling)
 40. [Physics and Collision](#40-physics-and-collision)
 41. [Camera](#41-camera)
@@ -223,7 +224,7 @@ Math::pi()   // 3.14159
 When the compiler needs help resolving a generic, annotate with `@[]`:
 
 ```rust
-let empty = HashMap::default() @[K: String, V: Int]
+let empty = HashMap::new() @[K: String, V: Int]
 ```
 
 ---
@@ -295,8 +296,16 @@ x = "hello" // ERROR — cannot change type
 | `\|\|` | Logical OR |
 | `!` | Logical NOT |
 
-> **Precedence warning:** `||` binds tighter than `&&` in Nova. Use parentheses:
-> `(a || b) && c`.
+`&&` and `||` work in all contexts: `if`, `elif`, `while`, and expressions.
+
+```rust
+while running && !paused {
+    update(dt)
+}
+```
+
+> **Precedence:** `&&` binds tighter than `||`, matching Python/C/Rust.
+> `a || b && c` is parsed as `a || (b && c)`.
 
 ### Compound Assignment
 
@@ -346,6 +355,15 @@ let x = {
 // x == 30
 ```
 
+An `if`/`elif`/`else` chain as the last statement also produces a value,
+as long as every branch ends with an expression of the same type:
+
+```rust
+let abs_val = {
+    if x >= 0 { x } else { 0 - x }
+}
+```
+
 Block expressions can be nested, used as function arguments, or combined
 with other expressions:
 
@@ -360,7 +378,7 @@ let doubled = double({
 ### for Loop
 
 ```rust
-// C-style
+// C-style (semicolons separate init, condition, step)
 for let i = 0; i < 10; i += 1 {
     println(i)
 }
@@ -374,6 +392,17 @@ for i in 0..=10 { println(i) }    // 0, 1, ..., 10
 // for-in over a list
 for item in myList { println(item) }
 ```
+
+### Semicolons as Statement Separators
+
+Semicolons can join multiple statements on one line:
+
+```rust
+let x = 1; let y = 2; println(x + y)
+```
+
+This is optional — one statement per line is the normal style. Their main
+use is in C-style `for` loops above.
 
 ### while Loop
 
@@ -934,6 +963,18 @@ Name an intermediate result inline:
 let len_sq = [1, 2, 3, 4, 5].len() ~> n { n * n }   // 25
 ```
 
+Binds can be **chained** — each block's last expression feeds the next:
+
+```rust
+let result = 100 ~> x {
+    let half = x / 2
+    half
+} ~> y {
+    y + 10
+}
+// result == 60
+```
+
 ### Capturing State
 
 Closures capture scalars **by value** and heap objects **by reference**.
@@ -944,6 +985,29 @@ import super.std.core
 let counter = Box(0)
 let inc = fn() { counter.value += 1 }
 inc(); inc(); inc()   // counter.value == 3
+```
+
+### Choosing Between `||` and `fn()`
+
+Short lambdas (`||`) are concise but limited — they evaluate a **single
+expression** and cannot contain `return`, `if`, `while`, or multi-line
+logic. They also cannot have return-type annotations.
+
+Use the full `fn()` form when you need:
+- Control flow (`if`, `while`, `for`)
+- Multiple statements
+- An explicit `-> ReturnType`
+
+```rust
+// Short lambda — one expression
+let double = |x: Int| x * 2
+
+// Full closure — needs control flow and return type
+let clamp = fn(x: Int) -> Int {
+    if x < 0 { return 0 }
+    elif x > 100 { return 100 }
+    return x
+}
 ```
 
 ---
@@ -1154,7 +1218,17 @@ fn inc(x: Int) -> Int { return x + 1 }
 let r = 4 |> inc() |> square()   // 25
 ```
 
-> Extends functions cannot be used with `|>`. Use UFCS chaining instead.
+Chains work with module-scoped functions like `Cast::`:
+
+```rust
+10 |> Cast::string() |> println()   // prints "10"
+```
+
+> **Important:** The function call **must** include `()`. Writing `5 |> println`
+> is a syntax error — always write `5 |> println()`.
+
+> Extends functions cannot be used with `|>`. Use UFCS chaining instead:
+> `xs.filter(pred).map(f)`.
 
 ---
 
@@ -1521,6 +1595,8 @@ Dyn types, and extends + UFCS.
 |---|---|---|
 | Exclusive range | `for i in 0..5` | Loop 0, 1, 2, 3, 4 |
 | Inclusive range | `for i in 0..=5` | Loop 0, 1, 2, 3, 4, 5 |
+| Pipe operator | `5 \|> inc() \|> double()` | Pass left as first arg to right |
+| Semicolons | `let x = 1; let y = 2` | Multiple statements on one line |
 | Slice | `xs[1:3]` | Elements at indices 1, 2 |
 | Negative slice | `xs[-2:]` | Last 2 elements |
 | Negative index | `xs[-1]` | Last element (read or write) |
@@ -1531,7 +1607,7 @@ Dyn types, and extends + UFCS.
 | `if let` | `if let v = opt { }` | Safe Option unwrap |
 | `while let` | `while let v = opt { }` | Loop while Some |
 | Trailing closure | `f(x): \|y\| y+1` | Closure after `:` |
-| Bind operator | `expr ~> x { x+1 }` | Name intermediate value |
+| Bind operator | `expr ~> x { x+1 }` | Name intermediate value (chainable) |
 | Empty closure | `\|\| expr` | Zero-parameter closure |
 | Function ref | `fn@(Int)` | Select overload by type |
 | Generic annotation | `Variant() @[A: Int]` | No-data variant type hint |
@@ -1555,6 +1631,7 @@ Dyn types, and extends + UFCS.
 
 - Use `elif` instead of `else if`
 - Closures with control flow need full `fn` syntax (not short lambda)
+- Bar closures (`||`) cannot have `-> Type` annotations — use `fn()` instead
 - Every function returning a value needs explicit `return`
 - No `*=` operator — write `x = x * 2`
 - Empty lists need type annotation: `let xs = []: Int`
@@ -1566,6 +1643,12 @@ Dyn types, and extends + UFCS.
 - Use `clone(x)` to break aliasing — especially for lists and structs
 - Use `todo() @[T: ReturnType]` as a placeholder in unfinished code
 - Use `nova check file.nv` to typecheck without executing
+- Pipe `|>` always requires `()`: write `5 |> println()` not `5 |> println`
+- Semicolons separate statements on one line: `let x = 1; let y = 2`
+- `&&` and `||` work in `while` and `elif` conditions
+- Numeric literals support binary `0b1010`, octal `0o17`, hex `0xFF`, and underscores `1_000_000`
+- Raw strings `r"..."` skip escape processing
+- See [`conventions.md`](conventions.md) for naming and formatting style
 
 ---
 
@@ -1576,16 +1659,18 @@ Dyn types, and extends + UFCS.
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
 | `x *= 2` | No `*=` — use `x = x * 2` |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
+| `5 \|> println` | Pipe needs `()` — write `5 \|> println()` |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends |
 | `match x { 0 => ... }` | Literals not in match — use `if/elif` |
 | `-10 % 3 == -1` | Nova uses Euclidean: `-10 % 3 == 2` |
 | `Cast::int(x)` used as `Int` | Returns `Option(Int)` — must unwrap |
 | `else if x > 0 { }` | Use `elif` |
+| `\|x: Int\| -> Int { return x + 1 }` | Bar closures can't have `-> Type` — use `fn(x: Int) -> Int { ... }` |
 | Lambda with control flow | Use `fn(params) -> Type { }` |
 | `fn f(x: Int) -> Int { x * x }` | Must have explicit `return` |
 | `let b = a` (a is a list) | Creates alias! Use `clone(a)` for copy |
 | `Color::Red` (no parens) | Must write `Color::Red()` |
-| `\|\| true && false` precedence | `\|\|` binds tighter — use parens |
+| `\|\| true && false` precedence | `&&` binds tighter than `\|\|` (standard) |
 | Nested loops reusing `i` | Each loop needs a unique variable |
 | Missing return on else branch | All paths must return |
 | Varargs with mixed types `f(1, "hi")` | All trailing varargs must be the same type |
@@ -1725,7 +1810,7 @@ return unreachable() @[T: Int]
 The syntax is `@[GenericName: ConcreteType]`. Multiple type parameters are comma-separated:
 
 ```rust
-let map = HashMap::default() @[K: String, V: Int]
+let map = HashMap::new() @[K: String, V: Int]
 ```
 
 ---
@@ -1824,15 +1909,55 @@ nova time my_program.nv
 
 #### `nova dis`
 
-Shows the disassembled bytecode — useful for understanding what the compiler generates:
+Shows the disassembled bytecode — useful for understanding what the compiler
+generates. The output includes control-flow arrows, resolved function/variable
+names, and color coding:
 
 ```bash
 nova dis my_program.nv
 ```
 
+**Reading the output:**
+- The left margin shows **flow arrows** connecting jump sources to targets:
+  - **Magenta** `│` — backward jumps (loops / `while`)
+  - **Yellow** `│` — conditional branches (`if` / `elif`)
+  - **Cyan** `│` — forward jumps (skip-ahead)
+- Function and closure bodies are **indented** to show nesting.
+- Instructions display **resolved names** instead of raw indices:
+  `DCALL fib` instead of `DCALL 5`, `STORE n` instead of `STORE 0`.
+- A **summary footer** lists all globals, instruction counts, and a color key.
+
 #### `nova dbg`
 
-Runs in debug mode, which shows additional runtime information for diagnosing issues.
+Opens an interactive split-panel **TUI debugger** that lets you step through
+every bytecode instruction while watching the stack and variables change in
+real time:
+
+```bash
+nova dbg my_program.nv
+```
+
+**Layout:**
+- **Left panel** — scrolling bytecode listing with `►` on the current
+  instruction. Instructions show resolved names just like `nova dis`.
+- **Right panel** — variables (top) and stack (bottom). Named locals and
+  globals are shown with their current values.
+- **Bottom** — program output captured from `print`/`println`.
+
+**Controls:**
+| Key | Action |
+|---|---|
+| `↓` / `j` / `Space` | Step forward |
+| `↑` / `k` | Step backward (browse history) |
+| `PgDn` / `PgUp` | Jump 20 steps |
+| `r` | Run to end |
+| `n` | Step over (skip into function calls) |
+| `Home` / `End` | Jump to first / latest step |
+| `?` | Help screen |
+| `q` / `Esc` | Quit |
+
+The debugger records every step, so you can freely scroll backward to see what
+happened earlier — no need to restart.
 
 #### `nova init`
 
@@ -2845,24 +2970,27 @@ Nova uses `elif` for chained conditionals. In expression context, only `if/else`
 
 ## 37. Scene Management
 
-Scenes decouple game states (title, gameplay, pause, game-over):
+Scenes decouple game states (title, gameplay, pause, game-over).
+SceneManager uses a stack so you can push overlays (pause menus)
+and pop back to the previous scene.
 
 ```rust
 import super.std.scene
-
-fn makeGameplayScene(mgr: SceneManager) -> Scene {
-    let world = EntityWorld::new()
-    let score = Box(0)
-
-    let update = fn(dt: Float) { /* game logic */ }
-    let draw = fn() { /* rendering */ }
-
-    return Scene::new(update, draw)
-}
+import super.std.signal
 
 raylib::init("My Game", 800, 600, 60)
 let mgr = SceneManager::empty()
-mgr.switch(makeTitleScene(mgr))
+
+// Scene = two closures: update(dt) and draw()
+fn makePlayScene() -> Scene {
+    let score = Box(0)
+    return Scene::new(
+        fn(dt: Float) { /* game logic */ },
+        fn() { /* rendering */ }
+    )
+}
+
+mgr.switch(makePlayScene())
 while raylib::rendering() {
     mgr.update(raylib::getFrameTime())
     mgr.draw()
@@ -2874,22 +3002,64 @@ while raylib::rendering() {
 | `mgr.switch(scene)` | Replace current, clear stack |
 | `mgr.push(scene)` | Push over current (pause menus) |
 | `mgr.pop()` | Return to previous scene |
+| `mgr.has()` | True if a scene exists |
+| `mgr.depth()` | Number of scenes on the stack |
+
+### Scene Signals
+
+SceneManager emits **VoidSignal**s on every transition — connect listeners
+to run analytics, play sounds, or do any side-effect without modifying the
+scene code itself:
+
+```rust
+mgr.onSwitch.connect(|| { println("scene switched!") })
+mgr.onPush.connect(||   { println("scene pushed!")   })
+mgr.onPop.connect(||    { println("scene popped!")   })
+```
+
+| Signal | Fires when |
+|---|---|
+| `mgr.onSwitch` | `switch()` is called |
+| `mgr.onPush` | `push()` is called |
+| `mgr.onPop` | `pop()` is called |
+
+> Signals keep your scene transitions observable without polluting the
+> transition logic. Analytics, audio, UI updates — connect them once and
+> forget.
 
 ---
 
 ## 38. Entity System
 
+`Entity(T)` is a **generic** game object.  The type parameter `T` is
+the user-defined data — any struct, Int, Float, String, or anything
+you need.  This makes entities reusable for every kind of game.
+
 ```rust
 import super.std.entity
 import super.std.vec2
+import super.std.signal
 
-let world = EntityWorld::new()
-
-let player = world.spawn(400.0, 300.0, "player")
+// Simple Float data (scores, timers, health)
+let world = EntityWorld::new() @[T: Float]
+let player = world.spawn(400.0, 300.0, "player", 100.0)
 player.size = Vec2::new(32.0, 32.0)
+
+// Custom struct data — carry anything you want
+struct EnemyData { hp: Int, speed: Float, loot: String }
+let world2 = EntityWorld::new() @[T: EnemyData]
+let e = world2.spawn(100.0, 50.0, "goblin", EnemyData { hp: 3, speed: 80.0, loot: "gold" })
+e.data.hp -= 1     // direct mutation
 ```
 
-### Entity Fields
+### Why generic?
+
+> Nova's standard library leverages generics so you never have to
+> fight the type system.  `Entity(Float)` for simple games,
+> `Entity(PlayerData)` for complex ones — same API, same iteration,
+> same collision helpers.  Write your struct, pass it as `T`, done.
+
+### Entity(T) Fields
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -2899,14 +3069,14 @@ player.size = Vec2::new(32.0, 32.0)
 | `size` | `Vec2` | Width × height |
 | `tag` | `String` | Category: `"player"`, `"enemy"`, etc. |
 | `alive` | `Bool` | Set false to destroy on next update |
-| `data` | `Float` | General-purpose slot (health, age, …) |
+| `data` | `T` | **Your custom data** (health struct, sprite id, etc.) |
 
 ### Querying and Iterating
 
 ```rust
 let pList = world.query("player")
-world.forEachTagged("enemy", fn(e: Entity) { /* mutate e */ })
-world.forEach(fn(e: Entity) { /* all entities */ })
+world.forEachTagged("enemy", fn(e: Entity(Float)) { /* mutate e */ })
+world.forEach(fn(e: Entity(Float)) { /* all entities */ })
 let count = world.countAlive("enemy")
 ```
 
@@ -2926,6 +3096,130 @@ e.entityDrawRect((60, 200, 100))      // filled rectangle
 e.entityDrawCircle((255, 230, 0))     // circle
 ```
 
+### EntityWorld Signals
+
+EntityWorld(T) has built-in signals that fire on lifecycle events:
+
+```rust
+world.onSpawn.connect(|id: Int| { println("spawned: " + Cast::string(id)) })
+world.onKill.connect(|id: Int|  { println("killed: " + Cast::string(id))  })
+world.onClear.connect(||        { println("world cleared!")               })
+```
+
+| Signal | Type | Fires when |
+|---|---|---|
+| `world.onSpawn` | `Signal(Int)` | After `spawn()` or `spawnFull()` — payload is the entity id |
+| `world.onKill` | `Signal(Int)` | After `kill()` or `killAll()` — payload is the entity id |
+| `world.onClear` | `VoidSignal` | After `clear()` |
+
+> **Tip:** Use `onKill` for score tracking, particle effects, or sound.
+> Use `onSpawn` for spawn animations.  This keeps game logic decoupled
+> from rendering and audio.
+
+---
+
+## 38b. Signals
+
+Signals are Nova's way to decouple game systems.  Inspired by Godot's
+signal pattern, they let objects communicate **without knowing about each
+other**.  An emitter defines signals; listeners connect callbacks.  When
+a signal fires, every connected callback runs.
+
+### Why signals?
+
+Traditional game code interleaves concerns:
+
+```rust
+// Without signals — everything jammed together
+if bullet.overlapsAABB(enemy) {
+    enemy.alive = false
+    score += 10                  // scoring
+    cam.shake(8.0, 0.2)         // visual feedback
+    playSound("explosion")      // audio
+    spawnParticles(enemy.pos)   // particles
+}
+```
+
+With signals, each system registers its own reaction:
+
+```rust
+// With signals — each system handles its own concern
+let onEnemyKill = VoidSignal::new()
+onEnemyKill.connect(|| { score.value += 10         })
+onEnemyKill.connect(|| { cam.shake(8.0, 0.2)       })
+onEnemyKill.connect(|| { playSound("explosion")    })
+onEnemyKill.connect(|| { spawnParticles(enemy.pos)  })
+
+// Collision code only says WHAT happened
+if bullet.overlapsAABB(enemy) {
+    enemy.alive = false
+    onEnemyKill.emit()   // everyone who cares reacts
+}
+```
+
+### Signal(T) — Typed signal with payload
+
+Carries a payload of type `T` to every listener:
+
+```rust
+import super.std.signal
+
+let onDamage = Signal::new() @[T: Int]
+onDamage.connect(|dmg: Int| { hp.value -= dmg })
+onDamage.emit(25)   // hp drops by 25
+
+// Works with any type — String, Float, Bool, or your own structs
+let onChat = Signal::new() @[T: String]
+onChat.connect(|msg: String| { println(msg) })
+onChat.emit("hello")
+```
+
+### VoidSignal — No payload
+
+For fire-and-forget notifications:
+
+```rust
+let onReady = VoidSignal::new()
+onReady.connect(|| { println("Game ready!") })
+onReady.emit()
+```
+
+### SignalBus — Named registry
+
+A bus of named void signals.  Good for global events:
+
+```rust
+let bus = SignalBus::new()
+bus.register("game_over")
+bus.connect("game_over", || { println("Game Over!") })
+bus.emit("game_over")
+```
+
+### API Summary
+
+| Type | Constructor | Methods |
+|---|---|---|
+| `Signal(T)` | `Signal::new() @[T: Type]` | `connect(fn(T))`, `emit(payload)`, `clear()`, `count()` |
+| `VoidSignal` | `VoidSignal::new()` | `connect(fn())`, `emit()`, `clear()`, `count()` |
+| `SignalBus` | `SignalBus::new()` | `register(name)`, `connect(name, fn())`, `emit(name)`, `has(name)`, `clear(name)`, `clearAll()`, `signalCount(name)` |
+
+### When to use signals
+
+- **Scoring** — `onEnemyKill.connect(|| { score += 10 })`
+- **Audio** — `onBrickBreak.connect(|| { playSound("break") })`
+- **Visual effects** — `onPlayerHit.connect(|| { cam.shake(14.0, 0.3) })`
+- **Analytics** — `mgr.onSwitch.connect(|| { logSceneChange() })`
+- **Decoupling** — Any time you find yourself writing `A.doX(); B.doY(); C.doZ()` after a single event
+
+### Generics philosophy
+
+> Nova's std lib leverages generics to make code **reusable without
+> boilerplate**.  `Signal(Int)`, `Signal(String)`, `Signal(DamageEvent)` —
+> same API, fully typed.  `Entity(Float)`, `Entity(PlayerData)` — same
+> world, same queries.  The generic parameter captures your intent;
+> the type checker enforces it.  This is the core design principle:
+> **write it once, parameterise what varies**.
+
 ---
 
 ## 39. Input Handling
@@ -2933,16 +3227,25 @@ e.entityDrawCircle((255, 230, 0))     // circle
 ### Raw Raylib Input
 
 ```rust
+// Keyboard
 raylib::isKeyPressed("A")        // held down (true every frame)
 raylib::isKeyDown("A")           // alias for isKeyPressed
 raylib::isKeyJustPressed("A")    // fires once when key first goes down
 raylib::isKeyReleased("A")       // released this frame
+
+// Mouse
 raylib::mousePosition()          // (Int, Int)
+raylib::isMousePressed("Left")   // just clicked this frame (fires once)
+raylib::isMouseDown("Left")      // held down (true every frame while held)
+raylib::isMouseReleased("Left")  // released this frame
 raylib::getMouseWheel()          // Float
 ```
 
 Use `isKeyPressed`/`isKeyDown` for continuous movement (action games).
 Use `isKeyJustPressed` for single-fire actions (turn-based, menus, toggles).
+
+Use `isMousePressed` for clicks (buttons, menus). Use `isMouseDown` for
+continuous actions (dragging, spray-fire).
 
 ### InputMap — Action Bindings
 
@@ -3148,7 +3451,237 @@ fn drawButton(x: Int, y: Int, w: Int, h: Int, text: String, hover: Bool) {
 }
 ```
 
+### Widget Signals (std/widget)
+
+The `std/widget` module provides ready-made UI widgets with **built-in
+signals**. Instead of polling `isClicked()` and writing all the reaction
+code right there, you can connect signal listeners:
+
+```rust
+import super.std.widget
+import super.std.signal
+
+let startBtn = Button::new(100, 200, 160, 40, "Start")
+
+// Connect a listener — runs whenever the button is clicked
+startBtn.onClick.connect(|| { mgr.switch(makePlayScene()) })
+
+// In the game loop, isClicked() both checks AND emits onClick:
+startBtn.isClicked()
+```
+
+| Widget | Signal | Type | Fires when |
+|---|---|---|---|
+| `Button` | `onClick` | `VoidSignal` | `isClicked()` detects a click |
+| `Button` | `onHover` | `VoidSignal` | `isHovered()` detects the cursor over the button |
+| `Toggle` | `onToggle` | `Signal(Bool)` | `isClicked()` detects a click — carries new on/off state |
+| `ProgressBar` | `onValueChanged` | `Signal(Float)` | `setValue(v)` is called — carries the new value |
+
+> **Tip:** Widget signals let you wire up UI reactions once and keep
+> the game loop clean.  The widget handles the polling; your listeners
+> handle the response.
+
 > **Draw order:** background first, then world, then HUD on top.
+
+### Advanced Widgets
+
+The `std/widget` module includes many more widgets beyond Button and Toggle:
+
+**Checkbox** — a checkable box with a label:
+
+```rust
+let soundCb = Checkbox::new(100, 200, 20, "Enable Sound")
+soundCb.onToggle.connect(|on: Bool| {
+    println("Sound: " + Cast::string(on))
+})
+
+// In game loop:
+soundCb.isClicked()
+soundCb.draw()
+```
+
+**Slider** — draggable value between min and max:
+
+```rust
+let volume = Slider::new(100, 250, 200, 0.0, 1.0, 0.5)
+volume.onChanged.connect(|v: Float| { setVolume(v) })
+
+// In game loop:
+volume.update()
+volume.draw()
+```
+
+**TextField** — keyboard text input:
+
+```rust
+let nameField = TextField::new(100, 300, 200, 30)
+nameField.placeholder = "Enter name..."
+nameField.onSubmit.connect(|| { submitName(nameField.text) })
+
+// In game loop:
+nameField.update()
+nameField.draw()
+```
+
+**RadioGroup** — mutually exclusive options:
+
+```rust
+let difficulty = RadioGroup::new(100, 350, ["Easy", "Normal", "Hard"], 1)
+difficulty.onChanged.connect(|idx: Int| {
+    println("Difficulty: " + Cast::string(idx))
+})
+
+// In game loop:
+difficulty.isClicked()
+difficulty.draw()
+```
+
+**Dropdown** — expandable selection menu:
+
+```rust
+let weapon = Dropdown::new(100, 420, 160, 30, ["Sword", "Bow", "Staff"])
+weapon.onChanged.connect(|idx: Int| { equipWeapon(idx) })
+
+// In game loop:
+weapon.update()
+weapon.draw()
+```
+
+### Layout Containers (std/container)
+
+The `std/container` module provides Godot-style containers that
+automatically position child widgets.  Any widget can be wrapped in
+a **Slot** — a pair of closures for drawing and sizing.
+
+**Wrapping a widget into a Slot:**
+
+```rust
+import super.std.container
+import super.std.widget
+
+let btn = Button::new(0, 0, 160, 40, "Play")
+let slot = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| { btn.drawAt(x, y, w, h) },
+    fn() -> (Int, Int) { return (160, 40) }
+)
+```
+
+**VBox — vertical stacking:**
+
+```rust
+let menu = VBox::new(100, 100, 200)
+menu.spacing = 8
+menu.padding = 10
+menu.add(playSlot)
+menu.add(settingsSlot)
+menu.add(quitSlot)
+menu.draw()
+```
+
+**HBox — horizontal stacking:**
+
+```rust
+let toolbar = HBox::new(10, 10, 40)
+toolbar.spacing = 5
+toolbar.add(saveSlot)
+toolbar.add(loadSlot)
+toolbar.draw()
+```
+
+**GridBox — grid layout:**
+
+```rust
+let grid = GridBox::new(50, 200, 4, 80, 80)   // 4 columns, 80x80 cells
+grid.spacingX = 5
+grid.spacingY = 5
+for item in items {
+    grid.add(makeItemSlot(item))
+}
+grid.draw()
+```
+
+**PanelBox — background + border:**
+
+```rust
+let panel = PanelBox::new(50, 50, 300, 400)
+panel.bgColor = color::darkGray()
+panel.borderColor = color::gray()
+panel.add(titleSlot)
+panel.add(contentSlot)
+panel.draw()
+```
+
+**MarginBox — padding wrapper:**
+
+```rust
+let inner = Slot::new(drawFn, sizeFn)
+let padded = MarginBox::new(inner, 10, 20, 10, 20)
+padded.draw(0, 0, 300, 200)
+
+// Can nest into other containers:
+let paddedSlot = padded.toSlot()
+vbox.add(paddedSlot)
+```
+
+> **Tip:** Containers don't know about widget types — they only talk
+> to Slots.  This means you can wrap *anything* (custom draws, labels,
+> buttons, even other containers) and mix them freely.
+
+### Particle Effects (std/particle)
+
+The `std/particle` module provides a simple but flexible particle system
+for visual effects like explosions, fire, rain, and more.
+
+**Basic usage:**
+
+```rust
+import super.std.particle
+
+let fire = Emitter::fire(400.0, 500.0)
+
+while raylib::rendering() {
+    let dt = raylib::getFrameTime()
+    raylib::clear((20, 20, 30))
+
+    fire.emit(3)       // spawn 3 particles per frame
+    fire.update(dt)    // age + physics
+    fire.draw()        // render
+}
+```
+
+**One-shot explosion:**
+
+```rust
+let boom = Emitter::explosion(enemy.pos.x, enemy.pos.y)
+boom.setColor(255, 100, 50)
+boom.emit(50)
+
+// In loop: just update and draw (no more emit)
+boom.update(dt)
+boom.draw()
+```
+
+**Custom emitter:**
+
+```rust
+let em = Emitter::new(400.0, 300.0)
+em.minSpeed = 30.0
+em.maxSpeed = 80.0
+em.minLife  = 1.0
+em.maxLife  = 3.0
+em.gravity  = 100.0
+em.angleMin = 4.0      // emit downward
+em.angleMax = 5.3
+em.setColorRange(100, 100, 255, 200, 200, 255)  // blue gradient
+em.emit(20)
+```
+
+**Built-in presets:** `Emitter::fountain(x, y)`, `Emitter::explosion(x, y)`,
+`Emitter::fire(x, y)`, `Emitter::snow(x, y)`, `Emitter::sparks(x, y)`
+
+> **Tip:** Use `emitter.emitAt(x, y, count)` to spawn particles at a
+> position different from the emitter's origin — great for bullet impacts,
+> footstep dust, or spell effects.
 
 ---
 
@@ -4030,7 +4563,7 @@ if let user = findUser(db, 42) {
 ```rust
 import super.std.hashmap
 
-let counts = HashMap::default() @[K: String, V: Int]
+let counts = HashMap::new() @[K: String, V: Int]
 for word in words { counts.increment(word) }
 ```
 

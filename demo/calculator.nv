@@ -1,0 +1,261 @@
+module calculator
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Calculator — Demonstrates std/widget, std/container, std/signal working
+// together.  A fully functional calculator with buttons, display, and
+// keyboard input.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.color
+import super.std.signal
+import super.std.widget
+import super.std.container
+import super.std.core
+
+let WIDTH  = 340
+let HEIGHT = 480
+
+raylib::init("Nova Calculator", WIDTH, HEIGHT, 30)
+
+// ── Calculator state ──────────────────────────────────────────────────────────
+
+let display   = Box("")       // current display string
+let operand1  = Box(0.0)      // first operand
+let operator  = Box("")       // pending operator (+, -, *, /)
+let newInput  = Box(true)     // next digit clears display
+
+// Signal bus for calculator events
+let bus = SignalBus::new()
+bus.register("digit")
+bus.register("operator")
+bus.register("equals")
+bus.register("clear")
+
+// ── Logic (connected via signals) ─────────────────────────────────────────────
+
+fn doCalculation(op: String, a: Float, b: Float) -> Float {
+    if op == "+" { return a + b }
+    if op == "-" { return a - b }
+    if op == "*" { return a * b }
+    if op == "/" {
+        if b != 0.0 { return a / b }
+        return 0.0
+    }
+    return b
+}
+
+// ── UI setup ──────────────────────────────────────────────────────────────────
+
+// Display label at top
+let displayLabel = Label::new(20, 20, "0")
+displayLabel.fontSize = 36
+displayLabel.color = color::white()
+
+// Button grid: 4 columns x 5 rows
+let grid = GridBox::new(10, 80, 4, 76, 56)
+grid.spacingX = 6
+grid.spacingY = 6
+grid.padding = 0
+
+// Button labels in order
+let labels = [
+    "C", "(", ")", "/",
+    "7", "8", "9", "*",
+    "4", "5", "6", "-",
+    "1", "2", "3", "+",
+    "0", ".", "=", ""
+]
+
+// Create buttons
+let buttons = []: Button
+for lbl in labels {
+    if lbl == "" {
+        // empty slot — create invisible button
+        let b = Button::new(0, 0, 76, 56, "")
+        b.bg = (30, 30, 40)
+        buttons.push(b)
+    } else {
+        let b = Button::new(0, 0, 76, 56, lbl)
+        b.fontSize = 24
+
+        // Style by category
+        if lbl == "C" {
+            b.bg = (180, 50, 50)
+        } elif lbl == "=" {
+            b.bg = (50, 150, 80)
+        } elif lbl == "+" {
+            b.bg = (60, 80, 130)
+        } elif lbl == "-" {
+            b.bg = (60, 80, 130)
+        } elif lbl == "*" {
+            b.bg = (60, 80, 130)
+        } elif lbl == "/" {
+            b.bg = (60, 80, 130)
+        } elif lbl == "(" {
+            b.bg = (70, 70, 80)
+        } elif lbl == ")" {
+            b.bg = (70, 70, 80)
+        } elif lbl == "." {
+            b.bg = (70, 70, 80)
+        } else {
+            b.bg = (55, 55, 65)
+        }
+        buttons.push(b)
+    }
+}
+
+// Create slots for the grid
+for btn in buttons {
+    let slot = Slot::new(
+        |x: Int, y: Int, w: Int, h: Int| {
+            btn.rect = Rect { x: x, y: y, w: w, h: h }
+            // Hover effect
+            let pos = raylib::mousePosition()
+            let hovered = btn.rect.contains(pos[0], pos[1])
+            if hovered {
+                raylib::drawRectangle(x, y, w, h, color::lighten(btn.bg, 0.15))
+            } else {
+                raylib::drawRectangle(x, y, w, h, btn.bg)
+            }
+            let tw = raylib::measureText(btn.label, btn.fontSize)
+            let tx = x + (w - tw) / 2
+            let ty = y + (h - btn.fontSize) / 2
+            raylib::drawText(btn.label, tx, ty, btn.fontSize, btn.fg)
+        },
+        fn() -> (Int, Int) { return (76, 56) }
+    )
+    grid.add(slot)
+}
+
+// ── Helper: parse display to float ────────────────────────────────────────────
+fn parseDisplay() -> Float {
+    let txt = display.value
+    if txt == "" || txt == "-" { return 0.0 }
+    let result = Cast::float(txt)
+    if let v = result { return v }
+    return 0.0
+}
+
+fn appendDigit(digit: String) {
+    if newInput.value {
+        display.value = digit
+        newInput.value = false
+    } else {
+        if display.value == "0" && digit != "." {
+            display.value = digit
+        } else {
+            display.value = display.value + digit
+        }
+    }
+}
+
+fn applyOperator(op: String) {
+    if operator.value != "" && !newInput.value {
+        let result = doCalculation(operator.value, operand1.value, parseDisplay())
+        operand1.value = result
+        display.value = Cast::string(result)
+    } else {
+        operand1.value = parseDisplay()
+    }
+    operator.value = op
+    newInput.value = true
+}
+
+fn doEquals() {
+    if operator.value != "" {
+        let result = doCalculation(operator.value, operand1.value, parseDisplay())
+        display.value = Cast::string(result)
+        operator.value = ""
+        newInput.value = true
+    }
+}
+
+fn doClear() {
+    display.value = "0"
+    operand1.value = 0.0
+    operator.value = ""
+    newInput.value = true
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+
+while raylib::rendering() {
+    raylib::clear((25, 25, 35))
+
+    // Draw display background
+    raylib::drawRectangle(10, 10, WIDTH - 20, 60, (35, 35, 50))
+    raylib::drawRectangleLines(10, 10, WIDTH - 20, 60, color::gray())
+
+    // Right-align display text
+    let dispText = display.value
+    if dispText == "" { dispText = "0" }
+    let tw = raylib::measureText(dispText, 36)
+    raylib::drawText(dispText, WIDTH - 30 - tw, 25, 36, color::white())
+
+    // Show pending operator
+    if operator.value != "" {
+        raylib::drawText(operator.value, 20, 30, 24, color::gray())
+    }
+
+    // Draw button grid
+    grid.draw()
+
+    // Process button clicks
+    let i = 0
+    for btn in buttons {
+        if btn.label != "" {
+            btn.isClicked()
+        }
+        i += 1
+    }
+
+    // Handle button presses via checking each button
+    for btn in buttons {
+        if btn.label == "" { continue }
+
+        if raylib::isMousePressed("Left") {
+            let pos = raylib::mousePosition()
+            if btn.rect.contains(pos[0], pos[1]) {
+                let lbl = btn.label
+
+                if lbl == "C" {
+                    doClear()
+                } elif lbl == "=" {
+                    doEquals()
+                } elif lbl == "+" {
+                    applyOperator(lbl)
+                } elif lbl == "-" {
+                    applyOperator(lbl)
+                } elif lbl == "*" {
+                    applyOperator(lbl)
+                } elif lbl == "/" {
+                    applyOperator(lbl)
+                } else {
+                    // digit or dot
+                    appendDigit(lbl)
+                }
+            }
+        }
+    }
+
+    // Keyboard input
+    let key = raylib::getKey()
+    if let k = key {
+        if k == "KEY_ZERO"  { appendDigit("0") }
+        if k == "KEY_ONE"   { appendDigit("1") }
+        if k == "KEY_TWO"   { appendDigit("2") }
+        if k == "KEY_THREE" { appendDigit("3") }
+        if k == "KEY_FOUR"  { appendDigit("4") }
+        if k == "KEY_FIVE"  { appendDigit("5") }
+        if k == "KEY_SIX"   { appendDigit("6") }
+        if k == "KEY_SEVEN" { appendDigit("7") }
+        if k == "KEY_EIGHT" { appendDigit("8") }
+        if k == "KEY_NINE"  { appendDigit("9") }
+        if k == "KEY_PERIOD" { appendDigit(".") }
+        if k == "KEY_ENTER"  { doEquals() }
+        if k == "KEY_BACKSPACE" { doClear() }
+    }
+
+    // FPS
+    raylib::drawFPS(10, HEIGHT - 24)
+}

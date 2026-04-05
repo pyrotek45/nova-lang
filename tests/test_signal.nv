@@ -99,4 +99,81 @@ bus.emit("nonexistent")
 
 println("PASS: SignalBus")
 
+// ── Signal(Float) ────────────────────────────────────────────
+
+let onHealth = Signal::new() @[T: Float]
+let lastHp = Box(0.0)
+onHealth.connect(|hp: Float| { lastHp.value = hp })
+onHealth.emit(75.5)
+assert(lastHp.value == 75.5, "Signal(Float) emit")
+onHealth.emit(0.0)
+assert(lastHp.value == 0.0, "Signal(Float) zero")
+println("PASS: Signal(Float)")
+
+// ── Signal(Bool) — used by Toggle widget ─────────────────────
+
+let onToggle = Signal::new() @[T: Bool]
+let togState = Box(false)
+onToggle.connect(|v: Bool| { togState.value = v })
+onToggle.emit(true)
+assert(togState.value == true, "Signal(Bool) true")
+onToggle.emit(false)
+assert(togState.value == false, "Signal(Bool) false")
+println("PASS: Signal(Bool)")
+
+// ── Signal with struct payload ───────────────────────────────
+
+struct DamageEvent { amount: Int, source: String }
+
+let onDmg = Signal::new() @[T: DamageEvent]
+let lastSource = Box("")
+let totalDmg = Box(0)
+onDmg.connect(fn(evt: DamageEvent) {
+    lastSource.value = evt.source
+    totalDmg.value += evt.amount
+})
+onDmg.emit(DamageEvent { amount: 30, source: "fire" })
+onDmg.emit(DamageEvent { amount: 15, source: "ice" })
+assert(totalDmg.value == 45, "Signal(struct) accumulates")
+assert(lastSource.value == "ice", "Signal(struct) last source")
+println("PASS: Signal(struct)")
+
+// ── Disconnect pattern: clear + reconnect ────────────────────
+
+let sig = Signal::new() @[T: Int]
+let acc = Box(0)
+sig.connect(|v: Int| { acc.value += v })
+sig.emit(10)
+assert(acc.value == 10, "pre-clear fires")
+sig.clear()
+sig.emit(10)
+assert(acc.value == 10, "post-clear does not fire")
+sig.connect(|v: Int| { acc.value += v * 2 })
+sig.emit(5)
+assert(acc.value == 20, "reconnected listener fires")
+println("PASS: disconnect/reconnect")
+
+// ── VoidSignal count and clear ───────────────────────────────
+
+let vs = VoidSignal::new()
+assert(vs.count() == 0, "VoidSignal empty count")
+vs.connect(|| {})
+vs.connect(|| {})
+vs.connect(|| {})
+assert(vs.count() == 3, "VoidSignal 3 listeners")
+vs.clear()
+assert(vs.count() == 0, "VoidSignal cleared")
+println("PASS: VoidSignal count/clear")
+
+// ── SignalBus: multiple listeners on same name ───────────────
+
+let bus2 = SignalBus::new()
+let x = Box(0)
+bus2.connect("tick", || { x.value += 1 })
+bus2.connect("tick", || { x.value += 10 })
+bus2.emit("tick")
+assert(x.value == 11, "bus multi-listener same name")
+assert(bus2.signalCount("tick") == 2, "bus signalCount 2")
+println("PASS: SignalBus multi-listener")
+
 println("ALL SIGNAL TESTS PASSED")

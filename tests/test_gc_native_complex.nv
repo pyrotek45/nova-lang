@@ -64,7 +64,7 @@ string_chain_gc()
 fn hashmap_gc_pressure() {
     let maps = []: HashMap(String, [Int])
     for let i = 0; i < 50; i += 1 {
-        let m = HashMap::default() @[K: String, V: [Int]]
+        let m = HashMap::new() @[K: String, V: [Int]]
         let key = "key_" + Cast::string(i)
         let vals = []: Int
         for let j = 0; j < 10; j += 1 {
@@ -117,7 +117,7 @@ struct Container {
 fn make_container() -> Container {
     return Container {
         items: []: String,
-        counts: HashMap::default() @[K: String, V: Int],
+        counts: HashMap::new() @[K: String, V: Int],
     }
 }
 
@@ -130,7 +130,7 @@ fn container_stress() {
         // throwaway struct to pressure GC
         let junk = Container {
             items: ["a", "b"],
-            counts: HashMap::default() @[K: String, V: Int],
+            counts: HashMap::new() @[K: String, V: Int],
         }
     }
     assert(c.items.len() == 100, "5: container has 100 items")
@@ -285,7 +285,7 @@ box_closure_gc()
 
 // ── 13. HashMap iteration + rebuild + GC ─────────────────────────
 fn hashmap_iterate_rebuild() {
-    let m = HashMap::default() @[K: Int, V: String]
+    let m = HashMap::new() @[K: Int, V: String]
     for let i = 0; i < 100; i += 1 {
         m.insert(i, "val_" + Cast::string(i))
     }
@@ -293,7 +293,7 @@ fn hashmap_iterate_rebuild() {
 
     // Rebuild map keeping only odd keys
     let keys = m.keys()
-    let m2 = HashMap::default() @[K: Int, V: String]
+    let m2 = HashMap::new() @[K: Int, V: String]
     for k in keys {
         if k % 2 != 0 {
             m2.insert(k, m.get(k).unwrap())
@@ -329,7 +329,7 @@ listcomp_gc()
 fn rapid_container_churn() {
     for let i = 0; i < 200; i += 1 {
         // Create a hashmap, fill it, use it, discard it
-        let m = HashMap::default() @[K: String, V: Int]
+        let m = HashMap::new() @[K: String, V: Int]
         m.insert("a", i)
         m.insert("b", i * 2)
         let sum = m.get("a").unwrap() + m.get("b").unwrap()

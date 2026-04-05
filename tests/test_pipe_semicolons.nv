@@ -1,0 +1,72 @@
+module test_pipe_operator
+
+// ============================================================
+// Test: Pipe Operator |>
+// ============================================================
+// The pipe operator passes the left-hand value as the first
+// argument to the function on the right.  The function must
+// be called with ().
+
+// ── Basic pipe ────────────────────────────────────────────────
+
+fn double(x: Int) -> Int { return x * 2 }
+fn addTen(x: Int) -> Int { return x + 10 }
+fn negate(x: Int) -> Int { return 0 - x }
+
+let a = 5 |> double()
+assert(a == 10, "pipe double")
+
+let b = 5 |> double() |> addTen()
+assert(b == 20, "pipe chain double then addTen")
+
+let c = 3 |> addTen() |> double()
+assert(c == 26, "pipe chain addTen then double")
+
+let d = 10 |> negate()
+assert(d == -10, "pipe negate")
+
+// ── Pipe with multi-arg functions ─────────────────────────────
+
+fn add(x: Int, y: Int) -> Int { return x + y }
+fn multiply(x: Int, y: Int) -> Int { return x * y }
+
+let e = 5 |> add(3)
+assert(e == 8, "pipe add extra arg")
+
+let f = 5 |> multiply(4)
+assert(f == 20, "pipe multiply extra arg")
+
+// ── Pipe chaining with multi-arg ─────────────────────────────
+
+let g = 2 |> multiply(3) |> add(4)
+assert(g == 10, "pipe chain multi-arg")
+
+// ── Pipe with Cast:: ─────────────────────────────────────────
+
+let h = 42 |> Cast::string()
+assert(h == "42", "pipe Cast::string")
+
+// ── Pipe with string functions ───────────────────────────────
+
+fn exclaim(s: String) -> String { return s + "!" }
+
+let i = "hello" |> exclaim()
+assert(i == "hello!", "pipe exclaim")
+
+// ── Semicolon as statement separator ─────────────────────────
+// Semicolons allow multiple statements on one line.
+
+let x = 1; let y = 2; let z = x + y
+assert(z == 3, "semicolons separate statements")
+
+let m = 10; m = m + 5; assert(m == 15, "semicolons with mutation")
+
+// ── C-style for loop uses semicolons ─────────────────────────
+
+let total = 0
+for let j = 0; j < 5; j += 1 {
+    total = total + j
+}
+assert(total == 10, "C-style for with semicolons")
+
+println("PASS: All pipe and semicolon tests passed!")

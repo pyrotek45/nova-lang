@@ -4,9 +4,33 @@ import color
 import signal
 
 // ---------------------------------------------------------------------------
-// Simple raylib GUI widgets for game UIs.
+// Raylib GUI widgets for game and application UIs.
 // All draw functions push to the raylib draw queue via raylib:: functions.
-// Widgets emit Godot-style signals for click / hover / toggle / value-change.
+// Interactive widgets emit Godot-style signals on user interaction.
+//
+// Each widget has a drawAt(x, y, w, h) method so layout containers
+// (std/container) can reposition them.  To place a widget in a
+// container, wrap it in a Slot closure:
+//
+//   import super.std.container
+//   import super.std.widget
+//   let btn = Button::new(0, 0, 120, 30, "OK")
+//   let slot = Slot::new(
+//       |x: Int, y: Int, w: Int, h: Int| { btn.drawAt(x, y, w, h) },
+//       fn() -> (Int, Int) { return (120, 30) }
+//   )
+//
+// Widgets:
+//   Button       — Clickable button with label
+//   Label        — Static text display
+//   Panel        — Rectangular background with border
+//   Toggle       — On/off toggle switch with signal
+//   ProgressBar  — Horizontal progress indicator with signal
+//   Checkbox     — Checkable box with label and signal
+//   Slider       — Horizontal slider with value signal
+//   TextField    — Single-line text input with signal
+//   RadioGroup   — Mutually exclusive option group with signal
+//   Dropdown     — Collapsible option list with signal
 // ---------------------------------------------------------------------------
 
 // --- Rect helper ---
@@ -22,7 +46,9 @@ fn extends contains(r: Rect, px: Int, py: Int) -> Bool {
     return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h
 }
 
-// --- Button ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// Button
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct Button {
     rect: Rect,
@@ -52,6 +78,11 @@ fn extends draw(btn: Button) {
     let tx = btn.rect.x + (btn.rect.w - tw) / 2
     let ty = btn.rect.y + (btn.rect.h - btn.fontSize) / 2
     raylib::drawText(btn.label, tx, ty, btn.fontSize, btn.fg)
+}
+
+fn extends drawAt(btn: Button, x: Int, y: Int, w: Int, h: Int) {
+    btn.rect = Rect { x: x, y: y, w: w, h: h }
+    btn.draw()
 }
 
 fn extends isClicked(btn: Button) -> Bool {
@@ -86,7 +117,9 @@ fn extends drawWithHover(btn: Button, hoverBg: (Int, Int, Int)) {
     raylib::drawText(btn.label, tx, ty, btn.fontSize, btn.fg)
 }
 
-// --- Label ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// Label
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct Label {
     x: Int,
@@ -98,8 +131,7 @@ struct Label {
 
 fn extends(Label) new(x: Int, y: Int, text: String) -> Label {
     return Label {
-        x: x,
-        y: y,
+        x: x, y: y,
         text: text,
         color: color::white(),
         fontSize: 20
@@ -110,7 +142,15 @@ fn extends draw(lbl: Label) {
     raylib::drawText(lbl.text, lbl.x, lbl.y, lbl.fontSize, lbl.color)
 }
 
-// --- Panel ---
+fn extends drawAt(lbl: Label, x: Int, y: Int, w: Int, h: Int) {
+    lbl.x = x
+    lbl.y = y
+    lbl.draw()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Panel
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct Panel {
     rect: Rect,
@@ -131,7 +171,14 @@ fn extends draw(panel: Panel) {
     raylib::drawRectangleLines(panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h, panel.borderColor)
 }
 
-// --- ProgressBar ---
+fn extends drawAt(panel: Panel, x: Int, y: Int, w: Int, h: Int) {
+    panel.rect = Rect { x: x, y: y, w: w, h: h }
+    panel.draw()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ProgressBar
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct ProgressBar {
     rect: Rect,
@@ -166,7 +213,14 @@ fn extends draw(bar: ProgressBar) {
     raylib::drawRectangleLines(bar.rect.x, bar.rect.y, bar.rect.w, bar.rect.h, color::gray())
 }
 
-// --- Toggle ---
+fn extends drawAt(bar: ProgressBar, x: Int, y: Int, w: Int, h: Int) {
+    bar.rect = Rect { x: x, y: y, w: w, h: h }
+    bar.draw()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Toggle
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct Toggle {
     rect: Rect,
@@ -204,6 +258,11 @@ fn extends draw(tog: Toggle) {
     raylib::drawText(tog.label, tx, ty, tog.fontSize, tog.fg)
 }
 
+fn extends drawAt(tog: Toggle, x: Int, y: Int, w: Int, h: Int) {
+    tog.rect = Rect { x: x, y: y, w: w, h: h }
+    tog.draw()
+}
+
 fn extends isClicked(tog: Toggle) -> Bool {
     if raylib::isMousePressed("Left") {
         let pos = raylib::mousePosition()
@@ -214,4 +273,465 @@ fn extends isClicked(tog: Toggle) -> Bool {
         }
     }
     return false
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Checkbox — small checkable box with a label
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct Checkbox {
+    x: Int,
+    y: Int,
+    size: Int,
+    label: String,
+    checked: Bool,
+    boxColor: (Int, Int, Int),
+    checkColor: (Int, Int, Int),
+    fg: (Int, Int, Int),
+    fontSize: Int,
+    onCheck: Signal(Bool)
+}
+
+fn extends(Checkbox) new(x: Int, y: Int, label: String) -> Checkbox {
+    return Checkbox {
+        x: x, y: y,
+        size: 20,
+        label: label,
+        checked: false,
+        boxColor: color::darkGray(),
+        checkColor: color::green(),
+        fg: color::white(),
+        fontSize: 18,
+        onCheck: Signal::new() @[T: Bool]
+    }
+}
+
+fn extends draw(cb: Checkbox) {
+    // Box
+    raylib::drawRectangle(cb.x, cb.y, cb.size, cb.size, cb.boxColor)
+    raylib::drawRectangleLines(cb.x, cb.y, cb.size, cb.size, color::gray())
+    // Check mark (filled inner square)
+    if cb.checked {
+        let inset = 4
+        raylib::drawRectangle(cb.x + inset, cb.y + inset, cb.size - inset * 2, cb.size - inset * 2, cb.checkColor)
+    }
+    // Label
+    raylib::drawText(cb.label, cb.x + cb.size + 8, cb.y + (cb.size - cb.fontSize) / 2, cb.fontSize, cb.fg)
+}
+
+fn extends drawAt(cb: Checkbox, x: Int, y: Int, w: Int, h: Int) {
+    cb.x = x
+    cb.y = y
+    cb.draw()
+}
+
+fn extends isClicked(cb: Checkbox) -> Bool {
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        let r = Rect { x: cb.x, y: cb.y, w: cb.size + 8 + raylib::measureText(cb.label, cb.fontSize), h: cb.size }
+        if r.contains(pos[0], pos[1]) {
+            cb.checked = !cb.checked
+            cb.onCheck.emit(cb.checked)
+            return true
+        }
+    }
+    return false
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Slider — horizontal slider (minVal..maxVal)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct Slider {
+    rect: Rect,
+    value: Float,
+    minVal: Float,
+    maxVal: Float,
+    bg: (Int, Int, Int),
+    fillColor: (Int, Int, Int),
+    knobColor: (Int, Int, Int),
+    dragging: Bool,
+    onValueChanged: Signal(Float)
+}
+
+fn extends(Slider) new(x: Int, y: Int, w: Int, h: Int, minVal: Float, maxVal: Float) -> Slider {
+    return Slider {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        value: minVal,
+        minVal: minVal,
+        maxVal: maxVal,
+        bg: color::darkGray(),
+        fillColor: color::blue(),
+        knobColor: color::white(),
+        dragging: false,
+        onValueChanged: Signal::new() @[T: Float]
+    }
+}
+
+fn extends draw(sl: Slider) {
+    // Track
+    raylib::drawRectangle(sl.rect.x, sl.rect.y, sl.rect.w, sl.rect.h, sl.bg)
+    // Fill
+    let range = sl.maxVal - sl.minVal
+    let ratio = if range > 0.0 { (sl.value - sl.minVal) / range } else { 0.0 }
+    let fillW = Cast::int(Cast::float(sl.rect.w).unwrap() * ratio).unwrap()
+    raylib::drawRectangle(sl.rect.x, sl.rect.y, fillW, sl.rect.h, sl.fillColor)
+    // Knob
+    let knobX = sl.rect.x + fillW - 4
+    raylib::drawRectangle(knobX, sl.rect.y - 2, 8, sl.rect.h + 4, sl.knobColor)
+    // Border
+    raylib::drawRectangleLines(sl.rect.x, sl.rect.y, sl.rect.w, sl.rect.h, color::gray())
+}
+
+fn extends drawAt(sl: Slider, x: Int, y: Int, w: Int, h: Int) {
+    sl.rect = Rect { x: x, y: y, w: w, h: h }
+    sl.draw()
+}
+
+fn extends update(sl: Slider) {
+    let pos = raylib::mousePosition()
+    let mx = pos[0]
+    let my = pos[1]
+    let r = sl.rect
+
+    if raylib::isMousePressed("Left") {
+        if r.contains(mx, my) {
+            sl.dragging = true
+        }
+    }
+    if raylib::isMouseReleased("Left") {
+        sl.dragging = false
+    }
+
+    if sl.dragging {
+        let rel = Cast::float(mx - r.x).unwrap() / Cast::float(r.w).unwrap()
+        if rel < 0.0 { rel = 0.0 }
+        if rel > 1.0 { rel = 1.0 }
+        let newVal = sl.minVal + rel * (sl.maxVal - sl.minVal)
+        if newVal != sl.value {
+            sl.value = newVal
+            sl.onValueChanged.emit(newVal)
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TextField — single-line text input
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct TextField {
+    rect: Rect,
+    text: String,
+    maxLen: Int,
+    focused: Bool,
+    bg: (Int, Int, Int),
+    fg: (Int, Int, Int),
+    borderColor: (Int, Int, Int),
+    focusBorder: (Int, Int, Int),
+    fontSize: Int,
+    cursorBlink: Int,
+    onTextChanged: Signal(String),
+    onSubmit: VoidSignal
+}
+
+fn extends(TextField) new(x: Int, y: Int, w: Int, h: Int) -> TextField {
+    return TextField {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        text: "",
+        maxLen: 64,
+        focused: false,
+        bg: (30, 30, 40),
+        fg: color::white(),
+        borderColor: color::gray(),
+        focusBorder: color::skyBlue(),
+        fontSize: 20,
+        cursorBlink: 0,
+        onTextChanged: Signal::new() @[T: String],
+        onSubmit: VoidSignal::new()
+    }
+}
+
+// Map raylib key name to a character string
+fn keyToChar(keyName: String) -> String {
+    if keyName == "KEY_ZERO"  { return "0" }
+    if keyName == "KEY_ONE"   { return "1" }
+    if keyName == "KEY_TWO"   { return "2" }
+    if keyName == "KEY_THREE" { return "3" }
+    if keyName == "KEY_FOUR"  { return "4" }
+    if keyName == "KEY_FIVE"  { return "5" }
+    if keyName == "KEY_SIX"   { return "6" }
+    if keyName == "KEY_SEVEN" { return "7" }
+    if keyName == "KEY_EIGHT" { return "8" }
+    if keyName == "KEY_NINE"  { return "9" }
+    if keyName == "KEY_A" { return "a" }
+    if keyName == "KEY_B" { return "b" }
+    if keyName == "KEY_C" { return "c" }
+    if keyName == "KEY_D" { return "d" }
+    if keyName == "KEY_E" { return "e" }
+    if keyName == "KEY_F" { return "f" }
+    if keyName == "KEY_G" { return "g" }
+    if keyName == "KEY_H" { return "h" }
+    if keyName == "KEY_I" { return "i" }
+    if keyName == "KEY_J" { return "j" }
+    if keyName == "KEY_K" { return "k" }
+    if keyName == "KEY_L" { return "l" }
+    if keyName == "KEY_M" { return "m" }
+    if keyName == "KEY_N" { return "n" }
+    if keyName == "KEY_O" { return "o" }
+    if keyName == "KEY_P" { return "p" }
+    if keyName == "KEY_Q" { return "q" }
+    if keyName == "KEY_R" { return "r" }
+    if keyName == "KEY_S" { return "s" }
+    if keyName == "KEY_T" { return "t" }
+    if keyName == "KEY_U" { return "u" }
+    if keyName == "KEY_V" { return "v" }
+    if keyName == "KEY_W" { return "w" }
+    if keyName == "KEY_X" { return "x" }
+    if keyName == "KEY_Y" { return "y" }
+    if keyName == "KEY_Z" { return "z" }
+    if keyName == "KEY_SPACE" { return " " }
+    if keyName == "KEY_MINUS" { return "-" }
+    if keyName == "KEY_PERIOD" { return "." }
+    if keyName == "KEY_COMMA" { return "," }
+    if keyName == "KEY_SLASH" { return "/" }
+    if keyName == "KEY_EQUAL" { return "=" }
+    if keyName == "KEY_SEMICOLON" { return ";" }
+    if keyName == "KEY_APOSTROPHE" { return "'" }
+    return ""
+}
+
+fn extends draw(tf: TextField) {
+    // Background
+    raylib::drawRectangle(tf.rect.x, tf.rect.y, tf.rect.w, tf.rect.h, tf.bg)
+    // Border (highlight when focused)
+    let bc = if tf.focused { tf.focusBorder } else { tf.borderColor }
+    raylib::drawRectangleLines(tf.rect.x, tf.rect.y, tf.rect.w, tf.rect.h, bc)
+    // Text
+    let textX = tf.rect.x + 6
+    let textY = tf.rect.y + (tf.rect.h - tf.fontSize) / 2
+    raylib::drawText(tf.text, textX, textY, tf.fontSize, tf.fg)
+    // Cursor blink
+    if tf.focused {
+        tf.cursorBlink += 1
+        if (tf.cursorBlink / 30) % 2 == 0 {
+            let tw = raylib::measureText(tf.text, tf.fontSize)
+            raylib::drawRectangle(textX + tw + 2, textY, 2, tf.fontSize, tf.fg)
+        }
+    }
+}
+
+fn extends drawAt(tf: TextField, x: Int, y: Int, w: Int, h: Int) {
+    tf.rect = Rect { x: x, y: y, w: w, h: h }
+    tf.draw()
+}
+
+fn extends update(tf: TextField) {
+    // Click to focus
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        tf.focused = tf.rect.contains(pos[0], pos[1])
+    }
+
+    if !tf.focused { return }
+
+    // Read key input
+    let key = raylib::getKey()
+    if let k = key {
+        if k == "KEY_BACKSPACE" {
+            if tf.text.len() > 0 {
+                tf.text = tf.text.substring(0, tf.text.len() - 1)
+                tf.onTextChanged.emit(tf.text)
+            }
+        } elif k == "KEY_ENTER" {
+            tf.onSubmit.emit()
+        } else {
+            let ch = keyToChar(k)
+            if ch != "" && tf.text.len() < tf.maxLen {
+                // Check shift for uppercase
+                if raylib::isKeyDown("LeftShift") || raylib::isKeyDown("RightShift") {
+                    ch = ch.toUpper()
+                }
+                tf.text = tf.text + ch
+                tf.onTextChanged.emit(tf.text)
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RadioGroup — mutually exclusive choices
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct RadioGroup {
+    x: Int,
+    y: Int,
+    options: [String],
+    selected: Int,
+    spacing: Int,
+    circleSize: Int,
+    fg: (Int, Int, Int),
+    selectedColor: (Int, Int, Int),
+    fontSize: Int,
+    onSelect: Signal(Int)
+}
+
+fn extends(RadioGroup) new(x: Int, y: Int, options: [String]) -> RadioGroup {
+    return RadioGroup {
+        x: x, y: y,
+        options: options,
+        selected: 0,
+        spacing: 28,
+        circleSize: 8,
+        fg: color::white(),
+        selectedColor: color::skyBlue(),
+        fontSize: 18,
+        onSelect: Signal::new() @[T: Int]
+    }
+}
+
+fn extends draw(rg: RadioGroup) {
+    let cy = rg.y
+    let i = 0
+    for opt in rg.options {
+        let cx = rg.x + rg.circleSize
+        let centerY = cy + rg.circleSize
+        // Outer circle
+        raylib::drawCircle(cx, centerY, rg.circleSize, color::gray())
+        // Inner filled if selected
+        if i == rg.selected {
+            raylib::drawCircle(cx, centerY, rg.circleSize - 3, rg.selectedColor)
+        } else {
+            raylib::drawCircle(cx, centerY, rg.circleSize - 3, color::darkGray())
+        }
+        // Label
+        raylib::drawText(opt, rg.x + rg.circleSize * 2 + 8, cy + (rg.circleSize * 2 - rg.fontSize) / 2, rg.fontSize, rg.fg)
+        cy += rg.spacing
+        i += 1
+    }
+}
+
+fn extends drawAt(rg: RadioGroup, x: Int, y: Int, w: Int, h: Int) {
+    rg.x = x
+    rg.y = y
+    rg.draw()
+}
+
+fn extends update(rg: RadioGroup) {
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        let mx = pos[0]
+        let my = pos[1]
+        let cy = rg.y
+        let i = 0
+        for opt in rg.options {
+            let tw = raylib::measureText(opt, rg.fontSize)
+            let hitW = rg.circleSize * 2 + 8 + tw
+            let r = Rect { x: rg.x, y: cy, w: hitW, h: rg.spacing }
+            if r.contains(mx, my) {
+                if i != rg.selected {
+                    rg.selected = i
+                    rg.onSelect.emit(i)
+                }
+            }
+            cy += rg.spacing
+            i += 1
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dropdown — collapsible option list
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct Dropdown {
+    rect: Rect,
+    options: [String],
+    selected: Int,
+    open: Bool,
+    bg: (Int, Int, Int),
+    hoverBg: (Int, Int, Int),
+    fg: (Int, Int, Int),
+    fontSize: Int,
+    onSelect: Signal(Int)
+}
+
+fn extends(Dropdown) new(x: Int, y: Int, w: Int, h: Int, options: [String]) -> Dropdown {
+    return Dropdown {
+        rect: Rect { x: x, y: y, w: w, h: h },
+        options: options,
+        selected: 0,
+        open: false,
+        bg: color::darkGray(),
+        hoverBg: (60, 80, 120),
+        fg: color::white(),
+        fontSize: 18,
+        onSelect: Signal::new() @[T: Int]
+    }
+}
+
+fn extends draw(dd: Dropdown) {
+    // Main box
+    raylib::drawRectangle(dd.rect.x, dd.rect.y, dd.rect.w, dd.rect.h, dd.bg)
+    raylib::drawRectangleLines(dd.rect.x, dd.rect.y, dd.rect.w, dd.rect.h, color::gray())
+    // Selected text
+    let txt = if dd.options.len() > 0 { dd.options[dd.selected] } else { "" }
+    let ty = dd.rect.y + (dd.rect.h - dd.fontSize) / 2
+    raylib::drawText(txt, dd.rect.x + 8, ty, dd.fontSize, dd.fg)
+    // Arrow indicator
+    let arrow = if dd.open { "^" } else { "v" }
+    let aw = raylib::measureText(arrow, dd.fontSize)
+    raylib::drawText(arrow, dd.rect.x + dd.rect.w - aw - 8, ty, dd.fontSize, dd.fg)
+
+    // Expanded list
+    if dd.open {
+        let pos = raylib::mousePosition()
+        let mx = pos[0]
+        let my = pos[1]
+        let i = 0
+        for opt in dd.options {
+            let iy = dd.rect.y + dd.rect.h + i * dd.rect.h
+            let itemRect = Rect { x: dd.rect.x, y: iy, w: dd.rect.w, h: dd.rect.h }
+            let bg = if itemRect.contains(mx, my) { dd.hoverBg } else { dd.bg }
+            raylib::drawRectangle(itemRect.x, itemRect.y, itemRect.w, itemRect.h, bg)
+            raylib::drawRectangleLines(itemRect.x, itemRect.y, itemRect.w, itemRect.h, color::gray())
+            let oty = iy + (dd.rect.h - dd.fontSize) / 2
+            raylib::drawText(opt, dd.rect.x + 8, oty, dd.fontSize, dd.fg)
+            i += 1
+        }
+    }
+}
+
+fn extends drawAt(dd: Dropdown, x: Int, y: Int, w: Int, h: Int) {
+    dd.rect = Rect { x: x, y: y, w: w, h: h }
+    dd.draw()
+}
+
+fn extends update(dd: Dropdown) {
+    if raylib::isMousePressed("Left") {
+        let pos = raylib::mousePosition()
+        let mx = pos[0]
+        let my = pos[1]
+
+        if dd.open {
+            // Check if clicked on an option
+            let i = 0
+            let found = false
+            for opt in dd.options {
+                let iy = dd.rect.y + dd.rect.h + i * dd.rect.h
+                let itemRect = Rect { x: dd.rect.x, y: iy, w: dd.rect.w, h: dd.rect.h }
+                if itemRect.contains(mx, my) {
+                    dd.selected = i
+                    dd.onSelect.emit(i)
+                    found = true
+                }
+                i += 1
+            }
+            dd.open = false
+        } else {
+            // Toggle open
+            if dd.rect.contains(mx, my) {
+                dd.open = true
+            }
+        }
+    }
 }

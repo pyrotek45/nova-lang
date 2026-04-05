@@ -36,7 +36,7 @@ iter_list_pipeline()
 // ── 2. HashMap + List: frequency counter ─────────────────────────
 fn frequency_counter() {
     let words = "the cat sat on the mat the cat".split(' ')
-    let freq = HashMap::default() @[K: String, V: Int]
+    let freq = HashMap::new() @[K: String, V: Int]
     for w in words {
         freq.increment(w)
     }
@@ -135,7 +135,7 @@ fn csv_parser() {
     let records = []: HashMap(String, String)
     for let i = 1; i < lines.len(); i += 1 {
         let fields = lines[i].split(',')
-        let record = HashMap::default() @[K: String, V: String]
+        let record = HashMap::new() @[K: String, V: String]
         for let j = 0; j < header.len(); j += 1 {
             record.insert(header[j], fields[j])
         }
@@ -180,8 +180,8 @@ error_pipeline()
 
 // ── 8. Box + Closure + HashMap: stateful registry ────────────────
 fn stateful_registry() {
-    let registry = Box(HashMap::default() @[K: String, V: fn() -> Int])
-    let counters = HashMap::default() @[K: String, V: Int]
+    let registry = Box(HashMap::new() @[K: String, V: fn() -> Int])
+    let counters = HashMap::new() @[K: String, V: Int]
 
     // Register factories
     fn registerCounter(reg: Box(HashMap(String, fn() -> Int)), name: String, start: Int) {
@@ -375,7 +375,7 @@ fn multi_module_stress() {
         let upper = label.toUpper()
 
         // HashMap
-        let m = HashMap::default() @[K: String, V: Int]
+        let m = HashMap::new() @[K: String, V: Int]
         m.insert(label, sum)
 
         // Set
@@ -471,7 +471,7 @@ fn word_histogram() {
     }
 
     // Count frequencies
-    let freq = HashMap::default() @[K: String, V: Int]
+    let freq = HashMap::new() @[K: String, V: Int]
     for w in doc {
         freq.increment(w)
     }
