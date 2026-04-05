@@ -1,82 +1,108 @@
 // ============================================================
-// std/entity.nv  — Lightweight entity component system
+// std/entity.nv  — Generic entity component system with signals
 // ============================================================
 //
 // Usage:  import super.std.entity
 //         import super.std.vec2
+//         import super.std.signal
 //
-// Structs:
-//   Entity      -- single game object
-//   EntityWorld -- container managing all entities
+// Entity(T) is a generic game object.  The type parameter T is
+// the user data — any struct, Int, Float, String, or anything
+// else you need.  This makes entities flexible enough to model
+// any kind of game object.
 //
-// Entity fields (all public, access directly):
+// Entity(T) fields (all public, access directly):
 //   id:    Int
 //   pos:   Vec2
 //   vel:   Vec2
-//   size:  Vec2      -- width/height (for AABB/draw)
-//   tag:   String    -- category label (e.g. "player", "enemy", "bullet")
-//   alive: Bool      -- set to false to queue for removal
-//   data:  Float     -- generic data slot (health, timer, angle, …)
+//   size:  Vec2       -- width/height (for AABB/draw)
+//   tag:   String     -- category label ("player", "enemy", "bullet")
+//   alive: Bool       -- set to false to queue for removal
+//   data:  T          -- your custom data (health struct, sprite id, etc.)
 //
-// EntityWorld constructors:
-//   EntityWorld::new()
+// EntityWorld(T) constructors:
+//   EntityWorld::new() @[T: MyData]
 //
-// EntityWorld methods:
-//   world.spawn(x, y, tag) -> Entity        -- create and register entity
-//   world.spawnFull(x,y,vx,vy,w,h,tag,d)   -- full constructor
-//   world.kill(id)                          -- mark entity dead
-//   world.killAll(tag)                      -- kill all with tag
-//   world.update(dt)                        -- integrate vel, prune dead
+// EntityWorld(T) methods:
+//   world.spawn(x, y, tag, data) -> Entity(T)
+//   world.spawnFull(x,y,vx,vy,w,h,tag,data) -> Entity(T)
+//   world.kill(id)
+//   world.killAll(tag)
+//   world.update(dt)                  -- integrate vel, prune dead
 //   world.count() -> Int
 //   world.countAlive(tag) -> Int
-//   world.query(tag) -> [Entity]            -- live entities with tag
-//   world.all() -> [Entity]                 -- all live entities
-//   world.getById(id) -> Option(Entity)
-//   world.forEach(f: fn(Entity))
-//   world.forEachTagged(tag, f: fn(Entity))
+//   world.query(tag) -> [Entity(T)]
+//   world.all() -> [Entity(T)]
+//   world.getById(id) -> Option(Entity(T))
+//   world.forEach(f: fn(Entity(T)))
+//   world.forEachTagged(tag, f: fn(Entity(T)))
 //   world.clear()
 //
-// Collision helpers:
-//   entity.overlapsAABB(other: Entity) -> Bool
-//   entity.overlapCircle(other: Entity) -> Bool  -- uses size.x as radius
+// Built-in signals (on EntityWorld):
+//   world.onSpawn    : Signal(Int)    -- fires with entity id after spawn
+//   world.onKill     : Signal(Int)    -- fires with entity id when killed
+//   world.onClear    : VoidSignal     -- fires when world is cleared
 //
-// Drawing helpers:
+// Collision helpers:
+//   entity.overlapsAABB(other) -> Bool
+//   entity.overlapCircle(other) -> Bool
+//
+// Drawing helpers (raylib):
 //   entity.drawRect(color)
 //   entity.drawCircle(color)
+//
+// ── Quick examples ────────────────────────────────────────────
+//
+//   // Simple float data (like the old entity):
+//   let world = EntityWorld::new() @[T: Float]
+//   let e = world.spawn(100.0, 200.0, "player", 0.0)
+//
+//   // Custom struct data:
+//   struct PlayerData { hp: Int, speed: Float, name: String }
+//   let world = EntityWorld::new() @[T: PlayerData]
+//   let data = PlayerData { hp: 100, speed: 200.0, name: "Hero" }
+//   let player = world.spawn(100.0, 200.0, "player", data)
+//   player.data.hp -= 25   // direct mutation
+//
+//   // Listen for spawns:
+//   world.onSpawn.connect(|id: Int| {
+//       println("Entity " + Cast::string(id) + " spawned!")
+//   })
 //
 // ============================================================
 
 module entity
 
 import vec2
+import signal
 
-// ── Entity ────────────────────────────────────────────────────────────────────
+// ── Entity(T) ─────────────────────────────────────────────────────────────────
 
-struct Entity {
+struct Entity(T) {
     id:    Int,
     pos:   Vec2,
     vel:   Vec2,
     size:  Vec2,
     tag:   String,
     alive: Bool,
-    data:  Float,
+    data:  $T,
 }
 
-fn extends overlapsAABB(self: Entity, other: Entity) -> Bool {
+fn extends overlapsAABB(self: Entity($T), other: Entity($T)) -> Bool {
     return self.pos.x < other.pos.x + other.size.x &&
            self.pos.x + self.size.x > other.pos.x &&
            self.pos.y < other.pos.y + other.size.y &&
            self.pos.y + self.size.y > other.pos.y
 }
 
-fn extends overlapCircle(self: Entity, other: Entity) -> Bool {
+fn extends overlapCircle(self: Entity($T), other: Entity($T)) -> Bool {
     let dx = self.pos.x - other.pos.x
     let dy = self.pos.y - other.pos.y
     let dist = (dx * dx + dy * dy).sqrt()
     return dist < self.size.x + other.size.x
 }
 
-fn extends entityDrawRect(self: Entity, color: (Int, Int, Int)) {
+fn extends entityDrawRect(self: Entity($T), color: (Int, Int, Int)) {
     raylib::drawRectangle(
         Cast::int(self.pos.x).unwrap(),
         Cast::int(self.pos.y).unwrap(),
@@ -86,7 +112,7 @@ fn extends entityDrawRect(self: Entity, color: (Int, Int, Int)) {
     )
 }
 
-fn extends entityDrawCircle(self: Entity, color: (Int, Int, Int)) {
+fn extends entityDrawCircle(self: Entity($T), color: (Int, Int, Int)) {
     raylib::drawCircle(
         Cast::int(self.pos.x + self.size.x / 2.0).unwrap(),
         Cast::int(self.pos.y + self.size.y / 2.0).unwrap(),
@@ -95,27 +121,33 @@ fn extends entityDrawCircle(self: Entity, color: (Int, Int, Int)) {
     )
 }
 
-fn extends center(self: Entity) -> Vec2 {
+fn extends center(self: Entity($T)) -> Vec2 {
     return Vec2::new(self.pos.x + self.size.x / 2.0,
                      self.pos.y + self.size.y / 2.0)
 }
 
-// ── EntityWorld ───────────────────────────────────────────────────────────────
+// ── EntityWorld(T) ────────────────────────────────────────────────────────────
 
-struct EntityWorld {
-    entities: [Entity],
+struct EntityWorld(T) {
+    entities: [Entity($T)],
     nextId:   Int,
+    onSpawn:  Signal(Int),
+    onKill:   Signal(Int),
+    onClear:  VoidSignal,
 }
 
-fn extends(EntityWorld) new() -> EntityWorld {
+fn extends(EntityWorld) new() -> EntityWorld($T) {
     return EntityWorld {
-        entities: []: Entity,
+        entities: []: Entity($T),
         nextId:   0,
+        onSpawn:  Signal::new() @[T: Int],
+        onKill:   Signal::new() @[T: Int],
+        onClear:  VoidSignal::new(),
     }
 }
 
 // Create a new entity with default vel/size and add it to the world
-fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
+fn extends spawn(self: EntityWorld($T), x: Float, y: Float, tag: String, data: $T) -> Entity($T) {
     let id = self.nextId
     self.nextId = self.nextId + 1
     let e = Entity {
@@ -125,18 +157,19 @@ fn extends spawn(self: EntityWorld, x: Float, y: Float, tag: String) -> Entity {
         size:  Vec2::new(16.0, 16.0),
         tag:   tag,
         alive: true,
-        data:  0.0,
+        data:  data,
     }
     self.entities.push(e)
+    self.onSpawn.emit(id)
     return e
 }
 
 // Create a fully specified entity
-fn extends spawnFull(self: EntityWorld,
+fn extends spawnFull(self: EntityWorld($T),
                      x: Float, y: Float,
                      vx: Float, vy: Float,
                      w: Float, h: Float,
-                     tag: String, data: Float) -> Entity {
+                     tag: String, data: $T) -> Entity($T) {
     let id = self.nextId
     self.nextId = self.nextId + 1
     let e = Entity {
@@ -149,26 +182,33 @@ fn extends spawnFull(self: EntityWorld,
         data:  data,
     }
     self.entities.push(e)
+    self.onSpawn.emit(id)
     return e
 }
 
 // Mark entity with given id as dead
-fn extends kill(self: EntityWorld, id: Int) {
+fn extends kill(self: EntityWorld($T), id: Int) {
     for e in self.entities {
-        if e.id == id { e.alive = false }
+        if e.id == id {
+            e.alive = false
+            self.onKill.emit(id)
+        }
     }
 }
 
 // Kill all entities with a given tag
-fn extends killAll(self: EntityWorld, tag: String) {
+fn extends killAll(self: EntityWorld($T), tag: String) {
     for e in self.entities {
-        if e.tag == tag { e.alive = false }
+        if e.tag == tag {
+            e.alive = false
+            self.onKill.emit(e.id)
+        }
     }
 }
 
 // Integrate velocities and remove dead entities
-fn extends update(self: EntityWorld, dt: Float) {
-    let alive = []: Entity
+fn extends update(self: EntityWorld($T), dt: Float) {
+    let alive = []: Entity($T)
     for e in self.entities {
         if e.alive {
             e.pos.x = e.pos.x + e.vel.x * dt
@@ -181,11 +221,11 @@ fn extends update(self: EntityWorld, dt: Float) {
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
-fn extends count(self: EntityWorld) -> Int {
+fn extends count(self: EntityWorld($T)) -> Int {
     return self.entities.len()
 }
 
-fn extends countAlive(self: EntityWorld, tag: String) -> Int {
+fn extends countAlive(self: EntityWorld($T), tag: String) -> Int {
     let n = 0
     for e in self.entities {
         if e.alive && e.tag == tag { n += 1 }
@@ -193,41 +233,42 @@ fn extends countAlive(self: EntityWorld, tag: String) -> Int {
     return n
 }
 
-fn extends query(self: EntityWorld, tag: String) -> [Entity] {
-    let out = []: Entity
+fn extends query(self: EntityWorld($T), tag: String) -> [Entity($T)] {
+    let out = []: Entity($T)
     for e in self.entities {
         if e.alive && e.tag == tag { out.push(e) }
     }
     return out
 }
 
-fn extends all(self: EntityWorld) -> [Entity] {
-    let out = []: Entity
+fn extends all(self: EntityWorld($T)) -> [Entity($T)] {
+    let out = []: Entity($T)
     for e in self.entities {
         if e.alive { out.push(e) }
     }
     return out
 }
 
-fn extends getById(self: EntityWorld, id: Int) -> Option(Entity) {
+fn extends getById(self: EntityWorld($T), id: Int) -> Option(Entity($T)) {
     for e in self.entities {
         if e.id == id { return Some(e) }
     }
-    return None(Entity)
+    return None(Entity($T))
 }
 
-fn extends forEach(self: EntityWorld, f: fn(Entity)) {
+fn extends forEach(self: EntityWorld($T), f: fn(Entity($T))) {
     for e in self.entities {
         if e.alive { f(e) }
     }
 }
 
-fn extends forEachTagged(self: EntityWorld, tag: String, f: fn(Entity)) {
+fn extends forEachTagged(self: EntityWorld($T), tag: String, f: fn(Entity($T))) {
     for e in self.entities {
         if e.alive && e.tag == tag { f(e) }
     }
 }
 
-fn extends clear(self: EntityWorld) {
-    self.entities = []: Entity
+fn extends clear(self: EntityWorld($T)) {
+    self.entities = []: Entity($T)
+    self.onClear.emit()
 }

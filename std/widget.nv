@@ -1,10 +1,12 @@
 module widget
 
 import color
+import signal
 
 // ---------------------------------------------------------------------------
 // Simple raylib GUI widgets for game UIs.
 // All draw functions push to the raylib draw queue via raylib:: functions.
+// Widgets emit Godot-style signals for click / hover / toggle / value-change.
 // ---------------------------------------------------------------------------
 
 // --- Rect helper ---
@@ -27,7 +29,9 @@ struct Button {
     label: String,
     bg: (Int, Int, Int),
     fg: (Int, Int, Int),
-    fontSize: Int
+    fontSize: Int,
+    onClick: VoidSignal,
+    onHover: VoidSignal
 }
 
 fn extends(Button) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Button {
@@ -36,7 +40,9 @@ fn extends(Button) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Button 
         label: label,
         bg: color::darkGray(),
         fg: color::white(),
-        fontSize: 20
+        fontSize: 20,
+        onClick: VoidSignal::new(),
+        onHover: VoidSignal::new()
     }
 }
 
@@ -51,14 +57,21 @@ fn extends draw(btn: Button) {
 fn extends isClicked(btn: Button) -> Bool {
     if raylib::isMousePressed("Left") {
         let pos = raylib::mousePosition()
-        return btn.rect.contains(pos[0], pos[1])
+        if btn.rect.contains(pos[0], pos[1]) {
+            btn.onClick.emit()
+            return true
+        }
     }
     return false
 }
 
 fn extends isHovered(btn: Button) -> Bool {
     let pos = raylib::mousePosition()
-    return btn.rect.contains(pos[0], pos[1])
+    let hit = btn.rect.contains(pos[0], pos[1])
+    if hit {
+        btn.onHover.emit()
+    }
+    return hit
 }
 
 fn extends drawWithHover(btn: Button, hoverBg: (Int, Int, Int)) {
@@ -125,7 +138,8 @@ struct ProgressBar {
     value: Float,
     maxValue: Float,
     bg: (Int, Int, Int),
-    fg: (Int, Int, Int)
+    fg: (Int, Int, Int),
+    onValueChanged: Signal(Float)
 }
 
 fn extends(ProgressBar) new(x: Int, y: Int, w: Int, h: Int) -> ProgressBar {
@@ -134,8 +148,14 @@ fn extends(ProgressBar) new(x: Int, y: Int, w: Int, h: Int) -> ProgressBar {
         value: 0.0,
         maxValue: 100.0,
         bg: color::darkGray(),
-        fg: color::green()
+        fg: color::green(),
+        onValueChanged: Signal::new() @[T: Float]
     }
+}
+
+fn extends setValue(bar: ProgressBar, v: Float) {
+    bar.value = v
+    bar.onValueChanged.emit(v)
 }
 
 fn extends draw(bar: ProgressBar) {
@@ -155,7 +175,8 @@ struct Toggle {
     onColor: (Int, Int, Int),
     offColor: (Int, Int, Int),
     fg: (Int, Int, Int),
-    fontSize: Int
+    fontSize: Int,
+    onToggle: Signal(Bool)
 }
 
 fn extends(Toggle) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Toggle {
@@ -166,7 +187,8 @@ fn extends(Toggle) new(x: Int, y: Int, w: Int, h: Int, label: String) -> Toggle 
         onColor: color::green(),
         offColor: color::darkGray(),
         fg: color::white(),
-        fontSize: 20
+        fontSize: 20,
+        onToggle: Signal::new() @[T: Bool]
     }
 }
 
@@ -185,7 +207,11 @@ fn extends draw(tog: Toggle) {
 fn extends isClicked(tog: Toggle) -> Bool {
     if raylib::isMousePressed("Left") {
         let pos = raylib::mousePosition()
-        return tog.rect.contains(pos[0], pos[1])
+        if tog.rect.contains(pos[0], pos[1]) {
+            tog.on = !tog.on
+            tog.onToggle.emit(tog.on)
+            return true
+        }
     }
     return false
 }

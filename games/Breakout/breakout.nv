@@ -24,6 +24,7 @@ module breakout
 
 import super.super.std.scene
 import super.super.std.entity
+import super.super.std.signal
 import super.super.std.timer
 import super.super.std.tween
 import super.super.std.vec2
@@ -91,7 +92,7 @@ let ballVel = Vec2::new(Cast::float(BALL_INIT_VX).unwrap(),
                          Cast::float(BALL_INIT_VY).unwrap())
 
 // EntityWorld — heap object, captured by reference
-let world = EntityWorld::new()
+let world = EntityWorld::new() @[T: Float]
 
 // Tween for score flash — heap object, captured by reference
 let scoreFlash = Tween::linear(255.0, 0.0, 0.4)
@@ -121,7 +122,7 @@ fn buildBricks() {
     }
 }
 
-fn getBall() -> Entity {
+fn getBall() -> Entity(Float) {
     let bs = world.query("ball")
     return bs[0]
 }
@@ -165,7 +166,7 @@ fn drawHUD() {
 }
 
 fn drawBricks() {
-    world.forEachTagged("brick", fn(b: Entity) {
+    world.forEachTagged("brick", fn(b: Entity(Float)) {
         let row = Cast::int(b.data).unwrap()
         let c   = rowColor(row)
         let bx  = Cast::int(b.pos.x).unwrap()

@@ -1,0 +1,219 @@
+// ============================================================
+// std/signal.nv  — Godot-style signal system
+// ============================================================
+//
+// Usage:  import super.std.signal
+//
+// Signals let objects communicate without knowing about each
+// other.  An emitter defines named signals; listeners connect
+// callbacks.  When a signal fires, every connected callback
+// runs — fully decoupled.
+//
+// Inspired by Godot's signal pattern:
+//   signal.connect(callback)
+//   signal.emit(payload)
+//
+// ── Signal(T) — Typed signal with payload ─────────────────────
+//
+// A typed signal that carries a payload of type T.
+//
+// Constructor:
+//   Signal::new() @[T: Int]           -- typed signal
+//   Signal::new() @[T: String]
+//
+// Methods:
+//   sig.connect(f: fn(T))             -- add listener
+//   sig.emit(payload: T)              -- fire all listeners
+//   sig.clear()                       -- remove all listeners
+//   sig.count() -> Int                -- number of listeners
+//
+// ── VoidSignal — Fire-and-forget, no payload ──────────────────
+//
+// Constructor:
+//   VoidSignal::new()
+//
+// Methods:
+//   sig.connect(f: fn())              -- add listener
+//   sig.emit()                        -- fire all listeners
+//   sig.clear()                       -- remove all listeners
+//   sig.count() -> Int                -- number of listeners
+//
+// ── SignalBus — Named registry of void signals ────────────────
+//
+// A named bus of void signals.  Good for global events where
+// listeners don't need a payload, or pass state via Box captures.
+//
+// Constructor:
+//   SignalBus::new()
+//
+// Methods:
+//   bus.register(name)                -- register a signal name
+//   bus.connect(name, f: fn())        -- connect listener to named signal
+//   bus.emit(name)                    -- fire named signal
+//   bus.has(name) -> Bool             -- check if signal exists
+//   bus.clear(name)                   -- clear listeners on a signal
+//   bus.clearAll()                    -- clear everything
+//
+// ── Example ───────────────────────────────────────────────────
+//
+//   import super.std.signal
+//   import super.std.core
+//
+//   // Typed signal — carries the damage amount
+//   let onDamage = Signal::new() @[T: Int]
+//   let hp = Box(100)
+//
+//   onDamage.connect(|dmg: Int| {
+//       hp.value -= dmg
+//       println("Ouch! HP: " + Cast::string(hp.value))
+//   })
+//
+//   onDamage.emit(25)   // "Ouch! HP: 75"
+//   onDamage.emit(10)   // "Ouch! HP: 65"
+//
+//   // Void signal — just a notification
+//   let onReady = VoidSignal::new()
+//   onReady.connect(|| { println("Game ready!") })
+//   onReady.emit()      // "Game ready!"
+//
+//   // Signal bus — named events for decoupled systems
+//   let bus = SignalBus::new()
+//   bus.register("game_over")
+//   bus.register("level_up")
+//
+//   bus.connect("game_over", || { println("Game Over!") })
+//   bus.connect("level_up",  || { println("Level Up!") })
+//
+//   bus.emit("game_over")   // "Game Over!"
+//   bus.emit("level_up")    // "Level Up!"
+//
+// ============================================================
+
+module signal
+
+import hashmap
+
+// ── Signal(T) — Typed signal with payload ─────────────────────────────────────
+
+struct Signal(T) {
+    listeners: [fn($T)],
+}
+
+fn extends(Signal) new() -> Signal($T) {
+    return Signal { listeners: []: fn($T) }
+}
+
+// Add a listener that receives the payload
+fn extends connect(self: Signal($T), f: fn($T)) {
+    self.listeners.push(f)
+}
+
+// Fire all listeners with the given payload
+fn extends emit(self: Signal($T), payload: $T) {
+    for f in self.listeners {
+        f(payload)
+    }
+}
+
+// Remove all listeners
+fn extends clear(self: Signal($T)) {
+    self.listeners = []: fn($T)
+}
+
+// Number of connected listeners
+fn extends count(self: Signal($T)) -> Int {
+    return self.listeners.len()
+}
+
+// ── VoidSignal — No payload ───────────────────────────────────────────────────
+
+struct VoidSignal {
+    listeners: [fn()],
+}
+
+fn extends(VoidSignal) new() -> VoidSignal {
+    return VoidSignal { listeners: []: fn() }
+}
+
+// Add a listener (no payload)
+fn extends connect(self: VoidSignal, f: fn()) {
+    self.listeners.push(f)
+}
+
+// Fire all listeners
+fn extends emit(self: VoidSignal) {
+    for f in self.listeners {
+        f()
+    }
+}
+
+// Remove all listeners
+fn extends clear(self: VoidSignal) {
+    self.listeners = []: fn()
+}
+
+// Number of connected listeners
+fn extends count(self: VoidSignal) -> Int {
+    return self.listeners.len()
+}
+
+// ── SignalBus — Named registry of void signals ────────────────────────────────
+
+struct SignalBus {
+    signals: HashMap(String, VoidSignal),
+}
+
+fn extends(SignalBus) new() -> SignalBus {
+    return SignalBus {
+        signals: HashMap::default() @[K: String, V: VoidSignal],
+    }
+}
+
+// Register a new named signal (creates an empty VoidSignal)
+fn extends register(self: SignalBus, name: String) {
+    if !self.signals.has(name) {
+        self.signals.insert(name, VoidSignal::new())
+    }
+}
+
+// Connect a listener to a named signal (auto-registers if needed)
+fn extends connect(self: SignalBus, name: String, f: fn()) {
+    self.register(name)
+    let sig = self.signals.get(name).unwrap()
+    sig.connect(f)
+}
+
+// Emit a named signal
+fn extends emit(self: SignalBus, name: String) {
+    if self.signals.has(name) {
+        let sig = self.signals.get(name).unwrap()
+        sig.emit()
+    }
+}
+
+// Check if a signal name is registered
+fn extends has(self: SignalBus, name: String) -> Bool {
+    return self.signals.has(name)
+}
+
+// Clear all listeners on a named signal
+fn extends clear(self: SignalBus, name: String) {
+    if self.signals.has(name) {
+        let sig = self.signals.get(name).unwrap()
+        sig.clear()
+    }
+}
+
+// Clear all signals and listeners
+fn extends clearAll(self: SignalBus) {
+    self.signals = HashMap::default() @[K: String, V: VoidSignal]
+}
+
+// Number of listeners on a named signal
+fn extends signalCount(self: SignalBus, name: String) -> Int {
+    if self.signals.has(name) {
+        let sig = self.signals.get(name).unwrap()
+        return sig.count()
+    }
+    return 0
+}
