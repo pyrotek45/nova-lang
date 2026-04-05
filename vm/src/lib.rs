@@ -24,7 +24,7 @@ use crossterm::{
     ExecutableCommand, QueueableCommand,
 };
 
-use memory_manager::{Object, ObjectType, VmData};
+use memory_manager::{MemoryManager, Object, ObjectType, VmData};
 use modulo::Mod;
 use state::{CallType, State};
 
@@ -1357,6 +1357,18 @@ impl Vm {
     ) -> NovaResult<()> {
         use common::debug_info::DebugInfo;
 
+        // ── Heap cell info for heap inspect mode ─────────────────
+        #[derive(Clone)]
+        struct HeapCellInfo {
+            index: usize,
+            alive: bool,
+            ref_count: usize,
+            type_name: String,    // e.g. "List", "Struct(Point)", "Closure@42"
+            data_preview: String, // short preview of .data contents
+            fields: Vec<(String, String)>, // field_name → value (for structs)
+            data_len: usize,
+        }
+
         // ── Snapshot ────────────────────────────────────────────────
         #[derive(Clone)]
         struct Snapshot {
@@ -1378,6 +1390,115 @@ impl Vm {
             gc_base: usize,
             gc_locked: bool,
             stack_depth: usize,
+            // Heap cell snapshot for inspect mode
+            heap_cells: Vec<HeapCellInfo>,
+        }
+
+        fn object_type_name(obj: &Object) -> String {
+            match &obj.object_type {
+                ObjectType::List => "List".to_string(),
+                ObjectType::String => "String".to_string(),
+                ObjectType::Tuple => "Tuple".to_string(),
+                ObjectType::Struct(name) => format!("Struct({})", name),
+                ObjectType::Enum { name, tag } => format!("Enum({}::{})", name, tag),
+                ObjectType::Closure(addr) => format!("Closure@{}", addr),
+            }
+        }
+
+        fn heap_data_preview(obj: &Object) -> String {
+            match &obj.object_type {
+                ObjectType::String => {
+                    // String data is stored as Char values
+                    let s: String = obj.data.iter().filter_map(|v| {
+                        if let VmData::Char(c) = v { Some(*c) } else { None }
+                    }).collect();
+                    let escaped: String = s.chars().map(|c| match c {
+                        '\n' => '␊', '\r' => '␍', '\t' => '␉', '\0' => '␀',
+                        c if c.is_control() => '·',
+                        c => c,
+                    }).collect();
+                    if escaped.chars().count() > 30 {
+                        let preview: String = escaped.chars().take(28).collect();
+                        format!("\"{}..\"", preview)
+                    } else {
+                        format!("\"{}\"", escaped)
+                    }
+                }
+                ObjectType::List | ObjectType::Tuple => {
+                    let items: Vec<String> = obj.data.iter().take(8).map(fmt_vmdata).collect();
+                    let mut s = format!("[{}]", items.join(", "));
+                    if obj.data.len() > 8 {
+                        s = format!("[{}, ...+{}]", items.join(", "), obj.data.len() - 8);
+                    }
+                    s
+                }
+                ObjectType::Struct(_) => {
+                    let mut pairs: Vec<String> = obj.table.iter().take(6).map(|(k, idx)| {
+                        let val = obj.data.get(*idx).map(fmt_vmdata).unwrap_or_else(|| "?".into());
+                        format!("{}={}", k, val)
+                    }).collect();
+                    if obj.table.len() > 6 {
+                        pairs.push(format!("...+{}", obj.table.len() - 6));
+                    }
+                    format!("{{{}}}", pairs.join(", "))
+                }
+                ObjectType::Enum { .. } => {
+                    if obj.data.is_empty() {
+                        String::new()
+                    } else {
+                        let items: Vec<String> = obj.data.iter().take(6).map(fmt_vmdata).collect();
+                        format!("({})", items.join(", "))
+                    }
+                }
+                ObjectType::Closure(addr) => {
+                    if obj.data.is_empty() {
+                        format!("@{}", addr)
+                    } else {
+                        let captures: Vec<String> = obj.data.iter().take(6).map(fmt_vmdata).collect();
+                        format!("@{} [{}]", addr, captures.join(", "))
+                    }
+                }
+            }
+        }
+
+        fn capture_heap_cells(memory: &MemoryManager) -> Vec<HeapCellInfo> {
+            let mut cells = Vec::new();
+            for i in 0..memory.heap_capacity() {
+                if let Some(obj) = memory.ref_from_heap(i) {
+                    // Live cell
+                    let rc = memory.ref_count(i);
+                    let fields: Vec<(String, String)> = if matches!(obj.object_type, ObjectType::Struct(_)) {
+                        let mut f: Vec<(String, String)> = obj.table.iter().map(|(k, idx)| {
+                            let val = obj.data.get(*idx).map(fmt_vmdata).unwrap_or_else(|| "?".into());
+                            (k.clone(), val)
+                        }).collect();
+                        f.sort_by(|a, b| a.0.cmp(&b.0));
+                        f
+                    } else {
+                        Vec::new()
+                    };
+                    cells.push(HeapCellInfo {
+                        index: i,
+                        alive: true,
+                        ref_count: rc,
+                        type_name: object_type_name(obj),
+                        data_preview: heap_data_preview(obj),
+                        fields,
+                        data_len: obj.data.len(),
+                    });
+                } else {
+                    cells.push(HeapCellInfo {
+                        index: i,
+                        alive: false,
+                        ref_count: 0,
+                        type_name: String::new(),
+                        data_preview: String::new(),
+                        fields: Vec::new(),
+                        data_len: 0,
+                    });
+                }
+            }
+            cells
         }
 
         fn fmt_vmdata(v: &VmData) -> String {
@@ -1514,6 +1635,7 @@ impl Vm {
                 gc_base: state.memory.gc_base_threshold(),
                 gc_locked: state.memory.gc_lock_depth() > 0,
                 stack_depth: state.memory.stack.len(),
+                heap_cells: capture_heap_cells(&state.memory),
             }
         };
 
@@ -1525,6 +1647,8 @@ impl Vm {
         let mut show_help = false;
         let mut playing = false;
         let mut play_speed_ms: u64 = 100; // ms between auto-steps
+        let mut heap_mode = false;       // Tab toggles between stack/heap view
+        let mut heap_scroll: usize = 0;  // scroll offset in heap inspect panel
 
         // Pre-decode bytecode listing for the left panel
         struct BytecodeLine {
@@ -1911,7 +2035,9 @@ impl Vm {
                       addr_to_line: &HashMap<usize, usize>,
                       show_help: bool,
                       playing: bool,
-                      play_speed_ms: u64|
+                      play_speed_ms: u64,
+                      heap_mode: bool,
+                      heap_scroll: usize|
          -> io::Result<()> {
             let (cols, rows) = terminal::size()?;
             let w = cols as usize;
@@ -1937,6 +2063,7 @@ impl Vm {
                     ("PgDn", "Jump forward 20 steps"),
                     ("Home", "Go to beginning"),
                     ("End", "Go to latest step"),
+                    ("Tab", "Toggle Stack / Heap inspect view"),
                     ("p", "Play / pause (auto-step visually)"),
                     ("+ / =", "Speed up playback"),
                     ("- / _", "Slow down playback"),
@@ -1966,6 +2093,7 @@ impl Vm {
                         "    Middle:  Stack (top-of-stack first, • = local)\r\n",
                     ))?
                     .queue(Print("    Right:   Variables (locals + globals)\r\n"))?
+                    .queue(Print("    Tab:     Heap inspect (scroll through heap cells)\r\n"))?
                     .queue(Print("    Bottom:  Program output + heap/GC status\r\n"))?
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(Print("\r\n"))?
@@ -2004,13 +2132,15 @@ impl Vm {
             } else {
                 String::new()
             };
+            let mode_tag = if heap_mode { " [HEAP]" } else { "" };
             let header = format!(
-                " Nova Debugger │ Step {}/{} │ IP:{} │ Depth:{} │ Offset:{}{}",
+                " Nova Debugger │ Step {}/{} │ IP:{} │ Depth:{} │ Offset:{}{}{}",
                 cursor + 1,
                 history.len(),
                 snap.ip,
                 snap.callstack_depth,
                 snap.offset,
+                mode_tag,
                 status
             );
             let hdr_display = trunc(&header, w);
@@ -2046,73 +2176,134 @@ impl Vm {
             let half = panel_rows / 2;
             let bc_start = current_bc_line.saturating_sub(half);
 
-            // Column 2: Stack (top-of-stack first)
+            // Right-side panel width (everything after bytecode column + 1 separator)
+            let right_w = w.saturating_sub(col1_w).saturating_sub(1);
+
+            // Build heap inspect lines (only used when heap_mode is true)
+            let mut heap_lines: Vec<(Color, String)> = Vec::new();
+            if heap_mode {
+                let live_count = snap.heap_cells.iter().filter(|c| c.alive).count();
+                let total = snap.heap_cells.len();
+                heap_lines.push((Color::Magenta, format!(
+                    "─ Heap Inspect ─  {} live / {} slots  (Tab=stack view, ↑↓=scroll)",
+                    live_count, total
+                )));
+
+                if snap.heap_cells.is_empty() {
+                    heap_lines.push((Color::DarkGrey, " (heap empty)".to_string()));
+                } else {
+                    // Build expanded lines for all cells, then window
+                    let mut cell_lines: Vec<(Color, String)> = Vec::new();
+                    for cell in &snap.heap_cells {
+                        if !cell.alive {
+                            cell_lines.push((Color::DarkGrey, format!(
+                                " [{:>4}]  (free)", cell.index
+                            )));
+                            continue;
+                        }
+                        let main = format!(
+                            " [{:>4}]  {}  rc={}  len={}  {}",
+                            cell.index, cell.type_name, cell.ref_count,
+                            cell.data_len, cell.data_preview
+                        );
+                        let color = match cell.type_name.as_str() {
+                            "String" => Color::Green,
+                            "List" => Color::Cyan,
+                            "Tuple" => Color::Blue,
+                            _ if cell.type_name.starts_with("Struct") => Color::Yellow,
+                            _ if cell.type_name.starts_with("Enum") => Color::Magenta,
+                            _ if cell.type_name.starts_with("Closure") => Color::DarkYellow,
+                            _ => Color::White,
+                        };
+                        cell_lines.push((color, main));
+                        for (fname, fval) in &cell.fields {
+                            cell_lines.push((Color::DarkGrey, format!(
+                                "          .{} = {}", fname, fval
+                            )));
+                        }
+                    }
+                    let visible = panel_rows.saturating_sub(1);
+                    let scroll = heap_scroll.min(cell_lines.len().saturating_sub(1));
+                    for line in cell_lines.iter().skip(scroll).take(visible) {
+                        heap_lines.push(line.clone());
+                    }
+                    if cell_lines.len() > visible + scroll {
+                        heap_lines.push((Color::DarkGrey, format!(
+                            " ... {} more below (↓ to scroll)",
+                            cell_lines.len().saturating_sub(visible + scroll)
+                        )));
+                    }
+                }
+            }
+
+            // Build stack + variables lines (only used when heap_mode is false)
             let mut stack_lines: Vec<(Color, String)> = Vec::new();
-            stack_lines.push((Color::Cyan, "─ Stack ─".to_string()));
-            let stack_label = format!(
-                " ({} entries, offset={})",
-                snap.stack.len(),
-                snap.offset
-            );
-            stack_lines.push((Color::DarkGrey, stack_label));
-
-            let max_stack = panel_rows.saturating_sub(3).max(3);
-            let stack_show: Vec<_> = snap
-                .stack
-                .iter()
-                .enumerate()
-                .rev()
-                .take(max_stack)
-                .collect();
-            for (i, entry) in stack_show.iter().rev() {
-                let marker = if *i == snap.stack.len().saturating_sub(1) {
-                    "►"
-                } else {
-                    " "
-                };
-                let local_tag = if *i >= snap.offset { "•" } else { " " };
-                let s = format!("{}{} [{:>3}] {}", marker, local_tag, i, entry);
-                let color = if *i == snap.stack.len().saturating_sub(1) {
-                    Color::Green
-                } else if *i >= snap.offset {
-                    Color::White
-                } else {
-                    Color::DarkGrey
-                };
-                stack_lines.push((color, s));
-            }
-            if snap.stack.len() > max_stack {
-                stack_lines.push((
-                    Color::DarkGrey,
-                    format!(" ... {} more", snap.stack.len() - max_stack),
-                ));
-            }
-            if snap.stack.is_empty() {
-                stack_lines.push((Color::DarkGrey, " (empty)".to_string()));
-            }
-
-            // Column 3: Variables (locals + globals)
             let mut var_lines: Vec<(Color, String)> = Vec::new();
-            var_lines.push((Color::Cyan, "─ Variables ─".to_string()));
-            if snap.locals.is_empty() && snap.globals_changed.is_empty() {
-                var_lines.push((Color::DarkGrey, " (none)".to_string()));
-            }
-            if !snap.locals.is_empty() {
-                var_lines.push((Color::DarkGrey, format!(" locals ({})", snap.scope_name)));
-                for (name, val) in &snap.locals {
-                    var_lines
-                        .push((Color::Green, format!("  {} = {}", name, val)));
+            if !heap_mode {
+                stack_lines.push((Color::Cyan, "─ Stack ─".to_string()));
+                let stack_label = format!(
+                    " ({} entries, offset={})",
+                    snap.stack.len(),
+                    snap.offset
+                );
+                stack_lines.push((Color::DarkGrey, stack_label));
+
+                let max_stack = panel_rows.saturating_sub(3).max(3);
+                let stack_show: Vec<_> = snap
+                    .stack
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .take(max_stack)
+                    .collect();
+                for (i, entry) in stack_show.iter().rev() {
+                    let marker = if *i == snap.stack.len().saturating_sub(1) {
+                        "►"
+                    } else {
+                        " "
+                    };
+                    let local_tag = if *i >= snap.offset { "•" } else { " " };
+                    let s = format!("{}{} [{:>3}] {}", marker, local_tag, i, entry);
+                    let color = if *i == snap.stack.len().saturating_sub(1) {
+                        Color::Green
+                    } else if *i >= snap.offset {
+                        Color::White
+                    } else {
+                        Color::DarkGrey
+                    };
+                    stack_lines.push((color, s));
                 }
-            }
-            if !snap.globals_changed.is_empty() {
-                var_lines.push((Color::DarkGrey, " globals:".to_string()));
-                for (name, val) in &snap.globals_changed {
-                    var_lines
-                        .push((Color::White, format!("  {} = {}", name, val)));
+                if snap.stack.len() > max_stack {
+                    stack_lines.push((
+                        Color::DarkGrey,
+                        format!(" ... {} more", snap.stack.len() - max_stack),
+                    ));
+                }
+                if snap.stack.is_empty() {
+                    stack_lines.push((Color::DarkGrey, " (empty)".to_string()));
+                }
+
+                var_lines.push((Color::Cyan, "─ Variables ─".to_string()));
+                if snap.locals.is_empty() && snap.globals_changed.is_empty() {
+                    var_lines.push((Color::DarkGrey, " (none)".to_string()));
+                }
+                if !snap.locals.is_empty() {
+                    var_lines.push((Color::DarkGrey, format!(" locals ({})", snap.scope_name)));
+                    for (name, val) in &snap.locals {
+                        var_lines
+                            .push((Color::Green, format!("  {} = {}", name, val)));
+                    }
+                }
+                if !snap.globals_changed.is_empty() {
+                    var_lines.push((Color::DarkGrey, " globals:".to_string()));
+                    for (name, val) in &snap.globals_changed {
+                        var_lines
+                            .push((Color::White, format!("  {} = {}", name, val)));
+                    }
                 }
             }
 
-            // Render 3 columns side by side
+            // Render: bytecode (left) | right panel
             for row in 0..panel_rows {
                 // Column 1: Bytecode
                 let bc_idx = bc_start + row;
@@ -2149,32 +2340,44 @@ impl Vm {
                     .queue(Print("│"))?
                     .queue(SetAttribute(Attribute::Reset))?;
 
-                // Column 2: Stack
-                if row < stack_lines.len() {
-                    let (color, ref text) = stack_lines[row];
-                    let display = pad(text, col2_w);
-                    stdout
-                        .queue(SetForegroundColor(color))?
-                        .queue(Print(&display))?
-                        .queue(SetAttribute(Attribute::Reset))?;
+                if heap_mode {
+                    // Heap inspect: single wide panel
+                    if row < heap_lines.len() {
+                        let (color, ref text) = heap_lines[row];
+                        let display = pad(text, right_w);
+                        stdout
+                            .queue(SetForegroundColor(color))?
+                            .queue(Print(&display))?
+                            .queue(SetAttribute(Attribute::Reset))?;
+                    }
                 } else {
-                    stdout.queue(Print(&" ".repeat(col2_w)))?;
-                }
+                    // Stack + Variables: two sub-columns
+                    if row < stack_lines.len() {
+                        let (color, ref text) = stack_lines[row];
+                        let display = pad(text, col2_w);
+                        stdout
+                            .queue(SetForegroundColor(color))?
+                            .queue(Print(&display))?
+                            .queue(SetAttribute(Attribute::Reset))?;
+                    } else {
+                        stdout.queue(Print(&" ".repeat(col2_w)))?;
+                    }
 
-                // Separator
-                stdout
-                    .queue(SetForegroundColor(Color::DarkGrey))?
-                    .queue(Print("│"))?
-                    .queue(SetAttribute(Attribute::Reset))?;
-
-                // Column 3: Variables
-                if row < var_lines.len() {
-                    let (color, ref text) = var_lines[row];
-                    let display = trunc(text, col3_w);
+                    // Separator
                     stdout
-                        .queue(SetForegroundColor(color))?
-                        .queue(Print(&display))?
+                        .queue(SetForegroundColor(Color::DarkGrey))?
+                        .queue(Print("│"))?
                         .queue(SetAttribute(Attribute::Reset))?;
+
+                    // Variables sub-column
+                    if row < var_lines.len() {
+                        let (color, ref text) = var_lines[row];
+                        let display = trunc(text, col3_w);
+                        stdout
+                            .queue(SetForegroundColor(color))?
+                            .queue(Print(&display))?
+                            .queue(SetAttribute(Attribute::Reset))?;
+                    }
                 }
 
                 stdout.queue(Print("\r\n"))?;
@@ -2234,10 +2437,12 @@ impl Vm {
                 .queue(Print("\r\n"))?;
 
             // Controls bar
-            let controls = if playing {
-                " [p] pause  [+/-] speed  [↑/↓] step  [?] help  [q] quit"
+            let controls = if heap_mode {
+                " [Tab] stack view  [↑/↓] scroll heap  [p] play  [?] help  [q] quit"
+            } else if playing {
+                " [p] pause  [+/-] speed  [Tab] heap  [↑/↓] step  [?] help  [q] quit"
             } else {
-                " [↑/↓] step  [p] play  [r] run  [n] next  [Home/End] bounds  [?] help  [q] quit"
+                " [↑/↓] step  [Tab] heap  [p] play  [r] run  [n] next  [?] help  [q] quit"
             };
             stdout
                 .queue(SetForegroundColor(Color::DarkGrey))?
@@ -2275,6 +2480,8 @@ impl Vm {
             show_help,
             playing,
             play_speed_ms,
+            heap_mode,
+            heap_scroll,
         );
 
         loop {
@@ -2309,6 +2516,8 @@ impl Vm {
                             show_help,
                             playing,
                             play_speed_ms,
+                            heap_mode,
+                            heap_scroll,
                         );
                         continue;
                     }
@@ -2323,6 +2532,14 @@ impl Vm {
                         KeyCode::Char('?') => {
                             show_help = true;
                             playing = false;
+                        }
+
+                        // Toggle heap inspect / stack view
+                        KeyCode::Tab => {
+                            heap_mode = !heap_mode;
+                            if heap_mode {
+                                heap_scroll = 0;
+                            }
                         }
 
                         // Play / Pause toggle
@@ -2351,6 +2568,28 @@ impl Vm {
                         }
 
                         // Step forward (pauses play mode)
+                        // In heap mode, ↑/↓/j/k scroll the heap; Space still steps.
+                        KeyCode::Down | KeyCode::Char('j') if heap_mode => {
+                            heap_scroll = heap_scroll.saturating_add(1);
+                        }
+                        KeyCode::Up | KeyCode::Char('k') if heap_mode => {
+                            heap_scroll = heap_scroll.saturating_sub(1);
+                        }
+                        KeyCode::PageDown if heap_mode => {
+                            heap_scroll = heap_scroll.saturating_add(20);
+                        }
+                        KeyCode::PageUp if heap_mode => {
+                            heap_scroll = heap_scroll.saturating_sub(20);
+                        }
+                        KeyCode::Home if heap_mode => {
+                            heap_scroll = 0;
+                        }
+                        KeyCode::End if heap_mode => {
+                            // Scroll to bottom of heap
+                            let snap = &history[cursor];
+                            heap_scroll = snap.heap_cells.len().saturating_sub(1);
+                        }
+
                         KeyCode::Down
                         | KeyCode::Char('j')
                         | KeyCode::Char(' ') => {
@@ -2737,6 +2976,8 @@ impl Vm {
                 show_help,
                 playing,
                 play_speed_ms,
+                heap_mode,
+                heap_scroll,
             );
         }
 
