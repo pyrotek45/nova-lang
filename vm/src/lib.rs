@@ -1728,6 +1728,42 @@ impl Vm {
         };
     history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info, 0));
 
+        // ── Display-width helpers ───────────────────────────────────
+        // `str.len()` counts UTF-8 bytes, but terminals measure columns
+        // by character count.  Our special chars (►, •, ─) are each 3
+        // bytes but 1 column wide.  These helpers let us pad/truncate
+        // strings to an exact terminal column width.
+
+        /// Visible column width of `s` (counts chars, not bytes).
+        fn vis_width(s: &str) -> usize {
+            s.chars().count()
+        }
+
+        /// Pad `s` with trailing spaces to exactly `w` visible columns.
+        /// If already wider, truncate to `w` columns.
+        fn pad(s: &str, w: usize) -> String {
+            let vw = vis_width(s);
+            if vw >= w {
+                s.chars().take(w).collect()
+            } else {
+                let mut out = s.to_string();
+                for _ in 0..(w - vw) {
+                    out.push(' ');
+                }
+                out
+            }
+        }
+
+        /// Truncate `s` to at most `w` visible columns.
+        fn trunc(s: &str, w: usize) -> String {
+            let vw = vis_width(s);
+            if vw <= w {
+                s.to_string()
+            } else {
+                s.chars().take(w).collect()
+            }
+        }
+
         // ── Render function ─────────────────────────────────────────
         let render = |stdout: &mut io::Stdout,
                       history: &[Snapshot],
@@ -1829,11 +1865,7 @@ impl Vm {
                 snap.offset,
                 status
             );
-            let hdr_display: String = if header.len() > w {
-                header[..w].to_string()
-            } else {
-                header.clone()
-            };
+            let hdr_display = trunc(&header, w);
             stdout
                 .queue(SetForegroundColor(Color::Cyan))?
                 .queue(SetAttribute(Attribute::Bold))?
@@ -1942,17 +1974,13 @@ impl Vm {
                 if bc_idx < bc_lines.len() {
                     let bl = &bc_lines[bc_idx];
                     let is_current = bc_idx == current_bc_line;
-                    let marker = if is_current { "►" } else { " " };
+                    let marker = if is_current { ">" } else { " " };
                     let addr_str = format!("{:>5}", bl.addr);
                     let text = format!(
                         "{} {} {:<12} {}",
                         marker, addr_str, bl.opname, bl.operand
                     );
-                    let display: String = if text.len() > col1_w {
-                        text[..col1_w].to_string()
-                    } else {
-                        format!("{:<width$}", text, width = col1_w)
-                    };
+                    let display = pad(&text, col1_w);
 
                     if is_current {
                         stdout
@@ -1979,11 +2007,7 @@ impl Vm {
                 // Column 2: Stack
                 if row < stack_lines.len() {
                     let (color, ref text) = stack_lines[row];
-                    let display: String = if text.len() > col2_w {
-                        text[..col2_w].to_string()
-                    } else {
-                        format!("{:<width$}", text, width = col2_w)
-                    };
+                    let display = pad(text, col2_w);
                     stdout
                         .queue(SetForegroundColor(color))?
                         .queue(Print(&display))?
@@ -2001,11 +2025,7 @@ impl Vm {
                 // Column 3: Variables
                 if row < var_lines.len() {
                     let (color, ref text) = var_lines[row];
-                    let display: String = if text.len() > col3_w {
-                        text[..col3_w].to_string()
-                    } else {
-                        text.clone()
-                    };
+                    let display = trunc(text, col3_w);
                     stdout
                         .queue(SetForegroundColor(color))?
                         .queue(Print(&display))?
@@ -2033,11 +2053,8 @@ impl Vm {
                     .queue(Print("\r\n"))?;
             } else {
                 for line in output_buf.iter().take(out_len).skip(out_start) {
-                    let display: String = if line.len() > w.saturating_sub(2) {
-                        format!(" {}..", &line[..w.saturating_sub(4)])
-                    } else {
-                        format!(" {}", line)
-                    };
+                    let trimmed = trunc(line, w.saturating_sub(2));
+                    let display = format!(" {}", trimmed);
                     stdout
                         .queue(SetForegroundColor(Color::White))?
                         .queue(Print(&display))?
