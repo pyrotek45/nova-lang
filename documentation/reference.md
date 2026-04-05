@@ -9,7 +9,37 @@ and raylib bindings.
 
 1. [Built-in Types](#1-built-in-types)
 2. [Built-in Functions](#2-built-in-functions)
+   — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program)
 3. [Standard Library](#3-standard-library)
+   - [`std/core`](#stdcore--foundation) — Box, Maybe, Result, range, Gen
+   - [`std/math`](#stdmath--extended-mathematics) — Int/Float extensions, primes, fib
+   - [`std/string`](#stdstring--string-utilities) — pad, slug, wrap, between
+   - [`std/list`](#stdlist--list-utilities) — sort, zip, chunk, group, filter, map
+   - [`std/option`](#stdoption--option-combinators) — orDefault, map, flatMap, filter
+   - [`std/maybe`](#stdmaybe--maybe-type) — Just/Nothing algebraic type
+   - [`std/result`](#stdresult--error-handling) — Ok/Err, map, andThen
+   - [`std/iter`](#stditer--lazy-iterators) — lazy map, filter, take, collect
+   - [`std/functional`](#stdfunctional--higher-order-utilities) — compose, pipe, memoize
+   - [`std/tuple`](#stdtuple--pair-and-triple) — swap, fst, snd, unzip
+   - [`std/hashmap`](#stdhashmap--hash-map) — insert, get, merge, mapValues
+   - [`std/set`](#stdset--set) — union, intersection, difference
+   - [`std/vec2`](#stdvec2--2d-vector-math) — add, dot, normalize, lerp
+   - [`std/deque`](#stddeque--double-ended-queue) — pushBack, pushFront, pop
+   - [`std/io`](#stdio--file-and-console-io) — prompt, readLines, writeLines
+   - [`std/ansi`](#stdansi--ansi-terminal-colours) — bold, red, rgb, clearScreen
+   - [`std/color`](#stdcolor--named-colour-tuples) — named RGB tuples, lerp, darken
+   - [`std/tui`](#stdtui--terminal-ui) — printAt, drawBox, poll
+   - [`std/widget`](#stdwidget--tui-widget-toolkit) — Button, Label, Panel, ProgressBar
+   - [`std/plot`](#stdplot--charts--graphs-raylib) — line, bar, scatter, pie charts
+   - [`std/timer`](#stdtimer--game-timers) — cooldown, repeating, once
+   - [`std/tween`](#stdtween--interpolation-and-easing) — easeIn, easeOut, bounce, elastic
+   - [`std/input`](#stdinput--action-based-input) — InputMap, bindKey, axis
+   - [`std/camera`](#stdcamera--2d-camera) — follow, shake, zoom, worldToScreen
+   - [`std/physics`](#stdphysics--2d-physics) — Body2D, AABB, Circle, raycasting
+   - [`std/entity`](#stdentity--entity-system) — EntityWorld, spawn, query, update
+   - [`std/scene`](#stdscene--scene-management) — SceneManager, push, pop, switch
+   - [`std/grid`](#stdgrid--2d-grid-and-tilemap) — Grid(T), get, set, bfs, draw
+   - [`std/noise`](#stdnoise--procedural-noise) — fbm, ridged, domain warp
 4. [Raylib API](#4-raylib-api)
 5. [Import System](#5-import-system)
 6. [CLI Reference](#6-cli-reference)
