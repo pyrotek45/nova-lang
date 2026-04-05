@@ -1367,6 +1367,7 @@ impl Vm {
             callstack_depth: usize,
             offset: usize,
             locals: Vec<(String, String)>,
+            scope_name: String,  // name of current function scope ("top-level", "fib", etc.)
             globals_changed: Vec<(String, String)>,
             output_len: usize,
             // Heap / GC stats captured at this step
@@ -1410,7 +1411,8 @@ impl Vm {
                  opname: &str,
                  named_op: &str,
                  info: &DebugInfo,
-                 output_len: usize|
+                 output_len: usize,
+                 fn_byte_ranges: &[(usize, usize, u64)]|
      -> Snapshot {
             // Build a reverse map: function byte-address → global name
             // so we can label Function values on the stack.
@@ -1424,10 +1426,13 @@ impl Vm {
                 }
             }
 
-            // Build local_name lookup for current scope (scope 0 = top-level)
+            // Determine the current function scope from the IP
+            let scope = scope_for_ip(executed_ip, fn_byte_ranges);
+
+            // Build local_name lookup for current scope
             let local_name_map: HashMap<usize, String> = info
                 .local_names
-                .get(&0)
+                .get(&scope)
                 .map(|v| {
                     v.iter()
                         .map(|(idx, name)| (state.offset + *idx as usize, name.clone()))
@@ -1460,7 +1465,7 @@ impl Vm {
                 .collect();
 
             let mut locals = Vec::new();
-            if let Some(local_names) = info.local_names.get(&0) {
+            if let Some(local_names) = info.local_names.get(&scope) {
                 for (idx, name) in local_names {
                     let abs_idx = state.offset + *idx as usize;
                     if abs_idx < state.memory.stack.len() {
@@ -1484,6 +1489,13 @@ impl Vm {
                 }
             }
 
+            // Determine scope name for display
+            let scope_name = if scope == 0 {
+                "top-level".to_string()
+            } else {
+                info.label_name(scope)
+            };
+
             Snapshot {
                 ip: executed_ip,
                 opname: opname.to_string(),
@@ -1492,6 +1504,7 @@ impl Vm {
                 callstack_depth: state.callstack.len(),
                 offset: state.offset,
                 locals,
+                scope_name,
                 globals_changed,
                 output_len,
                 heap_live: state.memory.live_count(),
@@ -1738,6 +1751,101 @@ impl Vm {
             addr_to_line.insert(line.addr, i);
         }
 
+        // Build function bytecode ranges: (body_start, body_end, label_id)
+        // Used to determine which function scope the current IP belongs to.
+        let addr_to_label = info.addr_to_label();
+        let mut fn_byte_ranges: Vec<(usize, usize, u64)> = Vec::new();
+        {
+            let prog = &self.state.program;
+            let mut pc = 0usize;
+            while pc < prog.len() {
+                let opcode = prog[pc];
+                match opcode {
+                    Code::FUNCTION | Code::CLOSURE => {
+                        let fn_addr = pc;
+                        pc += 1; // skip opcode
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            ) as usize
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        let body_end = fn_addr + 5 + v;
+                        if let Some(&label_id) = addr_to_label.get(&(body_end as u64)) {
+                            fn_byte_ranges.push((fn_addr + 5, body_end, label_id));
+                        }
+                    }
+                    _ => {
+                        // Skip this instruction (same logic as bc_lines pre-decode)
+                        pc += 1;
+                        match opcode {
+                            Code::INTEGER | Code::FLOAT => pc += 8,
+                            Code::STORE | Code::GET | Code::STOREFAST
+                            | Code::STOREGLOBAL | Code::GETGLOBAL
+                            | Code::DIRECTCALL | Code::ALLOCLOCALS
+                            | Code::ALLOCATEGLOBAL | Code::JUMPIFFALSE
+                            | Code::JMP | Code::BJMP => pc += 4,
+                            Code::OFFSET => pc += 8,
+                            Code::RET => pc += 1,
+                            Code::NATIVE | Code::NEWLIST | Code::NEWSTRUCT
+                            | Code::GETBIND | Code::CID | Code::STACKREF
+                            | Code::TAILCALL => pc += 8,
+                            Code::CHAR | Code::BYTE => pc += 1,
+                            Code::STRING => {
+                                let sz = if pc + 8 <= prog.len() {
+                                    u64::from_le_bytes(
+                                        prog[pc..pc + 8].try_into().unwrap_or_default(),
+                                    ) as usize
+                                } else {
+                                    0
+                                };
+                                pc += 8 + sz;
+                            }
+                            Code::REFID => pc += 2,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        /// Given the current IP, find the innermost enclosing function scope.
+        /// Returns the label_id of the function, or 0 for top-level.
+        fn scope_for_ip(ip: usize, fn_byte_ranges: &[(usize, usize, u64)]) -> u64 {
+            fn_byte_ranges
+                .iter()
+                .filter(|(start, end, _)| ip >= *start && ip < *end)
+                .min_by_key(|(start, end, _)| end - start)
+                .map(|(_, _, label_id)| *label_id)
+                .unwrap_or(0)
+        }
+
+        // Fix up bc_lines: re-resolve STORE/GET local names with correct function scope
+        {
+            let prog = &self.state.program;
+            for bl in bc_lines.iter_mut() {
+                let opcode = prog[bl.addr];
+                if matches!(opcode, Code::STORE | Code::GET | Code::STOREFAST) {
+                    let v = if bl.addr + 1 + 4 <= prog.len() {
+                        u32::from_le_bytes(
+                            prog[bl.addr + 1..bl.addr + 5].try_into().unwrap_or_default(),
+                        )
+                    } else {
+                        continue;
+                    };
+                    let scope = scope_for_ip(bl.addr, &fn_byte_ranges);
+                    let name = info.local_name(scope, v).unwrap_or_default();
+                    bl.operand = if name.is_empty() {
+                        format!("local[{}]", v)
+                    } else {
+                        name
+                    };
+                }
+            }
+        }
+
         // Initial snapshot
         let ip0 = self.state.current_instruction;
         let op0 = if ip0 < self.state.program.len() {
@@ -1750,7 +1858,7 @@ impl Vm {
         } else {
             String::new()
         };
-    history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info, 0));
+    history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info, 0, &fn_byte_ranges));
 
         // ── Display-width helpers ───────────────────────────────────
         // `str.len()` counts UTF-8 bytes, but terminals measure columns
@@ -1990,7 +2098,7 @@ impl Vm {
                 var_lines.push((Color::DarkGrey, " (none)".to_string()));
             }
             if !snap.locals.is_empty() {
-                var_lines.push((Color::DarkGrey, " locals:".to_string()));
+                var_lines.push((Color::DarkGrey, format!(" locals ({})", snap.scope_name)));
                 for (name, val) in &snap.locals {
                     var_lines
                         .push((Color::Green, format!("  {} = {}", name, val)));
@@ -2274,6 +2382,7 @@ impl Vm {
                                             &named,
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         cursor = history.len() - 1;
                                     }
@@ -2289,6 +2398,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         cursor = history.len() - 1;
                                     }
@@ -2301,6 +2411,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         cursor = history.len() - 1;
                                     }
@@ -2345,6 +2456,7 @@ impl Vm {
                                             &named,
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                             ));
                                             cursor = history.len() - 1;
                                         }
@@ -2360,6 +2472,7 @@ impl Vm {
                                                 "",
                                                 &info,
                                                 output_buf.len(),
+                                            &fn_byte_ranges,
                                             ));
                                             cursor = history.len() - 1;
                                             break;
@@ -2373,6 +2486,7 @@ impl Vm {
                                                 "",
                                                 &info,
                                                 output_buf.len(),
+                                            &fn_byte_ranges,
                                             ));
                                             cursor = history.len() - 1;
                                             break;
@@ -2419,6 +2533,7 @@ impl Vm {
                                             &named,
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                     }
                                     StepResult::Finished { output } => {
@@ -2433,6 +2548,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                     }
                                     StepResult::Error(msg) => {
@@ -2444,6 +2560,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                     }
                                 }
@@ -2485,6 +2602,7 @@ impl Vm {
                                             &named,
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         if self.state.callstack.len()
                                             <= target_depth
@@ -2504,6 +2622,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         break;
                                     }
@@ -2516,6 +2635,7 @@ impl Vm {
                                             "",
                                             &info,
                                             output_buf.len(),
+                                            &fn_byte_ranges,
                                         ));
                                         break;
                                     }
@@ -2563,6 +2683,7 @@ impl Vm {
                                 &named,
                                 &info,
                                 output_buf.len(),
+                                            &fn_byte_ranges,
                             ));
                             cursor = history.len() - 1;
                         }
@@ -2579,6 +2700,7 @@ impl Vm {
                                 "",
                                 &info,
                                 output_buf.len(),
+                                            &fn_byte_ranges,
                             ));
                             cursor = history.len() - 1;
                         }
@@ -2592,6 +2714,7 @@ impl Vm {
                                 "",
                                 &info,
                                 output_buf.len(),
+                                            &fn_byte_ranges,
                             ));
                             cursor = history.len() - 1;
                         }
