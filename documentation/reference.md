@@ -2964,7 +2964,8 @@ myproject/
 ### Debugger Controls
 
 The `nova dbg` command opens a full-screen TUI step debugger with a
-split-panel layout:
+3-column layout. See [`documentation/debugging.md`](debugging.md) for the
+full debugging guide with strategies, tips, and common mistakes.
 
 | Key | Action |
 |---|---|
@@ -2972,26 +2973,41 @@ split-panel layout:
 | `↑` / `k` | Step back (browse history) |
 | `PgDn` | Step forward 20 instructions |
 | `PgUp` | Step back 20 instructions |
-| `r` | Run to end (execute all remaining) |
+| `r` | Run to end (records every step so you can rewind) |
 | `n` | Step over (run until callstack returns to current depth) |
+| `p` | Play / pause (auto-step with visual animation) |
+| `+` / `=` | Speed up playback (decrease delay) |
+| `-` / `_` | Slow down playback (increase delay) |
 | `Home` | Jump to first step |
 | `End` | Jump to latest step |
 | `?` | Toggle help screen |
 | `q` / `Esc` | Quit debugger |
 
-The debugger layout:
+The debugger layout (3 columns):
 
-- **Left panel** — Scrolling bytecode listing with `►` marking the current
-  instruction. The view auto-scrolls to keep the current instruction centered.
-  Instructions show resolved names (function names, variable names, native
-  function names) instead of raw indices.
-- **Right panel (top)** — Variables panel showing named local variables and
-  their current values, plus any globals that hold non-function values.
-- **Right panel (bottom)** — Stack with all entries. Top-of-stack marked with
-  `►`, local-frame entries marked with `•`. Entries are color-coded: green for
-  TOS, white for locals, grey for globals/below-offset.
+- **Left column — Bytecode** — Scrolling bytecode listing with `>` marking the
+  current instruction. The view auto-scrolls to keep the current instruction
+  centered. Instructions show resolved names (function names, variable names,
+  native function names) instead of raw indices.
+- **Middle column — Stack** — All entries on the stack, top-of-stack first.
+  Top-of-stack marked with `>`, local-frame entries marked with `•`. Entries
+  are annotated with names where possible (e.g. `Int(42) (x)`). Color-coded:
+  green for TOS, white for locals, grey for globals/below-offset.
+- **Right column — Variables** — Named local variables and their current values,
+  plus any globals that hold non-function values.
 - **Output** — Last 2 lines of program output captured from `print`/`println`.
-- **Header** — Step counter, instruction pointer, callstack depth, and offset.
+- **Header** — Step counter, instruction pointer, callstack depth, offset, and
+  play status.
+
+**Play mode:** Press `p` to auto-step through execution at a configurable speed
+(10ms–2000ms, default 100ms). Play works from any position — if you've scrolled
+back in history, play replays forward through existing snapshots before
+executing new instructions. Press `p` to pause, or any navigation key pauses
+automatically.
+
+**Full rewind:** Both `r` (run to end) and `n` (step over) record every
+instruction executed. After running, you can use `↑`, `PgUp`, and `Home` to
+scrub backwards through the entire execution history.
 
 ### Disassembler Output
 

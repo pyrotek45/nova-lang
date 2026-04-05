@@ -81,6 +81,10 @@ A comprehensive guide to writing Nova — from first program to full games.
 
 59. [Charts and Plotting](#59-charts-and-plotting)
 
+### Part VI — Debugging
+
+60. [Debugging Nova Programs](#60-debugging-nova-programs)
+
 ---
 
 # Part I — The Language
@@ -1830,9 +1834,9 @@ Nova programs are compiled and run through the `nova` CLI tool.
 | `check --git` | `nova check --git owner/repo/path.nv` | Typecheck a file from GitHub |
 | `time` | `nova time file.nv` | Run and print execution time in milliseconds |
 | `time --git` | `nova time --git owner/repo/path.nv` | Time a file from GitHub |
-| `dbg` | `nova dbg file.nv` | Run in debug mode with extra runtime information |
+| `dbg` | `nova dbg file.nv` | Interactive step debugger (TUI) with full rewind and play mode |
 | `dbg --git` | `nova dbg --git owner/repo/path.nv` | Debug a file from GitHub |
-| `dis` | `nova dis file.nv` | Disassemble: show the compiled bytecode |
+| `dis` | `nova dis file.nv` | Disassemble: color-coded bytecode with flow arrows |
 | `dis --git` | `nova dis --git owner/repo/path.nv` | Disassemble a file from GitHub |
 | `init` | `nova init myproject` | Create a new project folder with `main.nv`, `libs/`, and `tests/` |
 | `init --with` | `nova init myproject --with owner/repo/folder` | Create project and fetch an entire folder from GitHub |
@@ -4659,3 +4663,86 @@ drawPieChartLabeled(400, 300, 100, pieData, labels, colors, (230,230,230), 14)
 See `demo/plotdemo.nv` for a complete 7-chart showcase:
 line chart, bar chart, scatter, filled area, multi-line overlay,
 thick line with reference lines, and a labeled pie chart — all in one window.
+
+---
+
+# Part VI — Debugging
+
+---
+
+## 60. Debugging Nova Programs
+
+Nova ships with three built-in debugging tools — no external dependencies,
+no plugins, no configuration.
+
+| Tool | Command | Purpose |
+|---|---|---|
+| **Type checker** | `nova check file.nv` | Catch type errors, missing fields, wrong args — all before execution. |
+| **Step debugger** | `nova dbg file.nv` | Walk through execution one instruction at a time, inspect stack & variables, travel backwards. |
+| **Disassembler** | `nova dis file.nv` | See the compiled bytecode, control-flow arrows, function nesting. |
+
+### Quick Start
+
+```bash
+# 1. Check for type errors first (fast — no execution)
+nova check my_program.nv
+
+# 2. Step through execution in the TUI debugger
+nova dbg my_program.nv
+
+# 3. Inspect compiled bytecode
+nova dis my_program.nv
+```
+
+### The Step Debugger (`nova dbg`)
+
+The debugger opens a full-screen TUI with 3 columns:
+
+- **Left — Bytecode**: Instruction listing with the current instruction highlighted.
+- **Middle — Stack**: Every value on the VM stack, annotated with variable names.
+- **Right — Variables**: Named locals and globals in human-readable form.
+
+**Key controls:**
+
+| Key | Action |
+|---|---|
+| `↓` / `j` / `Space` | Step forward |
+| `↑` / `k` | Step backward |
+| `PgDn` / `PgUp` | Jump 20 steps |
+| `Home` / `End` | First / latest step |
+| `p` | Play / pause (auto-step animation) |
+| `+` / `-` | Faster / slower playback |
+| `r` | Run to end (all steps recorded — rewind with `↑`) |
+| `n` | Step over (skip function bodies) |
+| `?` | Help screen |
+| `q` | Quit |
+
+**Play mode** (`p`) auto-steps through execution at a configurable speed
+(10ms–2000ms). If you've scrolled back in history, play replays from your
+current position. Press `p` again to pause.
+
+**Full rewind:** After `r` (run to end), every step is recorded. Use `Home` to
+jump to the start and `↑`/`PgUp` to scrub backwards through the entire
+execution.
+
+### The Disassembler (`nova dis`)
+
+Shows compiled bytecode with color-coded instructions, jump arrows
+(magenta = loops, yellow = conditionals, cyan = forward jumps), and
+function-nesting indentation.
+
+```bash
+nova dis my_program.nv | less -R   # pipe to a pager for long output
+```
+
+### Recommended Workflow
+
+1. **`nova check`** — fix all type errors.
+2. **`nova dbg`** — step through logic, watch variables.
+3. **`nova dis`** — inspect bytecode if the compiler output seems wrong.
+4. **`nova test`** — write a test to prevent the bug from recurring.
+
+### Full Debugging Guide
+
+For strategies, common mistakes, pitfalls, tips and tricks, and a cheat sheet,
+see the dedicated **[Debugging Guide](debugging.md)**.
