@@ -1,0 +1,9 @@
+[package]
+name = "debugger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+vm = { path = "../vm" }
+crossterm = "0.28.1"
