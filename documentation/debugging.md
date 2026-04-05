@@ -160,17 +160,39 @@ The debugger uses a **3-column layout**:
 |---|---|
 | `↓` / `j` / `Space` | Step forward one instruction |
 | `↑` / `k` | Step backward (browse history) |
+| `u` / `d` | Scroll stack view up / down |
 | `PgDn` | Step forward 20 instructions |
 | `PgUp` | Step back 20 instructions |
 | `Home` | Jump to the very first step |
 | `End` | Jump to the latest step |
+| `Tab` | Toggle between Stack view and Heap inspect view |
 | `p` | Toggle play/pause (auto-step) |
 | `+` / `=` | Speed up playback (decrease delay) |
 | `-` / `_` | Slow down playback (increase delay) |
 | `r` | Run to end (execute all remaining instructions) |
 | `n` | Step over (run until callstack returns to current depth) |
+| `:` | Enter command mode |
 | `?` | Toggle the help screen |
 | `q` / `Esc` | Quit the debugger |
+
+### Command Mode
+
+Press **`:`** to enter **command mode**. A command prompt appears at the bottom
+of the screen. Type a command and press **Enter** to execute, or **Esc** to
+cancel. If a command has an error (bad address, invalid number, unknown
+command), the error is shown in red on the control bar and clears on the next
+keypress.
+
+| Command | Action |
+|---|---|
+| `:goto <addr>` | Jump to a bytecode address. If the address hasn't been executed yet, the debugger steps forward until it reaches it (up to 1M steps). |
+| `:step <n>` | Execute *n* steps forward. |
+| `:find <text>` | Search bytecode for text (matches against opname or operand). Wraps around from the current position. If the target instruction hasn't been executed yet, the debugger steps forward to reach it. |
+| `:speed <ms>` | Set the playback speed in milliseconds (1–10000). |
+| `:heap` | Switch to heap inspect view. |
+| `:stack` | Switch to stack view. |
+| `:help` | Show the help screen. |
+| `:quit` | Quit the debugger. |
 
 ### Play Mode
 
@@ -787,15 +809,27 @@ output isn't a terminal.)
 │  ──────────────                                         │
 │  ↓ / j / Space    step forward                          │
 │  ↑ / k            step backward                         │
+│  u / d            scroll stack view up / down            │
 │  PgDn / PgUp      jump 20 steps                         │
 │  Home / End        first / latest step                   │
+│  Tab               toggle stack / heap inspect           │
 │  p                 play / pause                          │
 │  + / =             faster                                │
 │  - / _             slower                                │
 │  r                 run to end (records all steps)        │
 │  n                 step over (skip function body)        │
+│  :                 command mode                           │
 │  ?                 help                                  │
 │  q / Esc           quit                                  │
+│                                                         │
+│  COMMANDS (press : first)                               │
+│  ─────────────────────────                              │
+│  :goto <addr>     jump to bytecode address              │
+│  :step <n>        execute n steps forward                │
+│  :find <text>     search bytecode for text              │
+│  :speed <ms>      set playback speed (1-10000)          │
+│  :heap / :stack   switch view                            │
+│  :help / :quit    help / quit                            │
 │                                                         │
 │  DEBUGGER COLUMNS                                       │
 │  ─────────────────                                      │

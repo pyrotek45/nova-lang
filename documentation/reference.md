@@ -2971,6 +2971,7 @@ full debugging guide with strategies, tips, and common mistakes.
 |---|---|
 | `↓` / `j` / `Space` | Step forward one instruction |
 | `↑` / `k` | Step back (browse history) |
+| `u` / `d` | Scroll stack view up / down |
 | `PgDn` | Step forward 20 instructions |
 | `PgUp` | Step back 20 instructions |
 | `r` | Run to end (records every step so you can rewind) |
@@ -2978,10 +2979,26 @@ full debugging guide with strategies, tips, and common mistakes.
 | `p` | Play / pause (auto-step with visual animation) |
 | `+` / `=` | Speed up playback (decrease delay) |
 | `-` / `_` | Slow down playback (increase delay) |
+| `Tab` | Toggle between Stack view and Heap inspect view |
 | `Home` | Jump to first step |
 | `End` | Jump to latest step |
+| `:` | Enter command mode |
 | `?` | Toggle help screen |
 | `q` / `Esc` | Quit debugger |
+
+**Command mode:** Press `:` to enter command mode. Type a command and press
+Enter to execute, or Esc to cancel.
+
+| Command | Action |
+|---|---|
+| `:goto <addr>` | Jump to bytecode address (executes forward if needed) |
+| `:step <n>` | Execute n steps forward |
+| `:find <text>` | Search bytecode for text (opname or operand), wraps around |
+| `:speed <ms>` | Set playback speed in milliseconds (1–10000) |
+| `:heap` | Switch to heap inspect view |
+| `:stack` | Switch to stack view |
+| `:help` | Show the help screen |
+| `:quit` | Quit debugger |
 
 The debugger layout (3 columns):
 

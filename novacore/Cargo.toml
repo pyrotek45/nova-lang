@@ -16,3 +16,4 @@ disassembler ={ path = "../disassembler" }
 assembler ={ path = "../assembler" }
 optimizer ={ path = "../optimizer" }
 native ={ path = "../native" }
+debugger ={ path = "../debugger" }

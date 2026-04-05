@@ -241,6 +241,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "debugger"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "crossterm 0.28.1",
+ "vm",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -645,6 +654,7 @@ dependencies = [
  "assembler",
  "common",
  "compiler",
+ "debugger",
  "disassembler",
  "lexer",
  "native",
@@ -1275,7 +1285,6 @@ name = "vm"
 version = "0.1.0"
 dependencies = [
  "common",
- "crossterm 0.28.1",
  "modulo",
  "raylib",
 ]

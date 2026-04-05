@@ -1913,7 +1913,7 @@ impl NovaCore {
         );
         // Copy assembler label addresses so the debugger can map bytecode PCs to function scopes
         debug_info.label_addresses = self.assembler.labels.clone();
-        self.vm.run_debug(debug_info)?;
+        debugger::run_debug(&mut self.vm, debug_info)?;
         Ok(())
     }
 
