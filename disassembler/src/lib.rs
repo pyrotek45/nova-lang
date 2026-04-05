@@ -191,25 +191,34 @@ impl Disassembler {
         for (i, inst) in asm.iter().enumerate() {
             let m = render_margin(&margin[i], margin_width);
             let depth = fn_ranges.iter().filter(|(s, e, _, _)| i > *s && i < *e).count();
-            let nest = format!("{}{}", CYAN, "│  ".repeat(depth));
 
-            // Every line uses the same structure:
-            //   <margin> <line_num>  <nest><content>
-            // This keeps columns aligned regardless of instruction type.
+            // Build the nesting prefix.  Every instruction gets the same
+            // column budget so opcodes / content always line up.
+            //
+            //  depth 0  → ""           (0 chars)
+            //  depth 1  → "│  "        (3 chars)
+            //  depth 2  → "│  │  "     (6 chars)
+            //
+            // FUNCTION / CLOSURE use depth+1 with Open cap so the ┌─
+            // sits at the same column as body instructions (│  ).
+            // end-LABEL uses depth+1 with Close cap for the matching └─.
 
             match inst {
                 Asm::LABEL(id) => {
                     let name = info.label_name(*id);
                     let is_fn_end = fn_ranges.iter().any(|(_, end, lbl, _)| *lbl == *id && *end == i);
                     if is_fn_end {
-                        let close_depth = depth.saturating_sub(1);
-                        let close_nest = format!("{}{}", CYAN, "│  ".repeat(close_depth));
+                        // end-label: close the nesting bracket one level
+                        // deeper than this line's depth (to match the
+                        // body instructions and the ┌─ opener).
+                        let nest = build_nest(depth + 1, NestCap::Close);
                         println!(
-                            "{} {}{:>w$}  {}{}└── end {}{}",
-                            m, DIM, i, close_nest, BOLD, name, RESET,
+                            "{} {}{:>w$}  {}{}end {}{}",
+                            m, DIM, i, nest, BOLD, name, RESET,
                             w = line_num_width
                         );
                     } else {
+                        let nest = build_nest(depth, NestCap::None);
                         println!(
                             "{} {}{:>w$}  {}{}{}{}:{} {}; label {}{}",
                             m, DIM, i, RESET, nest, BOLD, name, RESET, DIM, id, RESET,
@@ -219,16 +228,18 @@ impl Disassembler {
                 }
                 Asm::FUNCTION(lbl) => {
                     let name = info.label_name(*lbl);
+                    let nest = build_nest(depth + 1, NestCap::Open);
                     println!(
-                        "{} {}{:>w$}  {}{}┌── fn {} ──────────────────{}",
+                        "{} {}{:>w$}  {}{}fn {}{}",
                         m, DIM, i, nest, BOLD, name, RESET,
                         w = line_num_width
                     );
                 }
                 Asm::CLOSURE(lbl) => {
                     let name = info.label_name(*lbl);
+                    let nest = build_nest(depth + 1, NestCap::Open);
                     println!(
-                        "{} {}{:>w$}  {}{}┌── closure {} ─────────────{}",
+                        "{} {}{:>w$}  {}{}closure {}{}",
                         m, DIM, i, nest, BOLD, name, RESET,
                         w = line_num_width
                     );
@@ -236,6 +247,7 @@ impl Disassembler {
                 _ => {
                     let (mnemonic, operand, cat) = decode_asm(inst, info);
                     let color = cat_color(cat);
+                    let nest = build_nest(depth, NestCap::None);
                     if operand.is_empty() {
                         println!(
                             "{} {}{:>w$}  {}{}{}{:<16}{}",
@@ -286,6 +298,43 @@ impl Disassembler {
         println!("  {}jmp/bjmp/jif{}  show target label names with arrows{}", RED, RESET, RESET);
         println!();
     }
+}
+
+// ── Nesting prefix builder ──────────────────────────────────────────
+// Produces a fixed-width string of `depth` × 3 visible characters so
+// the opcode column always starts at the same position.
+//
+//   NestCap::None  → "│  │  │  "   (all bars)
+//   NestCap::Open  → "│  │  ┌─ "   (last slot = open corner)
+//   NestCap::Close → "│  │  └─ "   (last slot = close corner)
+//
+// When depth is 0 the result is "" regardless of cap.
+
+enum NestCap {
+    None,
+    Open,
+    Close,
+}
+
+fn build_nest(depth: usize, cap: NestCap) -> String {
+    if depth == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    // All levels except the last get a normal bar
+    for _ in 0..depth.saturating_sub(1) {
+        out.push_str(CYAN);
+        out.push_str("│  ");
+    }
+    // Last level depends on cap
+    out.push_str(CYAN);
+    match cap {
+        NestCap::None  => out.push_str("│  "),
+        NestCap::Open  => out.push_str("┌─ "),
+        NestCap::Close => out.push_str("└─ "),
+    }
+    out.push_str(RESET);
+    out
 }
 
 // ── Column assignment ────────────────────────────────────────────────
