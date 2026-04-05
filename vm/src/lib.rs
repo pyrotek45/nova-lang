@@ -2174,7 +2174,11 @@ impl Vm {
                         KeyCode::Char('p') => {
                             if playing {
                                 playing = false;
+                            } else if cursor < history.len() - 1 {
+                                // There is recorded history ahead — replay it
+                                playing = true;
                             } else if !finished && error_msg.is_none() {
+                                // At the end of history, but program still running
                                 playing = true;
                             }
                         }
