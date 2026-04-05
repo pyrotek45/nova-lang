@@ -1114,10 +1114,8 @@ impl Vm {
                         if let Err(e) = self.state.deallocate_registers_with_return() {
                             return StepResult::Error(format!("{}", e));
                         }
-                    } else {
-                        if let Err(e) = self.state.deallocate_registers() {
-                            return StepResult::Error(format!("{}", e));
-                        }
+                    } else if let Err(e) = self.state.deallocate_registers() {
+                        return StepResult::Error(format!("{}", e));
                     }
                     match destination {
                         CallType::Function(target) => self.state.goto(target),
@@ -1938,11 +1936,7 @@ impl Vm {
             let current_bc_line =
                 addr_to_line.get(&snap.ip).copied().unwrap_or(0);
             let half = panel_rows / 2;
-            let bc_start = if current_bc_line > half {
-                current_bc_line - half
-            } else {
-                0
-            };
+            let bc_start = current_bc_line.saturating_sub(half);
 
             // Column 2: Stack (top-of-stack first)
             let mut stack_lines: Vec<(Color, String)> = Vec::new();
@@ -2317,9 +2311,7 @@ impl Vm {
                         // Step backward (pauses play mode)
                         KeyCode::Up | KeyCode::Char('k') => {
                             playing = false;
-                            if cursor > 0 {
-                                cursor -= 1;
-                            }
+                            cursor = cursor.saturating_sub(1);
                         }
 
                         // Page navigation (pauses play mode)
