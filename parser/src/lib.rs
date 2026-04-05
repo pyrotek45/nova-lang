@@ -4286,8 +4286,7 @@ impl Parser {
                     // Detect common mistake: user included the branch name in the path
                     let common_branches = ["main/", "master/", "dev/", "develop/"];
                     for prefix in common_branches {
-                        if file_path.starts_with(prefix) {
-                            let corrected = &file_path[prefix.len()..];
+                        if let Some(corrected) = file_path.strip_prefix(prefix) {
                             hint.push_str(&format!(
                                 "\n\n  It looks like the path contains the branch name `{}`.\n  \
                                  The branch is added automatically — try removing it:\n  \
@@ -4383,9 +4382,8 @@ impl Parser {
 
         // ── If the resolved path is a github:// virtual path, fetch from GitHub ──
         let resolved_str = resolved_filepath.to_string_lossy();
-        if resolved_str.starts_with("github://") {
+        if let Some(gh_path) = resolved_str.strip_prefix("github://") {
             // Parse github://owner/repo/path/to/file.nv
-            let gh_path = &resolved_str["github://".len()..];
             let gh_parts: Vec<&str> = gh_path.splitn(3, '/').collect();
             if gh_parts.len() >= 3 {
                 let gh_owner = gh_parts[0];

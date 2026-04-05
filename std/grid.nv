@@ -235,3 +235,103 @@ fn extends drawLabels(self: Grid($T), screenX: Int, screenY: Int, cellSize: Int,
         }
     }
 }
+
+// ── Terminal drawing (no raylib needed) ───────────────────────────────────────
+
+// Print the grid to stdout using a function that maps each cell to a
+// single-character string.  Good for quick debugging and TUI games.
+//
+//   grid.printGrid(|v: Int| if v == 1 { "#" } else { "." })
+//   // output:
+//   // ..#..
+//   // .###.
+//   // ..#..
+//
+fn extends printGrid(self: Grid($T), charFn: fn($T) -> String) {
+    for let row = 0; row < self.rows; row += 1 {
+        let line = ""
+        for let col = 0; col < self.cols; col += 1 {
+            line = line + charFn(self.get(col, row))
+        }
+        println(line)
+    }
+}
+
+// Print the grid with each cell padded to a fixed width, separated by
+// spaces.  Useful when cells contain numbers or multi-char labels.
+//
+//   grid.printGridLabels(|v: Int| Cast::string(v), 3)
+//   // output:
+//   //   0   0   1
+//   //   0   2   0
+//   //   1   0   0
+//
+fn extends printGridLabels(self: Grid($T), strFn: fn($T) -> String, cellWidth: Int) {
+    for let row = 0; row < self.rows; row += 1 {
+        let line = ""
+        for let col = 0; col < self.cols; col += 1 {
+            let s = strFn(self.get(col, row))
+            // Right-pad to cellWidth
+            while s.len() < cellWidth {
+                s = " " + s
+            }
+            if col > 0 { line = line + " " }
+            line = line + s
+        }
+        println(line)
+    }
+}
+
+// Print the grid with a border and optional title.  Uses Unicode
+// box-drawing characters for a clean look in the terminal.
+//
+//   grid.printGridBoxed(|v: String| v, "My Map")
+//   // output:
+//   // ┌─── My Map ───┐
+//   // │ . . # . .     │
+//   // │ . # # # .     │
+//   // │ . . # . .     │
+//   // └───────────────┘
+//
+fn extends printGridBoxed(self: Grid($T), charFn: fn($T) -> String, title: String) {
+    let innerW = self.cols * 2 - 1
+    if innerW < title.len() + 2 {
+        innerW = title.len() + 2
+    }
+    // Top border
+    let top = "┌"
+    if title.len() > 0 {
+        let dashes = (innerW - title.len() - 2) / 2
+        for let i = 0; i < dashes; i += 1 { top = top + "─" }
+        top = top + " " + title + " "
+        let remaining = innerW - dashes - title.len() - 2
+        for let i = 0; i < remaining; i += 1 { top = top + "─" }
+    } else {
+        for let i = 0; i < innerW; i += 1 { top = top + "─" }
+    }
+    top = top + "┐"
+    println(top)
+
+    // Rows
+    for let row = 0; row < self.rows; row += 1 {
+        let line = "│"
+        for let col = 0; col < self.cols; col += 1 {
+            if col > 0 { line = line + " " }
+            line = line + charFn(self.get(col, row))
+        }
+        // Pad to innerW
+        let content = self.cols * 2 - 1
+        while content < innerW {
+            line = line + " "
+            content += 1
+        }
+        line = line + "│"
+        println(line)
+    }
+
+    // Bottom border
+    let bottom = "└"
+    for let i = 0; i < innerW; i += 1 { bottom = bottom + "─" }
+    bottom = bottom + "┘"
+    println(bottom)
+}
