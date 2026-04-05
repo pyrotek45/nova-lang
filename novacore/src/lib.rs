@@ -1904,12 +1904,15 @@ impl NovaCore {
     pub fn run_debug(mut self) -> NovaResult<()> {
         self.process()?;
         // Build debug info for the interactive debugger
-        let debug_info = common::debug_info::extract_debug_info(
+        let mut debug_info = common::debug_info::extract_debug_info(
             &self.compiler.global,
             &self.compiler.native_functions,
             &self.compiler.variables,
             &self.compiler.asm,
+            &self.compiler.fn_local_names,
         );
+        // Copy assembler label addresses so the debugger can map bytecode PCs to function scopes
+        debug_info.label_addresses = self.assembler.labels.clone();
         self.vm.run_debug(debug_info)?;
         Ok(())
     }
@@ -1930,6 +1933,7 @@ impl NovaCore {
             &self.compiler.native_functions,
             &self.compiler.variables,
             &asm,
+            &self.compiler.fn_local_names,
         );
         let dis = disassembler::new();
         dis.dis_asm(asm, &debug_info);

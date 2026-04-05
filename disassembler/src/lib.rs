@@ -192,6 +192,15 @@ impl Disassembler {
             let m = render_margin(&margin[i], margin_width);
             let depth = fn_ranges.iter().filter(|(s, e, _, _)| i > *s && i < *e).count();
 
+            // Determine the innermost enclosing function scope for local name resolution.
+            // Pick the fn_range with the smallest span that contains this instruction.
+            let scope: u64 = fn_ranges
+                .iter()
+                .filter(|(s, e, _, _)| i > *s && i < *e)
+                .min_by_key(|(s, e, _, _)| e - s)
+                .map(|(_, _, lbl, _)| *lbl)
+                .unwrap_or(0);
+
             // Build the nesting prefix.  Every instruction gets the same
             // column budget so opcodes / content always line up.
             //
@@ -220,8 +229,8 @@ impl Disassembler {
                     } else {
                         let nest = build_nest(depth, NestCap::None);
                         println!(
-                            "{} {}{:>w$}  {}{}{}{}:{} {}; label {}{}",
-                            m, DIM, i, RESET, nest, BOLD, name, RESET, DIM, id, RESET,
+                            "{} {}{:>w$}  {}{}{}{}:{}",
+                            m, DIM, i, RESET, nest, BOLD, name, RESET,
                             w = line_num_width
                         );
                     }
@@ -245,7 +254,7 @@ impl Disassembler {
                     );
                 }
                 _ => {
-                    let (mnemonic, operand, cat) = decode_asm(inst, info);
+                    let (mnemonic, operand, cat) = decode_asm(inst, info, scope);
                     let color = cat_color(cat);
                     let nest = build_nest(depth, NestCap::None);
                     if operand.is_empty() {
@@ -388,7 +397,7 @@ fn render_margin(
 }
 
 // ── Decode ASM instruction to (mnemonic, operand, category) ─────────
-fn decode_asm(inst: &Asm, info: &DebugInfo) -> (&'static str, String, Category) {
+fn decode_asm(inst: &Asm, info: &DebugInfo, scope: u64) -> (&'static str, String, Category) {
     match inst {
         Asm::EXIT => ("exit", String::new(), Category::Control),
         Asm::ALLOCGLOBBALS(v) => ("alloc_global", format!("{}", v), Category::Memory),
@@ -399,7 +408,7 @@ fn decode_asm(inst: &Asm, info: &DebugInfo) -> (&'static str, String, Category) 
             Category::Memory,
         ),
         Asm::STORE(v) => {
-            let name = info.local_name(0, *v).unwrap_or_default();
+            let name = info.local_name(scope, *v).unwrap_or_default();
             if name.is_empty() {
                 ("store", format!("local[{}]", v), Category::Memory)
             } else {
@@ -411,7 +420,7 @@ fn decode_asm(inst: &Asm, info: &DebugInfo) -> (&'static str, String, Category) 
             ("storeg", format!("{} {}(global[{}]){}", name, DIM, v, RESET), Category::Memory)
         }
         Asm::GET(v) => {
-            let name = info.local_name(0, *v).unwrap_or_default();
+            let name = info.local_name(scope, *v).unwrap_or_default();
             if name.is_empty() {
                 ("get", format!("local[{}]", v), Category::Memory)
             } else {

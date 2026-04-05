@@ -29,6 +29,8 @@ pub struct Compiler {
     pub continues: Vec<u64>,
     pub global_strings: HashMap<Rc<str>, usize>,
     pub unrolled_index: HashMap<Rc<str>, usize>,
+    /// Per-function local variable names: (label_id, [(slot, name), ...])
+    pub fn_local_names: Vec<(u64, Vec<(u32, String)>)>,
 }
 
 pub fn new() -> Compiler {
@@ -48,6 +50,7 @@ pub fn new() -> Compiler {
         native_functions_types: HashMap::default(),
         global_strings: HashMap::default(),
         unrolled_index: HashMap::default(),
+        fn_local_names: Vec::new(),
     }
 }
 
@@ -267,6 +270,7 @@ impl Compiler {
                     let mut function_compile = self.clone();
                     function_compile.variables.clear();
                     function_compile.asm.clear();
+                    function_compile.fn_local_names.clear();
 
                     // Register parameter names in the function's local variable scope
                     for param in parameters.iter() {
@@ -332,6 +336,17 @@ impl Compiler {
                         num_parameters + num_captures,
                         local_vars - (num_parameters + num_captures),
                     ));
+
+                    // Record per-function local names for debug info
+                    let fn_locals: Vec<(u32, String)> = function_compile
+                        .variables
+                        .items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, name)| (i as u32, name.to_string()))
+                        .collect();
+                    self.fn_local_names.push((closure_jump_label, fn_locals));
+                    self.fn_local_names.append(&mut function_compile.fn_local_names);
 
                     // Append compiled function instructions to the current scope
                     self.gen = function_compile.gen;
@@ -1447,6 +1462,7 @@ impl Compiler {
                 function_compile.variables.clear();
                 //dbg!(&function_compile.variables);
                 function_compile.asm.clear();
+                function_compile.fn_local_names.clear();
                 //dbg!(&parameters, &captured);
                 // Register parameter names in the function's local variable scope
                 for param in parameters.iter() {
@@ -1510,6 +1526,17 @@ impl Compiler {
                     num_parameters + num_captures,
                     local_vars - (num_parameters + num_captures),
                 ));
+
+                // Record per-function local names for debug info
+                let fn_locals: Vec<(u32, String)> = function_compile
+                    .variables
+                    .items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, name)| (i as u32, name.to_string()))
+                    .collect();
+                self.fn_local_names.push((closure_jump_label, fn_locals));
+                self.fn_local_names.append(&mut function_compile.fn_local_names);
 
                 // Append compiled function instructions to the current scope
                 self.gen = function_compile.gen;
