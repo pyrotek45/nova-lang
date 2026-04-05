@@ -120,8 +120,8 @@ impl Disassembler {
             };
 
             // vertical bars in between
-            for idx in (lo + 1)..hi {
-                margin[idx].push((col, '│', color));
+            for item in margin.iter_mut().take(hi).skip(lo + 1) {
+                item.push((col, '│', color));
             }
 
             // corners at endpoints
@@ -479,11 +479,11 @@ fn decode_asm(inst: &Asm, info: &DebugInfo) -> (&'static str, String, Category) 
         Asm::PRINT => ("print", String::new(), Category::IO),
         Asm::DCALL(v) => {
             let name = info.global_name(*v);
-            ("dcall", format!("{}", name), Category::Control)
+            ("dcall", name.to_string(), Category::Control)
         }
         Asm::TCALL(v) => {
             let name = info.global_name(*v);
-            ("tcall", format!("{}", name), Category::Control)
+            ("tcall", name.to_string(), Category::Control)
         }
         Asm::CALL => ("call", String::new(), Category::Control),
         Asm::PIN(_) => ("pindex", String::new(), Category::Data),
