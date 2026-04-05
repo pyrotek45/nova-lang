@@ -1683,10 +1683,21 @@ impl Vm {
                         let s = if pc + sz <= prog.len() {
                             let raw =
                                 String::from_utf8_lossy(&prog[pc..pc + sz]).to_string();
-                            if raw.len() > 20 {
-                                format!("\"{}..\"", &raw[..18])
+                            // Escape control chars so they don't break TUI layout
+                            let escaped: String = raw.chars().map(|c| match c {
+                                '\n' => '␊',
+                                '\r' => '␍',
+                                '\t' => '␉',
+                                '\0' => '␀',
+                                c if c.is_control() => '·',
+                                c => c,
+                            }).collect();
+                            let char_count = escaped.chars().count();
+                            if char_count > 20 {
+                                let preview: String = escaped.chars().take(18).collect();
+                                format!("\"{}..\"", preview)
                             } else {
-                                format!("\"{}\"", raw)
+                                format!("\"{}\"", escaped)
                             }
                         } else {
                             "\"?\"".into()
@@ -1731,37 +1742,41 @@ impl Vm {
         // ── Display-width helpers ───────────────────────────────────
         // `str.len()` counts UTF-8 bytes, but terminals measure columns
         // by character count.  Our special chars (►, •, ─) are each 3
-        // bytes but 1 column wide.  These helpers let us pad/truncate
-        // strings to an exact terminal column width.
-
-        /// Visible column width of `s` (counts chars, not bytes).
-        fn vis_width(s: &str) -> usize {
-            s.chars().count()
-        }
+        // bytes but 1 column wide.  Control characters (\n, \t, etc.)
+        // occupy 0 columns and must be skipped so they don't break
+        // alignment.
 
         /// Pad `s` with trailing spaces to exactly `w` visible columns.
-        /// If already wider, truncate to `w` columns.
+        /// If already wider, truncate to `w` columns.  Control characters
+        /// are stripped to prevent layout breakage.
         fn pad(s: &str, w: usize) -> String {
-            let vw = vis_width(s);
-            if vw >= w {
-                s.chars().take(w).collect()
-            } else {
-                let mut out = s.to_string();
-                for _ in 0..(w - vw) {
-                    out.push(' ');
-                }
-                out
+            let mut out = String::with_capacity(w);
+            let mut cols = 0usize;
+            for c in s.chars() {
+                if c.is_control() { continue; }
+                if cols >= w { break; }
+                out.push(c);
+                cols += 1;
             }
+            while cols < w {
+                out.push(' ');
+                cols += 1;
+            }
+            out
         }
 
         /// Truncate `s` to at most `w` visible columns.
+        /// Control characters are stripped.
         fn trunc(s: &str, w: usize) -> String {
-            let vw = vis_width(s);
-            if vw <= w {
-                s.to_string()
-            } else {
-                s.chars().take(w).collect()
+            let mut out = String::new();
+            let mut cols = 0usize;
+            for c in s.chars() {
+                if c.is_control() { continue; }
+                if cols >= w { break; }
+                out.push(c);
+                cols += 1;
             }
+            out
         }
 
         // ── Render function ─────────────────────────────────────────
