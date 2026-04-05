@@ -1361,7 +1361,7 @@ impl Vm {
         // ── Snapshot ────────────────────────────────────────────────
         #[derive(Clone)]
         struct Snapshot {
-            ip: usize,
+            ip: usize,           // IP of the instruction that was executed
             opname: String,
             named_op: String,
             stack: Vec<String>,
@@ -1398,6 +1398,7 @@ impl Vm {
         }
 
         let take_snapshot = |state: &State,
+                             executed_ip: usize,
                              opname: &str,
                              named_op: &str,
                              info: &DebugInfo|
@@ -1431,7 +1432,7 @@ impl Vm {
             }
 
             Snapshot {
-                ip: state.current_instruction,
+                ip: executed_ip,
                 opname: opname.to_string(),
                 named_op: named_op.to_string(),
                 stack,
@@ -1675,12 +1676,7 @@ impl Vm {
         } else {
             String::new()
         };
-        let _raw0 = if ip0 < self.state.program.len() {
-            self.peek_operand(self.state.program[ip0])
-        } else {
-            String::new()
-        };
-        history.push(take_snapshot(&self.state, &op0, &named0, &info));
+        history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info));
 
         // ── Render function ─────────────────────────────────────────
         let render = |stdout: &mut io::Stdout,
@@ -2061,6 +2057,7 @@ impl Vm {
                                     }
                                     history.push(take_snapshot(
                                         &self.state,
+                                        ip_before,
                                         &opname,
                                         &named,
                                         &info,
@@ -2074,6 +2071,7 @@ impl Vm {
                                     finished = true;
                                     history.push(take_snapshot(
                                         &self.state,
+                                        ip_before,
                                         "END",
                                         "",
                                         &info,
@@ -2084,6 +2082,7 @@ impl Vm {
                                     error_msg = Some(msg);
                                     history.push(take_snapshot(
                                         &self.state,
+                                        ip_before,
                                         "ERROR",
                                         "",
                                         &info,
@@ -2126,6 +2125,7 @@ impl Vm {
                                         }
                                         history.push(take_snapshot(
                                         &self.state,
+                                        ip_b,
                                         &opname,
                                         &named,
                                         &info,
@@ -2139,6 +2139,7 @@ impl Vm {
                                         finished = true;
                                         history.push(take_snapshot(
                                             &self.state,
+                                            ip_b,
                                             "END",
                                             "",
                                             &info,
@@ -2150,6 +2151,7 @@ impl Vm {
                                         error_msg = Some(msg);
                                         history.push(take_snapshot(
                                             &self.state,
+                                            ip_b,
                                             "ERROR",
                                             "",
                                             &info,
@@ -2171,58 +2173,58 @@ impl Vm {
                     KeyCode::Char('r') => {
                         let limit = 1_000_000;
                         let mut count = 0;
+                        let mut last_ip = self.state.current_instruction;
                         while !finished
                             && error_msg.is_none()
                             && count < limit
                         {
-                            let ip_b = self.state.current_instruction;
-                            let opc =
-                                if ip_b < self.state.program.len() {
-                                    self.state.program[ip_b]
-                                } else {
-                                    0
-                                };
-                            let named =
-                                self.peek_operand_named(opc, &info);
+                            last_ip = self.state.current_instruction;
                             match self.step_one_debug() {
                                 StepResult::Continue {
-                                    opname,
+                                    opname: _,
                                     output,
                                 } => {
                                     if let Some(ref o) = output {
                                         output_buf.push(o.clone());
                                     }
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        &opname,
-                                        &named,
-                                        &info,
-                                    ));
                                 }
                                 StepResult::Finished { output } => {
                                     if let Some(ref o) = output {
                                         output_buf.push(o.clone());
                                     }
                                     finished = true;
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        "END",
-                                        "",
-                                        &info,
-                                    ));
                                 }
                                 StepResult::Error(msg) => {
                                     error_msg = Some(msg);
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        "ERROR",
-                                        "",
-                                        &info,
-                                    ));
                                 }
                             }
                             count += 1;
                         }
+                        // Take a single snapshot for the final state
+                        let final_op = if finished {
+                            "END"
+                        } else if error_msg.is_some() {
+                            "ERROR"
+                        } else {
+                            "PAUSED"
+                        };
+                        let final_named = if !finished && error_msg.is_none() {
+                            let ip_now = self.state.current_instruction;
+                            if ip_now < self.state.program.len() {
+                                self.peek_operand_named(self.state.program[ip_now], &info)
+                            } else {
+                                String::new()
+                            }
+                        } else {
+                            String::new()
+                        };
+                        history.push(take_snapshot(
+                            &self.state,
+                            last_ip,
+                            final_op,
+                            &final_named,
+                            &info,
+                        ));
                         cursor = history.len() - 1;
                     }
 
@@ -2232,33 +2234,20 @@ impl Vm {
                             history[cursor].callstack_depth;
                         let limit = 100_000;
                         let mut count = 0;
+                        let mut last_ip = self.state.current_instruction;
                         while !finished
                             && error_msg.is_none()
                             && count < limit
                         {
-                            let ip_b = self.state.current_instruction;
-                            let opc =
-                                if ip_b < self.state.program.len() {
-                                    self.state.program[ip_b]
-                                } else {
-                                    0
-                                };
-                            let named =
-                                self.peek_operand_named(opc, &info);
+                            last_ip = self.state.current_instruction;
                             match self.step_one_debug() {
                                 StepResult::Continue {
-                                    opname,
+                                    opname: _,
                                     output,
                                 } => {
                                     if let Some(ref o) = output {
                                         output_buf.push(o.clone());
                                     }
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        &opname,
-                                        &named,
-                                        &info,
-                                    ));
                                     if self.state.callstack.len()
                                         <= target_depth
                                     {
@@ -2270,27 +2259,45 @@ impl Vm {
                                         output_buf.push(o.clone());
                                     }
                                     finished = true;
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        "END",
-                                        "",
-                                        &info,
-                                    ));
                                     break;
                                 }
                                 StepResult::Error(msg) => {
                                     error_msg = Some(msg);
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        "ERROR",
-                                        "",
-                                        &info,
-                                    ));
                                     break;
                                 }
                             }
                             count += 1;
                         }
+                        // Take a single snapshot for the final state
+                        let final_op = if finished {
+                            "END".to_string()
+                        } else if error_msg.is_some() {
+                            "ERROR".to_string()
+                        } else {
+                            let ip_now = self.state.current_instruction;
+                            if ip_now < self.state.program.len() {
+                                code::byte_to_string(self.state.program[ip_now])
+                            } else {
+                                "END".to_string()
+                            }
+                        };
+                        let final_named = if !finished && error_msg.is_none() {
+                            let ip_now = self.state.current_instruction;
+                            if ip_now < self.state.program.len() {
+                                self.peek_operand_named(self.state.program[ip_now], &info)
+                            } else {
+                                String::new()
+                            }
+                        } else {
+                            String::new()
+                        };
+                        history.push(take_snapshot(
+                            &self.state,
+                            last_ip,
+                            &final_op,
+                            &final_named,
+                            &info,
+                        ));
                         cursor = history.len() - 1;
                     }
 

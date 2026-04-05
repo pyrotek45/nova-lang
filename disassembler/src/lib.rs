@@ -156,7 +156,9 @@ impl Disassembler {
 
         // ── Phase 6: Print ───────────────────────────────────────
         let margin_width = if max_col == 0 { 0 } else { max_col + 1 };
+        let line_num_width = format!("{}", n).len().max(4);
 
+        // Header
         println!(
             "\n{}{}══════════════════════════════════════════════════════════════{}",
             BOLD, CYAN, RESET
@@ -173,42 +175,62 @@ impl Disassembler {
             "{}  Legend: {}│{} loop   {}│{} branch   {}│{} jump{}",
             DIM, MAGENTA, RESET, YELLOW, RESET, CYAN, RESET, RESET
         );
+
+        // Globals table (printed at the top for quick reference)
+        if !info.global_names.is_empty() {
+            println!("\n{}{}  Globals:{}", BOLD, CYAN, RESET);
+            let mut globals: Vec<_> = info.global_names.iter().collect();
+            globals.sort_by_key(|(k, _)| *k);
+            for (idx, name) in &globals {
+                println!("    {}[{:>3}]{} {}", DIM, idx, RESET, name);
+            }
+        }
+
         println!();
 
         for (i, inst) in asm.iter().enumerate() {
             let m = render_margin(&margin[i], margin_width);
             let depth = fn_ranges.iter().filter(|(s, e, _, _)| i > *s && i < *e).count();
-            let nest = "│  ".repeat(depth);
+            let nest = format!("{}{}", CYAN, "│  ".repeat(depth));
+
+            // Every line uses the same structure:
+            //   <margin> <line_num>  <nest><content>
+            // This keeps columns aligned regardless of instruction type.
 
             match inst {
                 Asm::LABEL(id) => {
                     let name = info.label_name(*id);
                     let is_fn_end = fn_ranges.iter().any(|(_, end, lbl, _)| *lbl == *id && *end == i);
                     if is_fn_end {
-                        let close = "│  ".repeat(depth.saturating_sub(1));
+                        let close_depth = depth.saturating_sub(1);
+                        let close_nest = format!("{}{}", CYAN, "│  ".repeat(close_depth));
                         println!(
-                            "{}  {}{}{}└── end {}{}",
-                            m, DIM, CYAN, close, name, RESET
+                            "{} {}{:>w$}  {}{}└── end {}{}",
+                            m, DIM, i, close_nest, BOLD, name, RESET,
+                            w = line_num_width
                         );
                     } else {
                         println!(
-                            "{}  {}{}{}{}:{} {}; label {}{}",
-                            m, BOLD, CYAN, nest, name, RESET, DIM, id, RESET
+                            "{} {}{:>w$}  {}{}{}{}:{} {}; label {}{}",
+                            m, DIM, i, RESET, nest, BOLD, name, RESET, DIM, id, RESET,
+                            w = line_num_width
                         );
                     }
                 }
                 Asm::FUNCTION(lbl) => {
                     let name = info.label_name(*lbl);
                     println!(
-                        "{}  {}{}{}┌── fn {} ──────────────────{}",
-                        m, BOLD, CYAN, nest, name, RESET
+                        "{} {}{:>w$}  {}{}┌── fn {} ──────────────────{}",
+                        m, DIM, i, nest, BOLD, name, RESET,
+                        w = line_num_width
                     );
                 }
                 Asm::CLOSURE(lbl) => {
                     let name = info.label_name(*lbl);
                     println!(
-                        "{}  {}{}{}┌── closure {} ─────────────{}",
-                        m, BOLD, MAGENTA, nest, name, RESET
+                        "{} {}{:>w$}  {}{}┌── closure {} ─────────────{}",
+                        m, DIM, i, nest, BOLD, name, RESET,
+                        w = line_num_width
                     );
                 }
                 _ => {
@@ -216,13 +238,15 @@ impl Disassembler {
                     let color = cat_color(cat);
                     if operand.is_empty() {
                         println!(
-                            "{} {}{}{:>4}  {}{:<16}{}",
-                            m, DIM, nest, i, color, mnemonic, RESET
+                            "{} {}{:>w$}  {}{}{}{:<16}{}",
+                            m, DIM, i, RESET, nest, color, mnemonic, RESET,
+                            w = line_num_width
                         );
                     } else {
                         println!(
-                            "{} {}{}{:>4}  {}{:<16} {}{}{}",
-                            m, DIM, nest, i, color, mnemonic, WHITE, operand, RESET
+                            "{} {}{:>w$}  {}{}{}{:<16} {}{}{}",
+                            m, DIM, i, RESET, nest, color, mnemonic, WHITE, operand, RESET,
+                            w = line_num_width
                         );
                     }
                 }
@@ -249,16 +273,6 @@ impl Disassembler {
             WHITE, n_fn, DIM, n_cls, DIM, n_nat, DIM, n_lbl, RESET
         );
         println!("  {}total instructions: {}{}", WHITE, asm.len(), RESET);
-
-        // Global table
-        if !info.global_names.is_empty() {
-            println!("\n{}{}  Globals:{}",  BOLD, CYAN, RESET);
-            let mut globals: Vec<_> = info.global_names.iter().collect();
-            globals.sort_by_key(|(k, _)| *k);
-            for (idx, name) in &globals {
-                println!("    {}[{:>3}]{} {}", DIM, idx, RESET, name);
-            }
-        }
 
         // Reading guide
         println!("\n{}{}  How to read:{}", BOLD, CYAN, RESET);
