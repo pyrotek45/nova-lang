@@ -18,7 +18,7 @@ assert(hash(0) == hash(0), "hash deterministic for int")
 assert(hash('a') == hash('a'), "hash deterministic for char")
 
 // --- Basic insert / get / has ---
-let m = HashMap::default() @[K: String, V: Int]
+let m = HashMap::new() @[K: String, V: Int]
 m.insert("a", 1)
 m.insert("b", 2)
 m.insert("c", 3)
@@ -33,7 +33,7 @@ assert(!m.has("z"), "has z false")
 // --- size / isEmpty ---
 assert(m.size() == 3, "size 3")
 assert(!m.isEmpty(), "not empty")
-let empty = HashMap::default() @[K: Int, V: Int]
+let empty = HashMap::new() @[K: Int, V: Int]
 assert(empty.isEmpty(), "empty map isEmpty")
 assert(empty.size() == 0, "empty map size 0")
 
@@ -60,7 +60,7 @@ assert(m.getOrDefault("a", 0) == 100, "getOrDefault existing")
 assert(m.getOrDefault("missing", 42) == 42, "getOrDefault missing")
 
 // --- Int keys ---
-let mi = HashMap::default() @[K: Int, V: String]
+let mi = HashMap::new() @[K: Int, V: String]
 mi.insert(1, "one")
 mi.insert(2, "two")
 mi.insert(3, "three")
@@ -71,7 +71,7 @@ mi.delete(2)
 assert(!mi.has(2), "int key deleted")
 
 // --- Stress: insert 500 entries, triggers resize ---
-let big = HashMap::default() @[K: String, V: Int]
+let big = HashMap::new() @[K: String, V: Int]
 for let i = 0; i < 500; i += 1 {
     big.insert(Cast::string(i), i * 10)
 }
@@ -102,7 +102,7 @@ for let i = 250; i < 500; i += 1 {
 }
 
 // --- entries ---
-let m2 = HashMap::default() @[K: String, V: Int]
+let m2 = HashMap::new() @[K: String, V: Int]
 m2.insert("x", 10)
 m2.insert("y", 20)
 let ents = m2.entries()
@@ -134,7 +134,7 @@ assert(m2.get("z").unwrap() == 99, "insert after clear")
 assert(m2.size() == 1, "size 1 after clear + insert")
 
 // --- toString ---
-let m3 = HashMap::default() @[K: String, V: Int]
+let m3 = HashMap::new() @[K: String, V: Int]
 m3.insert("only", 1)
 let s = m3.toString()
 assert(s == "{only => 1}", "toString single")

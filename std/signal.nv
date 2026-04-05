@@ -165,7 +165,7 @@ struct SignalBus {
 
 fn extends(SignalBus) new() -> SignalBus {
     return SignalBus {
-        signals: HashMap::default() @[K: String, V: VoidSignal],
+        signals: HashMap::new() @[K: String, V: VoidSignal],
     }
 }
 
@@ -206,7 +206,7 @@ fn extends clear(self: SignalBus, name: String) {
 
 // Clear all signals and listeners
 fn extends clearAll(self: SignalBus) {
-    self.signals = HashMap::default() @[K: String, V: VoidSignal]
+    self.signals = HashMap::new() @[K: String, V: VoidSignal]
 }
 
 // Number of listeners on a named signal

@@ -1,0 +1,304 @@
+module test_container
+
+import super.std.container
+import super.std.core
+
+// ============================================================
+// Container module tests — exercise VBox, HBox, GridBox,
+// PanelBox, MarginBox layout logic using mock Slot closures.
+// Uses Box(Int) to capture draw calls.
+// ============================================================
+
+// ── 1. Slot creation & preferred size ─────────────────────────
+let s1 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| { },
+    fn() -> (Int, Int) { return (100, 30) }
+)
+let sz = s1.preferredSize()
+assert(sz[0] == 100, "slot preferred width")
+assert(sz[1] == 30, "slot preferred height")
+println("  1 [slot_basic] OK")
+
+// ── 2. VBox stacking ─────────────────────────────────────────
+let vCount = Box(0)
+let vy0 = Box(0)
+let vy1 = Box(0)
+let vy2 = Box(0)
+let vx0 = Box(0)
+let vw0 = Box(0)
+let vh0 = Box(0)
+
+let v = VBox::new(10, 20, 200)
+v.spacing = 4
+v.padding = 8
+
+let vs0 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        vCount.value = vCount.value + 1
+        vx0.value = x
+        vy0.value = y
+        vw0.value = w
+        vh0.value = h
+    },
+    fn() -> (Int, Int) { return (100, 30) }
+)
+v.add(vs0)
+
+let vs1 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        vCount.value = vCount.value + 1
+        vy1.value = y
+    },
+    fn() -> (Int, Int) { return (100, 30) }
+)
+v.add(vs1)
+
+let vs2 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        vCount.value = vCount.value + 1
+        vy2.value = y
+    },
+    fn() -> (Int, Int) { return (100, 30) }
+)
+v.add(vs2)
+
+v.draw()
+
+assert(vCount.value == 3, "vbox drew 3 children")
+assert(vx0.value == 18, "vbox child0 x = 10+8")
+assert(vy0.value == 28, "vbox child0 y = 20+8")
+assert(vw0.value == 184, "vbox child0 w = 200-16")
+assert(vh0.value == 30, "vbox child0 h")
+assert(vy1.value == 62, "vbox child1 y = 28+30+4")
+assert(vy2.value == 96, "vbox child2 y = 62+30+4")
+println("  2 [vbox_layout] OK")
+
+// ── 3. VBox totalHeight ──────────────────────────────────────
+let tht = v.totalHeight()
+assert(tht == 114, "vbox totalHeight = 16+90+8")
+println("  3 [vbox_totalHeight] OK")
+
+// ── 4. HBox stacking ────────────────────────────────────────
+let hCount = Box(0)
+let hx0 = Box(0)
+let hy0 = Box(0)
+let hw0 = Box(0)
+let hh0 = Box(0)
+let hx1 = Box(0)
+
+let hb = HBox::new(50, 100, 60)
+hb.spacing = 6
+hb.padding = 4
+
+let hs0 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        hCount.value = hCount.value + 1
+        hx0.value = x
+        hy0.value = y
+        hw0.value = w
+        hh0.value = h
+    },
+    fn() -> (Int, Int) { return (80, 40) }
+)
+hb.add(hs0)
+
+let hs1 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        hCount.value = hCount.value + 1
+        hx1.value = x
+    },
+    fn() -> (Int, Int) { return (80, 40) }
+)
+hb.add(hs1)
+
+hb.draw()
+
+assert(hCount.value == 2, "hbox drew 2 children")
+assert(hx0.value == 54, "hbox child0 x = 50+4")
+assert(hy0.value == 104, "hbox child0 y = 100+4")
+assert(hw0.value == 80, "hbox child0 w = preferred")
+assert(hh0.value == 52, "hbox child0 h = 60-8")
+assert(hx1.value == 140, "hbox child1 x = 54+80+6")
+println("  4 [hbox_layout] OK")
+
+// ── 5. HBox totalWidth ──────────────────────────────────────
+let htw = hb.totalWidth()
+assert(htw == 174, "hbox totalWidth = 8+160+6")
+println("  5 [hbox_totalWidth] OK")
+
+// ── 6. GridBox layout ────────────────────────────────────────
+let gCount = Box(0)
+let gx0 = Box(0)
+let gy0 = Box(0)
+let gx1 = Box(0)
+let gx3 = Box(0)
+let gy3 = Box(0)
+let gx4 = Box(0)
+let gy4 = Box(0)
+
+let g = GridBox::new(0, 0, 3, 40, 20)
+g.spacingX = 2
+g.spacingY = 2
+g.padding = 5
+
+let gs0 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        gCount.value = gCount.value + 1
+        gx0.value = x
+        gy0.value = y
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+g.add(gs0)
+
+let gs1 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        gCount.value = gCount.value + 1
+        gx1.value = x
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+g.add(gs1)
+
+let gs2 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        gCount.value = gCount.value + 1
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+g.add(gs2)
+
+let gs3 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        gCount.value = gCount.value + 1
+        gx3.value = x
+        gy3.value = y
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+g.add(gs3)
+
+let gs4 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        gCount.value = gCount.value + 1
+        gx4.value = x
+        gy4.value = y
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+g.add(gs4)
+
+g.draw()
+
+assert(gCount.value == 5, "grid drew 5 children")
+assert(gx0.value == 5, "grid child0 x = padding")
+assert(gy0.value == 5, "grid child0 y = padding")
+assert(gx1.value == 47, "grid child1 x = 5+42")
+assert(gx3.value == 5, "grid child3 x = col 0")
+assert(gy3.value == 27, "grid child3 y = 5+22")
+assert(gx4.value == 47, "grid child4 x = col 1")
+assert(gy4.value == 27, "grid child4 y = row 1")
+println("  6 [grid_layout] OK")
+
+// ── 7. GridBox dimensions ────────────────────────────────────
+let gtw = g.totalWidth()
+assert(gtw == 134, "grid totalWidth = 10+120+4")
+let gth = g.totalHeight()
+assert(gth == 52, "grid totalHeight = 10+40+2")
+println("  7 [grid_dimensions] OK")
+
+// ── 8. MarginBox ─────────────────────────────────────────────
+let mx0 = Box(0)
+let my0 = Box(0)
+let mw0 = Box(0)
+let mh0 = Box(0)
+let mDrawn = Box(false)
+
+let innerSlot = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        mDrawn.value = true
+        mx0.value = x
+        my0.value = y
+        mw0.value = w
+        mh0.value = h
+    },
+    fn() -> (Int, Int) { return (50, 25) }
+)
+let mb = MarginBox::new(innerSlot, 10, 5, 10, 5)
+mb.draw(0, 0, 100, 60)
+
+assert(mDrawn.value, "margin drew child")
+assert(mx0.value == 5, "margin inner x = left")
+assert(my0.value == 10, "margin inner y = top")
+assert(mw0.value == 90, "margin inner w = 100-5-5")
+assert(mh0.value == 40, "margin inner h = 60-10-10")
+
+let msz = mb.preferredSize()
+assert(msz[0] == 60, "margin preferred w = 50+10")
+assert(msz[1] == 45, "margin preferred h = 25+20")
+println("  8 [margin_box] OK")
+
+// ── 9. MarginBox uniform ─────────────────────────────────────
+let mx1 = Box(0)
+let my1 = Box(0)
+let mw1 = Box(0)
+let mh1 = Box(0)
+
+let innerSlot2 = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        mx1.value = x
+        my1.value = y
+        mw1.value = w
+        mh1.value = h
+    },
+    fn() -> (Int, Int) { return (30, 30) }
+)
+let mu = MarginBox::uniform(innerSlot2, 8)
+mu.draw(10, 10, 100, 100)
+
+assert(mx1.value == 18, "uniform margin x = 10+8")
+assert(my1.value == 18, "uniform margin y = 10+8")
+assert(mw1.value == 84, "uniform margin w = 100-16")
+assert(mh1.value == 84, "uniform margin h = 100-16")
+println("  9 [margin_uniform] OK")
+
+// ── 10. Empty containers ─────────────────────────────────────
+let ev = VBox::new(0, 0, 100)
+ev.draw()
+assert(ev.totalHeight() == 16, "empty vbox height = padding*2")
+
+let eh = HBox::new(0, 0, 50)
+eh.draw()
+assert(eh.totalWidth() == 16, "empty hbox width = padding*2")
+println("  10 [empty_containers] OK")
+
+// ── 11. MarginBox toSlot in VBox ─────────────────────────────
+let nx0 = Box(0)
+let ny0 = Box(0)
+let nw0 = Box(0)
+let nh0 = Box(0)
+
+let innerS = Slot::new(
+    |x: Int, y: Int, w: Int, h: Int| {
+        nx0.value = x
+        ny0.value = y
+        nw0.value = w
+        nh0.value = h
+    },
+    fn() -> (Int, Int) { return (40, 20) }
+)
+let mbox = MarginBox::uniform(innerS, 5)
+let mslot = mbox.toSlot()
+
+let nv = VBox::new(0, 0, 100)
+nv.padding = 0
+nv.add(mslot)
+nv.draw()
+
+assert(nx0.value == 5, "nested margin x")
+assert(ny0.value == 5, "nested margin y")
+assert(nw0.value == 90, "nested margin w")
+assert(nh0.value == 20, "nested margin h")
+println("  11 [margin_toSlot_nesting] OK")
+
+println("PASS: test_container")

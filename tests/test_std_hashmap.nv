@@ -3,7 +3,7 @@ module test_std_hashmap
 import super.std.hashmap
 
 // ── keys / values ────────────────────────────────────────────────
-let m = HashMap::default() @[K: String, V: Int]
+let m = HashMap::new() @[K: String, V: Int]
 m.insert("a", 1)
 m.insert("b", 2)
 m.insert("c", 3)
@@ -37,7 +37,7 @@ assert(fromP.get(1).unwrap() == "one", "fromPairs get 1")
 assert(fromP.get(3).unwrap() == "three", "fromPairs get 3")
 
 // ── increment ────────────────────────────────────────────────────
-let counts = HashMap::default() @[K: String, V: Int]
+let counts = HashMap::new() @[K: String, V: Int]
 counts.increment("x")
 counts.increment("x")
 counts.increment("y")
@@ -45,7 +45,7 @@ assert(counts.get("x").unwrap() == 2, "increment x twice")
 assert(counts.get("y").unwrap() == 1, "increment y once")
 
 // ── update ───────────────────────────────────────────────────────
-let upd = HashMap::default() @[K: String, V: Int]
+let upd = HashMap::new() @[K: String, V: Int]
 upd.insert("score", 10)
 upd.update("score", 0, fn(v: Int) -> Int { return v + 5 })
 assert(upd.get("score").unwrap() == 15, "update existing value")
@@ -53,10 +53,10 @@ upd.update("missing", 100, fn(v: Int) -> Int { return v + 1 })
 assert(upd.get("missing").unwrap() == 101, "update with default for missing key")
 
 // ── merge ────────────────────────────────────────────────────────
-let base = HashMap::default() @[K: String, V: Int]
+let base = HashMap::new() @[K: String, V: Int]
 base.insert("a", 1)
 base.insert("b", 2)
-let other = HashMap::default() @[K: String, V: Int]
+let other = HashMap::new() @[K: String, V: Int]
 other.insert("b", 99)  // collision — other wins
 other.insert("c", 3)
 base.merge(other)
@@ -66,7 +66,7 @@ assert(base.get("c").unwrap() == 3, "merge adds new key")
 assert(base.get("a").unwrap() == 1, "merge keeps non-overlapping")
 
 // ── large insertion (resize) ──────────────────────────────────────
-let big = HashMap::default() @[K: Int, V: Int]
+let big = HashMap::new() @[K: Int, V: Int]
 for let i = 0; i < 50; i += 1 {
     big.insert(i, i * i)
 }

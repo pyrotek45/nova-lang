@@ -128,4 +128,48 @@ assert(p.data.hp == 100, "custom struct hp")
 p.data.hp -= 25
 assert(p.data.hp == 75, "custom struct hp after damage")
 
+// -- Entity(String) data --
+let world4 = EntityWorld::new() @[T: String]
+let s = world4.spawn(50.0, 50.0, "label", "Hello")
+assert(s.data == "Hello", "Entity(String) data")
+s.data = "World"
+assert(s.data == "World", "Entity(String) mutated")
+
+// -- Entity(Int) data --
+let world5 = EntityWorld::new() @[T: Int]
+let i = world5.spawn(0.0, 0.0, "counter", 42)
+assert(i.data == 42, "Entity(Int) data")
+
+// -- onKill fires for each killAll target --
+let world6 = EntityWorld::new() @[T: Float]
+let killLog = []: Int
+world6.onKill.connect(|id: Int| { killLog.push(id) })
+let k1 = world6.spawn(0.0, 0.0, "mob", 0.0)
+let k2 = world6.spawn(0.0, 0.0, "mob", 0.0)
+let k3 = world6.spawn(0.0, 0.0, "friend", 0.0)
+world6.killAll("mob")
+assert(killLog.len() == 2, "killAll fires onKill for each")
+
+// -- onSpawn accumulation --
+let world7 = EntityWorld::new() @[T: Int]
+let spawnLog = []: Int
+world7.onSpawn.connect(|id: Int| { spawnLog.push(id) })
+for idx in 0..5 {
+    let _ = world7.spawn(0.0, 0.0, "x", idx)
+}
+assert(spawnLog.len() == 5, "onSpawn fires for all 5 spawns")
+assert(spawnLog[0] == 0, "first spawn id is 0")
+assert(spawnLog[4] == 4, "fifth spawn id is 4")
+
+// -- overlapCircle --
+let world8 = EntityWorld::new() @[T: Float]
+let c1 = world8.spawn(0.0, 0.0, "c", 0.0)
+c1.size = Vec2::new(10.0, 10.0)
+let c2 = world8.spawn(5.0, 0.0, "c", 0.0)
+c2.size = Vec2::new(10.0, 10.0)
+let c3 = world8.spawn(100.0, 100.0, "c", 0.0)
+c3.size = Vec2::new(10.0, 10.0)
+assert(c1.overlapCircle(c2), "overlapCircle overlapping")
+assert(!c1.overlapCircle(c3), "overlapCircle not overlapping")
+
 println("PASS: test_std_entity")

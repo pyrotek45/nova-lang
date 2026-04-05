@@ -1,0 +1,92 @@
+// ============================================================
+// test_datetime.nv — Tests for std/datetime module
+// ============================================================
+
+module test_datetime
+
+import super.std.datetime
+
+// ── DateTime::fromEpoch  ─────────────────────────────────────────────────────
+// 2024-01-01 00:00:00 UTC = 1704067200000 ms since epoch
+let epoch2024 = 1704067200000
+let dt = DateTime::fromEpoch(epoch2024)
+
+assert(dt.year() == 2024, "year: 2024, got " + Cast::string(dt.year()))
+assert(dt.month() == 1,   "month: 1, got " + Cast::string(dt.month()))
+assert(dt.day() == 1,     "day: 1, got " + Cast::string(dt.day()))
+assert(dt.hour() == 0,    "hour: 0, got " + Cast::string(dt.hour()))
+assert(dt.minute() == 0,  "minute: 0")
+assert(dt.second() == 0,  "second: 0")
+
+// 2024-01-01 is a Monday (weekday 1)
+assert(dt.weekday() == 1, "weekday: Monday=1, got " + Cast::string(dt.weekday()))
+assert(dt.weekdayName() == "Monday", "weekdayName: Monday")
+assert(dt.monthName() == "January", "monthName: January")
+
+// ── Formatting ───────────────────────────────────────────────────────────────
+
+assert(dt.formatDate() == "2024-01-01", "formatDate: 2024-01-01, got " + dt.formatDate())
+assert(dt.formatTime() == "00:00:00",   "formatTime: 00:00:00")
+assert(dt.format() == "2024-01-01 00:00:00", "format full")
+
+// ── Specific date: 2023-07-15 14:30:45 UTC ───────────────────────────────────
+// Epoch: 1689430245000
+let dt2 = DateTime::fromEpoch(1689430245000)
+assert(dt2.year() == 2023,  "dt2 year: 2023")
+assert(dt2.month() == 7,    "dt2 month: 7")
+assert(dt2.day() == 15,     "dt2 day: 15")
+assert(dt2.hour() == 14,    "dt2 hour: 14, got " + Cast::string(dt2.hour()))
+assert(dt2.minute() == 10,  "dt2 minute: 10")
+assert(dt2.second() == 45,  "dt2 second: 45")
+assert(dt2.formatDate() == "2023-07-15", "dt2 formatDate")
+assert(dt2.formatTime() == "14:10:45",   "dt2 formatTime")
+
+// ── Epoch round-trip ─────────────────────────────────────────────────────────
+
+assert(dt.toEpoch() == epoch2024, "toEpoch round-trip")
+
+// ── Difference ───────────────────────────────────────────────────────────────
+
+let a = DateTime::fromEpoch(1000000)
+let b = DateTime::fromEpoch(2000000)
+assert(b.diffMs(a) == 1000000, "diffMs: 1000000")
+
+// diffSec
+let diff = b.diffSec(a)
+assert(diff > 999.0 && diff < 1001.0, "diffSec: ~1000.0")
+
+// ── Leap year ────────────────────────────────────────────────────────────────
+// 2024 is a leap year. Feb 29, 2024 = day 60 of 2024
+// 2024-02-29 00:00:00 UTC = epoch 1704067200000 + (59 * 86400 * 1000)
+let feb29Epoch = 1704067200000 + 59 * 86400000
+let dtLeap = DateTime::fromEpoch(feb29Epoch)
+assert(dtLeap.month() == 2, "leap: month == 2, got " + Cast::string(dtLeap.month()))
+assert(dtLeap.day() == 29,  "leap: day == 29, got " + Cast::string(dtLeap.day()))
+
+// ── DateTime::now ────────────────────────────────────────────────────────────
+
+let dtNow = DateTime::now()
+// Should be at least year 2024
+assert(dtNow.year() >= 2024, "now: year >= 2024")
+assert(dtNow.month() >= 1 && dtNow.month() <= 12, "now: valid month")
+assert(dtNow.day() >= 1 && dtNow.day() <= 31, "now: valid day")
+
+// ── Stopwatch ────────────────────────────────────────────────────────────────
+
+let sw = Stopwatch::start()
+sleep(50)  // sleep 50ms
+let elapsed = sw.elapsedMs()
+assert(elapsed >= 40, "stopwatch: elapsed >= 40ms, got " + Cast::string(elapsed))
+
+// Lap
+sw.reset()
+sleep(30)
+let lapTime = sw.lap()
+assert(lapTime >= 20, "stopwatch lap: >= 20ms, got " + Cast::string(lapTime))
+
+// After lap, second lap should be shorter
+sleep(10)
+let lapTime2 = sw.lap()
+assert(lapTime2 >= 5, "stopwatch lap2: >= 5ms")
+
+println("PASS: All datetime tests passed!")

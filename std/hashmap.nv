@@ -25,7 +25,7 @@ fn makeBuckets(n: Int) -> [[($K,$V)]] {
 }
 
 // Create a new empty HashMap with an initial capacity of 16 buckets
-fn extends(HashMap) default() -> HashMap($K,$V) {
+fn extends(HashMap) new() -> HashMap($K,$V) {
     let nb = 16
     return HashMap {
         buckets: makeBuckets(nb) @[K: $K, V: $V],
@@ -209,14 +209,14 @@ fn extends merge(self: HashMap($K,$V), other: HashMap($K,$V)) {
 // Return a new HashMap with values transformed by f
 // Note: requires explicit type annotation at call site due to type inference limitations
 // fn extends mapValues(self: HashMap($K,$V), f: fn($V) -> $W) -> HashMap($K,$W) {
-//     let result: HashMap($K,$W) = HashMap::default() @[K: $K, V: $W]
+//     let result: HashMap($K,$W) = HashMap::new() @[K: $K, V: $W]
 //     self.forEach(|k: $K, v: $V| result.insert(k, f(v)))
 //     return result
 // }
 
 // Return a new HashMap keeping only entries whose key passes pred
 fn extends filterKeys(self: HashMap($K,$V), pred: fn($K) -> Bool) -> HashMap($K,$V) {
-    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    let result: HashMap($K,$V) = HashMap::new() @[K: $K, V: $V]
     self.forEach(|k: $K, v: $V| {
         if pred(k) { result.insert(k, v) }
     })
@@ -225,7 +225,7 @@ fn extends filterKeys(self: HashMap($K,$V), pred: fn($K) -> Bool) -> HashMap($K,
 
 // Return a new HashMap keeping only entries whose value passes pred
 fn extends filterValues(self: HashMap($K,$V), pred: fn($V) -> Bool) -> HashMap($K,$V) {
-    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    let result: HashMap($K,$V) = HashMap::new() @[K: $K, V: $V]
     self.forEach(|k: $K, v: $V| {
         if pred(v) { result.insert(k, v) }
     })
@@ -234,7 +234,7 @@ fn extends filterValues(self: HashMap($K,$V), pred: fn($V) -> Bool) -> HashMap($
 
 // Build a HashMap from a list of (key, value) pairs
 fn extends(HashMap) fromPairs(pairs: [($K,$V)]) -> HashMap($K,$V) {
-    let result: HashMap($K,$V) = HashMap::default() @[K: $K, V: $V]
+    let result: HashMap($K,$V) = HashMap::new() @[K: $K, V: $V]
     for p in pairs {
         result.insert(p[0], p[1])
     }

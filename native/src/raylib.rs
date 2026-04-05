@@ -505,6 +505,26 @@ pub fn raylib_get_time(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
+pub fn raylib_is_mouse_button_pressed(state: &mut state::State) -> NovaResult<()> {
+    let button_name = pop_string(state)?;
+
+    let rl_rc = state.raylib.clone().ok_or(Box::new(NovaError::Runtime {
+        msg: "Raylib not initialized".into(),
+    }))?;
+
+    let pressed = {
+        let rl = rl_rc.borrow();
+        if let Some(button) = string_to_mouse_button(&button_name) {
+            rl.is_mouse_button_pressed(button)
+        } else {
+            false
+        }
+    };
+
+    state.memory.stack.push(VmData::Bool(pressed));
+    Ok(())
+}
+
 pub fn raylib_is_mouse_button_down(state: &mut state::State) -> NovaResult<()> {
     let button_name = pop_string(state)?;
 

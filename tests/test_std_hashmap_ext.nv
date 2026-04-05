@@ -4,7 +4,7 @@ import super.std.hashmap
 import super.std.core
 
 // --- Create and insert ---
-let m = HashMap::default() @[K: String, V: Int]
+let m = HashMap::new() @[K: String, V: Int]
 m.insert("a", 1)
 m.insert("b", 2)
 m.insert("c", 3)
@@ -22,7 +22,7 @@ assert(!m.has("z"), "has z false")
 assert(m.size() == 3, "size after 3 inserts")
 
 // --- isEmpty ---
-let empty = HashMap::default() @[K: Int, V: Int]
+let empty = HashMap::new() @[K: Int, V: Int]
 assert(empty.isEmpty(), "isEmpty on empty map")
 assert(!m.isEmpty(), "isEmpty on non-empty map")
 
@@ -50,7 +50,7 @@ assert(m.isEmpty(), "clear empties map")
 assert(m.size() == 0, "clear sets size to 0")
 
 // --- toString ---
-let m2 = HashMap::default() @[K: String, V: Int]
+let m2 = HashMap::new() @[K: String, V: Int]
 m2.insert("x", 1)
 assert(m2.toString() == "{x => 1}", "toString single entry")
 

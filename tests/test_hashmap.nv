@@ -4,7 +4,7 @@ import super.std.hashmap
 import super.std.list
 
 // HashMap creation
-let map = HashMap::default() @[K: String, V: Int]
+let map = HashMap::new() @[K: String, V: Int]
 
 // Insert
 map.insert("one", 1)
@@ -37,7 +37,7 @@ assert(!map.has("two"), "hashmap delete removes key")
 assert(map.has("one"), "hashmap delete keeps other keys")
 
 // Int keys
-let int_map = HashMap::default() @[K: Int, V: String]
+let int_map = HashMap::new() @[K: Int, V: String]
 int_map.insert(1, "one")
 int_map.insert(2, "two")
 int_map.insert(3, "three")
@@ -50,7 +50,7 @@ let display = Cast::string(map)
 assert(display.len() > 0, "hashmap toString not empty")
 
 // Multiple operations
-let m2 = HashMap::default() @[K: String, V: Int]
+let m2 = HashMap::new() @[K: String, V: Int]
 for let i = 0; i < 10; i += 1 {
     m2.insert(Cast::string(i), i * i)
 }

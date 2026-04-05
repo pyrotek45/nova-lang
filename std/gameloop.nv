@@ -1,0 +1,124 @@
+// ============================================================
+// std/gameloop.nv  — Automatic update system for game objects
+// ============================================================
+//
+// Usage:  import super.std.gameloop
+//
+// Problem: In a game with particles, tweens, timers, cameras, etc.,
+//   you must manually call `.update(dt)` on each one every frame.
+//   Miss one and things break silently.
+//
+// Solution: The Updater collects anything with an `update` field
+//   (a function taking self + Float) into a single list, then
+//   `updater.tick(dt)` updates them all automatically.
+//
+// How it works:
+//   Any struct with an `update: fn(Self, Float)` field conforms
+//   to the `updatable` Dyn type. Add it to an Updater, and
+//   `tick(dt)` calls every registered object's update method.
+//
+// Pattern:
+//   1. Give your structs an `update` function field at creation
+//   2. Push them into the updater
+//   3. Call updater.tick(dt) once per frame
+//
+// Types:
+//   type updatable = Dyn(T = update: fn($T, Float))
+//
+// Struct:
+//   Updater — holds a list of updatable Dyn objects
+//
+// API:
+//   Updater::new()          -- create an empty updater
+//   updater.add(obj)        -- register an updatable object
+//   updater.tick(dt)        -- call update(dt) on everything
+//   updater.count() -> Int  -- number of registered objects
+//   updater.clear()         -- remove all objects
+//
+// Example:
+//   // Any struct with an `update` fn field works:
+//   struct Spinner {
+//       angle: Float,
+//       speed: Float,
+//       update: fn(Spinner, Float),
+//   }
+//
+//   let spinner = Spinner {
+//       angle: 0.0,
+//       speed: 90.0,
+//       update: fn(self: Spinner, dt: Float) {
+//           self.angle = self.angle + self.speed * dt
+//       },
+//   }
+//
+//   let u = Updater::new()
+//   u.add(spinner)
+//   // In your game loop:
+//   u.tick(dt)   // spinner.angle advances automatically
+//
+// Works with std/timer.nv Timers, std/tween.nv Tweens,
+//   std/particle.nv Emitters — anything with the right field.
+//
+// Tip: You can wrap existing std objects by creating a small
+//   adapter struct:
+//
+//   struct ManagedTimer {
+//       timer: Timer,
+//       update: fn(ManagedTimer, Float),
+//   }
+//
+//   let mt = ManagedTimer {
+//       timer: Timer::repeating(2.0),
+//       update: fn(self: ManagedTimer, dt: Float) {
+//           self.timer.update(dt)
+//       },
+//   }
+//   u.add(mt)
+//
+// ============================================================
+
+module gameloop
+
+// ── Dyn type: anything with an update(self, Float) field ─────────────────────
+
+type updatable = Dyn(T = update: fn($T, Float))
+
+// ── Updater struct ───────────────────────────────────────────────────────────
+
+struct Updater {
+    items: [updatable],
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(Updater) new() -> Updater {
+    return Updater {
+        items: []: updatable,
+    }
+}
+
+// ── Add an updatable object ──────────────────────────────────────────────────
+
+fn extends add(self: Updater, item: updatable) {
+    self.items.push(item)
+}
+
+// ── Tick: call update(dt) on every registered object ─────────────────────────
+
+fn extends tick(self: Updater, dt: Float) {
+    for item in self.items {
+        item->update(dt)
+    }
+}
+
+// ── Count ────────────────────────────────────────────────────────────────────
+
+fn extends count(self: Updater) -> Int {
+    return self.items.len()
+}
+
+// ── Clear ────────────────────────────────────────────────────────────────────
+
+fn extends clear(self: Updater) {
+    self.items = []: updatable
+}

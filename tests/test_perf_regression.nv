@@ -144,7 +144,7 @@ if t5d > 200 {
 // Typical: ~16ms. Limit: 500ms.
 // ============================================================
 let t6s = now()
-let hm6 = HashMap::default() @[K: String, V: Int]
+let hm6 = HashMap::new() @[K: String, V: Int]
 for i in 0..5000 {
     hm6.insert(Cast::string(i), i)
 }

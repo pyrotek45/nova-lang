@@ -3,7 +3,7 @@ module forth
 import super.std.string
 import super.std.hashmap
 
-let words = HashMap::default() @[K: String, V: [String]]
+let words = HashMap::new() @[K: String, V: [String]]
 let stack = []: String
 let recordword = false
 let recordquote = false

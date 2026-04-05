@@ -98,7 +98,7 @@ fn applyWhile(f: fn($A) -> $A, pred: fn($A) -> Bool, x: $A) -> $A {
 // NOTE: only safe for pure functions (no side effects, deterministic)
 //   let fastFib = memoize(fib)
 fn memoize(f: fn($A) -> $B) -> fn($A) -> $B {
-    let cache: HashMap(String, $B) = HashMap::default() @[K: String, V: $B]
+    let cache: HashMap(String, $B) = HashMap::new() @[K: String, V: $B]
     return fn(x: $A) -> $B {
         let key = Cast::string(x)
         if cache.has(key) {

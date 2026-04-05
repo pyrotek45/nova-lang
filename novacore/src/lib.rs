@@ -419,9 +419,19 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_is_key_released,
         );
-        // is mouse button pressed which returns bool
+        // is mouse button pressed which returns bool (true only the frame pressed)
         self.add_function(
             "raylib::isMousePressed",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::Function,
+            native::raylib::raylib_is_mouse_button_pressed,
+        );
+        // is mouse button held down which returns bool (true every frame while held)
+        self.add_function(
+            "raylib::isMouseDown",
             TType::Function {
                 parameters: vec![TType::String],
                 return_type: Box::new(TType::Bool),
@@ -1893,7 +1903,14 @@ impl NovaCore {
 
     pub fn run_debug(mut self) -> NovaResult<()> {
         self.process()?;
-        self.vm.run_debug()?;
+        // Build debug info for the interactive debugger
+        let debug_info = common::debug_info::extract_debug_info(
+            &self.compiler.global,
+            &self.compiler.native_functions,
+            &self.compiler.variables,
+            &self.compiler.asm,
+        );
+        self.vm.run_debug(debug_info)?;
         Ok(())
     }
 
@@ -1908,8 +1925,14 @@ impl NovaCore {
         let asm = self
             .compiler
             .compile_program(ast, filepath, true, true, false, false)?;
-        let mut dis = disassembler::new();
-        dis.dis_asm(asm);
+        let debug_info = common::debug_info::extract_debug_info(
+            &self.compiler.global,
+            &self.compiler.native_functions,
+            &self.compiler.variables,
+            &asm,
+        );
+        let dis = disassembler::new();
+        dis.dis_asm(asm, &debug_info);
         Ok(())
     }
 }

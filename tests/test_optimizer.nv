@@ -390,7 +390,7 @@ assert(se3.x == 10, "SE3a: struct mutation x")
 assert(se3.y == 20, "SE3b: struct mutation y")
 
 // 7d: HashMap mutation side effects
-let se4 = HashMap::default() @[K: String, V: Int]
+let se4 = HashMap::new() @[K: String, V: Int]
 se4.insert("a", 1)
 se4.insert("b", 2)
 se4.insert("a", 3)

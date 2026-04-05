@@ -10,9 +10,17 @@ use std::{
 };
 
 use common::{
-    code::Code,
+    code::{self as code, Code},
     error::{NovaError, NovaResult},
     fileposition::FilePosition,
+};
+
+use crossterm::{
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
+    terminal::{self, ClearType},
+    ExecutableCommand, QueueableCommand,
 };
 
 use memory_manager::{Object, ObjectType, VmData};
@@ -36,6 +44,18 @@ pub fn new() -> Vm {
 pub struct VmTask {
     pub vm: Vm,
     pub is_done: bool,
+}
+
+/// Result of executing a single debug step.
+enum StepResult {
+    Continue {
+        opname: String,
+        output: Option<String>,
+    },
+    Finished {
+        output: Option<String>,
+    },
+    Error(String),
 }
 
 impl Vm {
@@ -1074,8 +1094,1228 @@ impl Vm {
         Ok(())
     }
 
-    #[inline(always)]
-    pub fn run_debug(&mut self) -> NovaResult<()> {
+    /// Execute a single VM instruction for the debugger.
+    fn step_one_debug(&mut self) -> StepResult {
+        if self.state.current_instruction >= self.state.program.len() {
+            return StepResult::Finished { output: None };
+        }
+
+        let ip_before = self.state.current_instruction;
+        let opcode = self.state.program[ip_before];
+        let opname = code::byte_to_string(opcode);
+
+        let instruction = self.state.next_instruction();
+        match instruction {
+            Code::RET => {
+                let with_return = self.state.next_instruction();
+                if let Some(destination) = self.state.callstack.pop() {
+                    if with_return == 1 {
+                        if let Err(e) = self.state.deallocate_registers_with_return() {
+                            return StepResult::Error(format!("{}", e));
+                        }
+                    } else {
+                        if let Err(e) = self.state.deallocate_registers() {
+                            return StepResult::Error(format!("{}", e));
+                        }
+                    }
+                    match destination {
+                        CallType::Function(target) => self.state.goto(target),
+                        CallType::Closure { target, closure } => {
+                            self.state.goto(target);
+                            self.state.memory.dec(closure);
+                        }
+                    }
+                    StepResult::Continue {
+                        opname: "RET".to_string(),
+
+                        output: None,
+                    }
+                } else {
+                    StepResult::Finished { output: None }
+                }
+            }
+            Code::EXIT => StepResult::Finished { output: None },
+            Code::ERROR => StepResult::Error("Error instruction reached".into()),
+            Code::PRINT => {
+                let output_str = match self.state.memory.stack.pop() {
+                    Some(VmData::Int(i)) => format!("{}", i),
+                    Some(VmData::Float(f)) => format!("{}", f),
+                    Some(VmData::Bool(b)) => format!("{}", b),
+                    Some(VmData::Char(c)) => format!("{}", c),
+                    Some(VmData::Object(l)) => {
+                        let s = self.state.memory.print_heap_object(l, 0);
+                        self.state.memory.dec_value(VmData::Object(l));
+                        s
+                    }
+                    Some(VmData::None) => "None".to_string(),
+                    Some(VmData::Function(f)) => format!("<fn:{}>", f),
+                    Some(VmData::StackAddress(s)) => {
+                        let r = self.state.memory.print_heap_object(s, 0);
+                        self.state.memory.dec_value(VmData::StackAddress(s));
+                        r
+                    }
+                    None => "(empty)".to_string(),
+                };
+                StepResult::Continue {
+                    opname,
+                    output: Some(output_str),
+                }
+            }
+            other => match self.dispatch(other) {
+                Ok(()) => StepResult::Continue {
+                    opname,
+                    output: None,
+                },
+                Err(e) => StepResult::Error(format!("{}", e)),
+            },
+        }
+    }
+
+    /// Peek at the operand for display (does NOT advance IP).
+    fn peek_operand(&self, opcode: u8) -> String {
+        let ip = self.state.current_instruction + 1;
+        let prog = &self.state.program;
+        match opcode {
+            Code::INTEGER => {
+                if ip + 8 <= prog.len() {
+                    format!(
+                        "{}",
+                        i64::from_le_bytes(prog[ip..ip + 8].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::FLOAT => {
+                if ip + 8 <= prog.len() {
+                    format!(
+                        "{}",
+                        f64::from_le_bytes(prog[ip..ip + 8].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::STORE | Code::GET | Code::STOREFAST | Code::DIRECTCALL | Code::STOREGLOBAL
+            | Code::GETGLOBAL | Code::ALLOCLOCALS | Code::ALLOCATEGLOBAL | Code::JUMPIFFALSE
+            | Code::JMP | Code::FUNCTION | Code::CLOSURE => {
+                if ip + 4 <= prog.len() {
+                    format!(
+                        "{}",
+                        u32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::OFFSET => {
+                if ip + 8 <= prog.len() {
+                    let a =
+                        i32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default());
+                    let b = i32::from_le_bytes(
+                        prog[ip + 4..ip + 8].try_into().unwrap_or_default(),
+                    );
+                    format!("args={}, locals={}", a, b)
+                } else {
+                    String::new()
+                }
+            }
+            Code::BJMP => {
+                if ip + 4 <= prog.len() {
+                    format!(
+                        "-{}",
+                        u32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::RET => {
+                if ip < prog.len() && prog[ip] != 0 {
+                    "(value)".into()
+                } else {
+                    String::new()
+                }
+            }
+            Code::NATIVE => {
+                if ip + 8 <= prog.len() {
+                    format!(
+                        "#{}",
+                        u64::from_le_bytes(prog[ip..ip + 8].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::CHAR => {
+                if ip < prog.len() {
+                    format!("'{}'", prog[ip] as char)
+                } else {
+                    String::new()
+                }
+            }
+            Code::BYTE => {
+                if ip < prog.len() {
+                    format!("{}", prog[ip] as i64)
+                } else {
+                    String::new()
+                }
+            }
+            Code::NEWLIST | Code::NEWSTRUCT | Code::GETBIND | Code::CID | Code::STACKREF => {
+                if ip + 8 <= prog.len() {
+                    format!(
+                        "{}",
+                        u64::from_le_bytes(prog[ip..ip + 8].try_into().unwrap_or_default())
+                    )
+                } else {
+                    String::new()
+                }
+            }
+            Code::STRING => {
+                if ip + 8 <= prog.len() {
+                    let sz = u64::from_le_bytes(
+                        prog[ip..ip + 8].try_into().unwrap_or_default(),
+                    ) as usize;
+                    if ip + 8 + sz <= prog.len() {
+                        let s = String::from_utf8_lossy(&prog[ip + 8..ip + 8 + sz]);
+                        if s.len() > 30 {
+                            format!("\"{}...\"", &s[..27])
+                        } else {
+                            format!("\"{}\"", s)
+                        }
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                }
+            }
+            _ => String::new(),
+        }
+    }
+
+    /// Peek at the operand with debug info names resolved.
+    fn peek_operand_named(
+        &self,
+        opcode: u8,
+        info: &common::debug_info::DebugInfo,
+    ) -> String {
+        let ip = self.state.current_instruction + 1;
+        let prog = &self.state.program;
+        match opcode {
+            Code::STORE | Code::GET | Code::STOREFAST => {
+                if ip + 4 <= prog.len() {
+                    let v =
+                        u32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default());
+                    let name = info.local_name(0, v).unwrap_or_default();
+                    if name.is_empty() {
+                        format!("local[{}]", v)
+                    } else {
+                        format!("{} (local[{}])", name, v)
+                    }
+                } else {
+                    String::new()
+                }
+            }
+            Code::STOREGLOBAL | Code::GETGLOBAL => {
+                if ip + 4 <= prog.len() {
+                    let v =
+                        u32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default());
+                    let name = info.global_name(v);
+                    format!("{} (global[{}])", name, v)
+                } else {
+                    String::new()
+                }
+            }
+            Code::DIRECTCALL => {
+                if ip + 4 <= prog.len() {
+                    let v =
+                        u32::from_le_bytes(prog[ip..ip + 4].try_into().unwrap_or_default());
+                    info.global_name(v)
+                } else {
+                    String::new()
+                }
+            }
+            Code::NATIVE => {
+                if ip + 8 <= prog.len() {
+                    let v =
+                        u64::from_le_bytes(prog[ip..ip + 8].try_into().unwrap_or_default());
+                    info.native_name(v)
+                } else {
+                    String::new()
+                }
+            }
+            _ => self.peek_operand(opcode),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Interactive Debugger TUI
+    // ═══════════════════════════════════════════════════════════════════
+    pub fn run_debug(
+        &mut self,
+        info: common::debug_info::DebugInfo,
+    ) -> NovaResult<()> {
+        use common::debug_info::DebugInfo;
+
+        // ── Snapshot ────────────────────────────────────────────────
+        #[derive(Clone)]
+        struct Snapshot {
+            ip: usize,
+            opname: String,
+            named_op: String,
+            stack: Vec<String>,
+            callstack_depth: usize,
+            offset: usize,
+            locals: Vec<(String, String)>,
+            globals_changed: Vec<(String, String)>,
+        }
+
+        fn fmt_vmdata(v: &VmData) -> String {
+            match v {
+                VmData::Int(i) => format!("{}", i),
+                VmData::Float(f) => format!("{}", f),
+                VmData::Bool(b) => format!("{}", b),
+                VmData::Char(c) => format!("'{}'", c),
+                VmData::Function(f) => format!("<fn@{}>", f),
+                VmData::Object(o) => format!("obj#{}", o),
+                VmData::StackAddress(a) => format!("&{}", a),
+                VmData::None => "None".to_string(),
+            }
+        }
+
+        fn fmt_vmdata_typed(v: &VmData) -> String {
+            match v {
+                VmData::Int(i) => format!("Int({})", i),
+                VmData::Float(f) => format!("Float({})", f),
+                VmData::Bool(b) => format!("Bool({})", b),
+                VmData::Char(c) => format!("Char('{}')", c),
+                VmData::Function(f) => format!("Fn@{}", f),
+                VmData::Object(o) => format!("Obj#{}", o),
+                VmData::StackAddress(a) => format!("Addr({})", a),
+                VmData::None => "None".to_string(),
+            }
+        }
+
+        let take_snapshot = |state: &State,
+                             opname: &str,
+                             named_op: &str,
+                             info: &DebugInfo|
+         -> Snapshot {
+            let stack: Vec<String> =
+                state.memory.stack.iter().map(|v| fmt_vmdata_typed(v)).collect();
+
+            let mut locals = Vec::new();
+            if let Some(local_names) = info.local_names.get(&0) {
+                for (idx, name) in local_names {
+                    let abs_idx = state.offset + *idx as usize;
+                    if abs_idx < state.memory.stack.len() {
+                        let val = fmt_vmdata(&state.memory.stack[abs_idx]);
+                        locals.push((name.clone(), val));
+                    }
+                }
+            }
+
+            let mut globals_changed = Vec::new();
+            for (idx, name) in &info.global_names {
+                let i = *idx as usize;
+                if i < state.memory.stack.len() {
+                    let v = &state.memory.stack[i];
+                    match v {
+                        VmData::Function(_) | VmData::None => {}
+                        _ => {
+                            globals_changed.push((name.clone(), fmt_vmdata(v)));
+                        }
+                    }
+                }
+            }
+
+            Snapshot {
+                ip: state.current_instruction,
+                opname: opname.to_string(),
+                named_op: named_op.to_string(),
+                stack,
+                callstack_depth: state.callstack.len(),
+                offset: state.offset,
+                locals,
+                globals_changed,
+            }
+        };
+
+        let mut history: Vec<Snapshot> = Vec::new();
+        let mut cursor: usize = 0;
+        let mut finished = false;
+        let mut error_msg: Option<String> = None;
+        let mut output_buf: Vec<String> = Vec::new();
+        let mut show_help = false;
+
+        // Pre-decode bytecode listing for the left panel
+        struct BytecodeLine {
+            addr: usize,
+            opname: String,
+            operand: String,
+        }
+
+        let mut bc_lines: Vec<BytecodeLine> = Vec::new();
+        {
+            let prog = &self.state.program;
+            let mut pc = 0usize;
+            while pc < prog.len() {
+                let opcode = prog[pc];
+                let opname = code::byte_to_string(opcode);
+                let addr = pc;
+                pc += 1;
+                let operand = match opcode {
+                    Code::INTEGER => {
+                        let v = if pc + 8 <= prog.len() {
+                            i64::from_le_bytes(
+                                prog[pc..pc + 8].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 8;
+                        format!("{}", v)
+                    }
+                    Code::FLOAT => {
+                        let v = if pc + 8 <= prog.len() {
+                            f64::from_le_bytes(
+                                prog[pc..pc + 8].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0.0
+                        };
+                        pc += 8;
+                        format!("{}", v)
+                    }
+                    Code::STORE | Code::GET | Code::STOREFAST => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        let name = info.local_name(0, v).unwrap_or_default();
+                        if name.is_empty() {
+                            format!("local[{}]", v)
+                        } else {
+                            name
+                        }
+                    }
+                    Code::STOREGLOBAL | Code::GETGLOBAL => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        info.global_name(v)
+                    }
+                    Code::DIRECTCALL => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        info.global_name(v)
+                    }
+                    Code::ALLOCLOCALS | Code::ALLOCATEGLOBAL | Code::JUMPIFFALSE
+                    | Code::JMP => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        format!("+{}", v)
+                    }
+                    Code::BJMP => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        format!("-{}", v)
+                    }
+                    Code::FUNCTION | Code::CLOSURE => {
+                        let v = if pc + 4 <= prog.len() {
+                            u32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 4;
+                        format!("+{}", v)
+                    }
+                    Code::OFFSET => {
+                        let a = if pc + 4 <= prog.len() {
+                            i32::from_le_bytes(
+                                prog[pc..pc + 4].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        let b = if pc + 8 <= prog.len() {
+                            i32::from_le_bytes(
+                                prog[pc + 4..pc + 8].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 8;
+                        format!("{},{}", a, b)
+                    }
+                    Code::RET => {
+                        let v = if pc < prog.len() { prog[pc] } else { 0 };
+                        pc += 1;
+                        if v != 0 {
+                            "(val)".into()
+                        } else {
+                            String::new()
+                        }
+                    }
+                    Code::NATIVE => {
+                        let v = if pc + 8 <= prog.len() {
+                            u64::from_le_bytes(
+                                prog[pc..pc + 8].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 8;
+                        info.native_name(v)
+                    }
+                    Code::CHAR => {
+                        let v = if pc < prog.len() { prog[pc] as char } else { '?' };
+                        pc += 1;
+                        format!("'{}'", v)
+                    }
+                    Code::BYTE => {
+                        let v = if pc < prog.len() { prog[pc] as i64 } else { 0 };
+                        pc += 1;
+                        format!("{}", v)
+                    }
+                    Code::NEWLIST | Code::NEWSTRUCT | Code::GETBIND | Code::CID
+                    | Code::STACKREF => {
+                        let v = if pc + 8 <= prog.len() {
+                            u64::from_le_bytes(
+                                prog[pc..pc + 8].try_into().unwrap_or_default(),
+                            )
+                        } else {
+                            0
+                        };
+                        pc += 8;
+                        format!("{}", v)
+                    }
+                    Code::STRING => {
+                        let sz = if pc + 8 <= prog.len() {
+                            u64::from_le_bytes(
+                                prog[pc..pc + 8].try_into().unwrap_or_default(),
+                            ) as usize
+                        } else {
+                            0
+                        };
+                        pc += 8;
+                        let s = if pc + sz <= prog.len() {
+                            let raw =
+                                String::from_utf8_lossy(&prog[pc..pc + sz]).to_string();
+                            if raw.len() > 20 {
+                                format!("\"{}..\"", &raw[..18])
+                            } else {
+                                format!("\"{}\"", raw)
+                            }
+                        } else {
+                            "\"?\"".into()
+                        };
+                        pc += sz;
+                        s
+                    }
+                    Code::REFID => {
+                        pc += 2;
+                        String::new()
+                    }
+                    _ => String::new(),
+                };
+                bc_lines.push(BytecodeLine {
+                    addr,
+                    opname,
+                    operand,
+                });
+            }
+        }
+
+        // Map: byte address → bc_lines index
+        let mut addr_to_line: HashMap<usize, usize> = HashMap::new();
+        for (i, line) in bc_lines.iter().enumerate() {
+            addr_to_line.insert(line.addr, i);
+        }
+
+        // Initial snapshot
+        let ip0 = self.state.current_instruction;
+        let op0 = if ip0 < self.state.program.len() {
+            code::byte_to_string(self.state.program[ip0])
+        } else {
+            "END".into()
+        };
+        let named0 = if ip0 < self.state.program.len() {
+            self.peek_operand_named(self.state.program[ip0], &info)
+        } else {
+            String::new()
+        };
+        let _raw0 = if ip0 < self.state.program.len() {
+            self.peek_operand(self.state.program[ip0])
+        } else {
+            String::new()
+        };
+        history.push(take_snapshot(&self.state, &op0, &named0, &info));
+
+        // ── Render function ─────────────────────────────────────────
+        let render = |stdout: &mut io::Stdout,
+                      history: &[Snapshot],
+                      cursor: usize,
+                      finished: bool,
+                      error_msg: &Option<String>,
+                      output_buf: &[String],
+                      bc_lines: &[BytecodeLine],
+                      addr_to_line: &HashMap<usize, usize>,
+                      show_help: bool|
+         -> io::Result<()> {
+            let (cols, rows) = terminal::size()?;
+            let w = cols as usize;
+            let h = rows as usize;
+
+            stdout.execute(terminal::Clear(ClearType::All))?;
+            stdout.execute(cursor::MoveTo(0, 0))?;
+
+            let snap = &history[cursor];
+
+            if show_help {
+                stdout
+                    .queue(SetForegroundColor(Color::Cyan))?
+                    .queue(SetAttribute(Attribute::Bold))?
+                    .queue(Print("  Nova Debugger — Help\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(Print("\r\n"))?;
+                let help_lines = [
+                    ("↑ / k", "Step backward (view previous state)"),
+                    ("↓ / j", "Step forward (execute next instruction)"),
+                    ("Space", "Step forward"),
+                    ("PgUp", "Jump back 20 steps"),
+                    ("PgDn", "Jump forward 20 steps"),
+                    ("Home", "Go to beginning"),
+                    ("End", "Go to latest step"),
+                    ("r", "Run to end (execute all remaining)"),
+                    ("n", "Step over (run until callstack returns)"),
+                    ("?", "Toggle this help screen"),
+                    ("q / Esc", "Quit debugger"),
+                ];
+                for (key, desc) in &help_lines {
+                    stdout
+                        .queue(SetForegroundColor(Color::Yellow))?
+                        .queue(Print(format!("  {:>12}", key)))?
+                        .queue(SetForegroundColor(Color::White))?
+                        .queue(Print(format!("  {}\r\n", desc)))?
+                        .queue(SetAttribute(Attribute::Reset))?;
+                }
+                stdout
+                    .queue(Print("\r\n"))?
+                    .queue(SetForegroundColor(Color::Cyan))?
+                    .queue(Print("  Layout:\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(SetForegroundColor(Color::White))?
+                    .queue(Print(
+                        "    Left panel:  Bytecode listing (► = current)\r\n",
+                    ))?
+                    .queue(Print(
+                        "    Top right:   Variables (locals + globals)\r\n",
+                    ))?
+                    .queue(Print("    Mid right:   Stack (top-of-stack first)\r\n"))?
+                    .queue(Print("    Bottom:      Program output\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(Print("\r\n"))?
+                    .queue(SetForegroundColor(Color::DarkGrey))?
+                    .queue(Print("  Press ? or any key to return.\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?;
+                stdout.flush()?;
+                return Ok(());
+            }
+
+            // Layout: left (bytecode) and right (stack/vars)
+            let left_w = (w * 45 / 100).max(30).min(w.saturating_sub(30));
+            let right_w = w.saturating_sub(left_w).saturating_sub(1);
+
+            // Header bar
+            let status = if let Some(ref e) = error_msg {
+                format!(" ERROR: {}", e)
+            } else if finished {
+                " ✓ FINISHED".to_string()
+            } else {
+                String::new()
+            };
+            let header = format!(
+                " Nova Debugger │ Step {}/{} │ IP:{} │ Depth:{} │ Offset:{}{}",
+                cursor + 1,
+                history.len(),
+                snap.ip,
+                snap.callstack_depth,
+                snap.offset,
+                status
+            );
+            let hdr_display: String = if header.len() > w {
+                header[..w].to_string()
+            } else {
+                header.clone()
+            };
+            stdout
+                .queue(SetForegroundColor(Color::Cyan))?
+                .queue(SetAttribute(Attribute::Bold))?
+                .queue(Print(&hdr_display))?
+                .queue(SetAttribute(Attribute::Reset))?
+                .queue(Print("\r\n"))?;
+
+            // Current instruction highlight
+            stdout
+                .queue(SetForegroundColor(Color::Yellow))?
+                .queue(SetAttribute(Attribute::Bold))?
+                .queue(Print(format!(" ► {} {}", snap.opname, snap.named_op)))?
+                .queue(SetAttribute(Attribute::Reset))?
+                .queue(Print("\r\n"))?;
+
+            let sep = "─".repeat(w);
+            stdout
+                .queue(SetForegroundColor(Color::DarkGrey))?
+                .queue(Print(&sep))?
+                .queue(Print("\r\n"))?
+                .queue(SetAttribute(Attribute::Reset))?;
+
+            // Available rows for the main panels
+            let panel_rows = h.saturating_sub(7);
+
+            // Left panel: Bytecode listing
+            let current_bc_line =
+                addr_to_line.get(&snap.ip).copied().unwrap_or(0);
+            let half = panel_rows / 2;
+            let bc_start = if current_bc_line > half {
+                current_bc_line - half
+            } else {
+                0
+            };
+
+            // Right panel content: Variables then Stack
+            let mut right_lines: Vec<(Color, String)> = Vec::new();
+
+            right_lines.push((Color::Cyan, "─ Variables ─".to_string()));
+            if snap.locals.is_empty() && snap.globals_changed.is_empty() {
+                right_lines.push((Color::DarkGrey, " (none)".to_string()));
+            }
+            for (name, val) in &snap.locals {
+                right_lines
+                    .push((Color::Green, format!(" {} = {}", name, val)));
+            }
+            if !snap.globals_changed.is_empty() {
+                right_lines.push((Color::DarkGrey, " globals:".to_string()));
+                for (name, val) in &snap.globals_changed {
+                    right_lines
+                        .push((Color::White, format!("  {} = {}", name, val)));
+                }
+            }
+
+            right_lines.push((Color::Cyan, "─ Stack ─".to_string()));
+            let stack_label = format!(
+                " ({} entries, offset={})",
+                snap.stack.len(),
+                snap.offset
+            );
+            right_lines.push((Color::DarkGrey, stack_label));
+
+            let max_stack =
+                panel_rows.saturating_sub(right_lines.len()).max(3);
+            let stack_show: Vec<_> = snap
+                .stack
+                .iter()
+                .enumerate()
+                .rev()
+                .take(max_stack)
+                .collect();
+            for (i, entry) in stack_show.iter().rev() {
+                let marker = if *i == snap.stack.len().saturating_sub(1) {
+                    "►"
+                } else {
+                    " "
+                };
+                let local_tag = if *i >= snap.offset { "•" } else { " " };
+                let s = format!("{}{} [{:>3}] {}", marker, local_tag, i, entry);
+                let color = if *i == snap.stack.len().saturating_sub(1) {
+                    Color::Green
+                } else if *i >= snap.offset {
+                    Color::White
+                } else {
+                    Color::DarkGrey
+                };
+                right_lines.push((color, s));
+            }
+            if snap.stack.len() > max_stack {
+                right_lines.push((
+                    Color::DarkGrey,
+                    format!(" ... {} more", snap.stack.len() - max_stack),
+                ));
+            }
+            if snap.stack.is_empty() {
+                right_lines.push((Color::DarkGrey, " (empty)".to_string()));
+            }
+
+            // Render panels side by side
+            for row in 0..panel_rows {
+                let bc_idx = bc_start + row;
+                if bc_idx < bc_lines.len() {
+                    let bl = &bc_lines[bc_idx];
+                    let is_current = bc_idx == current_bc_line;
+                    let marker = if is_current { "►" } else { " " };
+                    let addr_str = format!("{:>5}", bl.addr);
+                    let text = format!(
+                        "{} {} {:<12} {}",
+                        marker, addr_str, bl.opname, bl.operand
+                    );
+                    let display: String = if text.len() > left_w {
+                        text[..left_w].to_string()
+                    } else {
+                        format!("{:<width$}", text, width = left_w)
+                    };
+
+                    if is_current {
+                        stdout
+                            .queue(SetForegroundColor(Color::Yellow))?
+                            .queue(SetAttribute(Attribute::Bold))?
+                            .queue(Print(&display))?
+                            .queue(SetAttribute(Attribute::Reset))?;
+                    } else {
+                        stdout
+                            .queue(SetForegroundColor(Color::DarkGrey))?
+                            .queue(Print(&display))?
+                            .queue(SetAttribute(Attribute::Reset))?;
+                    }
+                } else {
+                    stdout.queue(Print(&" ".repeat(left_w)))?;
+                }
+
+                stdout
+                    .queue(SetForegroundColor(Color::DarkGrey))?
+                    .queue(Print("│"))?
+                    .queue(SetAttribute(Attribute::Reset))?;
+
+                if row < right_lines.len() {
+                    let (color, ref text) = right_lines[row];
+                    let display: String = if text.len() > right_w {
+                        text[..right_w].to_string()
+                    } else {
+                        text.clone()
+                    };
+                    stdout
+                        .queue(SetForegroundColor(color))?
+                        .queue(Print(&display))?
+                        .queue(SetAttribute(Attribute::Reset))?;
+                }
+
+                stdout.queue(Print("\r\n"))?;
+            }
+
+            // Output section
+            stdout
+                .queue(SetForegroundColor(Color::DarkGrey))?
+                .queue(Print(&sep))?
+                .queue(Print("\r\n"))?
+                .queue(SetAttribute(Attribute::Reset))?;
+
+            let out_rows = 2;
+            let out_start = output_buf.len().saturating_sub(out_rows);
+            if output_buf.is_empty() {
+                stdout
+                    .queue(SetForegroundColor(Color::DarkGrey))?
+                    .queue(Print(" Output: (none)"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(Print("\r\n"))?;
+            } else {
+                for line in output_buf.iter().skip(out_start) {
+                    let display: String = if line.len() > w.saturating_sub(2) {
+                        format!(" {}..", &line[..w.saturating_sub(4)])
+                    } else {
+                        format!(" {}", line)
+                    };
+                    stdout
+                        .queue(SetForegroundColor(Color::White))?
+                        .queue(Print(&display))?
+                        .queue(Print("\r\n"))?
+                        .queue(SetAttribute(Attribute::Reset))?;
+                }
+            }
+
+            // Controls bar
+            stdout
+                .queue(SetForegroundColor(Color::DarkGrey))?
+                .queue(Print(
+                    " [↑/↓] step  [r] run  [n] next  [Home/End] bounds  [?] help  [q] quit",
+                ))?
+                .queue(SetAttribute(Attribute::Reset))?;
+
+            stdout.flush()?;
+            Ok(())
+        };
+
+        // ── Main loop ───────────────────────────────────────────────
+        let mut stdout = io::stdout();
+        terminal::enable_raw_mode().map_err(|e| {
+            Box::new(NovaError::Runtime {
+                msg: format!("raw mode: {}", e).into(),
+            })
+        })?;
+        stdout
+            .execute(terminal::EnterAlternateScreen)
+            .map_err(|e| {
+                Box::new(NovaError::Runtime {
+                    msg: format!("alt screen: {}", e).into(),
+                })
+            })?;
+
+        let _ = render(
+            &mut stdout,
+            &history,
+            cursor,
+            finished,
+            &error_msg,
+            &output_buf,
+            &bc_lines,
+            &addr_to_line,
+            show_help,
+        );
+
+        loop {
+            if let Ok(Event::Key(KeyEvent {
+                code: key,
+                modifiers,
+                ..
+            })) = event::read()
+            {
+                if show_help {
+                    show_help = false;
+                    let _ = render(
+                        &mut stdout,
+                        &history,
+                        cursor,
+                        finished,
+                        &error_msg,
+                        &output_buf,
+                        &bc_lines,
+                        &addr_to_line,
+                        show_help,
+                    );
+                    continue;
+                }
+
+                match key {
+                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    KeyCode::Char('c')
+                        if modifiers.contains(KeyModifiers::CONTROL) =>
+                    {
+                        break
+                    }
+                    KeyCode::Char('?') => {
+                        show_help = true;
+                    }
+
+                    // Step forward
+                    KeyCode::Down
+                    | KeyCode::Char('j')
+                    | KeyCode::Char(' ') => {
+                        if cursor < history.len() - 1 {
+                            cursor += 1;
+                        } else if !finished && error_msg.is_none() {
+                            let ip_before = self.state.current_instruction;
+                            let opcode = if ip_before < self.state.program.len()
+                            {
+                                self.state.program[ip_before]
+                            } else {
+                                0
+                            };
+                            let named =
+                                self.peek_operand_named(opcode, &info);
+                            match self.step_one_debug() {
+                                StepResult::Continue {
+                                    opname,
+                                    output,
+                                } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        &opname,
+                                        &named,
+                                        &info,
+                                    ));
+                                    cursor = history.len() - 1;
+                                }
+                                StepResult::Finished { output } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    finished = true;
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "END",
+                                        "",
+                                        &info,
+                                    ));
+                                    cursor = history.len() - 1;
+                                }
+                                StepResult::Error(msg) => {
+                                    error_msg = Some(msg);
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "ERROR",
+                                        "",
+                                        &info,
+                                    ));
+                                    cursor = history.len() - 1;
+                                }
+                            }
+                        }
+                    }
+
+                    // Step backward
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if cursor > 0 {
+                            cursor -= 1;
+                        }
+                    }
+
+                    // Page navigation
+                    KeyCode::PageDown => {
+                        for _ in 0..20 {
+                            if cursor < history.len() - 1 {
+                                cursor += 1;
+                            } else if !finished && error_msg.is_none() {
+                                let ip_b = self.state.current_instruction;
+                                let opc =
+                                    if ip_b < self.state.program.len() {
+                                        self.state.program[ip_b]
+                                    } else {
+                                        0
+                                    };
+                                let named =
+                                    self.peek_operand_named(opc, &info);
+                                match self.step_one_debug() {
+                                    StepResult::Continue {
+                                        opname,
+                                            output,
+                                    } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        history.push(take_snapshot(
+                                        &self.state,
+                                        &opname,
+                                        &named,
+                                        &info,
+                                        ));
+                                        cursor = history.len() - 1;
+                                    }
+                                    StepResult::Finished { output } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        finished = true;
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            "END",
+                                            "",
+                                            &info,
+                                        ));
+                                        cursor = history.len() - 1;
+                                        break;
+                                    }
+                                    StepResult::Error(msg) => {
+                                        error_msg = Some(msg);
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            "ERROR",
+                                            "",
+                                            &info,
+                                        ));
+                                        cursor = history.len() - 1;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    KeyCode::PageUp => {
+                        cursor = cursor.saturating_sub(20);
+                    }
+
+                    // Run to end
+                    KeyCode::Char('r') => {
+                        let limit = 1_000_000;
+                        let mut count = 0;
+                        while !finished
+                            && error_msg.is_none()
+                            && count < limit
+                        {
+                            let ip_b = self.state.current_instruction;
+                            let opc =
+                                if ip_b < self.state.program.len() {
+                                    self.state.program[ip_b]
+                                } else {
+                                    0
+                                };
+                            let named =
+                                self.peek_operand_named(opc, &info);
+                            match self.step_one_debug() {
+                                StepResult::Continue {
+                                    opname,
+                                    output,
+                                } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        &opname,
+                                        &named,
+                                        &info,
+                                    ));
+                                }
+                                StepResult::Finished { output } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    finished = true;
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "END",
+                                        "",
+                                        &info,
+                                    ));
+                                }
+                                StepResult::Error(msg) => {
+                                    error_msg = Some(msg);
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "ERROR",
+                                        "",
+                                        &info,
+                                    ));
+                                }
+                            }
+                            count += 1;
+                        }
+                        cursor = history.len() - 1;
+                    }
+
+                    // Step over
+                    KeyCode::Char('n') => {
+                        let target_depth =
+                            history[cursor].callstack_depth;
+                        let limit = 100_000;
+                        let mut count = 0;
+                        while !finished
+                            && error_msg.is_none()
+                            && count < limit
+                        {
+                            let ip_b = self.state.current_instruction;
+                            let opc =
+                                if ip_b < self.state.program.len() {
+                                    self.state.program[ip_b]
+                                } else {
+                                    0
+                                };
+                            let named =
+                                self.peek_operand_named(opc, &info);
+                            match self.step_one_debug() {
+                                StepResult::Continue {
+                                    opname,
+                                    output,
+                                } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        &opname,
+                                        &named,
+                                        &info,
+                                    ));
+                                    if self.state.callstack.len()
+                                        <= target_depth
+                                    {
+                                        break;
+                                    }
+                                }
+                                StepResult::Finished { output } => {
+                                    if let Some(ref o) = output {
+                                        output_buf.push(o.clone());
+                                    }
+                                    finished = true;
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "END",
+                                        "",
+                                        &info,
+                                    ));
+                                    break;
+                                }
+                                StepResult::Error(msg) => {
+                                    error_msg = Some(msg);
+                                    history.push(take_snapshot(
+                                        &self.state,
+                                        "ERROR",
+                                        "",
+                                        &info,
+                                    ));
+                                    break;
+                                }
+                            }
+                            count += 1;
+                        }
+                        cursor = history.len() - 1;
+                    }
+
+                    KeyCode::Home => cursor = 0,
+                    KeyCode::End => cursor = history.len() - 1,
+
+                    _ => {}
+                }
+
+                let _ = render(
+                    &mut stdout,
+                    &history,
+                    cursor,
+                    finished,
+                    &error_msg,
+                    &output_buf,
+                    &bc_lines,
+                    &addr_to_line,
+                    show_help,
+                );
+            }
+        }
+
+        let _ = stdout.execute(terminal::LeaveAlternateScreen);
+        let _ = terminal::disable_raw_mode();
         Ok(())
     }
 

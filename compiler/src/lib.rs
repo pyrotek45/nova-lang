@@ -410,9 +410,9 @@ impl Compiler {
                         false,
                         false,
                         false,
-                        false,
+                        keep,
                     )?;
-                    self.asm.pop();
+                    self.asm.pop(); // remove trailing RET(false)
 
                     if let Some(alternative) = alternative {
                         self.asm.push(Asm::JMP(alterjump));
@@ -426,9 +426,9 @@ impl Compiler {
                             false,
                             false,
                             false,
-                            false,
+                            keep,
                         )?;
-                        self.asm.pop();
+                        self.asm.pop(); // remove trailing RET(false)
                         self.asm.push(Asm::LABEL(alterjump));
                     } else {
                         self.asm.push(Asm::LABEL(bodyjump));

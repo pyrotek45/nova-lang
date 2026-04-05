@@ -1,0 +1,399 @@
+// ============================================================
+// std/log.nv  — Structured logging & debug utilities
+// ============================================================
+//
+// Usage:  import super.std.log
+//
+// Quick-start:
+//   let log = Logger::new("MyGame")
+//   log.info("Player spawned")
+//   log.warn("Low health")
+//   log.error("Collision failed")
+//   log.debug("pos = " + Cast::string(x))
+//   log.trace("tick")
+//
+// Log Levels (lowest → highest):
+//   TRACE=0  DEBUG=1  INFO=2  WARN=3  ERROR=4  OFF=5
+//
+// Only messages at or above the logger's level are printed.
+// Default level is INFO (hides TRACE && DEBUG).
+//
+// Constructors:
+//   Logger::new(name)          -- INFO level, colors on
+//   Logger::withLevel(name, l) -- custom level
+//   Logger::all(name)          -- TRACE level (show everything)
+//   Logger::quiet(name)        -- ERROR level only
+//   Logger::silent(name)       -- OFF (suppress all output)
+//
+// Methods:
+//   log.trace(msg)    log.debug(msg)    log.info(msg)
+//   log.warn(msg)     log.error(msg)
+//   log.setLevel(l)   log.getLevel() -> Int
+//   log.setColors(b)  -- enable/disable colored output
+//
+// Level Constants:
+//   Log::TRACE  Log::DEBUG  Log::INFO  Log::WARN  Log::ERROR  Log::OFF
+//
+// Utility:
+//   log.sep()                    -- print a separator line
+//   log.header(title)            -- print a boxed header
+//   log.dump(label, value)       -- info-level key=value print
+//   log.table(headers, rows)     -- print a simple ASCII table
+//   log.assert(cond, msg)        -- log error if condition false
+//   log.timer(label)  -> Int     -- returns now() for stopwatch start
+//   log.elapsed(label, start)    -- prints ms elapsed since start
+//   log.group(label)             -- indented group header
+//   log.groupEnd()               -- end group
+//   log.count(label)             -- increment & print a named counter
+//   log.resetCount(label)        -- reset a named counter
+//
+// ============================================================
+
+module log
+
+import super.std.ansi
+
+// ── Level constants ──────────────────────────────────────────────────────────
+
+struct Log {}
+
+fn extends(Log) TRACE() -> Int { return 0 }
+fn extends(Log) DEBUG() -> Int { return 1 }
+fn extends(Log) INFO()  -> Int { return 2 }
+fn extends(Log) WARN()  -> Int { return 3 }
+fn extends(Log) ERROR() -> Int { return 4 }
+fn extends(Log) OFF()   -> Int { return 5 }
+
+// ── Logger struct ────────────────────────────────────────────────────────────
+
+struct Logger {
+    name:     String,
+    level:    Int,
+    colors:   Bool,
+    indent:   Int,
+    counters: [Int],
+    labels:   [String],
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(Logger) new(name: String) -> Logger {
+    return Logger {
+        name:     name,
+        level:    2,
+        colors:   true,
+        indent:   0,
+        counters: []: Int,
+        labels:   []: String,
+    }
+}
+
+fn extends(Logger) withLevel(name: String, level: Int) -> Logger {
+    return Logger {
+        name:     name,
+        level:    level,
+        colors:   true,
+        indent:   0,
+        counters: []: Int,
+        labels:   []: String,
+    }
+}
+
+fn extends(Logger) all(name: String) -> Logger {
+    return Logger::withLevel(name, 0)
+}
+
+fn extends(Logger) quiet(name: String) -> Logger {
+    return Logger::withLevel(name, 4)
+}
+
+fn extends(Logger) silent(name: String) -> Logger {
+    return Logger::withLevel(name, 5)
+}
+
+// ── Level management ─────────────────────────────────────────────────────────
+
+fn extends setLevel(self: Logger, l: Int) {
+    self.level = l
+}
+
+fn extends getLevel(self: Logger) -> Int {
+    return self.level
+}
+
+fn extends setColors(self: Logger, on: Bool) {
+    self.colors = on
+}
+
+// ── Internal: level tag ──────────────────────────────────────────────────────
+
+fn _levelTag(level: Int, useColor: Bool) -> String {
+    if level == 0 {
+        let tag = "[TRACE]"
+        if useColor { return Ansi::dim(tag) }
+        return tag
+    } elif level == 1 {
+        let tag = "[DEBUG]"
+        if useColor { return Ansi::cyan(tag) }
+        return tag
+    } elif level == 2 {
+        let tag = "[INFO] "
+        if useColor { return Ansi::green(tag) }
+        return tag
+    } elif level == 3 {
+        let tag = "[WARN] "
+        if useColor { return Ansi::yellow(tag) }
+        return tag
+    } elif level == 4 {
+        let tag = "[ERROR]"
+        if useColor { return Ansi::bold(Ansi::red(tag)) }
+        return tag
+    }
+    return "[?????]"
+}
+
+fn _levelName(level: Int) -> String {
+    if level == 0 { return "TRACE" }
+    elif level == 1 { return "DEBUG" }
+    elif level == 2 { return "INFO"  }
+    elif level == 3 { return "WARN"  }
+    elif level == 4 { return "ERROR" }
+    elif level == 5 { return "OFF"   }
+    return "?"
+}
+
+// ── Internal: build prefix ───────────────────────────────────────────────────
+
+fn extends _prefix(self: Logger, level: Int) -> String {
+    let tag = _levelTag(level, self.colors)
+    let n = self.name
+    if self.colors {
+        n = Ansi::dim(n)
+    }
+    // Build indentation
+    let pad = ""
+    let i = 0
+    while i < self.indent {
+        pad = pad + "  "
+        i = i + 1
+    }
+    return tag + " " + n + " " + pad
+}
+
+// ── Core log method ──────────────────────────────────────────────────────────
+
+fn extends _log(self: Logger, level: Int, msg: String) {
+    if level < self.level { return }
+    println(self._prefix(level) + msg)
+}
+
+// ── Convenience methods ──────────────────────────────────────────────────────
+
+fn extends trace(self: Logger, msg: String) {
+    self._log(0, msg)
+}
+
+fn extends debug(self: Logger, msg: String) {
+    self._log(1, msg)
+}
+
+fn extends info(self: Logger, msg: String) {
+    self._log(2, msg)
+}
+
+fn extends warn(self: Logger, msg: String) {
+    self._log(3, msg)
+}
+
+fn extends error(self: Logger, msg: String) {
+    self._log(4, msg)
+}
+
+// ── Separator & header ───────────────────────────────────────────────────────
+
+fn extends sep(self: Logger) {
+    if self.level > 4 { return }
+    let line = "────────────────────────────────────────"
+    if self.colors {
+        println(Ansi::dim(line))
+    } else {
+        println(line)
+    }
+}
+
+fn extends header(self: Logger, title: String) {
+    if self.level > 4 { return }
+    let line = "════════════════════════════════════════"
+    let top = "╔" + line + "╗"
+    let mid = "║ " + title
+    // Pad mid to match line width
+    while mid.len() < line.len() + 1 {
+        mid = mid + " "
+    }
+    mid = mid + "║"
+    let bot = "╚" + line + "╝"
+    if self.colors {
+        println(Ansi::bold(Ansi::cyan(top)))
+        println(Ansi::bold(Ansi::cyan(mid)))
+        println(Ansi::bold(Ansi::cyan(bot)))
+    } else {
+        println(top)
+        println(mid)
+        println(bot)
+    }
+}
+
+// ── Data inspection ──────────────────────────────────────────────────────────
+
+// Print a labeled value at INFO level
+fn extends dump(self: Logger, label: String, value: String) {
+    if self.colors {
+        self._log(2, Ansi::bold(label) + " = " + value)
+    } else {
+        self._log(2, label + " = " + value)
+    }
+}
+
+// Simple ASCII table: headers is [String], rows is [[String]]
+fn extends table(self: Logger, headers: [String], rows: [[String]]) {
+    if self.level > 4 { return }
+
+    // Compute column widths from headers
+    let widths: [Int] = []: Int
+    let hi = 0
+    while hi < headers.len() {
+        widths.push(headers[hi].len())
+        hi = hi + 1
+    }
+
+    // Widen for row data
+    let ri = 0
+    while ri < rows.len() {
+        let ci = 0
+        while (ci < rows[ri].len() && ci < widths.len()) {
+            if rows[ri][ci].len() > widths[ci] {
+                widths[ci] = rows[ri][ci].len()
+            }
+            ci = ci + 1
+        }
+        ri = ri + 1
+    }
+
+    // Print header row
+    let hdr = "│"
+    let sep = "├"
+    let hi2 = 0
+    while hi2 < headers.len() {
+        let cell = headers[hi2]
+        while cell.len() < widths[hi2] {
+            cell = cell + " "
+        }
+        hdr = hdr + " " + cell + " │"
+        // Separator
+        let dash = ""
+        let di = 0
+        while di < widths[hi2] + 2 {
+            dash = dash + "─"
+            di = di + 1
+        }
+        sep = sep + dash + "┼"
+        hi2 = hi2 + 1
+    }
+
+    if self.colors {
+        println(Ansi::dim(hdr))
+        println(Ansi::dim(sep))
+    } else {
+        println(hdr)
+        println(sep)
+    }
+
+    // Print data rows
+    let ri2 = 0
+    while ri2 < rows.len() {
+        let row = "│"
+        let ci2 = 0
+        while ci2 < rows[ri2].len() && ci2 < widths.len() {
+            let cell = rows[ri2][ci2]
+            while cell.len() < widths[ci2] {
+                cell = cell + " "
+            }
+            row = row + " " + cell + " │"
+            ci2 = ci2 + 1
+        }
+        println(row)
+        ri2 = ri2 + 1
+    }
+}
+
+// ── Assertions ───────────────────────────────────────────────────────────────
+
+// Log an error if condition is false; returns the condition
+fn extends assert(self: Logger, cond: Bool, msg: String) -> Bool {
+    if !cond {
+        self._log(4, "ASSERT FAILED: " + msg)
+    }
+    return cond
+}
+
+// ── Timing ───────────────────────────────────────────────────────────────────
+
+// Start a timer — returns the current timestamp (ms).
+// Use with elapsed() to measure durations.
+fn extends timer(self: Logger, label: String) -> Int {
+    let t = now()
+    self._log(1, "⏱ " + label + " started")
+    return t
+}
+
+// Print elapsed time since a timer start
+fn extends elapsed(self: Logger, label: String, start: Int) {
+    let dt = now() - start
+    self._log(2, "⏱ " + label + " = " + Cast::string(dt) + " ms")
+}
+
+// ── Groups ───────────────────────────────────────────────────────────────────
+
+fn extends group(self: Logger, label: String) {
+    self._log(2, "▸ " + label)
+    self.indent = self.indent + 1
+}
+
+fn extends groupEnd(self: Logger) {
+    if self.indent > 0 {
+        self.indent = self.indent - 1
+    }
+}
+
+// ── Counters ─────────────────────────────────────────────────────────────────
+
+// Increment a named counter && print its new value.
+// Counters are stored as parallel label/count lists.
+fn extends count(self: Logger, label: String) {
+    // Search for existing label
+    let i = 0
+    while i < self.labels.len() {
+        if self.labels[i] == label {
+            self.counters[i] = self.counters[i] + 1
+            self._log(1, label + " #" + Cast::string(self.counters[i]))
+            return
+        }
+        i = i + 1
+    }
+    // New counter
+    self.labels.push(label)
+    self.counters.push(1)
+    self._log(1, label + " #1")
+}
+
+// Reset a named counter to zero
+fn extends resetCount(self: Logger, label: String) {
+    let i = 0
+    while i < self.labels.len() {
+        if self.labels[i] == label {
+            self.counters[i] = 0
+            return
+        }
+        i = i + 1
+    }
+}

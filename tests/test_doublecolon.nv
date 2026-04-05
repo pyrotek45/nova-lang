@@ -6,7 +6,7 @@ import super.std.core
 // ===== What :: actually means in Nova =====
 // The :: operator is used for:
 // 1. Enum variant construction: Result::Ok(42), Maybe::Just(x)
-// 2. Associated/static functions on types: Cast::string(), Float::pi(), HashMap::default()
+// 2. Associated/static functions on types: Cast::string(), Float::pi(), HashMap::new()
 // 3. Module-level function namespacing for fn extends mod(ModuleName) functions
 //
 // It is NOT used as a general namespace accessor like C++ (module::func)

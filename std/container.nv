@@ -1,0 +1,319 @@
+// ============================================================
+// std/container.nv  — Godot-style layout containers for UI
+// ============================================================
+//
+// Usage:  import super.std.container
+//
+// Containers automatically position child "slots" in a layout.
+// Each slot is a pair of closures: draw(x, y, w, h) and
+// preferredSize() -> (Int, Int).  This keeps containers generic —
+// any widget (Button, Label, Slider, etc.) can be wrapped into a
+// slot without containers needing to know about widget types.
+//
+// ── Slot ──────────────────────────────────────────────────────
+//
+//   A Slot wraps any drawable thing.  You provide:
+//     drawFn:  fn(Int, Int, Int, Int)   -- draw at (x, y, w, h)
+//     sizeFn:  fn() -> (Int, Int)        -- preferred (width, height)
+//
+//   Slot::new(drawFn, sizeFn) -> Slot
+//
+// ── VBox — Vertical container ─────────────────────────────────
+//
+//   Stacks children top-to-bottom with configurable spacing.
+//
+//   VBox::new(x, y, w) -> VBox
+//   vbox.add(slot)              -- append a slot
+//   vbox.draw()                 -- lay out and draw all children
+//   vbox.spacing                -- Int, pixels between children (default 4)
+//   vbox.padding                -- Int, inner padding (default 8)
+//
+// ── HBox — Horizontal container ───────────────────────────────
+//
+//   Stacks children left-to-right with configurable spacing.
+//
+//   HBox::new(x, y, h) -> HBox
+//   hbox.add(slot)
+//   hbox.draw()
+//   hbox.spacing / hbox.padding
+//
+// ── GridBox — Grid container ──────────────────────────────────
+//
+//   Arranges children in a grid with a fixed number of columns.
+//
+//   GridBox::new(x, y, cols, cellW, cellH) -> GridBox
+//   grid.add(slot)
+//   grid.draw()
+//   grid.spacingX / grid.spacingY / grid.padding
+//
+// ── MarginBox — Margin / padding wrapper ──────────────────────
+//
+//   Wraps a single child with configurable margins.
+//
+//   MarginBox::new(child, top, right, bottom, left) -> MarginBox
+//   margin.draw(x, y, w, h)
+//
+// ── PanelBox — Panel container (background + border + child) ──
+//
+//   PanelBox::new(x, y, w, h) -> PanelBox
+//   panelBox.child = some_slot
+//   panelBox.draw()
+//
+// ── Example ───────────────────────────────────────────────────
+//
+//   import super.std.container
+//   import super.std.widget
+//
+//   let btn1 = Button::new(0, 0, 120, 30, "OK")
+//   let btn2 = Button::new(0, 0, 120, 30, "Cancel")
+//
+//   let vbox = VBox::new(50, 50, 140)
+//   vbox.add(buttonSlot(btn1))
+//   vbox.add(buttonSlot(btn2))
+//
+//   // In draw loop:
+//   vbox.draw()
+//
+// ============================================================
+
+module container
+
+// ── Slot — universal child wrapper ────────────────────────────────────────────
+
+struct Slot {
+    drawFn:  fn(Int, Int, Int, Int),
+    sizeFn:  fn() -> (Int, Int),
+}
+
+fn extends(Slot) new(drawFn: fn(Int, Int, Int, Int), sizeFn: fn() -> (Int, Int)) -> Slot {
+    return Slot { drawFn: drawFn, sizeFn: sizeFn }
+}
+
+fn extends draw(s: Slot, x: Int, y: Int, w: Int, h: Int) {
+    let f = s.drawFn
+    f(x, y, w, h)
+}
+
+fn extends preferredSize(s: Slot) -> (Int, Int) {
+    let f = s.sizeFn
+    return f()
+}
+
+// ── VBox — Vertical stacking container ────────────────────────────────────────
+
+struct VBox {
+    x:       Int,
+    y:       Int,
+    w:       Int,
+    spacing: Int,
+    padding: Int,
+    slots:   [Slot],
+}
+
+fn extends(VBox) new(x: Int, y: Int, w: Int) -> VBox {
+    return VBox {
+        x: x, y: y, w: w,
+        spacing: 4,
+        padding: 8,
+        slots: []: Slot,
+    }
+}
+
+fn extends add(vbox: VBox, slot: Slot) {
+    vbox.slots.push(slot)
+}
+
+fn extends draw(vbox: VBox) {
+    let cy = vbox.y + vbox.padding
+    let innerW = vbox.w - vbox.padding * 2
+    for slot in vbox.slots {
+        let pref = slot.preferredSize()
+        let h = pref[1]
+        slot.draw(vbox.x + vbox.padding, cy, innerW, h)
+        cy += h + vbox.spacing
+    }
+}
+
+// Total height consumed (for nesting)
+fn extends totalHeight(vbox: VBox) -> Int {
+    let h = vbox.padding * 2
+    let i = 0
+    for slot in vbox.slots {
+        let pref = slot.preferredSize()
+        h += pref[1]
+        if i > 0 { h += vbox.spacing }
+        i += 1
+    }
+    return h
+}
+
+// ── HBox — Horizontal stacking container ──────────────────────────────────────
+
+struct HBox {
+    x:       Int,
+    y:       Int,
+    h:       Int,
+    spacing: Int,
+    padding: Int,
+    slots:   [Slot],
+}
+
+fn extends(HBox) new(x: Int, y: Int, h: Int) -> HBox {
+    return HBox {
+        x: x, y: y, h: h,
+        spacing: 4,
+        padding: 8,
+        slots: []: Slot,
+    }
+}
+
+fn extends add(hbox: HBox, slot: Slot) {
+    hbox.slots.push(slot)
+}
+
+fn extends draw(hbox: HBox) {
+    let cx = hbox.x + hbox.padding
+    let innerH = hbox.h - hbox.padding * 2
+    for slot in hbox.slots {
+        let pref = slot.preferredSize()
+        let w = pref[0]
+        slot.draw(cx, hbox.y + hbox.padding, w, innerH)
+        cx += w + hbox.spacing
+    }
+}
+
+// Total width consumed (for nesting)
+fn extends totalWidth(hbox: HBox) -> Int {
+    let w = hbox.padding * 2
+    let i = 0
+    for slot in hbox.slots {
+        let pref = slot.preferredSize()
+        w += pref[0]
+        if i > 0 { w += hbox.spacing }
+        i += 1
+    }
+    return w
+}
+
+// ── GridBox — Grid layout container ───────────────────────────────────────────
+
+struct GridBox {
+    x:        Int,
+    y:        Int,
+    cols:     Int,
+    cellW:    Int,
+    cellH:    Int,
+    spacingX: Int,
+    spacingY: Int,
+    padding:  Int,
+    slots:    [Slot],
+}
+
+fn extends(GridBox) new(x: Int, y: Int, cols: Int, cellW: Int, cellH: Int) -> GridBox {
+    return GridBox {
+        x: x, y: y,
+        cols: cols, cellW: cellW, cellH: cellH,
+        spacingX: 4, spacingY: 4,
+        padding: 8,
+        slots: []: Slot,
+    }
+}
+
+fn extends add(grid: GridBox, slot: Slot) {
+    grid.slots.push(slot)
+}
+
+fn extends draw(grid: GridBox) {
+    let i = 0
+    for slot in grid.slots {
+        let col = i % grid.cols
+        let row = i / grid.cols
+        let cx = grid.x + grid.padding + col * (grid.cellW + grid.spacingX)
+        let cy = grid.y + grid.padding + row * (grid.cellH + grid.spacingY)
+        slot.draw(cx, cy, grid.cellW, grid.cellH)
+        i += 1
+    }
+}
+
+fn extends totalWidth(grid: GridBox) -> Int {
+    return grid.padding * 2 + grid.cols * grid.cellW + (grid.cols - 1) * grid.spacingX
+}
+
+fn extends totalHeight(grid: GridBox) -> Int {
+    let rows = (grid.slots.len() + grid.cols - 1) / grid.cols
+    return grid.padding * 2 + rows * grid.cellH + (rows - 1) * grid.spacingY
+}
+
+// ── MarginBox — Wraps a slot with margins ─────────────────────────────────────
+
+struct MarginBox {
+    child:  Slot,
+    top:    Int,
+    right:  Int,
+    bottom: Int,
+    left:   Int,
+}
+
+fn extends(MarginBox) new(child: Slot, top: Int, right: Int, bottom: Int, left: Int) -> MarginBox {
+    return MarginBox { child: child, top: top, right: right, bottom: bottom, left: left }
+}
+
+fn extends(MarginBox) uniform(child: Slot, m: Int) -> MarginBox {
+    return MarginBox { child: child, top: m, right: m, bottom: m, left: m }
+}
+
+fn extends draw(mb: MarginBox, x: Int, y: Int, w: Int, h: Int) {
+    mb.child.draw(x + mb.left, y + mb.top, w - mb.left - mb.right, h - mb.top - mb.bottom)
+}
+
+fn extends preferredSize(mb: MarginBox) -> (Int, Int) {
+    let inner = mb.child.preferredSize()
+    return (inner[0] + mb.left + mb.right, inner[1] + mb.top + mb.bottom)
+}
+
+// Convert a MarginBox to a Slot for nesting inside containers
+fn extends toSlot(mb: MarginBox) -> Slot {
+    let drawCb = |x: Int, y: Int, w: Int, h: Int| { mb.draw(x, y, w, h) }
+    let sizeCb = fn() -> (Int, Int) { return mb.preferredSize() }
+    return Slot::new(drawCb, sizeCb)
+}
+
+// ── PanelBox — background + border + single child ─────────────────────────────
+
+struct PanelBox {
+    x:           Int,
+    y:           Int,
+    w:           Int,
+    h:           Int,
+    bg:          (Int, Int, Int),
+    borderColor: (Int, Int, Int),
+    padding:     Int,
+    slots:       [Slot],
+}
+
+fn extends(PanelBox) new(x: Int, y: Int, w: Int, h: Int) -> PanelBox {
+    return PanelBox {
+        x: x, y: y, w: w, h: h,
+        bg: (40, 40, 50),
+        borderColor: (130, 130, 130),
+        padding: 8,
+        slots: []: Slot,
+    }
+}
+
+fn extends add(pb: PanelBox, slot: Slot) {
+    pb.slots.push(slot)
+}
+
+fn extends draw(pb: PanelBox) {
+    raylib::drawRectangle(pb.x, pb.y, pb.w, pb.h, pb.bg)
+    raylib::drawRectangleLines(pb.x, pb.y, pb.w, pb.h, pb.borderColor)
+    // Draw children stacked vertically inside the panel
+    let cy = pb.y + pb.padding
+    let innerW = pb.w - pb.padding * 2
+    for slot in pb.slots {
+        let pref = slot.preferredSize()
+        slot.draw(pb.x + pb.padding, cy, innerW, pref[1])
+        cy += pref[1] + 4
+    }
+}

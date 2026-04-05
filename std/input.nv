@@ -53,8 +53,8 @@ struct InputMap {
 
 fn extends(InputMap) new() -> InputMap {
     return InputMap {
-        keys:  HashMap::default() @[K: String, V: String],
-        mouse: HashMap::default() @[K: String, V: String],
+        keys:  HashMap::new() @[K: String, V: String],
+        mouse: HashMap::new() @[K: String, V: String],
     }
 }
 

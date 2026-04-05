@@ -1,0 +1,264 @@
+// ============================================================
+// std/datetime.nv  — Date & time utilities
+// ============================================================
+//
+// Usage:  import super.std.datetime
+//
+// Built on the native `now()` (ms since epoch) and `nowSec()` builtins.
+//
+// Structs:
+//   DateTime  -- broken-down date and time (UTC)
+//   Stopwatch -- high-resolution elapsed-time tracker
+//
+// Functions:
+//   DateTime::now()             -- current UTC date & time
+//   DateTime::fromEpoch(ms)     -- from milliseconds since epoch
+//   dt.year()  dt.month()  dt.day()
+//   dt.hour()  dt.minute() dt.second() dt.millis()
+//   dt.weekday()       -> Int (0=Sun..6=Sat)
+//   dt.weekdayName()   -> String
+//   dt.monthName()     -> String
+//   dt.format()        -> "YYYY-MM-DD HH:MM:SS"
+//   dt.formatDate()    -> "YYYY-MM-DD"
+//   dt.formatTime()    -> "HH:MM:SS"
+//   dt.toEpoch()       -> Int (ms since epoch)
+//   dt.diffMs(other)   -> Int (ms difference)
+//   dt.diffSec(other)  -> Float (seconds difference)
+//
+//   Stopwatch::start()          -- new running stopwatch
+//   sw.elapsedMs() -> Int       -- ms since start
+//   sw.elapsedSec() -> Float    -- seconds since start
+//   sw.reset()                  -- restart from now
+//   sw.lap() -> Int             -- ms since last lap/start, resets lap
+//
+// ============================================================
+
+module datetime
+
+// ── DateTime ─────────────────────────────────────────────────────────────────
+// Stores milliseconds since Unix epoch and lazily computes date components.
+// All times are UTC.
+
+struct DateTime {
+    epochMs: Int,
+}
+
+// ── Constructors ─────────────────────────────────────────────────────────────
+
+fn extends(DateTime) now() -> DateTime {
+    return DateTime { epochMs: now() }
+}
+
+fn extends(DateTime) fromEpoch(ms: Int) -> DateTime {
+    return DateTime { epochMs: ms }
+}
+
+// ── Epoch access ─────────────────────────────────────────────────────────────
+
+fn extends toEpoch(self: DateTime) -> Int {
+    return self.epochMs
+}
+
+// ── Internal: date arithmetic ────────────────────────────────────────────────
+// Civil-date computation from days since epoch (1970-01-01).
+// Uses the classic leap-year algorithm.
+
+fn _isLeapYear(y: Int) -> Bool {
+    return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+fn _daysInMonth(m: Int, y: Int) -> Int {
+    if m == 1 { return 31 }
+    elif m == 2 {
+        if _isLeapYear(y) { return 29 }
+        return 28
+    }
+    elif m == 3 { return 31 }
+    elif m == 4 { return 30 }
+    elif m == 5 { return 31 }
+    elif m == 6 { return 30 }
+    elif m == 7 { return 31 }
+    elif m == 8 { return 31 }
+    elif m == 9 { return 30 }
+    elif m == 10 { return 31 }
+    elif m == 11 { return 30 }
+    elif m == 12 { return 31 }
+    return 30
+}
+
+fn _daysInYear(y: Int) -> Int {
+    if _isLeapYear(y) { return 366 }
+    return 365
+}
+
+// Returns (year, month, day) as a tuple from total days since epoch
+fn _civilFromDays(totalDays: Int) -> (Int, Int, Int) {
+    let d = totalDays
+    let y = 1970
+    while d >= _daysInYear(y) {
+        d = d - _daysInYear(y)
+        y = y + 1
+    }
+    let m = 1
+    while d >= _daysInMonth(m, y) {
+        d = d - _daysInMonth(m, y)
+        m = m + 1
+    }
+    return (y, m, d + 1)
+}
+
+// ── Date components ──────────────────────────────────────────────────────────
+
+fn extends year(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    let totalDays = totalSec / 86400
+    let civil = _civilFromDays(totalDays)
+    return civil[0]
+}
+
+fn extends month(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    let totalDays = totalSec / 86400
+    let civil = _civilFromDays(totalDays)
+    return civil[1]
+}
+
+fn extends day(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    let totalDays = totalSec / 86400
+    let civil = _civilFromDays(totalDays)
+    return civil[2]
+}
+
+fn extends hour(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    return (totalSec % 86400) / 3600
+}
+
+fn extends minute(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    return (totalSec % 3600) / 60
+}
+
+fn extends second(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    return totalSec % 60
+}
+
+fn extends millis(self: DateTime) -> Int {
+    return self.epochMs % 1000
+}
+
+// ── Weekday ──────────────────────────────────────────────────────────────────
+// 1970-01-01 was a Thursday (day 4, with 0=Sunday)
+
+fn extends weekday(self: DateTime) -> Int {
+    let totalSec = self.epochMs / 1000
+    let totalDays = totalSec / 86400
+    return (totalDays + 4) % 7
+}
+
+fn extends weekdayName(self: DateTime) -> String {
+    let d = self.weekday()
+    if d == 0 { return "Sunday" }
+    elif d == 1 { return "Monday" }
+    elif d == 2 { return "Tuesday" }
+    elif d == 3 { return "Wednesday" }
+    elif d == 4 { return "Thursday" }
+    elif d == 5 { return "Friday" }
+    elif d == 6 { return "Saturday" }
+    return "?"
+}
+
+fn extends monthName(self: DateTime) -> String {
+    let m = self.month()
+    if m == 1 { return "January" }
+    elif m == 2 { return "February" }
+    elif m == 3 { return "March" }
+    elif m == 4 { return "April" }
+    elif m == 5 { return "May" }
+    elif m == 6 { return "June" }
+    elif m == 7 { return "July" }
+    elif m == 8 { return "August" }
+    elif m == 9 { return "September" }
+    elif m == 10 { return "October" }
+    elif m == 11 { return "November" }
+    elif m == 12 { return "December" }
+    return "?"
+}
+
+// ── Formatting ───────────────────────────────────────────────────────────────
+
+fn _pad2(n: Int) -> String {
+    if n < 10 { return "0" + Cast::string(n) }
+    return Cast::string(n)
+}
+
+fn _pad3(n: Int) -> String {
+    if n < 10 { return "00" + Cast::string(n) }
+    elif n < 100 { return "0" + Cast::string(n) }
+    return Cast::string(n)
+}
+
+fn extends formatDate(self: DateTime) -> String {
+    let y = Cast::string(self.year())
+    let m = _pad2(self.month())
+    let d = _pad2(self.day())
+    return y + "-" + m + "-" + d
+}
+
+fn extends formatTime(self: DateTime) -> String {
+    let h = _pad2(self.hour())
+    let m = _pad2(self.minute())
+    let s = _pad2(self.second())
+    return h + ":" + m + ":" + s
+}
+
+fn extends format(self: DateTime) -> String {
+    return self.formatDate() + " " + self.formatTime()
+}
+
+// ── Difference ───────────────────────────────────────────────────────────────
+
+fn extends diffMs(self: DateTime, other: DateTime) -> Int {
+    return self.epochMs - other.epochMs
+}
+
+fn extends diffSec(self: DateTime, other: DateTime) -> Float {
+    let diff = self.epochMs - other.epochMs
+    return Cast::float(diff).unwrap() / 1000.0
+}
+
+// ── Stopwatch ────────────────────────────────────────────────────────────────
+
+struct Stopwatch {
+    startMs: Int,
+    lapMs:   Int,
+}
+
+fn extends(Stopwatch) start() -> Stopwatch {
+    let t = now()
+    return Stopwatch { startMs: t, lapMs: t }
+}
+
+fn extends elapsedMs(self: Stopwatch) -> Int {
+    return now() - self.startMs
+}
+
+fn extends elapsedSec(self: Stopwatch) -> Float {
+    let ms = now() - self.startMs
+    return Cast::float(ms).unwrap() / 1000.0
+}
+
+fn extends reset(self: Stopwatch) {
+    let t = now()
+    self.startMs = t
+    self.lapMs = t
+}
+
+fn extends lap(self: Stopwatch) -> Int {
+    let t = now()
+    let elapsed = t - self.lapMs
+    self.lapMs = t
+    return elapsed
+}

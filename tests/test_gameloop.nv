@@ -1,0 +1,88 @@
+// ============================================================
+// test_gameloop.nv — Tests for std/gameloop auto-update system
+// ============================================================
+
+module test_gameloop
+
+import super.std.gameloop
+
+// ── Simple updatable struct ──────────────────────────────────────────────────
+
+struct Counter {
+    value: Float,
+    speed: Float,
+    update: fn(Counter, Float),
+}
+
+fn makeCounter(speed: Float) -> Counter {
+    return Counter {
+        value: 0.0,
+        speed: speed,
+        update: fn(self: Counter, dt: Float) {
+            self.value = self.value + self.speed * dt
+        },
+    }
+}
+
+// ── Another updatable struct ─────────────────────────────────────────────────
+
+struct Spinner {
+    angle: Float,
+    rpm: Float,
+    update: fn(Spinner, Float),
+}
+
+fn makeSpinner(rpm: Float) -> Spinner {
+    return Spinner {
+        angle: 0.0,
+        rpm: rpm,
+        update: fn(self: Spinner, dt: Float) {
+            self.angle = self.angle + self.rpm * 360.0 * dt
+        },
+    }
+}
+
+// ── Test basic Updater ───────────────────────────────────────────────────────
+
+let u = Updater::new()
+assert(u.count() == 0, "updater starts empty")
+
+let c1 = makeCounter(10.0)
+let c2 = makeCounter(20.0)
+let s1 = makeSpinner(1.0)
+
+u.add(c1)
+u.add(c2)
+u.add(s1)
+assert(u.count() == 3, "updater has 3 items")
+
+// Tick with dt = 1.0
+u.tick(1.0)
+
+// c1: 0 + 10 * 1 = 10
+assert(c1.value > 9.9 && c1.value < 10.1, "c1 value after tick: " + Cast::string(c1.value))
+// c2: 0 + 20 * 1 = 20
+assert(c2.value > 19.9 && c2.value < 20.1, "c2 value after tick: " + Cast::string(c2.value))
+// s1: 0 + 1.0 * 360 * 1 = 360
+assert(s1.angle > 359.9 && s1.angle < 360.1, "spinner angle after tick: " + Cast::string(s1.angle))
+
+// ── Multiple ticks ───────────────────────────────────────────────────────────
+
+u.tick(0.5)
+// c1: 10 + 10 * 0.5 = 15
+assert(c1.value > 14.9 && c1.value < 15.1, "c1 after 2 ticks: " + Cast::string(c1.value))
+
+// ── Clear ────────────────────────────────────────────────────────────────────
+
+u.clear()
+assert(u.count() == 0, "updater empty after clear")
+
+// Tick should be safe on empty
+u.tick(1.0)
+
+// Values should NOT change since objects were removed
+let oldVal = c1.value
+u.tick(1.0)
+assert(c1.value > oldVal - 0.1 && c1.value < oldVal + 0.1, "c1 unchanged after clear + tick")
+
+println("PASS: All gameloop tests passed!")

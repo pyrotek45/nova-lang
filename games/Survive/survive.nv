@@ -56,6 +56,7 @@ import super.super.std.string
 import super.super.std.set
 import super.super.std.deque
 import super.super.std.functional
+import super.super.std.particle
 
 // ── Window / World ────────────────────────────────────────────────────────────
 let SW = 800
@@ -113,7 +114,7 @@ let compassPulse = Tween::smooth(0.8, 1.4, 0.7)
 
 // ── New std-module state ───────────────────────────────────────────────────────
 // hashmap: per-wave kill count (wave# -> kills)
-let waveKills  = HashMap::default() @[K: Int, V: Int]
+let waveKills  = HashMap::new() @[K: Int, V: Int]
 // set: which wave numbers triggered a bonus target spawn
 let bonusWaves = Set::empty() @[T: Int]
 // deque: rolling log of the last 5 hit times (in game-elapsed seconds)
@@ -125,6 +126,59 @@ keys.bindKey("down",  "KEY_S")
 keys.bindKey("left",  "KEY_A")
 keys.bindKey("right", "KEY_D")
 keys.bindKey("quit",  "KEY_Q")
+
+// ── Signal bus — decoupled game events ────────────────────────────────────────
+// All game systems fire signals instead of doing everything inline.
+// This keeps each system focused on its one job.
+let events = SignalBus::new()
+events.register("target_hit")      // player reached the target
+events.register("player_hit")      // player took damage from enemy
+events.register("wave_start")      // a new enemy wave spawned
+
+// React to target pickup — score, compass pulse, re-place target
+events.connect("target_hit", || {
+    targetsHit.value += 1
+    let pts = 100 + targetsHit.value * 50
+    score.value += pts
+    if score.value > hiScore.value {
+        hiScore.value = score.value
+    }
+    compassPulse.reset()
+})
+
+// React to player damage — screen flash, invincibility, hit log
+events.connect("player_hit", || {
+    invTimer.reset()
+    hitFlash.reset()
+    hitLog.pushBack(gameTime.value)
+    while hitLog.len() > 5 {
+        let _ = hitLog.popFront()
+    }
+    waveKills.increment(wave.value)
+})
+
+// ── Particle emitters ─────────────────────────────────────────────────────────
+// Target pickup sparkle
+let targetFx = Emitter::new(0.0, 0.0)
+targetFx.maxParticles = 400
+targetFx.gravityY = -30.0
+targetFx.spreadAngle = 6.2832
+targetFx.minSpeed = 40.0
+targetFx.maxSpeed = 140.0
+targetFx.minLife = 0.3
+targetFx.maxLife = 0.8
+targetFx.minSize = 2.0
+targetFx.maxSize = 5.0
+targetFx.fadeOut = true
+targetFx.shrink = true
+targetFx.setColorRange(80, 220, 120, 200, 255, 80)
+
+// Damage hit burst (red sparks)
+let hitFx = Emitter::explosion(0.0, 0.0)
+hitFx.maxParticles = 300
+hitFx.setColorRange(255, 50, 30, 255, 120, 60)
+hitFx.minSpeed = 40.0
+hitFx.maxSpeed = 150.0
 
 // ── SceneManager ──────────────────────────────────────────────────────────────
 let mgr = SceneManager::empty()
@@ -346,6 +400,7 @@ fn makePlayScene() -> Scene {
             if waveTimer.isDone() {
                 wave.value += 1
                 spawnEnemyWave(p.pos.x, p.pos.y)
+                events.emit("wave_start")
                 // Every 5th wave: spawn a bonus target and record it (std/set)
                 if wave.value % 5 == 0 {
                     bonusWaves.add(wave.value)
@@ -377,31 +432,23 @@ fn makePlayScene() -> Scene {
             let tdist = (tdx * tdx + tdy * tdy).sqrt()
 
             if tdist < Cast::float(TARGET_RADIUS + PLAYER_RADIUS).unwrap() {
-                targetsHit.value += 1
-                let pts = 100 + targetsHit.value * 50
-                score.value += pts
-                if score.value > hiScore.value {
-                    hiScore.value = score.value
-                }
+                // Target pickup sparkle
+                targetFx.moveTo(tx, ty)
+                targetFx.emit(25)
                 placeTarget(p.pos.x, p.pos.y)
-                compassPulse.reset()
+                events.emit("target_hit")
             }
 
             // ── Collision: player vs enemies ──────────────────────────────────
             if invTimer.isDone() {
                 world.forEachTagged("enemy", fn(e: Entity(Float)) {
                     if p.overlapsAABB(e) {
+                        // Damage hit burst at player position
+                        let pc = p.center()
+                        hitFx.moveTo(pc.x, pc.y)
+                        hitFx.emit(15)
                         playerHp.value -= 1
-                        invTimer.reset()
-                        hitFlash.reset()
-                        // Record hit time in rolling log (std/deque)
-                        hitLog.pushBack(gameTime.value)
-                        // Trim to last 5 hits
-                        while hitLog.len() > 5 {
-                            let _ = hitLog.popFront()
-                        }
-                        // Increment kill count for current wave (std/hashmap)
-                        waveKills.increment(wave.value)
+                        events.emit("player_hit")
                         if playerHp.value <= 0 {
                             mgr.switch(makeGameOverScene())
                         }
@@ -413,6 +460,10 @@ fn makePlayScene() -> Scene {
             if keys.isReleased("quit") {
                 mgr.switch(makeMenuScene())
             }
+
+            // ── Update particles ──────────────────────────────────────────────
+            targetFx.update(dt)
+            hitFx.update(dt)
         },
 
         fn() {
@@ -467,6 +518,10 @@ fn makePlayScene() -> Scene {
             raylib::drawCircle(psx, psy, PLAYER_RADIUS + 2, (20, 60, 80))
             raylib::drawCircle(psx, psy, PLAYER_RADIUS, PLAYER_COLOR)
             raylib::drawCircleLines(psx, psy, PLAYER_RADIUS + 3, PLAYER_RING)
+
+            // ── Draw particles (world-space, offset by camera) ────────────────
+            targetFx.drawOffset(cam.pos.x, cam.pos.y)
+            hitFx.drawOffset(cam.pos.x, cam.pos.y)
 
             // ── Screen flash on hit ───────────────────────────────────────────
             let flashAlpha = Cast::int(hitFlash.tweenValue()).unwrap()
@@ -580,7 +635,7 @@ fn makePlayScene() -> Scene {
                 let bx = barX0 + i * (barW + barGap)
                 if i < playerHp.value {
                     let frac = Cast::float(playerHp.value).unwrap() / Cast::float(PLAYER_HP_MAX).unwrap()
-                    let hpCol = lerpColor(red(), green(), frac)
+                    let hpCol = color::lerpColor(color::red(), color::green(), frac)
                     raylib::drawRectangle(bx, barY0, barW, barH, hpCol)
                 } else {
                     raylib::drawRectangle(bx, barY0, barW, barH, (40, 20, 20))

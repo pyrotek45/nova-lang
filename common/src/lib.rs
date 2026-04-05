@@ -1,4 +1,5 @@
 pub mod code;
+pub mod debug_info;
 pub mod environment;
 pub mod error;
 pub mod fileposition;

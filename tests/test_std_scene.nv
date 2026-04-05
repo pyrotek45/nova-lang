@@ -1,0 +1,112 @@
+module test_std_scene
+
+import super.std.scene
+import super.std.signal
+import super.std.core
+
+// ── Scene construction ───────────────────────────────────────
+
+let empty = Scene::empty()
+let s1 = Scene::new(fn(dt: Float) {}, fn() {})
+
+// ── SceneManager::empty ──────────────────────────────────────
+
+let mgr = SceneManager::empty()
+assert(!mgr.has(), "empty mgr has no scene")
+assert(mgr.depth() == 0, "empty mgr depth 0")
+println("PASS: SceneManager::empty")
+
+// ── switch ───────────────────────────────────────────────────
+
+let switches = Box(0)
+mgr.onSwitch.connect(|| { switches.value += 1 })
+
+mgr.switch(s1)
+assert(mgr.has(), "has scene after switch")
+assert(mgr.depth() == 1, "depth 1 after switch")
+assert(switches.value == 1, "onSwitch fired once")
+println("PASS: switch")
+
+// ── push / pop ───────────────────────────────────────────────
+
+let pushes = Box(0)
+let pops = Box(0)
+mgr.onPush.connect(|| { pushes.value += 1 })
+mgr.onPop.connect(|| { pops.value += 1 })
+
+let s2 = Scene::new(fn(dt: Float) {}, fn() {})
+mgr.push(s2)
+assert(mgr.depth() == 2, "depth 2 after push")
+assert(pushes.value == 1, "onPush fired")
+
+let s3 = Scene::new(fn(dt: Float) {}, fn() {})
+mgr.push(s3)
+assert(mgr.depth() == 3, "depth 3 after second push")
+assert(pushes.value == 2, "onPush fired twice")
+
+mgr.pop()
+assert(mgr.depth() == 2, "depth 2 after pop")
+assert(pops.value == 1, "onPop fired once")
+
+mgr.pop()
+assert(mgr.depth() == 1, "depth 1 after second pop")
+assert(pops.value == 2, "onPop fired twice")
+println("PASS: push/pop + signals")
+
+// ── switch clears stack ──────────────────────────────────────
+
+let s4 = Scene::new(fn(dt: Float) {}, fn() {})
+let s5 = Scene::new(fn(dt: Float) {}, fn() {})
+mgr.push(s4)
+mgr.push(s5)
+assert(mgr.depth() == 3, "depth 3 before switch-clear")
+
+let s6 = Scene::new(fn(dt: Float) {}, fn() {})
+mgr.switch(s6)
+assert(mgr.depth() == 1, "switch clears to depth 1")
+assert(switches.value == 2, "onSwitch fired again")
+println("PASS: switch clears stack")
+
+// ── update and draw forwarding ──────────────────────────────
+
+let updated = Box(false)
+let drawn = Box(false)
+let activeScene = Scene::new(
+    fn(dt: Float) { updated.value = true },
+    fn() { drawn.value = true }
+)
+mgr.switch(activeScene)
+mgr.update(0.016)
+mgr.draw()
+assert(updated.value, "update forwarded to active scene")
+assert(drawn.value, "draw forwarded to active scene")
+println("PASS: update/draw forwarding")
+
+// ── pop on empty is safe ─────────────────────────────────────
+
+let emptyMgr = SceneManager::empty()
+emptyMgr.pop()   // should not crash
+assert(emptyMgr.depth() == 0, "pop on empty is safe")
+println("PASS: pop on empty")
+
+// ── SceneManager::new (with initial scene) ───────────────────
+
+let initScene = Scene::new(fn(dt: Float) {}, fn() {})
+let mgr2 = SceneManager::new(initScene)
+assert(mgr2.has(), "new(scene) has scene")
+assert(mgr2.depth() == 1, "new(scene) depth 1")
+println("PASS: SceneManager::new")
+
+// ── Multiple listeners on same signal ────────────────────────
+
+let mgr3 = SceneManager::empty()
+let countA = Box(0)
+let countB = Box(0)
+mgr3.onSwitch.connect(|| { countA.value += 1 })
+mgr3.onSwitch.connect(|| { countB.value += 1 })
+mgr3.switch(Scene::empty())
+assert(countA.value == 1, "multi listener A on switch")
+assert(countB.value == 1, "multi listener B on switch")
+println("PASS: multiple listeners on scene signals")
+
+println("ALL SCENE TESTS PASSED")

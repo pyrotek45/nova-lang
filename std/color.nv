@@ -8,43 +8,43 @@ module color
 
 // --- Core colors ---
 
-fn white() -> (Int, Int, Int) { return (255, 255, 255) }
-fn black() -> (Int, Int, Int) { return (0, 0, 0) }
-fn red() -> (Int, Int, Int) { return (230, 41, 55) }
-fn green() -> (Int, Int, Int) { return (0, 228, 48) }
-fn blue() -> (Int, Int, Int) { return (0, 121, 241) }
-fn yellow() -> (Int, Int, Int) { return (253, 249, 0) }
-fn orange() -> (Int, Int, Int) { return (255, 161, 0) }
-fn pink() -> (Int, Int, Int) { return (255, 109, 194) }
-fn purple() -> (Int, Int, Int) { return (200, 122, 255) }
+fn mod(color) white() -> (Int, Int, Int) { return (255, 255, 255) }
+fn mod(color) black() -> (Int, Int, Int) { return (0, 0, 0) }
+fn mod(color) red() -> (Int, Int, Int) { return (230, 41, 55) }
+fn mod(color) green() -> (Int, Int, Int) { return (0, 228, 48) }
+fn mod(color) blue() -> (Int, Int, Int) { return (0, 121, 241) }
+fn mod(color) yellow() -> (Int, Int, Int) { return (253, 249, 0) }
+fn mod(color) orange() -> (Int, Int, Int) { return (255, 161, 0) }
+fn mod(color) pink() -> (Int, Int, Int) { return (255, 109, 194) }
+fn mod(color) purple() -> (Int, Int, Int) { return (200, 122, 255) }
 
 // --- Raylib standard palette ---
 
-fn lightGray() -> (Int, Int, Int) { return (200, 200, 200) }
-fn gray() -> (Int, Int, Int) { return (130, 130, 130) }
-fn darkGray() -> (Int, Int, Int) { return (80, 80, 80) }
-fn darkBlue() -> (Int, Int, Int) { return (0, 82, 172) }
-fn skyBlue() -> (Int, Int, Int) { return (102, 191, 255) }
-fn lime() -> (Int, Int, Int) { return (0, 158, 47) }
-fn darkGreen() -> (Int, Int, Int) { return (0, 117, 44) }
-fn darkPurple() -> (Int, Int, Int) { return (112, 31, 126) }
-fn violet() -> (Int, Int, Int) { return (135, 60, 190) }
-fn beige() -> (Int, Int, Int) { return (211, 176, 131) }
-fn brown() -> (Int, Int, Int) { return (127, 106, 79) }
-fn darkBrown() -> (Int, Int, Int) { return (76, 63, 47) }
-fn maroon() -> (Int, Int, Int) { return (190, 33, 55) }
-fn magenta() -> (Int, Int, Int) { return (255, 0, 255) }
-fn gold() -> (Int, Int, Int) { return (255, 203, 0) }
+fn mod(color) lightGray() -> (Int, Int, Int) { return (200, 200, 200) }
+fn mod(color) gray() -> (Int, Int, Int) { return (130, 130, 130) }
+fn mod(color) darkGray() -> (Int, Int, Int) { return (80, 80, 80) }
+fn mod(color) darkBlue() -> (Int, Int, Int) { return (0, 82, 172) }
+fn mod(color) skyBlue() -> (Int, Int, Int) { return (102, 191, 255) }
+fn mod(color) lime() -> (Int, Int, Int) { return (0, 158, 47) }
+fn mod(color) darkGreen() -> (Int, Int, Int) { return (0, 117, 44) }
+fn mod(color) darkPurple() -> (Int, Int, Int) { return (112, 31, 126) }
+fn mod(color) violet() -> (Int, Int, Int) { return (135, 60, 190) }
+fn mod(color) beige() -> (Int, Int, Int) { return (211, 176, 131) }
+fn mod(color) brown() -> (Int, Int, Int) { return (127, 106, 79) }
+fn mod(color) darkBrown() -> (Int, Int, Int) { return (76, 63, 47) }
+fn mod(color) maroon() -> (Int, Int, Int) { return (190, 33, 55) }
+fn mod(color) magenta() -> (Int, Int, Int) { return (255, 0, 255) }
+fn mod(color) gold() -> (Int, Int, Int) { return (255, 203, 0) }
 
 // --- Custom helpers ---
 
 // Create a color from RGB values
-fn rgb(r: Int, g: Int, b: Int) -> (Int, Int, Int) {
+fn mod(color) rgb(r: Int, g: Int, b: Int) -> (Int, Int, Int) {
     return (r, g, b)
 }
 
 // Linear interpolation between two colors
-fn lerpColor(c1: (Int, Int, Int), c2: (Int, Int, Int), t: Float) -> (Int, Int, Int) {
+fn mod(color) lerpColor(c1: (Int, Int, Int), c2: (Int, Int, Int), t: Float) -> (Int, Int, Int) {
     let r = Cast::int(Cast::float(c1[0]).unwrap() + (Cast::float(c2[0]).unwrap() - Cast::float(c1[0]).unwrap()) * t).unwrap()
     let g = Cast::int(Cast::float(c1[1]).unwrap() + (Cast::float(c2[1]).unwrap() - Cast::float(c1[1]).unwrap()) * t).unwrap()
     let b = Cast::int(Cast::float(c1[2]).unwrap() + (Cast::float(c2[2]).unwrap() - Cast::float(c1[2]).unwrap()) * t).unwrap()
@@ -52,16 +52,16 @@ fn lerpColor(c1: (Int, Int, Int), c2: (Int, Int, Int), t: Float) -> (Int, Int, I
 }
 
 // Invert a color
-fn invert(c: (Int, Int, Int)) -> (Int, Int, Int) {
+fn mod(color) invert(c: (Int, Int, Int)) -> (Int, Int, Int) {
     return (255 - c[0], 255 - c[1], 255 - c[2])
 }
 
 // Darken a color by a factor (0.0 = unchanged, 1.0 = black)
-fn darken(c: (Int, Int, Int), factor: Float) -> (Int, Int, Int) {
-    return lerpColor(c, black(), factor)
+fn mod(color) darken(c: (Int, Int, Int), factor: Float) -> (Int, Int, Int) {
+    return color::lerpColor(c, color::black(), factor)
 }
 
 // Lighten a color by a factor (0.0 = unchanged, 1.0 = white)
-fn lighten(c: (Int, Int, Int), factor: Float) -> (Int, Int, Int) {
-    return lerpColor(c, white(), factor)
+fn mod(color) lighten(c: (Int, Int, Int), factor: Float) -> (Int, Int, Int) {
+    return color::lerpColor(c, color::white(), factor)
 }
