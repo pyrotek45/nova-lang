@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     io::{self, Write},
     process::exit,
+    time::Duration,
 };
 
 use common::{
@@ -1405,8 +1406,52 @@ impl Vm {
                  info: &DebugInfo,
                  output_len: usize|
      -> Snapshot {
-            let stack: Vec<String> =
-                state.memory.stack.iter().map(|v| fmt_vmdata_typed(v)).collect();
+            // Build a reverse map: function byte-address → global name
+            // so we can label Function values on the stack.
+            let mut fn_addr_to_name: HashMap<usize, String> = HashMap::new();
+            for (idx, name) in &info.global_names {
+                let i = *idx as usize;
+                if i < state.memory.stack.len() {
+                    if let VmData::Function(addr) = &state.memory.stack[i] {
+                        fn_addr_to_name.insert(*addr, name.clone());
+                    }
+                }
+            }
+
+            // Build local_name lookup for current scope (scope 0 = top-level)
+            let local_name_map: HashMap<usize, String> = info
+                .local_names
+                .get(&0)
+                .map(|v| {
+                    v.iter()
+                        .map(|(idx, name)| (state.offset + *idx as usize, name.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let stack: Vec<String> = state
+                .memory
+                .stack
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    let base = fmt_vmdata_typed(v);
+                    // Try to attach a name
+                    if let Some(gname) = info.global_names.get(&(i as u32)) {
+                        format!("{} ({})", base, gname)
+                    } else if let Some(lname) = local_name_map.get(&i) {
+                        format!("{} ({})", base, lname)
+                    } else if let VmData::Function(addr) = v {
+                        if let Some(fname) = fn_addr_to_name.get(addr) {
+                            format!("{} ({})", base, fname)
+                        } else {
+                            base
+                        }
+                    } else {
+                        base
+                    }
+                })
+                .collect();
 
             let mut locals = Vec::new();
             if let Some(local_names) = info.local_names.get(&0) {
@@ -1452,6 +1497,8 @@ impl Vm {
         let mut error_msg: Option<String> = None;
         let mut output_buf: Vec<String> = Vec::new();
         let mut show_help = false;
+        let mut playing = false;
+        let mut play_speed_ms: u64 = 100; // ms between auto-steps
 
         // Pre-decode bytecode listing for the left panel
         struct BytecodeLine {
@@ -1690,7 +1737,9 @@ impl Vm {
                       output_buf: &[String],
                       bc_lines: &[BytecodeLine],
                       addr_to_line: &HashMap<usize, usize>,
-                      show_help: bool|
+                      show_help: bool,
+                      playing: bool,
+                      play_speed_ms: u64|
          -> io::Result<()> {
             let (cols, rows) = terminal::size()?;
             let w = cols as usize;
@@ -1716,6 +1765,9 @@ impl Vm {
                     ("PgDn", "Jump forward 20 steps"),
                     ("Home", "Go to beginning"),
                     ("End", "Go to latest step"),
+                    ("p", "Play / pause (auto-step visually)"),
+                    ("+ / =", "Speed up playback"),
+                    ("- / _", "Slow down playback"),
                     ("r", "Run to end (execute all remaining)"),
                     ("n", "Step over (run until callstack returns)"),
                     ("?", "Toggle this help screen"),
@@ -1736,13 +1788,13 @@ impl Vm {
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(SetForegroundColor(Color::White))?
                     .queue(Print(
-                        "    Left panel:  Bytecode listing (► = current)\r\n",
+                        "    Left:    Bytecode listing (► = current)\r\n",
                     ))?
                     .queue(Print(
-                        "    Top right:   Variables (locals + globals)\r\n",
+                        "    Middle:  Stack (top-of-stack first, • = local)\r\n",
                     ))?
-                    .queue(Print("    Mid right:   Stack (top-of-stack first)\r\n"))?
-                    .queue(Print("    Bottom:      Program output\r\n"))?
+                    .queue(Print("    Right:   Variables (locals + globals)\r\n"))?
+                    .queue(Print("    Bottom:  Program output\r\n"))?
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(Print("\r\n"))?
                     .queue(SetForegroundColor(Color::DarkGrey))?
@@ -1752,15 +1804,19 @@ impl Vm {
                 return Ok(());
             }
 
-            // Layout: left (bytecode) and right (stack/vars)
-            let left_w = (w * 45 / 100).max(30).min(w.saturating_sub(30));
-            let right_w = w.saturating_sub(left_w).saturating_sub(1);
+            // Layout: 3 columns — Bytecode | Stack | Variables
+            let col1_w = (w * 35 / 100).max(28).min(w.saturating_sub(40));
+            let remaining = w.saturating_sub(col1_w).saturating_sub(2); // 2 for │ separators
+            let col2_w = (remaining * 55 / 100).max(15);
+            let col3_w = remaining.saturating_sub(col2_w);
 
             // Header bar
             let status = if let Some(ref e) = error_msg {
                 format!(" ERROR: {}", e)
             } else if finished {
                 " ✓ FINISHED".to_string()
+            } else if playing {
+                format!(" ▶ PLAYING ({}ms)", play_speed_ms)
             } else {
                 String::new()
             };
@@ -1803,7 +1859,7 @@ impl Vm {
             // Available rows for the main panels
             let panel_rows = h.saturating_sub(7);
 
-            // Left panel: Bytecode listing
+            // Column 1: Bytecode listing
             let current_bc_line =
                 addr_to_line.get(&snap.ip).copied().unwrap_or(0);
             let half = panel_rows / 2;
@@ -1813,35 +1869,17 @@ impl Vm {
                 0
             };
 
-            // Right panel content: Variables then Stack
-            let mut right_lines: Vec<(Color, String)> = Vec::new();
-
-            right_lines.push((Color::Cyan, "─ Variables ─".to_string()));
-            if snap.locals.is_empty() && snap.globals_changed.is_empty() {
-                right_lines.push((Color::DarkGrey, " (none)".to_string()));
-            }
-            for (name, val) in &snap.locals {
-                right_lines
-                    .push((Color::Green, format!(" {} = {}", name, val)));
-            }
-            if !snap.globals_changed.is_empty() {
-                right_lines.push((Color::DarkGrey, " globals:".to_string()));
-                for (name, val) in &snap.globals_changed {
-                    right_lines
-                        .push((Color::White, format!("  {} = {}", name, val)));
-                }
-            }
-
-            right_lines.push((Color::Cyan, "─ Stack ─".to_string()));
+            // Column 2: Stack (top-of-stack first)
+            let mut stack_lines: Vec<(Color, String)> = Vec::new();
+            stack_lines.push((Color::Cyan, "─ Stack ─".to_string()));
             let stack_label = format!(
                 " ({} entries, offset={})",
                 snap.stack.len(),
                 snap.offset
             );
-            right_lines.push((Color::DarkGrey, stack_label));
+            stack_lines.push((Color::DarkGrey, stack_label));
 
-            let max_stack =
-                panel_rows.saturating_sub(right_lines.len()).max(3);
+            let max_stack = panel_rows.saturating_sub(3).max(3);
             let stack_show: Vec<_> = snap
                 .stack
                 .iter()
@@ -1864,20 +1902,42 @@ impl Vm {
                 } else {
                     Color::DarkGrey
                 };
-                right_lines.push((color, s));
+                stack_lines.push((color, s));
             }
             if snap.stack.len() > max_stack {
-                right_lines.push((
+                stack_lines.push((
                     Color::DarkGrey,
                     format!(" ... {} more", snap.stack.len() - max_stack),
                 ));
             }
             if snap.stack.is_empty() {
-                right_lines.push((Color::DarkGrey, " (empty)".to_string()));
+                stack_lines.push((Color::DarkGrey, " (empty)".to_string()));
             }
 
-            // Render panels side by side
+            // Column 3: Variables (locals + globals)
+            let mut var_lines: Vec<(Color, String)> = Vec::new();
+            var_lines.push((Color::Cyan, "─ Variables ─".to_string()));
+            if snap.locals.is_empty() && snap.globals_changed.is_empty() {
+                var_lines.push((Color::DarkGrey, " (none)".to_string()));
+            }
+            if !snap.locals.is_empty() {
+                var_lines.push((Color::DarkGrey, " locals:".to_string()));
+                for (name, val) in &snap.locals {
+                    var_lines
+                        .push((Color::Green, format!("  {} = {}", name, val)));
+                }
+            }
+            if !snap.globals_changed.is_empty() {
+                var_lines.push((Color::DarkGrey, " globals:".to_string()));
+                for (name, val) in &snap.globals_changed {
+                    var_lines
+                        .push((Color::White, format!("  {} = {}", name, val)));
+                }
+            }
+
+            // Render 3 columns side by side
             for row in 0..panel_rows {
+                // Column 1: Bytecode
                 let bc_idx = bc_start + row;
                 if bc_idx < bc_lines.len() {
                     let bl = &bc_lines[bc_idx];
@@ -1888,10 +1948,10 @@ impl Vm {
                         "{} {} {:<12} {}",
                         marker, addr_str, bl.opname, bl.operand
                     );
-                    let display: String = if text.len() > left_w {
-                        text[..left_w].to_string()
+                    let display: String = if text.len() > col1_w {
+                        text[..col1_w].to_string()
                     } else {
-                        format!("{:<width$}", text, width = left_w)
+                        format!("{:<width$}", text, width = col1_w)
                     };
 
                     if is_current {
@@ -1907,18 +1967,42 @@ impl Vm {
                             .queue(SetAttribute(Attribute::Reset))?;
                     }
                 } else {
-                    stdout.queue(Print(&" ".repeat(left_w)))?;
+                    stdout.queue(Print(&" ".repeat(col1_w)))?;
                 }
 
+                // Separator
                 stdout
                     .queue(SetForegroundColor(Color::DarkGrey))?
                     .queue(Print("│"))?
                     .queue(SetAttribute(Attribute::Reset))?;
 
-                if row < right_lines.len() {
-                    let (color, ref text) = right_lines[row];
-                    let display: String = if text.len() > right_w {
-                        text[..right_w].to_string()
+                // Column 2: Stack
+                if row < stack_lines.len() {
+                    let (color, ref text) = stack_lines[row];
+                    let display: String = if text.len() > col2_w {
+                        text[..col2_w].to_string()
+                    } else {
+                        format!("{:<width$}", text, width = col2_w)
+                    };
+                    stdout
+                        .queue(SetForegroundColor(color))?
+                        .queue(Print(&display))?
+                        .queue(SetAttribute(Attribute::Reset))?;
+                } else {
+                    stdout.queue(Print(&" ".repeat(col2_w)))?;
+                }
+
+                // Separator
+                stdout
+                    .queue(SetForegroundColor(Color::DarkGrey))?
+                    .queue(Print("│"))?
+                    .queue(SetAttribute(Attribute::Reset))?;
+
+                // Column 3: Variables
+                if row < var_lines.len() {
+                    let (color, ref text) = var_lines[row];
+                    let display: String = if text.len() > col3_w {
+                        text[..col3_w].to_string()
                     } else {
                         text.clone()
                     };
@@ -1963,11 +2047,14 @@ impl Vm {
             }
 
             // Controls bar
+            let controls = if playing {
+                " [p] pause  [+/-] speed  [↑/↓] step  [?] help  [q] quit"
+            } else {
+                " [↑/↓] step  [p] play  [r] run  [n] next  [Home/End] bounds  [?] help  [q] quit"
+            };
             stdout
                 .queue(SetForegroundColor(Color::DarkGrey))?
-                .queue(Print(
-                    " [↑/↓] step  [r] run  [n] next  [Home/End] bounds  [?] help  [q] quit",
-                ))?
+                .queue(Print(controls))?
                 .queue(SetAttribute(Attribute::Reset))?;
 
             stdout.flush()?;
@@ -1999,144 +2086,113 @@ impl Vm {
             &bc_lines,
             &addr_to_line,
             show_help,
+            playing,
+            play_speed_ms,
         );
 
         loop {
-            if let Ok(Event::Key(KeyEvent {
-                code: key,
-                modifiers,
-                ..
-            })) = event::read()
-            {
-                if show_help {
-                    show_help = false;
-                    let _ = render(
-                        &mut stdout,
-                        &history,
-                        cursor,
-                        finished,
-                        &error_msg,
-                        &output_buf,
-                        &bc_lines,
-                        &addr_to_line,
-                        show_help,
-                    );
-                    continue;
-                }
+            // When playing, poll with a timeout so we auto-step if no key
+            // is pressed.  When paused, block until a key arrives.
+            let timeout = if playing {
+                Duration::from_millis(play_speed_ms)
+            } else {
+                Duration::from_secs(3600) // effectively blocking
+            };
 
-                match key {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    KeyCode::Char('c')
-                        if modifiers.contains(KeyModifiers::CONTROL) =>
-                    {
-                        break
-                    }
-                    KeyCode::Char('?') => {
-                        show_help = true;
+            let got_key = event::poll(timeout).unwrap_or(false);
+
+            if got_key {
+                if let Ok(Event::Key(KeyEvent {
+                    code: key,
+                    modifiers,
+                    ..
+                })) = event::read()
+                {
+                    if show_help {
+                        show_help = false;
+                        let _ = render(
+                            &mut stdout,
+                            &history,
+                            cursor,
+                            finished,
+                            &error_msg,
+                            &output_buf,
+                            &bc_lines,
+                            &addr_to_line,
+                            show_help,
+                            playing,
+                            play_speed_ms,
+                        );
+                        continue;
                     }
 
-                    // Step forward
-                    KeyCode::Down
-                    | KeyCode::Char('j')
-                    | KeyCode::Char(' ') => {
-                        if cursor < history.len() - 1 {
-                            cursor += 1;
-                        } else if !finished && error_msg.is_none() {
-                            let ip_before = self.state.current_instruction;
-                            let opcode = if ip_before < self.state.program.len()
-                            {
-                                self.state.program[ip_before]
-                            } else {
-                                0
-                            };
-                            let named =
-                                self.peek_operand_named(opcode, &info);
-                            match self.step_one_debug() {
-                                StepResult::Continue {
-                                    opname,
-                                    output,
-                                } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
-                                    }
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        ip_before,
-                                        &opname,
-                                        &named,
-                                        &info,
-                                        output_buf.len(),
-                                    ));
-                                    cursor = history.len() - 1;
-                                }
-                                StepResult::Finished { output } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
-                                    }
-                                    finished = true;
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        ip_before,
-                                        "END",
-                                        "",
-                                        &info,
-                                        output_buf.len(),
-                                    ));
-                                    cursor = history.len() - 1;
-                                }
-                                StepResult::Error(msg) => {
-                                    error_msg = Some(msg);
-                                    history.push(take_snapshot(
-                                        &self.state,
-                                        ip_before,
-                                        "ERROR",
-                                        "",
-                                        &info,
-                                        output_buf.len(),
-                                    ));
-                                    cursor = history.len() - 1;
-                                }
+                    match key {
+                        KeyCode::Char('q') | KeyCode::Esc => break,
+                        KeyCode::Char('c')
+                            if modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            break
+                        }
+                        KeyCode::Char('?') => {
+                            show_help = true;
+                            playing = false;
+                        }
+
+                        // Play / Pause toggle
+                        KeyCode::Char('p') => {
+                            if playing {
+                                playing = false;
+                            } else if !finished && error_msg.is_none() {
+                                playing = true;
+                                // Jump to latest if we're reviewing history
+                                cursor = history.len() - 1;
                             }
                         }
-                    }
 
-                    // Step backward
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        if cursor > 0 {
-                            cursor -= 1;
+                        // Speed controls
+                        KeyCode::Char('+') | KeyCode::Char('=') => {
+                            if play_speed_ms > 10 {
+                                play_speed_ms = play_speed_ms.saturating_sub(
+                                    if play_speed_ms > 100 { 50 } else { 10 },
+                                );
+                            }
                         }
-                    }
+                        KeyCode::Char('-') | KeyCode::Char('_') => {
+                            play_speed_ms = (play_speed_ms + if play_speed_ms >= 100 { 50 } else { 10 }).min(2000);
+                        }
 
-                    // Page navigation
-                    KeyCode::PageDown => {
-                        for _ in 0..20 {
+                        // Step forward (pauses play mode)
+                        KeyCode::Down
+                        | KeyCode::Char('j')
+                        | KeyCode::Char(' ') => {
+                            playing = false;
                             if cursor < history.len() - 1 {
                                 cursor += 1;
                             } else if !finished && error_msg.is_none() {
-                                let ip_b = self.state.current_instruction;
-                                let opc =
-                                    if ip_b < self.state.program.len() {
-                                        self.state.program[ip_b]
-                                    } else {
-                                        0
-                                    };
+                                let ip_before = self.state.current_instruction;
+                                let opcode = if ip_before < self.state.program.len()
+                                {
+                                    self.state.program[ip_before]
+                                } else {
+                                    0
+                                };
                                 let named =
-                                    self.peek_operand_named(opc, &info);
+                                    self.peek_operand_named(opcode, &info);
                                 match self.step_one_debug() {
                                     StepResult::Continue {
                                         opname,
-                                            output,
+                                        output,
                                     } => {
                                         if let Some(ref o) = output {
                                             output_buf.push(o.clone());
                                         }
                                         history.push(take_snapshot(
-                                        &self.state,
-                                        ip_b,
-                                        &opname,
-                                        &named,
-                                        &info,
-                                        output_buf.len(),
+                                            &self.state,
+                                            ip_before,
+                                            &opname,
+                                            &named,
+                                            &info,
+                                            output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
                                     }
@@ -2147,190 +2203,339 @@ impl Vm {
                                         finished = true;
                                         history.push(take_snapshot(
                                             &self.state,
-                                            ip_b,
+                                            ip_before,
                                             "END",
                                             "",
                                             &info,
                                             output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
-                                        break;
                                     }
                                     StepResult::Error(msg) => {
                                         error_msg = Some(msg);
                                         history.push(take_snapshot(
                                             &self.state,
-                                            ip_b,
+                                            ip_before,
                                             "ERROR",
                                             "",
                                             &info,
                                             output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
-                                        break;
                                     }
                                 }
-                            } else {
-                                break;
                             }
                         }
-                    }
-                    KeyCode::PageUp => {
-                        cursor = cursor.saturating_sub(20);
-                    }
 
-                    // Run to end
-                    KeyCode::Char('r') => {
-                        let limit = 1_000_000;
-                        let mut count = 0;
-                        let mut last_ip = self.state.current_instruction;
-                        while !finished
-                            && error_msg.is_none()
-                            && count < limit
-                        {
-                            last_ip = self.state.current_instruction;
-                            match self.step_one_debug() {
-                                StepResult::Continue {
-                                    opname: _,
-                                    output,
-                                } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
-                                    }
-                                }
-                                StepResult::Finished { output } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
-                                    }
-                                    finished = true;
-                                }
-                                StepResult::Error(msg) => {
-                                    error_msg = Some(msg);
-                                }
+                        // Step backward (pauses play mode)
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            playing = false;
+                            if cursor > 0 {
+                                cursor -= 1;
                             }
-                            count += 1;
                         }
-                        // Take a single snapshot for the final state
-                        let final_op = if finished {
-                            "END"
-                        } else if error_msg.is_some() {
-                            "ERROR"
-                        } else {
-                            "PAUSED"
-                        };
-                        let final_named = if !finished && error_msg.is_none() {
-                            let ip_now = self.state.current_instruction;
-                            if ip_now < self.state.program.len() {
-                                self.peek_operand_named(self.state.program[ip_now], &info)
-                            } else {
-                                String::new()
-                            }
-                        } else {
-                            String::new()
-                        };
-                        history.push(take_snapshot(
-                            &self.state,
-                            last_ip,
-                            final_op,
-                            &final_named,
-                            &info,
-                            output_buf.len(),
-                        ));
-                        cursor = history.len() - 1;
-                    }
 
-                    // Step over
-                    KeyCode::Char('n') => {
-                        let target_depth =
-                            history[cursor].callstack_depth;
-                        let limit = 100_000;
-                        let mut count = 0;
-                        let mut last_ip = self.state.current_instruction;
-                        while !finished
-                            && error_msg.is_none()
-                            && count < limit
-                        {
-                            last_ip = self.state.current_instruction;
-                            match self.step_one_debug() {
-                                StepResult::Continue {
-                                    opname: _,
-                                    output,
-                                } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
+                        // Page navigation (pauses play mode)
+                        KeyCode::PageDown => {
+                            playing = false;
+                            for _ in 0..20 {
+                                if cursor < history.len() - 1 {
+                                    cursor += 1;
+                                } else if !finished && error_msg.is_none() {
+                                    let ip_b = self.state.current_instruction;
+                                    let opc =
+                                        if ip_b < self.state.program.len() {
+                                            self.state.program[ip_b]
+                                        } else {
+                                            0
+                                        };
+                                    let named =
+                                        self.peek_operand_named(opc, &info);
+                                    match self.step_one_debug() {
+                                        StepResult::Continue {
+                                            opname,
+                                                output,
+                                        } => {
+                                            if let Some(ref o) = output {
+                                                output_buf.push(o.clone());
+                                            }
+                                            history.push(take_snapshot(
+                                            &self.state,
+                                            ip_b,
+                                            &opname,
+                                            &named,
+                                            &info,
+                                            output_buf.len(),
+                                            ));
+                                            cursor = history.len() - 1;
+                                        }
+                                        StepResult::Finished { output } => {
+                                            if let Some(ref o) = output {
+                                                output_buf.push(o.clone());
+                                            }
+                                            finished = true;
+                                            history.push(take_snapshot(
+                                                &self.state,
+                                                ip_b,
+                                                "END",
+                                                "",
+                                                &info,
+                                                output_buf.len(),
+                                            ));
+                                            cursor = history.len() - 1;
+                                            break;
+                                        }
+                                        StepResult::Error(msg) => {
+                                            error_msg = Some(msg);
+                                            history.push(take_snapshot(
+                                                &self.state,
+                                                ip_b,
+                                                "ERROR",
+                                                "",
+                                                &info,
+                                                output_buf.len(),
+                                            ));
+                                            cursor = history.len() - 1;
+                                            break;
+                                        }
                                     }
-                                    if self.state.callstack.len()
-                                        <= target_depth
-                                    {
-                                        break;
-                                    }
-                                }
-                                StepResult::Finished { output } => {
-                                    if let Some(ref o) = output {
-                                        output_buf.push(o.clone());
-                                    }
-                                    finished = true;
-                                    break;
-                                }
-                                StepResult::Error(msg) => {
-                                    error_msg = Some(msg);
+                                } else {
                                     break;
                                 }
                             }
-                            count += 1;
                         }
-                        // Take a single snapshot for the final state
-                        let final_op = if finished {
-                            "END".to_string()
-                        } else if error_msg.is_some() {
-                            "ERROR".to_string()
-                        } else {
-                            let ip_now = self.state.current_instruction;
-                            if ip_now < self.state.program.len() {
-                                code::byte_to_string(self.state.program[ip_now])
-                            } else {
-                                "END".to_string()
+                        KeyCode::PageUp => {
+                            playing = false;
+                            cursor = cursor.saturating_sub(20);
+                        }
+
+                        // Run to end (records every step so you can rewind)
+                        KeyCode::Char('r') => {
+                            playing = false;
+                            let limit = 1_000_000;
+                            let mut count = 0;
+                            while !finished
+                                && error_msg.is_none()
+                                && count < limit
+                            {
+                                let ip_before = self.state.current_instruction;
+                                let opcode = if ip_before < self.state.program.len() {
+                                    self.state.program[ip_before]
+                                } else {
+                                    0
+                                };
+                                let named = self.peek_operand_named(opcode, &info);
+                                match self.step_one_debug() {
+                                    StepResult::Continue {
+                                        opname,
+                                        output,
+                                    } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            &opname,
+                                            &named,
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                    }
+                                    StepResult::Finished { output } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        finished = true;
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            "END",
+                                            "",
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                    }
+                                    StepResult::Error(msg) => {
+                                        error_msg = Some(msg);
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            "ERROR",
+                                            "",
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                    }
+                                }
+                                count += 1;
                             }
-                        };
-                        let final_named = if !finished && error_msg.is_none() {
-                            let ip_now = self.state.current_instruction;
-                            if ip_now < self.state.program.len() {
-                                self.peek_operand_named(self.state.program[ip_now], &info)
-                            } else {
-                                String::new()
+                            cursor = history.len() - 1;
+                        }
+
+                        // Step over (records every step so you can rewind)
+                        KeyCode::Char('n') => {
+                            playing = false;
+                            let target_depth =
+                                history[cursor].callstack_depth;
+                            let limit = 100_000;
+                            let mut count = 0;
+                            while !finished
+                                && error_msg.is_none()
+                                && count < limit
+                            {
+                                let ip_before = self.state.current_instruction;
+                                let opcode = if ip_before < self.state.program.len() {
+                                    self.state.program[ip_before]
+                                } else {
+                                    0
+                                };
+                                let named = self.peek_operand_named(opcode, &info);
+                                match self.step_one_debug() {
+                                    StepResult::Continue {
+                                        opname,
+                                        output,
+                                    } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            &opname,
+                                            &named,
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                        if self.state.callstack.len()
+                                            <= target_depth
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    StepResult::Finished { output } => {
+                                        if let Some(ref o) = output {
+                                            output_buf.push(o.clone());
+                                        }
+                                        finished = true;
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            "END",
+                                            "",
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                        break;
+                                    }
+                                    StepResult::Error(msg) => {
+                                        error_msg = Some(msg);
+                                        history.push(take_snapshot(
+                                            &self.state,
+                                            ip_before,
+                                            "ERROR",
+                                            "",
+                                            &info,
+                                            output_buf.len(),
+                                        ));
+                                        break;
+                                    }
+                                }
+                                count += 1;
                             }
-                        } else {
-                            String::new()
-                        };
-                        history.push(take_snapshot(
-                            &self.state,
-                            last_ip,
-                            &final_op,
-                            &final_named,
-                            &info,
-                            output_buf.len(),
-                        ));
-                        cursor = history.len() - 1;
+                            cursor = history.len() - 1;
+                        }
+
+                        KeyCode::Home => {
+                            playing = false;
+                            cursor = 0;
+                        }
+                        KeyCode::End => {
+                            playing = false;
+                            cursor = history.len() - 1;
+                        }
+
+                        _ => {}
                     }
-
-                    KeyCode::Home => cursor = 0,
-                    KeyCode::End => cursor = history.len() - 1,
-
-                    _ => {}
                 }
-
-                let _ = render(
-                    &mut stdout,
-                    &history,
-                    cursor,
-                    finished,
-                    &error_msg,
-                    &output_buf,
-                    &bc_lines,
-                    &addr_to_line,
-                    show_help,
-                );
+            } else if playing {
+                // No key pressed within timeout → auto-step forward
+                if cursor < history.len() - 1 {
+                    // Replay from history
+                    cursor += 1;
+                } else if !finished && error_msg.is_none() {
+                    // Execute next instruction
+                    let ip_before = self.state.current_instruction;
+                    let opcode = if ip_before < self.state.program.len() {
+                        self.state.program[ip_before]
+                    } else {
+                        0
+                    };
+                    let named = self.peek_operand_named(opcode, &info);
+                    match self.step_one_debug() {
+                        StepResult::Continue { opname, output } => {
+                            if let Some(ref o) = output {
+                                output_buf.push(o.clone());
+                            }
+                            history.push(take_snapshot(
+                                &self.state,
+                                ip_before,
+                                &opname,
+                                &named,
+                                &info,
+                                output_buf.len(),
+                            ));
+                            cursor = history.len() - 1;
+                        }
+                        StepResult::Finished { output } => {
+                            if let Some(ref o) = output {
+                                output_buf.push(o.clone());
+                            }
+                            finished = true;
+                            playing = false;
+                            history.push(take_snapshot(
+                                &self.state,
+                                ip_before,
+                                "END",
+                                "",
+                                &info,
+                                output_buf.len(),
+                            ));
+                            cursor = history.len() - 1;
+                        }
+                        StepResult::Error(msg) => {
+                            error_msg = Some(msg);
+                            playing = false;
+                            history.push(take_snapshot(
+                                &self.state,
+                                ip_before,
+                                "ERROR",
+                                "",
+                                &info,
+                                output_buf.len(),
+                            ));
+                            cursor = history.len() - 1;
+                        }
+                    }
+                } else {
+                    // Nothing left to do, stop playing
+                    playing = false;
+                }
             }
+
+            let _ = render(
+                &mut stdout,
+                &history,
+                cursor,
+                finished,
+                &error_msg,
+                &output_buf,
+                &bc_lines,
+                &addr_to_line,
+                show_help,
+                playing,
+                play_speed_ms,
+            );
         }
 
         let _ = stdout.execute(terminal::LeaveAlternateScreen);
