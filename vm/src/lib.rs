@@ -2176,8 +2176,6 @@ impl Vm {
                                 playing = false;
                             } else if !finished && error_msg.is_none() {
                                 playing = true;
-                                // Jump to latest if we're reviewing history
-                                cursor = history.len() - 1;
                             }
                         }
 
