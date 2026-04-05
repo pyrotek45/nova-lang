@@ -17,6 +17,7 @@ to the step debugger to the disassembler.
    - [Navigating History](#navigating-history)
    - [Run to End and Rewind](#run-to-end-and-rewind)
    - [Step Over](#step-over)
+   - [Reading the Heap/GC Bar](#reading-the-heapgc-bar)
    - [Reading the Stack](#reading-the-stack)
    - [Reading Variables](#reading-variables)
    - [Reading Bytecode](#reading-bytecode)
@@ -129,6 +130,8 @@ The debugger uses a **3-column layout**:
 ├─────────────────────┴──────────────────────┴──────────────┤
 │  Output: Hello, world!                                    │
 ├───────────────────────────────────────────────────────────┤
+│  Heap: 3 live / 16 slots (13 free) │ Stack: 5 │ GC …     │
+├───────────────────────────────────────────────────────────┤
 │  [↑/↓] step  [p] play  [r] run  [n] next  [?] help  [q] │
 └───────────────────────────────────────────────────────────┘
 ```
@@ -146,6 +149,8 @@ The debugger uses a **3-column layout**:
   any globals that hold non-function values. This is the "human-readable"
   view — you don't need to decode the stack by hand.
 - **Output**: The last 2 lines of program output from `print`/`println`.
+- **Heap/GC bar**: Live object counts, heap capacity, GC threshold info, and
+  callstack depth. See [Reading the Heap/GC Bar](#reading-the-heapgc-bar).
 - **Header**: Step number (`Step 5/120`), instruction pointer (`IP:12`),
   callstack depth (`Depth:1`), and local frame offset (`Offset:3`).
 
@@ -221,6 +226,51 @@ the callstack returns to the same depth as when you pressed `n`. In practice:
 
 Every instruction executed during step-over is recorded, so you can rewind into
 the function body afterwards if you need to.
+
+### Reading the Heap/GC Bar
+
+Below the output area, the debugger shows a **heap/GC status bar** with live
+memory information:
+
+```
+ Heap: 12 live / 64 slots (52 free) │ Stack: 7 │ GC next@128 base=5000 │ Calls: 2
+```
+
+During play mode a speed indicator is appended:
+
+```
+ Heap: 12 live / 64 slots (52 free) │ Stack: 7 │ GC next@128 base=5000 │ Calls: 2 │ Speed: 100ms
+```
+
+**Field meanings:**
+
+| Field | Meaning |
+|---|---|
+| `Heap: N live` | Number of live (allocated) objects on the heap right now. |
+| `/ M slots` | Total heap capacity — the heap array length. |
+| `(K free)` | Number of slots on the free list, ready for reuse without growing the heap. |
+| `Stack: N` | Current value-stack depth (number of entries). |
+| `GC next@T` | The garbage collector will trigger its next collection when live objects reach this threshold. |
+| `base=B` | The adaptive base threshold. The GC adjusts this between 5 000 and 1 000 000 depending on allocation pressure. |
+| `LOCKED` | Shown when the GC is inhibited (lock depth > 0). Some native operations temporarily lock the GC to prevent collection mid-operation. If you see this stuck on, something may be wrong. |
+| `Calls: D` | Current callstack depth (number of active function frames). |
+| `Speed: Xms` | Only shown during play mode — the delay between auto-steps. |
+
+**How to use it for memory debugging:**
+
+- **Watch `live` climb**: If live objects grow without bound as your program
+  runs, you have a leak. Use `↑` to scrub back and find the instruction where
+  objects start accumulating.
+- **Check `free`**: A high free count relative to live count means many objects
+  were allocated and freed — normal for short-lived temporaries. A very low
+  free count means the heap is nearly full and the next allocation will grow it.
+- **GC `LOCKED` staying on**: If the GC stays locked for many steps, a native
+  operation may be holding the lock too long, preventing collection.
+- **`next@` vs `live`**: When live approaches `next@`, a GC cycle is imminent.
+  Step forward and watch the live count drop after collection.
+- **`base` changes**: The base threshold adapts over time. If it's growing
+  toward 1 000 000, your program allocates heavily and the GC is backing off
+  to avoid constant collection.
 
 ### Reading the Stack
 
@@ -580,7 +630,9 @@ Stack — it's the raw VM state.
 Heap objects (structs, lists, strings stored as objects) are shown as `Obj#5`
 on the stack. You can't see their contents directly in the debugger stack
 column. Use the Variables column, which resolves named locals to their
-display-formatted values.
+display-formatted values. The **Heap/GC bar** shows aggregate stats — how many
+live objects exist and when the next collection will trigger — so you can
+correlate `Obj#N` references with overall heap activity.
 
 ### Pitfall: Play mode speed affects nothing but display
 
@@ -750,6 +802,18 @@ output isn't a terminal.)
 │  Left     Bytecode (> = current instruction)            │
 │  Middle   Stack    (> = TOS, • = local frame)           │
 │  Right    Variables (locals + globals)                   │
+│                                                         │
+│  HEAP/GC BAR                                            │
+│  ────────────                                           │
+│  live       allocated objects on the heap               │
+│  slots      total heap capacity                         │
+│  free       free-list slots ready for reuse             │
+│  Stack      value-stack depth                           │
+│  GC next@   collection threshold                        │
+│  base=      adaptive base threshold (5K–1M)             │
+│  LOCKED     GC inhibited (lock depth > 0)               │
+│  Calls      callstack depth                             │
+│  Speed      play mode delay (shown while playing)       │
 │                                                         │
 │  DISASSEMBLER ARROWS                                    │
 │  ────────────────────                                   │

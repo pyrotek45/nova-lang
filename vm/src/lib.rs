@@ -1371,6 +1371,14 @@ impl Vm {
             locals: Vec<(String, String)>,
             globals_changed: Vec<(String, String)>,
             output_len: usize,
+            // Heap / GC stats captured at this step
+            heap_live: usize,
+            heap_capacity: usize,
+            heap_free: usize,
+            gc_threshold: usize,
+            gc_base: usize,
+            gc_locked: bool,
+            stack_depth: usize,
         }
 
         fn fmt_vmdata(v: &VmData) -> String {
@@ -1488,6 +1496,13 @@ impl Vm {
                 locals,
                 globals_changed,
                 output_len,
+                heap_live: state.memory.live_count(),
+                heap_capacity: state.memory.heap_capacity(),
+                heap_free: state.memory.free_count(),
+                gc_threshold: state.memory.gc_threshold(),
+                gc_base: state.memory.gc_base_threshold(),
+                gc_locked: state.memory.gc_lock_depth() > 0,
+                stack_depth: state.memory.stack.len(),
             }
         };
 
@@ -1839,13 +1854,25 @@ impl Vm {
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(SetForegroundColor(Color::White))?
                     .queue(Print(
-                        "    Left:    Bytecode listing (► = current)\r\n",
+                        "    Left:    Bytecode listing (> = current)\r\n",
                     ))?
                     .queue(Print(
                         "    Middle:  Stack (top-of-stack first, • = local)\r\n",
                     ))?
                     .queue(Print("    Right:   Variables (locals + globals)\r\n"))?
-                    .queue(Print("    Bottom:  Program output\r\n"))?
+                    .queue(Print("    Bottom:  Program output + heap/GC status\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(Print("\r\n"))?
+                    .queue(SetForegroundColor(Color::Cyan))?
+                    .queue(Print("  Heap/GC bar:\r\n"))?
+                    .queue(SetAttribute(Attribute::Reset))?
+                    .queue(SetForegroundColor(Color::White))?
+                    .queue(Print("    live    — heap objects currently alive\r\n"))?
+                    .queue(Print("    slots   — total heap array size (live + freed)\r\n"))?
+                    .queue(Print("    free    — recycled slots on the free-list\r\n"))?
+                    .queue(Print("    GC next — alloc count that triggers next collection\r\n"))?
+                    .queue(Print("    base    — adaptive threshold (grows/shrinks with load)\r\n"))?
+                    .queue(Print("    LOCKED  — GC inhibited (mid-opcode safety window)\r\n"))?
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(Print("\r\n"))?
                     .queue(SetForegroundColor(Color::DarkGrey))?
@@ -1904,7 +1931,8 @@ impl Vm {
                 .queue(SetAttribute(Attribute::Reset))?;
 
             // Available rows for the main panels
-            let panel_rows = h.saturating_sub(7);
+            // Header(1) + instruction(1) + sep(1) + sep(1) + output(2) + heap_bar(1) + controls(1) = 8
+            let panel_rows = h.saturating_sub(8);
 
             // Column 1: Bytecode listing
             let current_bc_line =
@@ -2077,6 +2105,31 @@ impl Vm {
                         .queue(SetAttribute(Attribute::Reset))?;
                 }
             }
+
+            // Heap / GC status bar
+            let gc_lock_tag = if snap.gc_locked { " LOCKED" } else { "" };
+            let heap_bar = format!(
+                " Heap: {} live / {} slots ({} free) │ Stack: {} │ GC next@{} base={}{} │ Calls: {}{}",
+                snap.heap_live,
+                snap.heap_capacity,
+                snap.heap_free,
+                snap.stack_depth,
+                snap.gc_threshold,
+                snap.gc_base,
+                gc_lock_tag,
+                snap.callstack_depth,
+                if playing {
+                    format!(" │ Speed: {}ms", play_speed_ms)
+                } else {
+                    String::new()
+                },
+            );
+            let heap_display = trunc(&heap_bar, w);
+            stdout
+                .queue(SetForegroundColor(Color::DarkGrey))?
+                .queue(Print(&heap_display))?
+                .queue(SetAttribute(Attribute::Reset))?
+                .queue(Print("\r\n"))?;
 
             // Controls bar
             let controls = if playing {
