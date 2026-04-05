@@ -38,7 +38,7 @@ and raylib bindings.
    - [`std/physics`](#stdphysics--2d-physics) — Body2D, AABB, Circle, raycasting
    - [`std/entity`](#stdentity--entity-system) — EntityWorld, spawn, query, update
    - [`std/scene`](#stdscene--scene-management) — SceneManager, push, pop, switch
-   - [`std/grid`](#stdgrid--2d-grid-and-tilemap) — Grid(T), get, set, bfs, draw
+   - [`std/grid`](#stdgrid--2d-grid-and-tilemap) — Grid(T), get, set, bfs, draw, printGrid (terminal)
    - [`std/noise`](#stdnoise--procedural-noise) — fbm, ridged, domain warp
 4. [Raylib API](#4-raylib-api)
 5. [Import System](#5-import-system)
@@ -314,33 +314,137 @@ full syntax details including GitHub imports.
 import super.std.core
 ```
 
-| Function | Signature | Description |
-|---|---|---|
-| `clamp` | `(v, lo, hi: Float) -> Float` | Clamp value to [lo, hi] |
-| `clampI` | `(v, lo, hi: Int) -> Int` | Clamp integer |
-| `min` | `(a, b: Float) -> Float` | Minimum |
-| `max` | `(a, b: Float) -> Float` | Maximum |
-| `sign` | `(x: Float) -> Float` | -1, 0, or 1 |
-| `lerp` | `(a, b, t: Float) -> Float` | Linear interpolation |
-| `mapRange` | `(v, inLo, inHi, outLo, outHi: Float) -> Float` | Remap between ranges |
-| `swapF` | `(a, b: Float) -> (Float, Float)` | Swap two floats |
-| `swapI` | `(a, b: Int) -> (Int, Int)` | Swap two ints |
+The core module is the "batteries included" import. One line gives you `Box`,
+`Gen`, `Maybe`, `Result`, range helpers, and Option bridge functions.
 
-**Key types:**
+#### Box(T) — Mutable Shared Wrapper
 
-| Name | Kind | Description |
+Nova closures capture primitives **by value**. `Box(T)` wraps a value on the
+heap so multiple closures can read and write the same state through `.value`.
+
+```rust
+let counter = Box(0)
+let inc = || { counter.value += 1 }
+inc()
+inc()
+println(Cast::string(counter.value))  // "2"
+```
+
+| Method | Description |
+|---|---|
+| `Box(value)` | Wrap any value. Access via `.value`. |
+| `.toString()` | Returns `Cast::string(self.value)`. |
+| `.show()` | Prints the value with `println`. |
+
+#### Gen(start) — Stateful Counter
+
+Returns a closure that yields successive integers starting from `start`.
+
+```rust
+let id = Gen(0)
+println(Cast::string(id()))  // "0"
+println(Cast::string(id()))  // "1"
+println(Cast::string(id()))  // "2"
+```
+
+#### Maybe(A) — Algebraic Optional
+
+A heap-allocated enum with two variants: `Just(value)` and `Nothing()`.
+Unlike the built-in `Option(T)` (a VM stack sentinel), `Maybe` lives on the
+heap and supports pattern matching.
+
+```rust
+let x = Maybe::Just(42)
+let y = Maybe::Nothing() @[A: Int]
+
+match x {
+    Just(v)   => { println(Cast::string(v)) }   // "42"
+    Nothing() => { println("empty") }
+}
+```
+
+| Method | Signature | Description |
 |---|---|---|
-| `Box(T)` | Struct | Heap wrapper for mutable shared state. Read/write via `.value`. |
-| `Gen(start)` | Function | Stateful integer counter. |
-| `Maybe(A)` | Enum | `Maybe::Just(v)` / `Maybe::Nothing()`. `.isJust()`, `.map(f)`, `.flatMap(f)`, `.orElse(v)`. |
-| `Result(A, B)` | Enum | `Result::Ok(v)` / `Result::Err(e)`. `.isOk()`, `.map(f)`, `.mapErr(f)`, `.andThen(f)`. |
-| `range(start, end)` | Function | Returns `[start, ..., end-1]`. |
-| `n.to(end)` | Extension | Returns `[n, ..., end-1]` (UFCS). |
-| `.orDefault(v)` | Extension | Unwrap Option/Maybe/Result or return default. |
-| `.orError(msg)` | Extension | Unwrap Option or print error and exit. |
-| `.isNone()` | Extension | True if Option is None. |
-| `.toMaybe()` | Extension | Convert Option to Maybe. |
-| `.toResult(err)` | Extension | Convert Option to Result. |
+| `Maybe::Just(v)` | `$A -> Maybe($A)` | Wrap a value |
+| `Maybe::Nothing()` | `-> Maybe($A)` | Empty (needs `@[A: Type]` annotation) |
+| `.isJust()` | `-> Bool` | True if Just |
+| `.isNothing()` | `-> Bool` | True if Nothing |
+| `.unwrap()` | `-> $A` | Extract value (panics on Nothing) |
+| `.orDefault(v)` | `($A) -> $A` | Value, or fallback if Nothing |
+| `.orDoFn(f)` | `(fn()->$A) -> $A` | Value, or lazy fallback |
+| `.map(f)` | `(fn($A)->$B) -> Maybe($B)` | Transform inner value |
+| `.toString()` | `-> String` | `"Just(42)"` or `"Nothing"` |
+| `.toOption()` | `-> Option($A)` | Convert to built-in Option |
+
+```rust
+let m = Maybe::Just(10)
+let doubled = m.map(|n: Int| n * 2)       // Just(20)
+let fallback = m.orDefault(0)             // 10
+println(doubled.toString())               // "Just(20)"
+```
+
+#### Result(A, B) — Error Handling
+
+A heap-allocated enum for operations that can fail: `Ok(value)` or `Err(error)`.
+
+```rust
+fn divide(a: Int, b: Int) -> Result(Int, String) {
+    if b == 0 { return Result::Err("division by zero") }
+    return Result::Ok(a / b)
+}
+
+let r = divide(10, 3)
+println(Cast::string(r.unwrap()))  // "3"
+
+let bad = divide(1, 0)
+println(Cast::string(bad.orDefault(-1)))  // "-1"
+```
+
+| Method | Signature | Description |
+|---|---|---|
+| `Result::Ok(v)` | `$A -> Result($A,$B)` | Wrap a success value |
+| `Result::Err(e)` | `$B -> Result($A,$B)` | Wrap an error |
+| `.isOk()` / `.isErr()` | `-> Bool` | Test which variant |
+| `.unwrap()` | `-> $A` | Extract value (panics on Err) |
+| `.unwrapErr()` | `-> $B` | Extract error (panics on Ok) |
+| `.orDefault(v)` | `($A) -> $A` | Value, or fallback |
+| `.orDoFn(f)` | `(fn()->$A) -> $A` | Value, or lazy fallback |
+| `.map(f)` | `(fn($A)->$C) -> Result($C,$B)` | Transform success value |
+| `.mapErr(f)` | `(fn($B)->$C) -> Result($A,$C)` | Transform error |
+| `.toString()` | `-> String` | `"Ok(3)"` or `"Err(msg)"` |
+| `.toOption()` | `-> Option($A)` | Ok→Some, Err→None |
+
+#### Option Bridges
+
+Convert the built-in `Option(T)` to `Maybe` or `Result`:
+
+```rust
+Some(42).toMaybe()            // Maybe::Just(42)
+None(Int).toMaybe()           // Maybe::Nothing()
+
+Some(10).toResult("missing")  // Result::Ok(10)
+None(Int).toResult("missing") // Result::Err("missing")
+```
+
+#### Range Helpers
+
+Build integer lists for loops and comprehensions.
+
+```rust
+range(5)          // [0, 1, 2, 3, 4]
+range(2, 6)       // [2, 3, 4, 5]
+3.to(7)           // [3, 4, 5, 6]      (UFCS)
+5.iota()          // [0, 1, 2, 3, 4]   (UFCS)
+0.toStep(10, 3)   // [0, 3, 6, 9]      (UFCS)
+```
+
+| Function | Description |
+|---|---|
+| `range(n)` | `[0, 1, ..., n-1]` |
+| `range(start, end)` | `[start, ..., end-1]` |
+| `n.to(end)` | `[n, ..., end-1]` (UFCS) |
+| `n.iota()` | `[0, ..., n-1]` (UFCS) |
+| `start.toStep(end, step)` | `[start, start+step, ..., < end]` (UFCS) |
 
 ---
 
@@ -350,46 +454,92 @@ import super.std.core
 import super.std.math
 ```
 
-**Int extensions (UFCS):**
+Extends Int and Float with UFCS methods. Also provides standalone math functions.
+
+#### Int Extensions
+
+```rust
+(-5).abs()          // 5
+3.pow(4)            // 81
+2.sqrt()            // 1.414...
+10.clamp(0, 8)      // 8
+5.factorial()        // 120
+12.gcd(8)            // 4
+12.lcm(8)            // 24
+6.isEven()           // true
+7.isOdd()            // true
+(-3).sign()          // -1
+2.modpow(10, 1000)   // 24  (2^10 % 1000)
+17.isPrime()         // true
+1234.digitSum()      // 10
+1234.digits()        // [1, 2, 3, 4]
+3.min(5)             // 3
+3.max(5)             // 5
+```
 
 | Method | Description |
 |---|---|
-| `n.min(other)` / `n.max(other)` | Smaller / larger of two |
 | `n.abs()` | Absolute value |
 | `n.pow(exp)` | Integer exponentiation |
 | `n.sqrt()` → Float | Square root |
+| `n.exp()` → Float | e^n |
 | `n.clamp(lo, hi)` | Clamp into range |
 | `n.factorial()` | n! |
 | `n.gcd(other)` / `n.lcm(other)` | GCD / LCM |
 | `n.isEven()` / `n.isOdd()` | Parity check |
 | `n.sign()` | -1, 0, or 1 |
 | `n.modpow(exp, mod)` | Fast modular exponentiation |
-| `n.isPrime()` | Primality test |
-| `n.digitSum()` / `n.digits()` | Digit operations |
+| `n.isPrime()` | Primality test (trial division) |
+| `n.digitSum()` | Sum of decimal digits |
+| `n.digits()` | List of decimal digits `[Int]` |
+| `n.min(other)` / `n.max(other)` | Smaller / larger |
 
-**Float extensions (UFCS):**
+#### Float Extensions
+
+```rust
+90.0.radians()              // 1.5707...  (π/2)
+Float::pi().degrees()       // 180.0
+5.0.normalize(0.0, 10.0)    // 0.5
+5.0.mapRange(0.0, 10.0, 0.0, 100.0)  // 50.0
+```
 
 | Method | Description |
 |---|---|
-| `f.degrees()` / `f.radians()` | Radians ↔ degrees |
-| `f.normalize(lo, hi)` | Map to [0.0, 1.0] |
-| `f.mapRange(flo, fhi, tlo, thi)` | Remap between ranges |
+| `f.radians()` | Degrees → radians |
+| `f.degrees()` | Radians → degrees |
+| `f.normalize(lo, hi)` | Map to [0.0, 1.0] within range |
+| `f.mapRange(fromLo, fromHi, toLo, toHi)` | Remap between ranges |
 
-**Standalone functions:**
+#### Standalone Functions
+
+```rust
+fib(10)       // 55
+fibSeq(6)     // [0, 1, 1, 2, 3, 5]
+bin(42)       // "101010"
+hex(255)      // "ff"
+oct(8)        // "10"
+divmod(17, 5) // (3, 2)
+lerp(0.0, 10.0, 0.5)  // 5.0
+smoothstep(0.5)        // 0.5  (3t²-2t³)
+primes(20)   // [2, 3, 5, 7, 11, 13, 17, 19]
+collatz(6)   // [6, 3, 10, 5, 16, 8, 4, 2, 1]
+```
 
 | Function | Description |
 |---|---|
 | `fib(n)` / `fibSeq(n)` | nth Fibonacci / first n Fibonacci numbers |
-| `bin(n)` / `hex(n)` / `oct(n)` | Int to binary / hex / octal string |
+| `bin(n)` / `hex(n)` / `oct(n)` | Int → binary / hex / octal string |
 | `divmod(n, d)` | `(quotient, remainder)` |
 | `toRadians(deg)` / `toDegrees(rad)` | Degree ↔ radian conversion |
-| `lerp(a, b, t)` / `lerpF(a, b, t)` | Float / Int linear interpolation |
-| `remap(v, fl, fh, tl, th)` | Remap between ranges |
+| `lerp(a, b, t)` | Float linear interpolation (t ∈ [0, 1]) |
+| `lerpF(a, b, t)` | Int linear interpolation (floors result) |
+| `remap(v, fromLo, fromHi, toLo, toHi)` | Remap value between ranges |
 | `round(f)` | Float → nearest Int |
 | `smoothstep(t)` | Smooth Hermite curve (3t²−2t³) |
-| `sign(x)` | Float sign |
-| `isPrime(n)` / `primes(n)` | Primality / sieve |
-| `collatz(n)` | Collatz sequence |
+| `sign(x)` | Float sign: -1.0, 0.0, or 1.0 |
+| `isPrime(n)` | Standalone primality test |
+| `primes(n)` | All primes ≤ n (Sieve of Eratosthenes) |
+| `collatz(n)` | Collatz sequence from n to 1 |
 
 ---
 
@@ -399,22 +549,52 @@ import super.std.math
 import super.std.string
 ```
 
+Extends strings with padding, searching, classification, and transformation.
+
+```rust
+"hello".padLeft(10, '.')      // ".....hello"
+"hi".padRight(8, '-')         // "hi------"
+"yes".center(9, '=')          // "===yes==="
+"banana".count("an")          // 2
+"hello".countChar('l')        // 2
+"hello".indexOfChar('l')      // 2
+"12345".isDigit()             // true
+"Hello".isAlpha()             // true
+"hello".capitalize()          // "Hello"
+"hello world".title()         // "Hello World"
+"a-b-c".removeChar('-')       // "abc"
+"a.b.c".replaceChar('.', '/')  // "a/b/c"
+"one\ntwo\nthree".lines()     // ["one", "two", "three"]
+"  the  quick  fox ".words()  // ["the", "quick", "fox"]
+"hello world".truncate(7, "...")  // "hell..."
+"Hello World".slugify()        // "hello-world"
+"this is a long text".wrap(10) // "this is a\nlong text"
+"[hello]".between("[", "]")    // Some("hello")
+"foobar".stripPrefix("foo")    // "bar"
+"foobar".stripSuffix("bar")    // "foo"
+"ab".split('b')                // ["a", ""]
+```
+
 | Method | Description |
 |---|---|
-| `s.split(Char)` | Split by character |
-| `s.padLeft(n, c)` / `s.padRight(n, c)` | Pad to width |
-| `s.center(n, c)` | Center with padding |
-| `s.count(sub)` / `s.countChar(c)` | Count substrings / characters |
+| `s.split(Char)` | Split by a single character |
+| `s.padLeft(n, c)` / `s.padRight(n, c)` | Pad to width with char |
+| `s.center(n, c)` | Center with padding char |
+| `s.count(sub)` | Count non-overlapping substring matches |
+| `s.countChar(c)` | Count character occurrences |
 | `s.indexOfChar(c)` | First index of char, or -1 |
 | `s.isDigit()` / `s.isAlpha()` / `s.isAlphanumeric()` | Character class checks |
-| `s.capitalize()` / `s.title()` | Capitalize first / each word |
-| `s.removeChar(c)` / `s.replaceChar(old, new)` | Character mutation |
-| `s.lines()` / `s.words()` | Split on newlines / spaces |
-| `s.truncate(n, suffix)` | Cut with suffix |
-| `s.slugify()` | URL-friendly slug |
+| `s.capitalize()` | Uppercase first character |
+| `s.title()` | Capitalize each word |
+| `s.removeChar(c)` | Delete all occurrences of char |
+| `s.replaceChar(old, new)` | Replace all occurrences of a char |
+| `s.lines()` | Split on `'\n'` |
+| `s.words()` | Split on spaces, drop empty strings |
+| `s.truncate(n, suffix)` | Cut with suffix (e.g. `"..."`) |
+| `s.slugify()` | Lowercase, spaces→hyphens, strip non-alphanumeric |
 | `s.wrap(width)` | Word-wrap at column width |
-| `s.between(left, right)` | Extract between delimiters |
-| `s.stripPrefix(p)` / `s.stripSuffix(s)` | Remove prefix / suffix |
+| `s.between(left, right)` | Extract text between delimiters → `Option(String)` |
+| `s.stripPrefix(p)` / `s.stripSuffix(s)` | Remove prefix / suffix if present |
 
 ---
 
@@ -424,28 +604,121 @@ import super.std.string
 import super.std.list
 ```
 
-| Function | Description |
-|---|---|
-| `List::range(start, end)` / `List::rangeStep(start, end, step)` | Integer range lists |
-| `List::repeat(v, n)` | Repeat value n times |
-| `List::zip(a, b)` / `List::unzip(pairs)` | Zip / unzip |
-| `List::flatten(nested)` | Flatten one level |
-| `List::chunk(list, n)` | Split into chunks |
-| `List::unique(list)` | Remove duplicates |
-| `List::sum(list)` / `List::sumF(list)` | Sum integers / floats |
-| `List::min(list)` / `List::max(list)` / `List::mean(list)` | Aggregates |
-| `List::sortAsc(list)` / `List::sortDesc(list)` / `List::sortBy(list, f)` | Sorting |
-| `List::take(list, n)` / `List::drop(list, n)` | First n / skip n |
-| `List::last(list)` | Last element (Option) |
-| `List::find(list, pred)` / `List::count(list, pred)` | Search / count |
-| `List::any(list, pred)` / `List::all(list, pred)` | Boolean checks |
-| `List::partition(list, pred)` | Split into matches / non-matches |
-| `List::groupBy(list, f)` / `List::frequencies(list)` | Grouping |
-| `List::rotate(list, n)` / `List::interleave(a, b)` | Rotation / interleaving |
+A comprehensive set of functional-style operations on Nova's built-in list type.
+All use UFCS (dot notation).
 
-**UFCS methods:** `.filter(pred)`, `.map(f)`, `.sort()`, `.sortWith(cmp)`, `.reduce(f, init)`,
-`.foreach(f)`, `.any(pred)`, `.all(pred)`, `.find(pred)`, `.join(sep)`, `.flatten()`,
-`.concat(other)`, `.fill(v, n)`, `.bubblesort()`, `.enumerate()`, `.zip(other)`.
+#### Transforming
+
+```rust
+[1, 2, 3].map(|x: Int| x * 2)             // [2, 4, 6]
+[1, 2, 3, 4].filter(|x: Int| x > 2)       // [3, 4]
+[[1,2],[3,4]].flatten()                     // [1, 2, 3, 4]
+[1, 2, 3].flatmap(|x: Int| [x, x * 10])   // [1, 10, 2, 20, 3, 30]
+[1, 2, 3].foreach(|x: Int| println(Cast::string(x)))
+[1, 2, 3].reverse()                        // [3, 2, 1]
+[1, 2, 2, 3, 3].unique()                   // [1, 2, 3]
+```
+
+#### Sorting
+
+```rust
+[3, 1, 4, 1, 5].quicksort()               // [1, 1, 3, 4, 5]
+[3, 1, 2].bubblesort()                     // [1, 2, 3]
+[3, 1, 2].sortWith(|a: Int, b: Int| a > b) // [1, 2, 3]
+```
+
+#### Searching and Querying
+
+```rust
+[10, 20, 30].indexOf(20)                    // 1
+[1, 2, 3].contains(2)                       // true
+[1, 2, 3, 4].find(|x: Int| x > 2)          // Some(3)
+[1, 2, 3, 4].count(|x: Int| x > 2)         // 2
+[true, true, true].all()                     // true
+[false, true, false].any()                   // true
+[1, 2, 3].anyWith(|x: Int| x == 2)          // true
+[2, 4, 6].allWith(|x: Int| x % 2 == 0)     // true
+[1, 2, 3].last()                             // Some(3)
+[1, 2, 3].isEmpty()                          // false
+```
+
+#### Slicing and Chunking
+
+```rust
+[1, 2, 3, 4, 5].slice(1, 4)               // [2, 3, 4]
+[1, 2, 3, 4, 5].take(3)                    // [1, 2, 3]
+[1, 2, 3, 4, 5].drop(2)                    // [3, 4, 5]
+[1, 2, 3, 4, 5, 6].chunk(2)               // [[1,2],[3,4],[5,6]]
+[1, 2, 3, 4].windows(3)                    // [[1,2,3],[2,3,4]]
+[1, 2, 3, 4, 5].takeWhile(|x: Int| x < 4) // [1, 2, 3]
+[1, 2, 3, 4, 5].dropWhile(|x: Int| x < 3) // [3, 4, 5]
+```
+
+#### Aggregation
+
+```rust
+[1, 2, 3, 4].sum()     // 10
+[1, 2, 3, 4].product()  // 24
+[3, 1, 4].max()         // 4
+[3, 1, 4].min()         // 1
+[1.0, 2.5, 3.0].sum()   // 6.5  (Float overload)
+```
+
+#### Combining and Pairing
+
+```rust
+[1, 2, 3].concat([4, 5])                    // [1, 2, 3, 4, 5]
+[1, 2, 3].append([4, 5])                    // [1, 2, 3, 4, 5]
+[1, 2, 3].zip(["a", "b", "c"])              // [(1,"a"),(2,"b"),(3,"c")]
+[(1,"a"),(2,"b")].unzip()                    // ([1,2],["a","b"])
+[1, 2, 3].enumerate()                       // [(1,0),(2,1),(3,2)]
+[1, 2, 3].intersperse(0)                    // [1, 0, 2, 0, 3]
+```
+
+#### Folding and Reducing
+
+```rust
+[1, 2, 3].foldl(|a: Int, b: Int| a + b)      // 6
+[1, 2, 3].foldr(|a: Int, b: Int| a - b)      // 2  (1-(2-3))
+[1, 2, 3, 4].reduce(|acc: Int, x: Int, i: Int| acc + x, 0) // 10
+```
+
+#### Grouping and Partitioning
+
+```rust
+[1, 2, 3, 4, 5, 6].partition(|x: Int| x % 2 == 0)
+    // ([2, 4, 6], [1, 3, 5])
+
+["apple","avocado","banana","blueberry"].groupBy(|s: String| s[0])
+    // [('a',["apple","avocado"]),('b',["banana","blueberry"])]
+
+[1, 2, 2, 3, 3, 3].group()
+    // [(1,1),(2,2),(3,3)]   -- (value, count)
+```
+
+#### Advanced
+
+```rust
+[1, 2, 3].indices()                   // [0, 1, 2]
+[1, 2, 3, 4, 5].shuffle()             // random order
+[1, 2, 3, 4, 5].get(2)                // Some(3)
+[1, 2, 3, 4, 5].get(99)               // None(Int)
+[1, 2, 3].dropFirst(|x: Int| x == 2)  // [1, 3]
+[1, 2, 3].dropIndex(1)                // [1, 3]
+[1, 2, 3, 4, 5].truncate(2)           // [1, 2, 3]  (removes last 2)
+```
+
+#### Bitmask
+
+Filter lists with a boolean mask:
+
+```rust
+let data = [10, 20, 30, 40, 50]
+let mask = data.bitmask(|x: Int| x > 25)  // Bitmask{data:[0,0,1,1,1]}
+let selected = data.selection(mask)         // [30, 40, 50]
+let inv = mask.inverse()                    // Bitmask{data:[1,1,0,0,0]}
+let excluded = data.selection(inv)          // [10, 20]
+```
 
 ---
 
@@ -455,20 +728,57 @@ import super.std.list
 import super.std.option
 ```
 
-Extends the built-in `Option(T)` (which has `.isSome()` and `.unwrap()`):
+Extends the built-in `Option(T)` (which already has `.isSome()` and `.unwrap()`)
+with ergonomic chainable combinators.
+
+```rust
+let x: Option(Int) = None(Int)
+
+// Fallbacks
+x.orDefault(42)               // 42
+x.orDoFn(|| 99)               // 99 (lazy — closure only called if None)
+x.orError("value is missing") // prints msg and exits if None
+
+// Querying
+x.isNone()                    // true
+
+// Transforming
+Some(3).map(|n: Int| n * 2)         // Some(6)
+None(Int).map(|n: Int| n * 2)       // None(Int)
+
+// Chaining
+Some(4).flatMap(|n: Int| if n > 3 { Some(n) } else { None(Int) })
+    // Some(4)
+
+// Filtering
+Some(10).filter(|n: Int| n > 5)   // Some(10)
+Some(3).filter(|n: Int| n > 5)    // None(Int)
+
+// Combining
+Some(1).zip(Some("a"))   // Some((1,"a"))
+Some(1).zip(None(String)) // None
+
+// Converting
+Some(7).toList()    // [7]
+None(Int).toList()  // []
+
+// Side-effects
+Some(42).inspect(|n: Int| println(Cast::string(n))).orDefault(0)
+    // prints "42", returns 42
+```
 
 | Method | Description |
 |---|---|
-| `opt.isNone()` | True when holding no value |
+| `opt.isNone()` | True if None |
 | `opt.orDefault(v)` | Unwrap or return fallback |
 | `opt.orDoFn(f)` | Unwrap or lazily compute fallback |
 | `opt.orError(msg)` | Unwrap or print msg and exit |
-| `opt.map(f)` | Transform inner value |
+| `opt.map(f)` | Transform inner value if Some |
 | `opt.flatMap(f)` | Chain Option-returning function |
 | `opt.filter(pred)` | Keep Some only if pred holds |
-| `opt.zip(other)` | Combine two Options into `Option((A,B))` |
-| `opt.toList()` | `[v]` if Some, else `[]` |
-| `opt.inspect(f)` | Side-effect if Some, pass through |
+| `opt.zip(other)` | Combine two Options → `Option((A,B))` |
+| `opt.toList()` | `[v]` if Some, `[]` if None |
+| `opt.inspect(f)` | Run side-effect if Some, pass through |
 
 ---
 
@@ -478,12 +788,10 @@ Extends the built-in `Option(T)` (which has `.isSome()` and `.unwrap()`):
 import super.std.maybe
 ```
 
-| Method | Description |
-|---|---|
-| `Maybe::just(v)` | Wrap a value |
-| `Maybe::nothing()` | Empty maybe |
-| `m.isJust()` / `m.isNothing()` | Test state |
-| `m.fromMaybe(default)` | Value or default |
+> **Note:** `Maybe` is also available through `std/core`. This standalone
+> module exists for when you only need `Maybe` without the rest of core.
+
+See [`std/core`](#stdcore--foundation) for full Maybe documentation.
 
 ---
 
@@ -493,13 +801,10 @@ import super.std.maybe
 import super.std.result
 ```
 
-| Method | Description |
-|---|---|
-| `Result::ok(v)` / `Result::err(msg)` | Construct |
-| `r.isOk()` / `r.isErr()` | Test state |
-| `r.unwrap()` / `r.unwrapOr(default)` | Extract value |
-| `r.map(f)` / `r.mapErr(f)` | Transform |
-| `r.andThen(f)` | Chain results |
+> **Note:** `Result` is also available through `std/core`. This standalone
+> module exists for when you only need `Result` without the rest of core.
+
+See [`std/core`](#stdcore--foundation) for full Result documentation.
 
 ---
 
@@ -509,15 +814,78 @@ import super.std.result
 import super.std.iter
 ```
 
-**Constructors:** `Iter::fromVec(list)`, `Iter::fromRange(start, end)`, `Iter::fromFn(f)`,
-`Iter::enumerate(iter)`, `Iter::repeat(v)`, `Iter::generate(f)`.
+Lazy iterators evaluate one element at a time. Build a pipeline of
+transformations, then consume at the end. Nothing runs until you call a
+consumer like `.collect()`.
 
-**Transformers (lazy):** `.map(f)`, `.filter(pred)`, `.take(n)`, `.drop(n)`,
-`.takeWhile(pred)`, `.dropWhile(pred)`, `.flatMap(f)`, `.zip(other)`, `.chain(other)`.
+#### Constructing
 
-**Consumers (eager):** `.collect()`, `.show()`, `.count()`, `.sum()`, `.sumF()`,
-`.reduce(f, init)`, `.fold(f, init)`, `.any(pred)`, `.all(pred)`, `.find(pred)`,
-`.last()`, `.nth(n)`, `.forEach(f)`.
+```rust
+Iter::fromRange(0, 5)      // 0, 1, 2, 3, 4
+Iter::fromVec([10,20,30])  // 10, 20, 30
+Iter::repeat(42)           // 42, 42, 42, ... (infinite)
+Iter::generate(Gen(0))     // 0, 1, 2, 3, ...  (infinite)
+```
+
+| Constructor | Description |
+|---|---|
+| `Iter::fromRange(start, end)` | Integers `[start, end)` |
+| `Iter::fromVec(list)` | Iterate over a list |
+| `Iter::fromFn(f)` | Custom pull function `fn() -> Option(T)` |
+| `Iter::enumerate(iter)` | Wrap with `(index, value)` pairs |
+| `Iter::repeat(v)` | Infinite stream of `v` |
+| `Iter::generate(f)` | Infinite stream from `f()` calls |
+
+#### Transforming (lazy)
+
+```rust
+Iter::fromRange(0, 10)
+    .filter(|x: Int| x % 2 == 0)  // keep even
+    .map(|x: Int| x * x)           // square
+    .take(3)                        // first 3
+    .collect()                      // [0, 4, 16]
+```
+
+| Transformer | Description |
+|---|---|
+| `.map(f)` | Apply f to each element |
+| `.filter(pred)` | Keep elements where pred is true |
+| `.take(n)` | First n elements |
+| `.drop(n)` | Skip first n elements |
+| `.takeWhile(pred)` | Take while pred holds |
+| `.dropWhile(pred)` | Skip while pred holds |
+| `.flatMap(f)` | Map then flatten one level |
+| `.zip(other)` | Pair elements from two iterators |
+| `.chain(other)` | Append another iterator |
+
+#### Consuming (eager)
+
+```rust
+Iter::fromRange(1, 6).sum()          // 15
+Iter::fromRange(1, 6).count()        // 5
+Iter::fromRange(1, 100)
+    .find(|x: Int| x > 50)          // Some(51)
+Iter::fromRange(1, 6)
+    .reduce(|acc: Int, x: Int| acc + x, 0)  // 15
+Iter::fromVec(["a","b","c"]).nth(1)  // Some("b")
+Iter::fromRange(1, 6).last()         // Some(5)
+```
+
+| Consumer | Description |
+|---|---|
+| `.collect()` | Gather into a list |
+| `.show()` | Print each element |
+| `.count()` | Number of elements |
+| `.sum()` | Sum of Int elements |
+| `.sumF()` | Sum of Float elements |
+| `.reduce(f, init)` | Fold with accumulator |
+| `.fold(f, init)` | Alias for reduce |
+| `.any(pred)` | True if any element passes |
+| `.all(pred)` | True if all elements pass |
+| `.find(pred)` | First element passing pred |
+| `.last()` | Last element |
+| `.nth(n)` | nth element (0-indexed) |
+| `.forEach(f)` | Run side-effect on each |
 
 ---
 
@@ -527,18 +895,60 @@ import super.std.iter
 import super.std.functional
 ```
 
+Tools for working with Nova's first-class closures.
+
+```rust
+// Composition
+let double  = |x: Int| x * 2
+let addOne  = |x: Int| x + 1
+let doubleThenAdd = pipe(double, addOne)
+doubleThenAdd(3)  // 7  (3*2 = 6, 6+1 = 7)
+
+let addThenDouble = compose(double, addOne)
+addThenDouble(3)  // 8  (3+1 = 4, 4*2 = 8)
+
+// Flip arguments
+let sub = |a: Int, b: Int| a - b
+let flipped = flip(sub)
+flipped(3, 10)  // 7  (10 - 3)
+
+// Apply repeatedly
+applyN(|x: Int| x * 2, 4, 1)   // 16  (1→2→4→8→16)
+applyWhile(|x: Int| x * 2, |x: Int| x < 100, 1)  // 128
+
+// Constants and identity
+let always5 = const_(5)
+always5("anything")  // 5
+identity(42)         // 42
+
+// Predicate combinators
+let isEven = |x: Int| x % 2 == 0
+let isPositive = |x: Int| x > 0
+let evenAndPositive = both(isEven, isPositive)
+evenAndPositive(4)    // true
+evenAndPositive(-2)   // false
+
+let notEven = negate(isEven)
+notEven(3)  // true
+
+// Memoization
+let fastFib = memoize(fib)
+fastFib(30)  // cached after first call
+```
+
 | Function | Description |
 |---|---|
-| `compose(f, g)` | `fn(x) -> f(g(x))` |
-| `pipe(f, g)` | `fn(x) -> g(f(x))` |
+| `compose(f, g)` | `fn(x) -> f(g(x))` (right-to-left) |
+| `pipe(f, g)` | `fn(x) -> g(f(x))` (left-to-right) |
 | `flip(f)` | Swap two arguments of a binary fn |
 | `const_(v)` | Always return v |
 | `identity(x)` | Return x unchanged |
-| `applyN(f, n, x)` | Apply f to x n times |
-| `applyWhile(f, pred, x)` | Apply while pred holds |
-| `memoize(f)` | Cache results |
-| `negate(pred)` | Logical NOT of predicate |
-| `both(p, q)` / `either(p, q)` | Combine predicates |
+| `applyN(f, n, x)` | Apply f to x exactly n times |
+| `applyWhile(f, pred, x)` | Apply f while pred holds |
+| `memoize(f)` | Cache results (String key cache) |
+| `negate(pred)` | `fn(x) -> !pred(x)` |
+| `both(p, q)` | `fn(x) -> p(x) && q(x)` |
+| `either(p, q)` | `fn(x) -> p(x) \|\| q(x)` |
 
 ---
 
@@ -548,13 +958,40 @@ import super.std.functional
 import super.std.tuple
 ```
 
+Utilities for working with tuples.
+
+```rust
+let p = (1, "hello")
+p.fst()               // 1
+p.snd()               // "hello"
+p.swap()              // ("hello", 1)
+p.mapFirst(|x: Int| x + 10)    // (11, "hello")
+p.mapSecond(|s: String| s.len())  // (1, 5)
+
+let nums = (3, 7)
+nums.both(|n: Int| n * 2)   // (6, 14)
+nums.toList()                // [3, 7]
+
+// Convenience constructors
+pair(1, 2)        // (1, 2)
+triple(1, 2, 3)   // (1, 2, 3)
+
+// Standalone
+fst((10, 20))     // 10
+snd((10, 20))     // 20
+
+// Unzip a list of pairs
+[(1,"a"),(2,"b"),(3,"c")].unzip()  // ([1,2,3],["a","b","c"])
+```
+
 | Method | Description |
 |---|---|
-| `t.swap()` | Reverse pair: `(b, a)` |
+| `t.swap()` | `(b, a)` |
 | `t.fst()` / `t.snd()` | First / second element |
 | `t.mapFirst(f)` / `t.mapSecond(f)` | Transform one element |
-| `t.both(f)` | Apply f to both (requires A==B) |
-| `t.toStrings()` / `t.toList()` | Conversion |
+| `t.both(f)` | Apply f to both (when A==B) |
+| `t.toStrings()` | `[String, String]` |
+| `t.toList()` | `[a, b]` (when A==B) |
 | `pairs.unzip()` | `[(A,B)]` → `([A], [B])` |
 | `pair(a, b)` / `triple(a, b, c)` | Convenience constructors |
 
@@ -566,22 +1003,70 @@ import super.std.tuple
 import super.std.hashmap
 ```
 
+O(1) average-case hash map using bucket chaining. Automatically resizes at 75% load.
+
+```rust
+// Create and populate
+let m = HashMap::default() @[K: String, V: Int]
+m.insert("apples", 5)
+m.insert("bananas", 3)
+
+// Lookup
+m.get("apples")           // Some(5)
+m.get("oranges")          // None(Int)
+m.getOrDefault("oranges", 0)  // 0
+m.has("apples")           // true
+
+// Modify
+m.delete("bananas")
+m.size()                  // 1
+
+// Counting pattern
+let freq = HashMap::default() @[K: String, V: Int]
+freq.increment("hello")
+freq.increment("hello")
+freq.increment("world")
+freq.get("hello")         // Some(2)
+
+// Iterate
+m.forEach(|k: String, v: Int| {
+    println(k + " = " + Cast::string(v))
+})
+
+// Collections
+m.keys()       // ["apples"]
+m.values()     // [5]
+m.entries()    // [("apples", 5)]
+
+// Build from pairs
+let m2 = HashMap::fromPairs([("x", 1), ("y", 2)]) @[K: String, V: Int]
+
+// Filter and merge
+let big = m.filterValues(|v: Int| v > 2)
+m.merge(m2)  // m now has entries from m2 too
+
+// Update with function
+m.update("apples", 0, |v: Int| v + 10)  // apples = 15
+```
+
 | Method | Description |
 |---|---|
 | `HashMap::default()` | Empty map (16-bucket initial) |
 | `HashMap::fromPairs(list)` | Build from `[(K,V)]` |
-| `.insert(k, v)` / `.delete(k)` | Mutate |
+| `.insert(k, v)` | Insert or update |
 | `.get(k)` → `Option(V)` | Lookup |
-| `.has(k)` / `.size()` / `.isEmpty()` | Query |
-| `.clear()` | Remove all |
 | `.getOrDefault(k, v)` | Lookup with fallback |
-| `.entries()` / `.keys()` / `.values()` | Collection views |
+| `.delete(k)` | Remove entry |
+| `.has(k)` | Key exists? |
+| `.size()` / `.isEmpty()` | Count / empty check |
+| `.clear()` | Remove all entries |
+| `.keys()` / `.values()` / `.entries()` | Collection views |
 | `.forEach(f)` | Iterate `(k, v)` pairs |
-| `.merge(other)` | Insert all from other |
-| `.mapValues(f)` / `.filterKeys(pred)` / `.filterValues(pred)` | Transform |
+| `.merge(other)` | Insert all from other (other wins on conflict) |
+| `.filterKeys(pred)` / `.filterValues(pred)` | Filter into new map |
 | `.increment(k)` | Increment Int value (counting helper) |
 | `.update(k, default, f)` | Update with function |
-| `.toSortedPairs()` | Entries sorted by key |
+| `.toString()` | `"{k1 => v1, k2 => v2}"` |
 
 ---
 
@@ -591,15 +1076,43 @@ import super.std.hashmap
 import super.std.set
 ```
 
+A generic set backed by `HashMap`. Values must be hashable.
+
+```rust
+let s = Set::fromList([1, 2, 3, 2, 1]) @[T: Int]
+s.size()         // 3
+s.has(2)         // true
+s.add(4)
+s.remove(1)
+
+let a = Set::fromList([1, 2, 3]) @[T: Int]
+let b = Set::fromList([2, 3, 4]) @[T: Int]
+
+a.union(b).toList()         // [1, 2, 3, 4]  (order may vary)
+a.intersection(b).toList()  // [2, 3]
+a.difference(b).toList()    // [1]
+a.isSubset(b)               // false
+a.isDisjoint(b)             // false
+
+// Higher-order
+let evens = a.filter(|n: Int| n % 2 == 0)   // {2}
+let doubled = a.map(|n: Int| n * 2)          // {2, 4, 6}
+a.forEach(|n: Int| println(Cast::string(n)))
+
+println(a.toString())  // "{1, 2, 3}"
+```
+
 | Method | Description |
 |---|---|
 | `Set::empty()` / `Set::singleton(v)` / `Set::fromList(list)` | Construct |
 | `.add(v)` / `.remove(v)` | Mutate |
-| `.has(v)` / `.size()` / `.isEmpty()` | Query |
+| `.has(v)` | Membership test |
+| `.size()` / `.isEmpty()` | Count |
 | `.toList()` | All elements as list |
 | `.union(other)` / `.intersection(other)` / `.difference(other)` | Set operations |
 | `.isSubset(other)` / `.isSuperset(other)` / `.isDisjoint(other)` | Comparisons |
-| `.forEach(f)` / `.filter(pred)` / `.map(f)` | Iteration |
+| `.forEach(f)` / `.filter(pred)` / `.map(f)` | Higher-order |
+| `.toString()` | `"{a, b, c}"` |
 
 ---
 
@@ -609,24 +1122,52 @@ import super.std.set
 import super.std.vec2
 ```
 
-**Constructors:** `Vec2::new(x, y)`, `Vec2::zero()`, `Vec2::one()`, `Vec2::up()`,
-`Vec2::right()`, `Vec2::fromAngle(rad)`.
+A 2D floating-point vector for game math and physics.
+
+```rust
+let a = Vec2::new(3.0, 4.0)
+let b = Vec2::new(1.0, 0.0)
+
+a.length()              // 5.0
+a.normalized()          // Vec2(0.6, 0.8)
+a.add(b)                // Vec2(4.0, 4.0)
+a.sub(b)                // Vec2(2.0, 4.0)
+a.scale(2.0)            // Vec2(6.0, 8.0)
+a.dot(b)                // 3.0
+a.cross(b)              // -4.0
+a.distance(b)           // ~4.47
+a.angle()               // 0.927... radians
+a.rotate(Float::pi())   // Vec2(-3.0, -4.0)
+a.lerp(b, 0.5)          // Vec2(2.0, 2.0)
+a.reflect(Vec2::up())   // reflect across y-axis
+a.perpendicular()       // Vec2(4.0, -3.0)
+a.clampLength(3.0)      // scaled down to length 3
+a.negate()              // Vec2(-3.0, -4.0)
+a.abs()                 // Vec2(3.0, 4.0)
+
+Vec2::zero()            // (0, 0)
+Vec2::one()             // (1, 1)
+Vec2::fromAngle(1.57)   // unit vector at ~90°
+```
 
 | Method | Description |
 |---|---|
-| `.add(v)` / `.sub(v)` | Component-wise add / subtract |
-| `.scale(s)` / `.negate()` | Scalar multiply / negate |
+| `Vec2::new(x, y)` / `::zero()` / `::one()` / `::up()` / `::right()` | Constructors |
+| `::fromAngle(rad)` | Unit vector at angle |
+| `.add(v)` / `.sub(v)` | Component-wise arithmetic |
+| `.scale(s)` / `.negate()` / `.abs()` | Scalar operations |
 | `.dot(v)` / `.cross(v)` | Dot product / 2D cross (scalar) |
-| `.length()` / `.lengthSq()` | Magnitude / squared magnitude |
+| `.length()` / `.lengthSq()` | Magnitude |
 | `.normalized()` | Unit vector |
-| `.distance(v)` / `.distanceSq(v)` | Distance / squared distance |
-| `.angle()` / `.angleTo(v)` | Angle of vector / between vectors |
+| `.distance(v)` / `.distanceSq(v)` | Distance |
+| `.angle()` / `.angleTo(v)` | Angle (radians) |
 | `.rotate(rad)` | Rotate by radians |
 | `.lerp(v, t)` | Linear interpolation |
-| `.reflect(normal)` | Reflect across unit normal |
+| `.reflect(normal)` | Reflect across normal |
 | `.perpendicular()` | 90° clockwise rotation |
 | `.clampLength(max)` | Scale down if too long |
-| `.equals(v)` / `.isZero()` | Equality checks |
+| `.equals(v)` / `.isZero()` | Equality |
+| `.toString()` | `"(3.0, 4.0)"` |
 
 ---
 
@@ -636,14 +1177,39 @@ import super.std.vec2
 import super.std.deque
 ```
 
+A double-ended queue with efficient push/pop at both ends.
+
+```rust
+let d = Deque::fromList([1, 2, 3]) @[T: Int]
+
+d.pushBack(4)       // [1, 2, 3, 4]
+d.pushFront(0)      // [0, 1, 2, 3, 4]
+d.popFront()        // Some(0)  → [1, 2, 3, 4]
+d.popBack()         // Some(4)  → [1, 2, 3]
+d.peekFront()       // Some(1)
+d.peekBack()        // Some(3)
+d.len()             // 3
+d.isEmpty()         // false
+d.toList()          // [1, 2, 3]
+
+// Higher-order
+let doubled = d.map(|x: Int| x * 2)        // Deque[2, 4, 6]
+let big = d.filter(|x: Int| x > 1)         // Deque[2, 3]
+d.forEach(|x: Int| println(Cast::string(x)))
+
+println(d.toString())  // "Deque[1, 2, 3]"
+```
+
 | Method | Description |
 |---|---|
-| `Deque::empty()` / `Deque::singleton(v)` / `Deque::fromList(xs)` | Construct |
+| `Deque::empty()` / `::singleton(v)` / `::fromList(xs)` | Construct |
 | `.pushBack(v)` / `.pushFront(v)` | Add to back / front |
-| `.popBack()` / `.popFront()` | Remove from back / front (Option) |
-| `.peekBack()` / `.peekFront()` | View back / front (Option) |
+| `.popBack()` / `.popFront()` | Remove from back / front → `Option` |
+| `.peekBack()` / `.peekFront()` | View without removing → `Option` |
 | `.len()` / `.isEmpty()` | Size |
-| `.toList()` / `.forEach(f)` / `.map(f)` / `.filter(pred)` | Iteration |
+| `.toList()` | Snapshot as list |
+| `.forEach(f)` / `.map(f)` / `.filter(pred)` | Higher-order |
+| `.toString()` | `"Deque[a, b, c]"` |
 
 ---
 
@@ -653,15 +1219,41 @@ import super.std.deque
 import super.std.io
 ```
 
+Convenience wrappers around Nova's built-in I/O functions.
+
+```rust
+// Interactive prompts
+let name = prompt("Enter your name: ")
+let age = promptInt("Enter age: ")       // Option(Int)
+let ok = promptYN("Continue? (y/n) ")    // Bool
+
+// Print with separator
+printSep(["one", "two", "three"], ", ")  // "one, two, three\n"
+
+// Error output
+eprintln("something went wrong")  // "[error] something went wrong"
+
+// File I/O
+writeLines("output.txt", ["line 1", "line 2"])
+let lines = readLines("output.txt")  // ["line 1", "line 2"]
+appendLine("output.txt", "line 3")
+
+// String splitting
+let text = "hello\nworld"
+linesOf(text)  // ["hello", "world"]
+```
+
 | Function | Description |
 |---|---|
 | `prompt(msg)` | Print msg, return input line |
-| `promptInt(msg)` / `promptFloat(msg)` | Prompt and parse (Option) |
-| `promptYN(msg)` | Prompt for yes/no → Bool |
+| `promptInt(msg)` | Prompt and parse Int → `Option(Int)` |
+| `promptFloat(msg)` | Prompt and parse Float → `Option(Float)` |
+| `promptYN(msg)` | Prompt for yes/no → `Bool` |
 | `printSep(values, sep)` | Print values joined with separator |
 | `eprintln(msg)` | Print `[error] msg` |
-| `readLines(path)` / `writeLines(path, lines)` | File line I/O |
-| `appendLine(path, line)` | Append one line |
+| `readLines(path)` | File → `[String]` |
+| `writeLines(path, lines)` | `[String]` → file |
+| `appendLine(path, line)` | Append one line to file |
 | `linesOf(text)` | Split string on newlines |
 
 ---
@@ -670,6 +1262,18 @@ import super.std.io
 
 ```rust
 import super.std.ansi
+```
+
+Wrap strings with ANSI escape codes for coloured terminal output.
+
+```rust
+println(bold("important"))
+println(red("error: something failed"))
+println(green("success!"))
+println(italic(cyan("stylish")))
+println(rgb(255, 128, 0, "orange text"))
+println(bgRgb(0, 0, 128, "blue background"))
+println(color256(196, "bright red"))
 ```
 
 | Category | Functions |
@@ -689,16 +1293,27 @@ import super.std.ansi
 import super.std.color
 ```
 
-| Function / Constant | Description |
+Named RGB tuples and colour manipulation for use with raylib or terminal.
+
+```rust
+let c = red          // (255, 0, 0)
+let mixed = lerpColor(red, blue, 0.5)  // purple-ish
+let dark = darken(green, 0.5)          // half-brightness green
+let light = lighten(blue, 0.3)         // lighter blue
+let inv = invert(white)                // (0, 0, 0)
+let custom = rgb(128, 64, 200)         // (128, 64, 200)
+```
+
+| Name / Function | Description |
 |---|---|
-| `red`, `green`, `blue`, `white`, `black` | Primary colour tuples `(Int,Int,Int)` |
-| `yellow`, `cyan`, `magenta` | Secondary colour tuples |
+| `red`, `green`, `blue`, `white`, `black` | Primary colours `(R,G,B)` |
+| `yellow`, `cyan`, `magenta` | Secondary colours |
 | `orange`, `purple`, `pink`, `brown`, `gray` | Extended palette |
 | `rgb(r, g, b)` | Construct an RGB tuple |
 | `lerpColor(a, b, t)` | Interpolate between two colours (t = 0.0–1.0) |
 | `invert(c)` | Invert an RGB colour |
-| `darken(c, f)` | Darken by factor f (0.0–1.0) |
-| `lighten(c, f)` | Lighten by factor f (0.0–1.0) |
+| `darken(c, f)` | Darken by factor (0.0–1.0) |
+| `lighten(c, f)` | Lighten by factor (0.0–1.0) |
 
 ---
 
@@ -708,19 +1323,36 @@ import super.std.color
 import super.std.tui
 ```
 
+Lightweight terminal-mode UI functions. Use for text-based games and tools.
+
+```rust
+import super.std.tui
+
+fn main() {
+    run(|| {
+        clear()
+        fg(255, 200, 50)
+        printAt(10, 5, "Hello, TUI!")
+        resetColor()
+        drawBox(5, 3, 20, 5)
+        flush()
+        getch()  // wait for keypress
+    })
+}
+```
+
 | Function | Description |
 |---|---|
-| `run(fn)` | Start a TUI app with a main function |
-| `printAt(x, y, s)` | Print string at position (col, row) |
+| `run(fn)` | Start TUI app (sets up raw mode, cleans up on exit) |
+| `printAt(x, y, s)` | Print string at column x, row y |
 | `clear()` | Clear the terminal |
 | `flush()` | Flush output buffer |
-| `size()` | Get terminal size `(Int, Int)` |
-| `fg(r, g, b)` | Set foreground colour (RGB) |
-| `bg(r, g, b)` | Set background colour (RGB) |
-| `resetColor()` | Reset terminal colours to default |
-| `drawBox(x, y, w, h)` | Draw a box outline with Unicode characters |
-| `getch()` | Read a single character (blocking) |
-| `poll()` | Non-blocking character read |
+| `size()` | Terminal `(width, height)` |
+| `fg(r, g, b)` / `bg(r, g, b)` | Set foreground / background colour |
+| `resetColor()` | Reset to defaults |
+| `drawBox(x, y, w, h)` | Draw Unicode box outline |
+| `getch()` | Blocking single-character read |
+| `poll()` | Non-blocking character read → `Option(Char)` |
 
 ---
 
@@ -730,19 +1362,21 @@ import super.std.tui
 import super.std.widget
 ```
 
-| Type | Description |
+Higher-level widgets for terminal UIs (built on `std/tui`).
+
+| Widget | Description |
 |---|---|
 | `Button` | Clickable button with label and position |
-| `Label` | Static text display at a position |
+| `Label` | Static text display |
 | `Panel` | Rectangular container with border |
 | `ProgressBar` | Horizontal progress indicator |
 | `Toggle` | On/off toggle switch |
 
 | Method | Description |
 |---|---|
-| `.draw()` | Render the widget to the terminal |
-| `.isClicked()` | True if widget was clicked (interactive widgets) |
-| `.isHovered()` | True if cursor is over widget (interactive widgets) |
+| `.draw()` | Render the widget |
+| `.isClicked()` | True if widget was clicked (interactive) |
+| `.isHovered()` | True if cursor is over widget (interactive) |
 
 ---
 
@@ -752,63 +1386,11 @@ import super.std.widget
 import super.std.plot
 ```
 
-> Requires an active raylib window (`raylib::init(...)` + `while raylib::rendering() { ... }`).
-
-#### PlotArea Struct
-
-A `PlotArea` maps data coordinates to screen pixels.
-
-| Constructor | Description |
-|---|---|
-| `PlotArea::new(x, y, w, h, xMin, xMax, yMin, yMax)` | Manual bounds |
-| `PlotArea::auto(x, y, w, h, data: [Float])` | Auto-range from data |
-| `PlotArea::square(x, y, size, data: [Float])` | Square auto-range |
-
-#### Coordinate Conversion
-
-| Method | Signature | Description |
-|---|---|---|
-| `toScreen` | `(Float, Float) -> (Int, Int)` | Data → pixel |
-| `toData` | `(Int, Int) -> (Float, Float)` | Pixel → data |
-
-#### Chart Drawing (extends PlotArea)
-
-| Method | Signature | Description |
-|---|---|---|
-| `lineChart` | `([Float], (Int,Int,Int))` | Connected line from sequential data |
-| `lineChartThick` | `([Float], Float, (Int,Int,Int))` | Thick line chart |
-| `barChart` | `([Float], (Int,Int,Int))` | Vertical bars |
-| `barChartLabeled` | `([Float], [String], color, labelColor)` | Bars + x-axis labels |
-| `scatter` | `([(Float,Float)], Int, (Int,Int,Int))` | Scatter points |
-| `scatterSized` | `([(Float,Float)], [Int], (Int,Int,Int))` | Variable-size scatter |
-| `fillArea` | `([Float], (Int,Int,Int))` | Filled area chart |
-| `hLine` | `(Float, (Int,Int,Int))` | Horizontal reference line |
-| `vLine` | `(Float, (Int,Int,Int))` | Vertical reference line |
-
-#### Decorations (extends PlotArea)
-
-| Method | Description |
-|---|---|
-| `drawAxes(color)` | X/Y axes at data origin |
-| `drawGrid(cols, rows, color)` | Background grid |
-| `drawBorder(color)` | Outline rectangle |
-| `drawXLabels(labels, fontSize, color)` | X-axis labels |
-| `drawYLabels(steps, fontSize, color)` | Y-axis tick labels |
-| `drawTitle(title, fontSize, color)` | Centered title above chart |
-
-#### Standalone Functions
-
-| Function | Signature | Description |
-|---|---|---|
-| `drawPieChart` | `(cx, cy, radius, [Float], [(Int,Int,Int)])` | Filled pie chart |
-| `drawPieChartLabeled` | `(cx, cy, radius, [Float], [String], colors, labelColor, fontSize)` | Pie chart with text labels |
-
-#### Example
+Requires an active raylib window. Draw charts by creating a `PlotArea` that
+maps data coordinates to screen pixels.
 
 ```rust
-import super.std.plot
-
-raylib::init("Chart", 800, 600, 30)
+raylib::init("Chart Demo", 800, 600, 30)
 let data = [3.0, 7.0, 2.0, 9.0, 5.0]
 let area = PlotArea::auto(50, 50, 700, 400, data)
 
@@ -822,7 +1404,51 @@ while raylib::rendering() {
 }
 ```
 
-See `demo/plotdemo.nv` for a comprehensive 7-chart demo.
+#### PlotArea Construction
+
+| Constructor | Description |
+|---|---|
+| `PlotArea::new(x, y, w, h, xMin, xMax, yMin, yMax)` | Manual bounds |
+| `PlotArea::auto(x, y, w, h, data)` | Auto-range from `[Float]` |
+| `PlotArea::square(x, y, size, data)` | Square auto-range |
+
+#### Coordinate Conversion
+
+| Method | Description |
+|---|---|
+| `.toScreen(dataX, dataY)` → `(Int, Int)` | Data → pixel |
+| `.toData(screenX, screenY)` → `(Float, Float)` | Pixel → data |
+
+#### Charts (extends PlotArea)
+
+| Method | Description |
+|---|---|
+| `.lineChart(data, color)` | Connected line chart |
+| `.lineChartThick(data, thickness, color)` | Thick line chart |
+| `.barChart(data, color)` | Vertical bar chart |
+| `.barChartLabeled(data, labels, color, labelColor)` | Bars with x-axis labels |
+| `.scatter(points, size, color)` | Scatter plot from `[(Float,Float)]` |
+| `.scatterSized(points, sizes, color)` | Variable-size scatter |
+| `.fillArea(data, color)` | Filled area chart |
+| `.hLine(y, color)` / `.vLine(x, color)` | Reference lines |
+
+#### Decorations (extends PlotArea)
+
+| Method | Description |
+|---|---|
+| `.drawAxes(color)` | X/Y axes at data origin |
+| `.drawGrid(cols, rows, color)` | Background grid |
+| `.drawBorder(color)` | Outline rectangle |
+| `.drawXLabels(labels, fontSize, color)` | X-axis labels |
+| `.drawYLabels(steps, fontSize, color)` | Y-axis tick labels |
+| `.drawTitle(title, fontSize, color)` | Centered title |
+
+#### Standalone
+
+| Function | Description |
+|---|---|
+| `drawPieChart(cx, cy, radius, data, colors)` | Filled pie chart |
+| `drawPieChartLabeled(cx, cy, radius, data, labels, colors, labelColor, fontSize)` | Labeled pie chart |
 
 ---
 
@@ -832,20 +1458,37 @@ See `demo/plotdemo.nv` for a comprehensive 7-chart demo.
 import super.std.timer
 ```
 
+Frame-rate-independent timers for game loops.
+
+```rust
+let shoot = Timer::cooldown(0.5)  // can fire every 0.5s
+
+while raylib::rendering() {
+    let dt = raylib::getFrameTime()
+    shoot.update(dt)
+
+    if raylib::isKeyPressed("Space") && shoot.ready() {
+        // fire! (ready() resets the timer automatically)
+    }
+
+    // Progress bar: shoot.progress() goes from 0.0 to 1.0
+}
+```
+
 | Constructor | Behaviour |
 |---|---|
-| `Timer::cooldown(s)` | `ready()` fires after `s` seconds; auto-resets |
-| `Timer::repeating(s)` | `ready()` fires every `s` seconds; auto-resets |
-| `Timer::once(s)` | `isDone()` fires once after `s` seconds |
+| `Timer::cooldown(s)` | `.ready()` fires after `s` seconds; auto-resets |
+| `Timer::repeating(s)` | `.ready()` fires every `s` seconds; auto-resets |
+| `Timer::once(s)` | `.isDone()` fires once after `s` seconds |
 
 | Method | Description |
 |---|---|
-| `update(dt)` | Advance by `dt` seconds |
-| `ready()` | True if elapsed ≥ duration; resets on cooldown/repeating |
-| `isDone()` | True if elapsed ≥ duration (does NOT reset) |
-| `progress()` | 0.0 → 1.0 fraction of current cycle |
-| `activate()` | Manually arm a timer |
-| `reset()` | Reset elapsed to 0 |
+| `.update(dt)` | Advance by dt seconds |
+| `.ready()` | True if elapsed ≥ duration (resets cooldown/repeating) |
+| `.isDone()` | True if elapsed ≥ duration (does NOT reset) |
+| `.progress()` | 0.0 → 1.0 fraction of current cycle |
+| `.activate()` | Manually arm the timer |
+| `.reset()` | Reset elapsed to 0 |
 
 ---
 
@@ -855,11 +1498,27 @@ import super.std.timer
 import super.std.tween
 ```
 
+Animate values from start to end with various easing curves.
+
+```rust
+let slide = Tween::easeOut(0.0, 400.0, 1.0)  // 0→400 in 1 second
+
+while raylib::rendering() {
+    let dt = raylib::getFrameTime()
+    let x = slide.update(dt)
+    raylib::drawRectangle(Cast::int(x).unwrap(), 200, 50, 50, (255, 100, 50))
+
+    if slide.isDone() {
+        slide.ping()  // reverse direction
+    }
+}
+```
+
 | Constructor | Easing |
 |---|---|
 | `Tween::linear(start, end, duration)` | Constant speed |
-| `Tween::easeIn(start, end, duration)` | Accelerating |
-| `Tween::easeOut(start, end, duration)` | Decelerating |
+| `Tween::easeIn(start, end, duration)` | Accelerating (quadratic) |
+| `Tween::easeOut(start, end, duration)` | Decelerating (quadratic) |
 | `Tween::smooth(start, end, duration)` | Ease-in-out |
 | `Tween::easeOutBounce(start, end, duration)` | Bouncy landing |
 | `Tween::easeOutElastic(start, end, duration)` | Spring overshoot |
@@ -868,11 +1527,11 @@ import super.std.tween
 
 | Method | Description |
 |---|---|
-| `update(dt)` | Advance and return current value |
-| `isDone()` | True when reached end |
-| `ping()` | Reverse direction (start ↔ end) |
-| `reset()` | Restart from beginning |
-| `value()` | Current value without advancing |
+| `.update(dt)` | Advance and return current value |
+| `.isDone()` | True when reached end |
+| `.ping()` | Reverse direction (start ↔ end) |
+| `.reset()` | Restart from beginning |
+| `.value()` | Current value without advancing |
 
 ---
 
@@ -882,17 +1541,40 @@ import super.std.tween
 import super.std.input
 ```
 
+Map named actions to keys and mouse buttons for cleaner game input.
+
+```rust
+let keys = InputMap::new()
+keys.bindKey("jump", "Space")
+keys.bindKey("left", "Left")
+keys.bindKey("right", "Right")
+keys.bindMouse("shoot", "Left")
+
+while raylib::rendering() {
+    if keys.isPressed("jump") {
+        // fires once on first press
+    }
+    if keys.isHeld("left") {
+        // true every frame while held
+    }
+    let h = keys.axis("left", "right")   // -1.0, 0.0, or 1.0
+
+    let pos = InputMap::mousePos()        // (Int, Int)
+    let lastKey = InputMap::lastKey()     // Option(String)
+}
+```
+
 | Method | Description |
 |---|---|
 | `InputMap::new()` | Create empty input map |
-| `keys.bindKey(action, key)` | Bind a key to an action name |
-| `keys.bindMouse(action, button)` | Bind a mouse button to an action |
-| `keys.isHeld(action)` | True while held |
-| `keys.isPressed(action)` | True on first press |
-| `keys.isReleased(action)` | True on release frame |
-| `keys.axis(neg, pos)` | -1.0, 0.0, or 1.0 |
+| `.bindKey(action, key)` | Bind keyboard key to action |
+| `.bindMouse(action, button)` | Bind mouse button to action |
+| `.isHeld(action)` | True while held |
+| `.isPressed(action)` | True on first press (fires once) |
+| `.isReleased(action)` | True on release frame |
+| `.axis(neg, pos)` | -1.0, 0.0, or 1.0 |
 | `InputMap::mousePos()` | Screen coordinates `(Int, Int)` |
-| `InputMap::lastKey()` | `Option(String)` — last key pressed |
+| `InputMap::lastKey()` | Last key pressed → `Option(String)` |
 
 ---
 
@@ -902,19 +1584,43 @@ import super.std.input
 import super.std.camera
 ```
 
+A 2D camera with smooth following, screen shake, and zoom.
+
+```rust
+let cam = Camera2D::new(800, 600)
+cam.setZoom(1.5)
+
+while raylib::rendering() {
+    let dt = raylib::getFrameTime()
+    cam.follow(player.pos, 5.0, dt)  // smooth follow
+    cam.update(dt)
+
+    // Draw in world space (automatically offset by camera)
+    cam.drawRect(100, 100, 50, 50, (255, 0, 0))
+    cam.drawCircle(200, 200, 20, (0, 255, 0))
+    cam.drawLine(0, 0, 300, 300, (100, 100, 255))
+
+    // Screen shake on hit
+    if hit { cam.shake(10.0, 0.3) }
+
+    // Coordinate conversion
+    let worldPos = cam.screenToWorld(mouseVec)
+    let visible = cam.isVisible(enemyX, enemyY, 50)
+}
+```
+
 | Method | Description |
 |---|---|
 | `Camera2D::new(w, h)` | Create for screen size |
-| `cam.follow(pos, speed, dt)` | Smooth-follow a Vec2 |
-| `cam.shake(intensity, duration)` | Screen shake |
-| `cam.setZoom(z)` | Set zoom (1.0 = normal) |
-| `cam.update(dt)` | Advance shake decay |
-| `cam.drawRect(x, y, w, h, c)` | Draw rect in world space |
-| `cam.drawCircle(x, y, r, c)` | Draw circle in world space |
-| `cam.drawLine(x1, y1, x2, y2, c)` | Draw line in world space |
-| `cam.screenToWorld(v)` | Screen Vec2 → world Vec2 |
-| `cam.worldToScreen(v)` | World Vec2 → screen Vec2 |
-| `cam.isVisible(x, y, margin)` | Frustum-cull test |
+| `.follow(pos, speed, dt)` | Smooth-follow a Vec2 |
+| `.shake(intensity, duration)` | Screen shake effect |
+| `.setZoom(z)` | Set zoom (1.0 = normal) |
+| `.update(dt)` | Advance shake decay |
+| `.drawRect(x, y, w, h, c)` | Draw rect in world space |
+| `.drawCircle(x, y, r, c)` | Draw circle in world space |
+| `.drawLine(x1, y1, x2, y2, c)` | Draw line in world space |
+| `.screenToWorld(v)` / `.worldToScreen(v)` | Coordinate conversion |
+| `.isVisible(x, y, margin)` | Frustum-cull test |
 
 ---
 
@@ -924,15 +1630,42 @@ import super.std.camera
 import super.std.physics
 ```
 
+Simple 2D physics bodies, collision shapes, and raycasting.
+
+```rust
+// Create a physics body
+let ball = Body2D::new(100.0, 50.0, 1.0)
+ball.restitution = 0.8  // bouncy
+
+while raylib::rendering() {
+    let dt = raylib::getFrameTime()
+    ball.applyGravity(500.0, dt)
+    ball.update(dt)
+
+    // AABB collision
+    let ground = AABB::new(0.0, 500.0, 800.0, 20.0)
+    pushOutAABB(ball, 10.0, 10.0, ground)
+
+    // Circle collision
+    let c1 = Circle::new(100.0, 200.0, 25.0)
+    let c2 = Circle::new(150.0, 200.0, 25.0)
+    resolveCircle(c1, 25.0, c2, 25.0)
+
+    // Raycasting
+    let ray = Ray2::new(0.0, 250.0, 1.0, 0.0)
+    let hit = ray.castAABB(ground)  // HitInfo
+}
+```
+
 | Type / Function | Description |
 |---|---|
-| `Body2D::new(x, y, mass)` | Moveable physics body |
-| `body.applyGravity(g, dt)` | Apply downward force |
-| `body.update(dt)` | Integrate velocity |
-| `body.restitution` | Bounce factor (0.0–1.0) |
+| `Body2D::new(x, y, mass)` | Moveable physics body with velocity |
+| `.applyGravity(g, dt)` | Apply downward acceleration |
+| `.update(dt)` | Integrate velocity → position |
+| `.restitution` | Bounce factor (0.0–1.0) |
 | `AABB::new(x, y, w, h)` | Axis-aligned bounding box |
 | `Circle::new(x, y, r)` | Circle shape |
-| `pushOutAABB(body, r, r, aabb)` | Push body out of AABB |
+| `pushOutAABB(body, hw, hh, aabb)` | Push body out of AABB |
 | `resolveCircle(a, ra, b, rb)` | Circle-circle resolution |
 | `resolveAABB(a, b)` | AABB-AABB resolution |
 | `Ray2::new(x, y, dx, dy)` | Ray for casting |
@@ -946,22 +1679,52 @@ import super.std.physics
 import super.std.entity
 ```
 
+A lightweight entity system for games. Entities have position, velocity, size,
+a tag string, and a data float.
+
+```rust
+let world = EntityWorld::new()
+
+// Spawn entities
+let player = world.spawn(100.0, 200.0, "player")
+let e1 = world.spawn(300.0, 200.0, "enemy")
+let e2 = world.spawn(500.0, 200.0, "enemy")
+
+// Query by tag
+let enemies = world.query("enemy")  // [Entity, Entity]
+
+// Update all entities (pos += vel * dt)
+world.update(dt)
+
+// Iterate with mutation
+world.forEachTagged("enemy", |e: Entity| {
+    if e.overlapsAABB(player) {
+        e.alive = false  // mark for removal
+    }
+})
+
+// Purge dead entities
+world.update(0.0)
+
+// Count living entities
+let remaining = world.countAlive("enemy")
+```
+
+**Entity fields:** `id: Int`, `pos: Vec2`, `vel: Vec2`, `size: Vec2`,
+`tag: String`, `alive: Bool`, `data: Float`.
+
 | Method | Description |
 |---|---|
 | `EntityWorld::new()` | Create entity manager |
-| `world.spawn(x, y, tag)` | Create entity at position with tag |
-| `world.query(tag)` | Return `[Entity]` with matching tag |
-| `world.forEachTagged(tag, fn)` | Iterate entities with tag (mutable) |
-| `world.forEach(fn)` | Iterate ALL entities |
-| `world.countAlive(tag)` | Count living entities with tag |
-| `world.update(dt)` | `pos += vel*dt` for all; purge dead |
-| `world.update(0.0)` | Purge dead only (no movement) |
-
-**Entity fields:** `id: Int`, `pos: Vec2`, `vel: Vec2`, `size: Vec2`, `tag: String`,
-`alive: Bool`, `data: Float`.
-
-**Entity methods:** `e.overlapsAABB(other)`, `e.center()`, `e.entityDrawRect(color)`,
-`e.entityDrawCircle(color)`.
+| `.spawn(x, y, tag)` | Create entity at position |
+| `.query(tag)` | Get `[Entity]` with matching tag |
+| `.forEachTagged(tag, fn)` | Iterate entities with tag |
+| `.forEach(fn)` | Iterate ALL entities |
+| `.countAlive(tag)` | Count living entities with tag |
+| `.update(dt)` | Move all entities and purge dead |
+| `e.overlapsAABB(other)` | AABB overlap test |
+| `e.center()` | Center point |
+| `e.entityDrawRect(color)` / `e.entityDrawCircle(color)` | Draw helpers |
 
 ---
 
@@ -971,16 +1734,42 @@ import super.std.entity
 import super.std.scene
 ```
 
+Manage game scenes (menus, gameplay, pause screens) with a stack-based system.
+
+```rust
+let menu = Scene::new(
+    |dt: Float| { /* update menu */ },
+    || { /* draw menu */ }
+)
+let game = Scene::new(
+    |dt: Float| { /* update game */ },
+    || { /* draw game */ }
+)
+
+let mgr = SceneManager::new(menu)
+
+// Switch scenes
+mgr.switch(game)   // replaces current, clears stack
+
+// Overlay (pause menu on top of game)
+mgr.push(menu)     // game still exists underneath
+mgr.pop()          // return to game
+
+// In game loop:
+mgr.update(dt)
+mgr.draw()
+```
+
 | Method | Description |
 |---|---|
-| `SceneManager::empty()` | Create empty (no scene) |
-| `SceneManager::new(scene)` | Create with initial scene |
-| `mgr.switch(scene)` | Replace current, clear stack |
-| `mgr.push(scene)` | Push over current (pause menus) |
-| `mgr.pop()` | Return to previous scene |
-| `mgr.update(dt)` | Tick current scene |
-| `mgr.draw()` | Draw current scene |
 | `Scene::new(updateFn, drawFn)` | Create scene from two closures |
+| `SceneManager::empty()` | Create with no scene |
+| `SceneManager::new(scene)` | Create with initial scene |
+| `.switch(scene)` | Replace current, clear stack |
+| `.push(scene)` | Push over current (pause menus) |
+| `.pop()` | Return to previous scene |
+| `.update(dt)` | Tick current scene |
+| `.draw()` | Draw current scene |
 
 ---
 
@@ -990,31 +1779,95 @@ import super.std.scene
 import super.std.grid
 ```
 
-`Grid(T)` is a **generic** fixed-size 2D grid. Specify the element type
+`Grid(T)` is a **generic** fixed-size 2D grid backed by a flat array.
+Coordinates are `(col, row)` = `(x, y)`. Specify the element type
 with `@[T: Type]` at construction.
 
 ```rust
-let intGrid  = Grid::new(10, 10, 0)     @[T: Int]
-let boolGrid = Grid::new(5, 5, false)   @[T: Bool]
-let strGrid  = Grid::new(3, 3, ".")     @[T: String]
+let g = Grid::new(10, 10, 0) @[T: Int]
+g.set(5, 5, 1)
+g.get(5, 5)        // 1
+g.inBounds(10, 10)  // false
+g.width()           // 10
+g.height()          // 10
+```
+
+#### Construction and Access
+
+| Method | Description |
+|---|---|
+| `Grid::new(cols, rows, default) @[T: Type]` | Create grid filled with default |
+| `.get(col, row)` | Read cell value |
+| `.set(col, row, value)` | Write cell value |
+| `.fill(value)` | Set all cells |
+| `.fillRect(x, y, w, h, value)` | Fill rectangular region |
+| `.inBounds(col, row)` | Check if coordinates are valid |
+| `.width()` / `.height()` | Grid dimensions |
+
+#### Neighbours and Pathfinding
+
+```rust
+g.neighbors4(5, 5)  // [(5,4),(5,6),(6,5),(4,5)]  — N/S/E/W
+g.neighbors8(5, 5)  // all 8 surrounding cells
+
+// BFS pathfinding: find path from (0,0) to (9,9) through walkable cells
+let path = g.bfs(0, 0, 9, 9, |v: Int| v == 0)  // [(Int,Int)] or []
 ```
 
 | Method | Description |
 |---|---|
-| `Grid::new(cols, rows, default) @[T: Type]` | Create `Grid(T)` filled with `default` |
-| `grid.get(col, row) -> T` | Read cell value |
-| `grid.set(col, row, value: T)` | Write cell value |
-| `grid.fill(value: T)` | Set all cells to `value` |
-| `grid.fillRect(x, y, w, h, value: T)` | Fill rectangular region |
-| `grid.inBounds(col, row) -> Bool` | Check if coordinates are valid |
-| `grid.cols() -> Int` / `grid.rows() -> Int` | Grid dimensions |
-| `grid.neighbors4(col, row) -> [(Int, Int)]` | 4 cardinal neighbours |
-| `grid.neighbors8(col, row) -> [(Int, Int)]` | 8 surrounding neighbours |
-| `grid.forEach(fn(Int, Int, T))` | Iterate all cells with col, row, value |
-| `grid.bfs(sx, sy, gx, gy, fn(T)->Bool) -> [(Int,Int)]` | BFS pathfinding |
-| `grid.draw(ox, oy, tileSize, fn(T)->(Int,Int,Int))` | Draw with colour function |
-| `grid.drawLines(ox, oy, tileSize, color)` | Draw grid lines |
-| `grid.drawLabels(ox, oy, tileSize, fn(T)->String, fontSize, color)` | Draw text labels |
+| `.neighbors4(col, row)` | 4 cardinal neighbours `[(Int,Int)]` |
+| `.neighbors8(col, row)` | 8 surrounding neighbours `[(Int,Int)]` |
+| `.forEach(fn(col, row, value))` | Iterate all cells |
+| `.bfs(sx, sy, gx, gy, passable)` | BFS pathfinding → `[(Int,Int)]` |
+
+#### Drawing (Raylib)
+
+For graphical games with a raylib window:
+
+```rust
+g.draw(0, 0, 32, |v: Int| if v == 1 { (255,0,0) } else { (40,40,40) })
+g.drawLines(0, 0, 32, (80, 80, 80))
+g.drawLabels(0, 0, 32, |v: Int| Cast::string(v), 12, (200,200,200))
+```
+
+| Method | Description |
+|---|---|
+| `.draw(x, y, cellSize, colorFn)` | Draw coloured cells |
+| `.drawLines(x, y, cellSize, color)` | Draw grid lines |
+| `.drawLabels(x, y, cellSize, strFn, fontSize, color)` | Draw text labels |
+
+#### Terminal Drawing (no raylib needed)
+
+For text-based games and debugging — works in any terminal:
+
+```rust
+// Simple character grid
+g.printGrid(|v: Int| if v == 1 { "#" } else { "." })
+// ..#..
+// .###.
+// ..#..
+
+// Padded numeric labels
+g.printGridLabels(|v: Int| Cast::string(v), 3)
+//   0   0   1   0   0
+//   0   1   1   1   0
+//   0   0   1   0   0
+
+// Boxed with title
+g.printGridBoxed(|v: Int| if v == 1 { "#" } else { "." }, "Map")
+// ┌── Map ──┐
+// │. . # . .│
+// │. # # # .│
+// │. . # . .│
+// └─────────┘
+```
+
+| Method | Description |
+|---|---|
+| `.printGrid(charFn)` | Print grid with single-char cells |
+| `.printGridLabels(strFn, cellWidth)` | Print grid with padded labels |
+| `.printGridBoxed(charFn, title)` | Print grid with Unicode box border and title |
 
 ---
 
@@ -1024,14 +1877,36 @@ let strGrid  = Grid::new(3, 3, ".")     @[T: String]
 import super.std.noise
 ```
 
-| Function | Description |
-|---|---|
-| `valueNoise(x, y, seed)` | Basic value noise |
-| `smoothNoise(x, y, seed)` | Smoothed noise |
-| `fbm(x, y, seed, octaves, lacunarity, gain)` | Fractal Brownian motion |
-| `ridged(x, y, seed, octaves, lacunarity, gain)` | Ridged noise |
-| `domain(x, y, seed, octaves, lacunarity, gain, strength)` | Domain-warped noise |
-| `noiseToColor(value, colorA, colorB)` | Map noise to RGB colour |
+Pure-math procedural noise for terrain generation and visual effects.
+No dependencies — works in both raylib and terminal programs.
+
+```rust
+// Basic noise
+let n = valueNoise(1.5, 2.3, 42)     // 0.0–1.0
+let s = smoothNoise(1.5, 2.3, 42)    // smoother version
+
+// Fractal Brownian motion — layered noise for terrain
+let h = fbm(x * 0.01, y * 0.01, 42, 6, 2.0, 0.5)
+
+// Ridged noise — mountain ridges
+let r = ridged(x * 0.01, y * 0.01, 42, 6)
+
+// Domain warping — swirling organic patterns
+let w = domain(x * 0.01, y * 0.01, 42, 2.0)
+
+// Map noise to colour
+let color = noiseToColor(h, (0, 50, 200), (255, 255, 255))
+```
+
+| Function | Signature | Description |
+|---|---|---|
+| `noiseHash(x, y, seed)` | `(Int, Int, Int) -> Float` | Deterministic hash → `[0.0, 1.0)` |
+| `valueNoise(x, y, seed)` | `(Float, Float, Int) -> Float` | Bilinear value noise |
+| `smoothNoise(x, y, seed)` | `(Float, Float, Int) -> Float` | Smoothstep-interpolated noise |
+| `fbm(x, y, seed, octaves, lacunarity, gain)` | `(Float, Float, Int, Int, Float, Float) -> Float` | Fractal Brownian motion |
+| `ridged(x, y, seed, octaves)` | `(Float, Float, Int, Int) -> Float` | Ridged multifractal |
+| `domain(x, y, seed, strength)` | `(Float, Float, Int, Float) -> Float` | Domain-warped fbm |
+| `noiseToColor(n, lo, hi)` | `(Float, (Int,Int,Int), (Int,Int,Int)) -> (Int,Int,Int)` | Lerp between colours |
 
 ---
 
