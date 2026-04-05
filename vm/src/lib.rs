@@ -1369,6 +1369,7 @@ impl Vm {
             offset: usize,
             locals: Vec<(String, String)>,
             globals_changed: Vec<(String, String)>,
+            output_len: usize,
         }
 
         fn fmt_vmdata(v: &VmData) -> String {
@@ -1397,12 +1398,13 @@ impl Vm {
             }
         }
 
-        let take_snapshot = |state: &State,
-                             executed_ip: usize,
-                             opname: &str,
-                             named_op: &str,
-                             info: &DebugInfo|
-         -> Snapshot {
+    let take_snapshot = |state: &State,
+                 executed_ip: usize,
+                 opname: &str,
+                 named_op: &str,
+                 info: &DebugInfo,
+                 output_len: usize|
+     -> Snapshot {
             let stack: Vec<String> =
                 state.memory.stack.iter().map(|v| fmt_vmdata_typed(v)).collect();
 
@@ -1440,6 +1442,7 @@ impl Vm {
                 offset: state.offset,
                 locals,
                 globals_changed,
+                output_len,
             }
         };
 
@@ -1676,7 +1679,7 @@ impl Vm {
         } else {
             String::new()
         };
-        history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info));
+    history.push(take_snapshot(&self.state, ip0, &op0, &named0, &info, 0));
 
         // ── Render function ─────────────────────────────────────────
         let render = |stdout: &mut io::Stdout,
@@ -1936,15 +1939,16 @@ impl Vm {
                 .queue(SetAttribute(Attribute::Reset))?;
 
             let out_rows = 2;
-            let out_start = output_buf.len().saturating_sub(out_rows);
-            if output_buf.is_empty() {
+            let out_len = std::cmp::min(snap.output_len, output_buf.len());
+            let out_start = out_len.saturating_sub(out_rows);
+            if out_len == 0 {
                 stdout
                     .queue(SetForegroundColor(Color::DarkGrey))?
                     .queue(Print(" Output: (none)"))?
                     .queue(SetAttribute(Attribute::Reset))?
                     .queue(Print("\r\n"))?;
             } else {
-                for line in output_buf.iter().skip(out_start) {
+                for line in output_buf.iter().take(out_len).skip(out_start) {
                     let display: String = if line.len() > w.saturating_sub(2) {
                         format!(" {}..", &line[..w.saturating_sub(4)])
                     } else {
@@ -2061,6 +2065,7 @@ impl Vm {
                                         &opname,
                                         &named,
                                         &info,
+                                        output_buf.len(),
                                     ));
                                     cursor = history.len() - 1;
                                 }
@@ -2075,6 +2080,7 @@ impl Vm {
                                         "END",
                                         "",
                                         &info,
+                                        output_buf.len(),
                                     ));
                                     cursor = history.len() - 1;
                                 }
@@ -2086,6 +2092,7 @@ impl Vm {
                                         "ERROR",
                                         "",
                                         &info,
+                                        output_buf.len(),
                                     ));
                                     cursor = history.len() - 1;
                                 }
@@ -2129,6 +2136,7 @@ impl Vm {
                                         &opname,
                                         &named,
                                         &info,
+                                        output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
                                     }
@@ -2143,6 +2151,7 @@ impl Vm {
                                             "END",
                                             "",
                                             &info,
+                                            output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
                                         break;
@@ -2155,6 +2164,7 @@ impl Vm {
                                             "ERROR",
                                             "",
                                             &info,
+                                            output_buf.len(),
                                         ));
                                         cursor = history.len() - 1;
                                         break;
@@ -2224,6 +2234,7 @@ impl Vm {
                             final_op,
                             &final_named,
                             &info,
+                            output_buf.len(),
                         ));
                         cursor = history.len() - 1;
                     }
@@ -2297,6 +2308,7 @@ impl Vm {
                             &final_op,
                             &final_named,
                             &info,
+                            output_buf.len(),
                         ));
                         cursor = history.len() - 1;
                     }
