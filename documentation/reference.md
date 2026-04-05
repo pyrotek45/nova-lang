@@ -2996,6 +2996,10 @@ The debugger layout (3 columns):
 - **Right column — Variables** — Named local variables and their current values,
   plus any globals that hold non-function values.
 - **Output** — Last 2 lines of program output captured from `print`/`println`.
+- **Heap/GC bar** — Live heap object count, heap capacity, free-list size,
+  stack depth, GC threshold info, callstack depth, and play speed. Shows
+  `LOCKED` when the GC is inhibited. Useful for diagnosing memory leaks and
+  understanding GC behavior.
 - **Header** — Step counter, instruction pointer, callstack depth, offset, and
   play status.
 

@@ -347,8 +347,42 @@ impl MemoryManager {
     }
 
     /// Return the number of live heap entries.
-    fn live_count(&self) -> usize {
+    pub fn live_count(&self) -> usize {
         self.heap.len() - self.free_list.len()
+    }
+
+    /// Return the total number of heap slots (live + free).
+    pub fn heap_capacity(&self) -> usize {
+        self.heap.len()
+    }
+
+    /// Return the number of free-list slots.
+    pub fn free_count(&self) -> usize {
+        self.free_list.len()
+    }
+
+    /// Return the allocation count that will trigger the next GC.
+    pub fn gc_threshold(&self) -> usize {
+        self.next_gc
+    }
+
+    /// Return the current base threshold used for GC tuning.
+    pub fn gc_base_threshold(&self) -> usize {
+        self.base_threshold
+    }
+
+    /// Return whether the GC is currently inhibited (lock depth).
+    pub fn gc_lock_depth(&self) -> usize {
+        self.gc_lock
+    }
+
+    /// Return the ref-count of a heap slot, or 0 if empty.
+    pub fn ref_count(&self, index: usize) -> usize {
+        self.heap
+            .get(index)
+            .and_then(|e| e.as_ref())
+            .map(|e| e.ref_count)
+            .unwrap_or(0)
     }
 
     /// Prevent `allocate` from triggering `collect_cycles`.
