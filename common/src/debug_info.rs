@@ -22,6 +22,9 @@ pub struct DebugInfo {
 
     /// Struct name → list of field names (in order)
     pub struct_fields: HashMap<String, Vec<String>>,
+
+    /// label_id → bytecode address  (populated from the assembler's label map)
+    pub label_addresses: HashMap<u64, u64>,
 }
 
 impl DebugInfo {
@@ -68,6 +71,14 @@ impl DebugInfo {
     pub fn set_toplevel_locals(&mut self, names: Vec<(u32, String)>) {
         self.local_names.insert(0, names);
     }
+
+    /// Build a reverse map: bytecode address → label_id.
+    pub fn addr_to_label(&self) -> HashMap<u64, u64> {
+        self.label_addresses
+            .iter()
+            .map(|(label, addr)| (*addr, *label))
+            .collect()
+    }
 }
 
 /// Helper to extract DebugInfo from the compiler's tables after compilation.
@@ -77,6 +88,7 @@ pub fn extract_debug_info(
     native_table: &crate::table::Table<Rc<str>>,
     variable_table: &crate::table::Table<Rc<str>>,
     asm: &[crate::code::Asm],
+    fn_local_names: &[(u64, Vec<(u32, String)>)],
 ) -> DebugInfo {
     use crate::code::Asm;
     let mut info = DebugInfo::new();
@@ -149,6 +161,20 @@ pub fn extract_debug_info(
                 .insert(*lbl, format!("closure_{}", unnamed_cls));
             unnamed_cls += 1;
         }
+    }
+
+    // Per-function local variable names from the compiler
+    for (label, locals) in fn_local_names {
+        let filtered: Vec<(u32, String)> = locals
+            .iter()
+            .filter(|(_, name)| {
+                !name.starts_with("__tempcounter__")
+                    && !name.starts_with("__arrayexpr__")
+                    && !name.starts_with("___matchexpr___")
+            })
+            .cloned()
+            .collect();
+        info.local_names.insert(*label, filtered);
     }
 
     info

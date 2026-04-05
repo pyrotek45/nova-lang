@@ -11,7 +11,7 @@ pub struct Assembler {
     pub input: Vec<Asm>,
     pub nva: Vec<Asm>,
     pub output: Vec<u8>,
-    labels: HashMap<u64, u64>,
+    pub labels: HashMap<u64, u64>,
     forwardjumps: Vec<(u64, u64)>,
 }
 
