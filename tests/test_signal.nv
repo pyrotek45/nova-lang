@@ -1,0 +1,102 @@
+module test_signal
+
+import super.std.signal
+import super.std.core
+
+// ── Signal(T) typed ──────────────────────────────────────────
+
+// Int payload
+let onDamage = Signal::new() @[T: Int]
+let hp = Box(100)
+onDamage.connect(|dmg: Int| { hp.value -= dmg })
+onDamage.emit(25)
+assert(hp.value == 75, "Signal(Int) emit reduces hp")
+onDamage.emit(10)
+assert(hp.value == 65, "Signal(Int) second emit")
+println("PASS: Signal(Int)")
+
+// String payload
+let onChat = Signal::new() @[T: String]
+let msgs = Box("")
+onChat.connect(|msg: String| { msgs.value = msgs.value + msg + ";" })
+onChat.emit("hello")
+onChat.emit("world")
+assert(msgs.value == "hello;world;", "Signal(String) accumulates")
+println("PASS: Signal(String)")
+
+// Multiple listeners
+let onScore = Signal::new() @[T: Int]
+let a = Box(0)
+let b = Box(0)
+onScore.connect(|v: Int| { a.value += v })
+onScore.connect(|v: Int| { b.value += v * 2 })
+onScore.emit(5)
+assert(a.value == 5, "multi listener a")
+assert(b.value == 10, "multi listener b")
+println("PASS: multiple listeners")
+
+// count + clear
+assert(onScore.count() == 2, "count before clear")
+onScore.clear()
+assert(onScore.count() == 0, "count after clear")
+onScore.emit(100)
+assert(a.value == 5, "cleared signal does not fire")
+println("PASS: count and clear")
+
+// ── VoidSignal ───────────────────────────────────────────────
+
+let onReady = VoidSignal::new()
+let called = Box(0)
+onReady.connect(|| { called.value += 1 })
+onReady.connect(|| { called.value += 10 })
+onReady.emit()
+assert(called.value == 11, "VoidSignal fires both")
+onReady.emit()
+assert(called.value == 22, "VoidSignal fires again")
+println("PASS: VoidSignal")
+
+// ── SignalBus ────────────────────────────────────────────────
+
+let bus = SignalBus::new()
+
+// register + connect + emit
+let gameOver = Box(false)
+let levelUp  = Box(0)
+
+bus.register("game_over")
+bus.connect("game_over", || { gameOver.value = true })
+
+bus.connect("level_up", || { levelUp.value += 1 })  // auto-registers
+
+bus.emit("game_over")
+assert(gameOver.value, "bus game_over fired")
+
+bus.emit("level_up")
+bus.emit("level_up")
+assert(levelUp.value == 2, "bus level_up fired twice")
+
+// has
+assert(bus.has("game_over"), "bus has game_over")
+assert(bus.has("level_up"), "bus has level_up")
+assert(!bus.has("nope"), "bus !has nope")
+
+// signalCount
+assert(bus.signalCount("game_over") == 1, "bus count game_over")
+assert(bus.signalCount("level_up") == 1, "bus count level_up")
+assert(bus.signalCount("nope") == 0, "bus count nonexistent")
+
+// clear one signal
+bus.clear("game_over")
+assert(bus.signalCount("game_over") == 0, "bus clear game_over")
+
+// clearAll
+bus.clearAll()
+assert(!bus.has("game_over"), "bus clearAll removed game_over")
+assert(!bus.has("level_up"), "bus clearAll removed level_up")
+
+// emit nonexistent signal (should not crash)
+bus.emit("nonexistent")
+
+println("PASS: SignalBus")
+
+println("ALL SIGNAL TESTS PASSED")

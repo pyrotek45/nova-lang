@@ -41,6 +41,7 @@ module survive
 
 import super.super.std.scene
 import super.super.std.entity
+import super.super.std.signal
 import super.super.std.timer
 import super.super.std.tween
 import super.super.std.vec2
@@ -93,7 +94,7 @@ let WAVE_INTERVAL    = 5.0    // seconds between enemy waves
 let ENEMIES_PER_WAVE = 3
 
 // ── Shared mutable state ──────────────────────────────────────────────────────
-let world   = EntityWorld::new()
+let world   = EntityWorld::new() @[T: Float]
 let cam     = Camera2D::new(SW, SH)
 let keys    = InputMap::new()
 
@@ -359,7 +360,7 @@ fn makePlayScene() -> Scene {
             let waveT = smoothstep(Cast::float(wave.value).unwrap() / 20.0)
             let enemySpeed = lerp(ENEMY_SPEED_BASE, ENEMY_SPEED_BASE * 2.8, waveT)
 
-            world.forEachTagged("enemy", fn(e: Entity) {
+            world.forEachTagged("enemy", fn(e: Entity(Float)) {
                 let dir = p.pos.sub(e.pos)
                 let dlen = dir.length()
                 if dlen > 0.5 {
@@ -388,7 +389,7 @@ fn makePlayScene() -> Scene {
 
             // ── Collision: player vs enemies ──────────────────────────────────
             if invTimer.isDone() {
-                world.forEachTagged("enemy", fn(e: Entity) {
+                world.forEachTagged("enemy", fn(e: Entity(Float)) {
                     if p.overlapsAABB(e) {
                         playerHp.value -= 1
                         invTimer.reset()
@@ -443,7 +444,7 @@ fn makePlayScene() -> Scene {
             raylib::drawLine(txS, tyS + 10, txS, tyS + 28, TARGET_GLOW)
 
             // ── Enemies ──────────────────────────────────────────────────────
-            world.forEachTagged("enemy", fn(e: Entity) {
+            world.forEachTagged("enemy", fn(e: Entity(Float)) {
                 let sp = cam.worldToScreen(e.pos)
                 let ex = Cast::int(sp.x).unwrap()
                 let ey = Cast::int(sp.y).unwrap()

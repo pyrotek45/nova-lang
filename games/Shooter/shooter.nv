@@ -15,6 +15,7 @@ module shooter
 
 import super.super.std.scene
 import super.super.std.entity
+import super.super.std.signal
 import super.super.std.timer
 import super.super.std.tween
 import super.super.std.vec2
@@ -51,7 +52,7 @@ let BULLET_RADIUS   = 5
 // ── Shared state (captured by all scene closures) ─────────────────────────────
 // Heap objects (struct/EntityWorld/Camera2D) are captured by reference automatically.
 // Plain scalars (Int, Bool) must be Box-wrapped so closures see mutations.
-let world  = EntityWorld::new()
+let world  = EntityWorld::new() @[T: Float]
 let cam    = Camera2D::new(SW, SH)
 
 let score       = Box(0)
@@ -154,7 +155,7 @@ fn spawnWave() {
 }
 
 // ── Helper: get the player entity (first "player" entity) ────────────────────
-fn getPlayer() -> Entity {
+fn getPlayer() -> Entity(Float) {
     let ps = world.query("player")
     return ps[0]
 }
@@ -243,7 +244,7 @@ fn makePlayScene() -> Scene {
 
             // ── Enemy AI — chase player ───────────────────────────────────
             let pPos = p.center()
-            world.forEachTagged("enemy", fn(e: Entity) {
+            world.forEachTagged("enemy", fn(e: Entity(Float)) {
                 let ePos = e.center()
                 let toPlayer = pPos.sub(ePos)
                 if toPlayer.length() > 0.5 {
@@ -255,7 +256,7 @@ fn makePlayScene() -> Scene {
             })
 
             // ── Bullet movement + lifetime ────────────────────────────────
-            world.forEachTagged("bullet", fn(b: Entity) {
+            world.forEachTagged("bullet", fn(b: Entity(Float)) {
                 b.pos.x += b.vel.x * dt
                 b.pos.y += b.vel.y * dt
                 b.data += dt
@@ -315,7 +316,7 @@ fn makePlayScene() -> Scene {
             drawGrid(ox, oy)
 
             // Draw entities via camera (world-space → screen-space)
-            world.forEachTagged("brick_wall", fn(w: Entity) {
+            world.forEachTagged("brick_wall", fn(w: Entity(Float)) {
                 let sp = cam.worldToScreen(w.pos)
                 let sx = Cast::int(sp.x).unwrap()
                 let sy = Cast::int(sp.y).unwrap()
@@ -324,7 +325,7 @@ fn makePlayScene() -> Scene {
                 raylib::drawRectangle(sx, sy, sw2, sh2, (60, 80, 60))
             })
 
-            world.forEachTagged("enemy", fn(e: Entity) {
+            world.forEachTagged("enemy", fn(e: Entity(Float)) {
                 let sp = cam.worldToScreen(e.pos)
                 let scx = Cast::int(sp.x).unwrap() + ENEMY_RADIUS
                 let scy = Cast::int(sp.y).unwrap() + ENEMY_RADIUS
@@ -334,7 +335,7 @@ fn makePlayScene() -> Scene {
                 }
             })
 
-            world.forEachTagged("bullet", fn(b: Entity) {
+            world.forEachTagged("bullet", fn(b: Entity(Float)) {
                 if cam.isVisible(b.pos.x, b.pos.y, 20.0) {
                     let sp = cam.worldToScreen(b.pos)
                     let scx = Cast::int(sp.x).unwrap() + BULLET_RADIUS
