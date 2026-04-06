@@ -182,26 +182,6 @@ Every file command also accepts `--git owner/repo/path.nv` to work directly from
 
 ---
 
-## Standard Library
-
-| Module | Purpose |
-|---|---|
-| `std/core` | `Box`, `Gen`, `range`, `Maybe`, `Result`, Option helpers |
-| `std/list` | `map`, `filter`, `reduce`, `sortWith`, `flatten`, `zip` |
-| `std/iter` | Lazy iterators |
-| `std/string` | `split`, `padLeft`, `capitalize`, `lines`, `words` |
-| `std/math` | `sqrt`, `pow`, `abs`, trig |
-| `std/io` | `prompt`, `readLines`, `writeLines` |
-| `std/hashmap` | O(1) hash map |
-| `std/grid` | Generic 2D grid for tilemaps and pathfinding |
-| `std/plot` | Line, bar, scatter, pie, and fill charts (raylib) |
-| `std/tui` | Terminal UI — cursor, colour, input, draw primitives |
-
-Game development: `std/camera`, `std/entity`, `std/physics`, `std/scene`,
-`std/tween`, `std/vec2`, `std/noise`, `std/timer`, `std/widget`
-
----
-
 ## Documentation
 
 - [Tutorial](documentation/tutorial.md) — 59 sections from hello world to shipping games
