@@ -1,18 +1,18 @@
 # Nova Reference
 
-Complete API reference for Nova's built-in functions, type system, standard library,
+Complete API reference for Nova's built-in functions, standard library,
 and raylib bindings.
+
+For language features, syntax, imports, and CLI usage, see the
+[Tutorial](tutorial.md).
 
 ---
 
 ## Table of Contents
 
-1. [Built-in Types](#1-built-in-types)
-2. [Built-in Functions](#2-built-in-functions)
+1. [Built-in Functions](#1-built-in-functions)
    — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program) · [Data Serialization](#data-serialization)
-3. [Language Syntax Notes](#3-language-syntax-notes)
-   — [Semicolons](#semicolons) · [Pipe Operator](#pipe-operator-) · [Closures](#closure-syntax) · [Logical Operators](#logical-operators--and-) · [Literal Formats](#literal-formats) · [Comments](#comments) · [Block Expressions](#block-expressions) · [Match Expressions](#match-expressions) · [Conventions](#conventions)
-4. [Standard Library](#4-standard-library)
+2. [Standard Library](#2-standard-library)
    - [`std/core`](#stdcore--foundation) — Box, Maybe, Result, range, Gen
    - [`std/math`](#stdmath--extended-mathematics) — Int/Float extensions, primes, fib
    - [`std/string`](#stdstring--string-utilities) — pad, slug, wrap, between
@@ -48,61 +48,11 @@ and raylib bindings.
    - [`std/log`](#stdlog--structured-logging) — Logger, levels, colored output, tables, timers
    - [`std/datetime`](#stddatetime--date-and-time) — DateTime, Stopwatch, formatting
    - [`std/gameloop`](#stdgameloop--automatic-update-system) — Updater, Dyn-based tick-all pattern
-5. [Raylib API](#5-raylib-api)
-6. [Import System](#6-import-system)
-7. [CLI Reference](#7-cli-reference)
+3. [Raylib API](#3-raylib-api)
 
 ---
 
-## 1. Built-in Types
-
-### Primitive Types
-
-| Type | Description |
-|---|---|
-| `Int` | 64-bit signed integer. |
-| `Float` | 64-bit IEEE 754 floating-point number. |
-| `Bool` | Boolean value: `true` or `false`. |
-| `String` | UTF-8 encoded text. Indexable: `"hello"[0]` → `'h'`. Supports negative indexing. |
-| `Char` | Single Unicode character. |
-| `Void` | Absence of a return value. |
-
-### Composite Types
-
-| Type | Shorthand | Word Form | Description |
-|---|---|---|---|
-| `Option(T)` | — | `Option(T)` | An optional value — either present or absent. |
-| `List` | `[T]` | `List(T)` | A dynamically-sized sequence of elements of a single type. |
-| `Tuple` | `(A, B, ...)` | `Tuple(A, B, ...)` | A fixed-size, heterogeneous collection. |
-| `Function` | — | `fn(A, B) -> R` | A callable value with typed parameters and a return type. |
-
-Both forms are interchangeable everywhere a type is expected (annotations, generics, `@[T: ...]`):
-
-```rust
-let xs: [Int] = [1, 2, 3]           // shorthand
-let ys: List(Int) = [4, 5, 6]       // word form — identical
-
-let pair: (Int, String) = (1, "a")  // shorthand
-let p2: Tuple(Int, String) = (2, "b") // word form — identical
-```
-
-### User-defined Types
-
-| Type | Description |
-|---|---|
-| `Custom` | A user-defined struct or enum, optionally generic (e.g. `Pair(Int, String)`). |
-| `Generic` | A type variable used in generic definitions, written `$T`. |
-
-### Special Types
-
-| Type | Description |
-|---|---|
-| `Dyn` | Structural constraint for duck-typed dispatch: `Dyn(T = field: Type + ...)`. |
-| `None` | The absence of a value inside an `Option`. Written `None(T)` to specify the inner type. |
-
----
-
-## 2. Built-in Functions
+## 1. Built-in Functions
 
 These functions are available without any imports.
 
@@ -291,46 +241,6 @@ These functions are available without any imports.
 | `unreachable() -> T` | Marks unreachable code. Compiles as any return type. |
 | `terminal::args() -> Option([String])` | Command-line arguments after the script name. Returns `None` if no extra arguments. |
 
-`terminal::args()` returns everything passed after `nova run file.nv`:
-
-```bash
-nova run myapp.nv hello world 42
-```
-
-```rust
-let args = terminal::args()         // Some(["hello", "world", "42"])
-if args.isSome() {
-    let list = args.unwrap()
-    println(list[0])                // "hello"
-}
-```
-
-### Generic Annotation `@[T: Type]`
-
-When calling a generic function where a type parameter cannot be inferred from
-the arguments (e.g. it only appears in the return type), use `@[T: Type]`
-**after** the call to tell the typechecker what the generic resolves to:
-
-```rust
-return todo() @[T: String]
-return unreachable() @[T: Int]
-let map = HashMap::new() @[K: String, V: Int]
-let loaded = Data::load("save.json") @[T: Int]
-```
-
-Multiple generic parameters are comma-separated: `@[K: String, V: Int]`.
-
-### Overload Selection `@(Type)`
-
-When a function name has multiple overloaded signatures and you need a
-reference to a *specific* overload (e.g. to pass it as a value), use
-`@(Type)` **after** the function name, **before** the call parentheses.
-This selects the overload whose parameter types match:
-
-```rust
-let f = someFunc@(Int)    // selects the Int overload of someFunc
-```
-
 ### Data Serialization
 
 Save and load any Nova value as JSON.  The JSON embeds `_type` tags so values
@@ -343,293 +253,12 @@ round-trip with full type fidelity.  Closures and functions cannot be serialized
 | `Data::toJson(value: T) -> String` | Serialize `value` to a JSON string. |
 | `Data::fromJson(json: String) -> Option(T)` | Deserialize a value from a JSON string. Returns `None` on failure. Needs `@[T: Type]`. |
 
-Because `Data::load` and `Data::fromJson` have a generic return type,
-you must annotate the expected type with `@[T: Type]`:
-
-```rust
-// Save
-Data::save("player.json", Player { name: "Nova", hp: 100 })
-
-// Load — specify the expected type
-let p = Data::load("player.json") @[T: Player]
-if p.isSome() {
-    let player = p.unwrap()
-    println(player.name)
-}
-
-// In-memory JSON round-trip
-let json = Data::toJson([1, 2, 3])
-let list = Data::fromJson(json) @[T: [Int]]     // or @[T: List(Int)]
-```
-
-**Supported types:** `Int`, `Float`, `Bool`, `Char`, `String`, `List(T)`,
-`Tuple(A, B, …)`, `Struct`, `Enum`, `Option(T)`, and any nesting of these.
-
-**Not supported:** Closures, functions, and `Dyn` types cannot be serialized.
-
-**Error behavior:**
-- `Data::save` returns `false` if the path is not writable.
-- `Data::load` returns `None` if the file is missing or the JSON is malformed.
-- `Data::fromJson` returns `None` if the string is not valid JSON.
-
-**Word-form types** work in the `@[T:...]` annotation:
-```rust
-let xs = Data::load("list.json") @[T: List(Int)]
-let tp = Data::fromJson(s) @[T: Tuple(Int, String)]
-```
-
 ---
 
-## 3. Language Syntax Notes
-
-### Semicolons
-
-Semicolons serve two purposes in Nova:
-
-**1. Statement separator on a single line:**
-
-```rust
-let x = 1; let y = 2; println(x + y)
-```
-
-Multiple statements can share one line when separated by `;`. This is
-optional — putting each statement on its own line is preferred.
-
-**2. C-style for loops:**
-
-```rust
-for let i = 0; i < 10; i += 1 {
-    println(i)
-}
-```
-
-Semicolons separate the initializer, condition, and increment clauses.
-Range-based `for i in 0..10` is usually cleaner, but C-style loops allow
-non-integer stepping or custom iteration logic.
-
-### Pipe Operator (`|>`)
-
-`|>` passes the left-hand value as the **first argument** to the right-hand
-function call:
-
-```rust
-fn double(x: Int) -> Int { return x * 2 }
-fn inc(x: Int) -> Int { return x + 1 }
-
-let r = 5 |> double() |> inc()   // 11
-```
-
-Chains work with module-scoped functions:
-
-```rust
-10 |> Cast::string() |> println()   // prints "10"
-```
-
-> **The function call MUST include `()`.** Writing `5 |> println` is a
-> syntax error. Always write `5 |> println()`.
-
-> **Extends functions cannot be piped.** Use UFCS (method-style) chaining
-> instead: `xs.filter(pred).map(f)`.
-
-### Closure Syntax
-
-Nova has two closure forms:
-
-| Form | Syntax | Notes |
-|---|---|---|
-| Full closure | `fn(x: Int) -> Int { return x + 1 }` | Supports control flow, multi-line, explicit return |
-| Short lambda | `\|x: Int\| x + 1` | Single expression only — no `return`, `if`, `while` |
-
-**Bar closures (`||`) cannot have return-type annotations.** If you need
-`-> Type`, use the `fn()` form:
-
-```rust
-// ✗ won't compile
-let f = |x: Int| -> Int { return x + 1 }
-
-// ✓ correct
-let f = fn(x: Int) -> Int { return x + 1 }
-```
-
-**Zero-parameter closures** omit the parameter list entirely:
-
-```rust
-let greet = || println("hello")
-greet()
-```
-
-### Logical Operators (`&&` and `||`)
-
-`&&` (logical AND) and `||` (logical OR) work in all contexts including
-`if`, `elif`, `while`, and expression position:
-
-```rust
-while running && !paused {
-    update(dt)
-}
-
-if x > 0 && x < 100 {
-    println("in range")
-}
-```
-
-> **Precedence:** `&&` binds **tighter** than `||`, matching
-> Python / C / Rust.  `a || b && c` is parsed as `a || (b && c)`.
-
-### Literal Formats
-
-Nova supports several numeric literal formats:
-
-| Format | Example | Value |
-|---|---|---|
-| Decimal | `42` | 42 |
-| Binary | `0b1010` | 10 |
-| Octal | `0o17` | 15 |
-| Hexadecimal | `0xFF` | 255 |
-| Underscores | `1_000_000` | 1000000 |
-| Float | `3.14` | 3.14 |
-| Float + underscores | `1_000.50` | 1000.5 |
-| Negative | `-7` | −7 |
-
-Underscores can appear anywhere within the digit sequence (including hex,
-binary, octal, and float literals) and are ignored during parsing. They are
-useful for making large numbers more readable: `0xFF_FF`, `0b1010_0101`,
-`1_000_000.123_456`.
-
-**String literals:**
-
-| Form | Example | Notes |
-|---|---|---|
-| Double-quoted | `"hello\nworld"` | Standard, escape sequences processed |
-| Raw string | `r#"no \n escapes"#` | Backslash is literal (Rust-style) |
-| Char literal | `'a'` | Single character |
-
-### Comments
-
-```rust
-// Line comment
-
-/* Block comment
-   spanning multiple
-   lines */
-```
-
-### Block Expressions
-
-A `{ }` block in expression position evaluates to the value of its last
-expression:
-
-```rust
-let x = {
-    let a = 10
-    let b = 20
-    a + b          // ← block's value
-}
-// x == 30
-```
-
-If the last statement is an `if`/`elif`/`else` chain where every branch
-ends with an expression of the same type, the block produces that value:
-
-```rust
-let abs_val = {
-    if x >= 0 { x } else { 0 - x }
-}
-
-let label = {
-    if score > 90 { "A" }
-    elif score > 80 { "B" }
-    else { "C" }
-}
-```
-
-### Match Expressions
-
-`match` can be used as an **expression** — the result of the matched arm is
-the value of the whole expression.  Every arm must produce the same type.
-
-```rust
-enum Color { Red, Green, Blue }
-
-let c = Color::Green()
-let name = match c {
-    Red()   => "red"
-    Green() => "green"
-    Blue()  => "blue"
-}
-// name == "green"
-```
-
-Match expressions work with data-carrying variants, default branches, block
-bodies, and can be nested inside other expressions:
-
-```rust
-enum Shape { Circle: Float, Rect: Float, Point }
-
-let s = Shape::Circle(3.14)
-
-// inline single-expression arms
-let label = match s {
-    Circle(r) => "circle:" + Cast::string(r)
-    Rect(w)   => "rect:" + Cast::string(w)
-    Point()   => "point"
-}
-
-// with default branch
-let is_round = match s {
-    Circle(r) => true
-    _ => false
-}
-
-// as a function argument
-println(Cast::string(match s {
-    Circle(r) => r
-    Rect(w)   => w
-    Point()   => 0.0
-}))
-
-// arms with block bodies
-let desc = match s {
-    Circle(r) => {
-        let d = r * 2.0
-        "diameter=" + Cast::string(d)
-    }
-    Rect(w) => { "width=" + Cast::string(w) }
-    Point() => { "origin" }
-}
-
-// in a return statement
-fn to_int(c: Color) -> Int {
-    return match c {
-        Red()   => 0
-        Green() => 1
-        Blue()  => 2
-    }
-}
-```
-
-> **Note:** All arms must return the same type.  If they don't, the compiler
-> will reject the program with a helpful error.
-
-### Conventions
-
-Nova follows these naming conventions:
-
-| Kind | Style | Example |
-|---|---|---|
-| Types, structs, enums | PascalCase | `Player`, `Color` |
-| Variables, functions, methods | camelCase | `playerScore`, `getHealth()` |
-| Modules | snake\_case | `module my_utils` |
-| Constants (static methods) | UPPER\_CASE | `Color::RED()` |
-
-See [`documentation/conventions.md`](conventions.md) for the full style guide.
-
----
-
-## 4. Standard Library
+## 2. Standard Library
 
 All modules live in `nova-lang/std/`. Import with `import super.std.<name>`
-(dot-path relative to your file). See [Import System](#5-import-system) for
+(dot-path relative to your file). See the [Tutorial — Imports](tutorial.md#20-imports-and-the-standard-library) for
 full syntax details including GitHub imports.
 
 ---
@@ -715,8 +344,8 @@ A heap-allocated enum for operations that can fail: `Ok(value)` or `Err(error)`.
 
 ```rust
 fn divide(a: Int, b: Int) -> Result(Int, String) {
-    if b == 0 { return Result::Err("division by zero") }
-    return Result::Ok(a / b)
+    if b == 0 { return Result::Err("division by zero") @[A: Int] }
+    return Result::Ok(a / b) @[B: String]
 }
 
 let r = divide(10, 3)
@@ -1243,7 +872,7 @@ applyN(|x: Int| x * 2, 4, 1)   // 16  (1→2→4→8→16)
 applyWhile(|x: Int| x * 2, |x: Int| x < 100, 1)  // 128
 
 // Constants and identity
-let always5 = const_(5)
+let always5 = const_(5) @[B: String]
 always5("anything")  // 5
 identity(42)         // 42
 
@@ -2476,6 +2105,97 @@ g.printGridBoxed(|v: Int| if v == 1 { "#" } else { "." }, "Map")
 
 ---
 
+### `std/signal` — Signals
+
+```rust
+import super.std.signal
+```
+
+Godot-style signal system for decoupled communication.  An emitter
+defines signals; listeners `connect()` callbacks.  When the signal
+fires, every connected callback runs.
+
+Three flavours:
+
+| Type | Purpose |
+|---|---|
+| `Signal(T)` | Typed signal — carries a payload of type `T` |
+| `VoidSignal` | Fire-and-forget — no payload |
+| `SignalBus` | Named registry of void signals (global event bus) |
+
+#### Signal(T) — Typed Signal
+
+```rust
+import super.std.signal
+import super.std.core    // Box
+
+let onDamage = Signal::new() @[T: Int]
+let hp = Box(100)
+
+onDamage.connect(|dmg: Int| {
+    hp.value -= dmg
+})
+
+onDamage.emit(25)   // hp.value == 75
+onDamage.emit(10)   // hp.value == 65
+```
+
+| Method | Description |
+|---|---|
+| `Signal::new() @[T: Type]` | Create a typed signal |
+| `.connect(f: fn(T))` | Add a listener callback |
+| `.emit(payload: T)` | Fire all listeners with payload |
+| `.clear()` | Remove all listeners |
+| `.count()` → `Int` | Number of connected listeners |
+
+#### VoidSignal — No Payload
+
+```rust
+let onReady = VoidSignal::new()
+onReady.connect(|| { println("Ready!") })
+onReady.emit()   // "Ready!"
+```
+
+| Method | Description |
+|---|---|
+| `VoidSignal::new()` | Create a void signal |
+| `.connect(f: fn())` | Add a listener callback |
+| `.emit()` | Fire all listeners |
+| `.clear()` | Remove all listeners |
+| `.count()` → `Int` | Number of connected listeners |
+
+#### SignalBus — Named Event Bus
+
+```rust
+let bus = SignalBus::new()
+bus.register("game_over")
+bus.register("level_up")
+
+bus.connect("game_over", || { println("Game Over!") })
+bus.connect("level_up",  || { println("Level Up!") })
+
+bus.emit("game_over")   // "Game Over!"
+bus.emit("level_up")    // "Level Up!"
+```
+
+| Method | Description |
+|---|---|
+| `SignalBus::new()` | Create an empty signal bus |
+| `.register(name: String)` | Register a named signal |
+| `.connect(name, f: fn())` | Connect listener to named signal |
+| `.emit(name: String)` | Fire all listeners on named signal |
+| `.has(name)` → `Bool` | True if signal name is registered |
+| `.clear(name: String)` | Remove listeners on one signal |
+| `.clearAll()` | Remove all signals and listeners |
+| `.signalCount(name)` → `Int` | Number of listeners on one signal |
+
+> **When to use which?**
+> - `Signal(T)` — event carries data (damage amount, new position, toggle state).
+> - `VoidSignal` — event is a pure notification (game over, scene changed).
+> - `SignalBus` — many unrelated systems need a shared event bus by string name.
+
+---
+
 ### `std/noise` — Procedural Noise
 
 ```rust
@@ -2608,97 +2328,6 @@ fire.emit(3)
 fire.update(dt)
 fire.draw()
 ```
-
----
-
-### `std/signal` — Signals
-
-```rust
-import super.std.signal
-```
-
-Godot-style signal system for decoupled communication.  An emitter
-defines signals; listeners `connect()` callbacks.  When the signal
-fires, every connected callback runs.
-
-Three flavours:
-
-| Type | Purpose |
-|---|---|
-| `Signal(T)` | Typed signal — carries a payload of type `T` |
-| `VoidSignal` | Fire-and-forget — no payload |
-| `SignalBus` | Named registry of void signals (global event bus) |
-
-#### Signal(T) — Typed Signal
-
-```rust
-import super.std.signal
-import super.std.core    // Box
-
-let onDamage = Signal::new() @[T: Int]
-let hp = Box(100)
-
-onDamage.connect(|dmg: Int| {
-    hp.value -= dmg
-})
-
-onDamage.emit(25)   // hp.value == 75
-onDamage.emit(10)   // hp.value == 65
-```
-
-| Method | Description |
-|---|---|
-| `Signal::new() @[T: Type]` | Create a typed signal |
-| `.connect(f: fn(T))` | Add a listener callback |
-| `.emit(payload: T)` | Fire all listeners with payload |
-| `.clear()` | Remove all listeners |
-| `.count()` → `Int` | Number of connected listeners |
-
-#### VoidSignal — No Payload
-
-```rust
-let onReady = VoidSignal::new()
-onReady.connect(|| { println("Ready!") })
-onReady.emit()   // "Ready!"
-```
-
-| Method | Description |
-|---|---|
-| `VoidSignal::new()` | Create a void signal |
-| `.connect(f: fn())` | Add a listener callback |
-| `.emit()` | Fire all listeners |
-| `.clear()` | Remove all listeners |
-| `.count()` → `Int` | Number of connected listeners |
-
-#### SignalBus — Named Event Bus
-
-```rust
-let bus = SignalBus::new()
-bus.register("game_over")
-bus.register("level_up")
-
-bus.connect("game_over", || { println("Game Over!") })
-bus.connect("level_up",  || { println("Level Up!") })
-
-bus.emit("game_over")   // "Game Over!"
-bus.emit("level_up")    // "Level Up!"
-```
-
-| Method | Description |
-|---|---|
-| `SignalBus::new()` | Create an empty signal bus |
-| `.register(name: String)` | Register a named signal |
-| `.connect(name, f: fn())` | Connect listener to named signal |
-| `.emit(name: String)` | Fire all listeners on named signal |
-| `.has(name)` → `Bool` | True if signal name is registered |
-| `.clear(name: String)` | Remove listeners on one signal |
-| `.clearAll()` | Remove all signals and listeners |
-| `.signalCount(name)` → `Int` | Number of listeners on one signal |
-
-> **When to use which?**
-> - `Signal(T)` — event carries data (damage amount, new position, toggle state).
-> - `VoidSignal` — event is a pure notification (game over, scene changed).
-> - `SignalBus` — many unrelated systems need a shared event bus by string name.
 
 ---
 
@@ -2876,7 +2505,7 @@ u.tick(dt)  // spinner.angle advances automatically!
 
 ---
 
-## 5. Raylib API
+## 3. Raylib API
 
 Nova's raylib bindings provide 2D game development with window management, drawing,
 input, sprites, and audio.
@@ -3001,192 +2630,3 @@ before exit.
 | `raylib::getMusicTimePlayed(Int) -> Float` | Elapsed play time (seconds). |
 | `raylib::seekMusic(Int, Float) -> Void` | Seek to position (seconds). |
 | `raylib::setMusicLooping(Int, Bool) -> Void` | Enable/disable looping. |
-
----
-
-## 6. Import System
-
-Every Nova file begins with `module <name>`. The module name is used for
-deduplication — if a module has already been imported, subsequent imports
-of the same module are silently skipped.
-
-### Local Imports
-
-| Syntax | Resolves to | Notes |
-|---|---|---|
-| `import helper` | `./helper.nv` | Same directory |
-| `import libs.math` | `./libs/math.nv` | Subfolder |
-| `import super.std.core` | `../std/core.nv` | `super` = go up one directory |
-| `import super.super.std.grid` | `../../std/grid.nv` | Chain `super` to go up multiple |
-| `import "libs/helper.nv"` | `./libs/helper.nv` | String literal — path used as-is |
-| `import "../std/core.nv"` | `../std/core.nv` | String literal with parent traversal |
-
-**Rules:**
-- Dot-separated names: each `.` becomes `/`, `.nv` is appended automatically.
-- `super` translates to `..` (parent directory).
-- All paths are relative to the file containing the `import`.
-- All imported symbols flatten into the caller's scope (no prefix needed).
-
-### GitHub Imports
-
-Fetch a file from a public GitHub repository:
-
-```rust
-import @ "owner/repo/path/to/file.nv"
-```
-
-Lock to a specific commit hash:
-
-```rust
-import @ "owner/repo/path/to/file.nv" ! "a1b2c3d"
-```
-
-| Part | Meaning |
-|---|---|
-| `@` | Signals a GitHub import |
-| `"owner/repo/path"` | GitHub path: `owner/repo/filepath` |
-| `! "hash"` | Optional: fetch from this exact commit instead of `main` |
-
-The `module` declaration inside the fetched file determines the module name.
-Duplicate detection works the same as local imports.
-
----
-
-## 7. CLI Reference
-
-### Commands
-
-| Command | Description |
-|---|---|
-| `nova run file.nv` | Compile and run a file |
-| `nova run` | Run `main.nv` in the current directory (project mode) |
-| `nova run --git owner/repo/path.nv [commit]` | Fetch and run from GitHub |
-| `nova check [file.nv]` | Typecheck only (no execution) |
-| `nova check --git owner/repo/path.nv [commit]` | Typecheck a file from GitHub |
-| `nova time [file.nv]` | Run and print execution time |
-| `nova time --git owner/repo/path.nv [commit]` | Time a file from GitHub |
-| `nova dbg [file.nv]` | Run in interactive step debugger (TUI) |
-| `nova dbg --git owner/repo/path.nv [commit]` | Debug a file from GitHub |
-| `nova dis [file.nv]` | Disassemble to color-coded instruction listing |
-| `nova dis --git owner/repo/path.nv [commit]` | Disassemble a file from GitHub |
-| `nova init name [--with owner/repo/folder]` | Create a new project |
-| `nova install name owner/repo/folder` | Install a library into `libs/<name>/` |
-| `nova remove name` | Remove a library from `libs/<name>/` |
-| `nova test [dir]` | Run all `test_*.nv` files in `tests/` (or given dir) |
-| `nova repl` | Start interactive REPL |
-| `nova help` | Show help |
-
-All commands that accept `[file.nv]` also accept `--git` to fetch the file
-from GitHub. They will auto-detect `main.nv` in the current directory if
-the file argument is omitted.
-
-### Project Structure
-
-A Nova project is any folder with a `main.nv` file. No config file is needed.
-
-```
-myproject/
-    main.nv          ← entry point (module main)
-    libs/            ← shared modules
-        math.nv
-        helper.nv
-    tests/           ← test files (run with: nova test)
-        test_math.nv
-```
-
-- `nova init myproject` creates this structure with a hello-world template and starter test.
-- `nova init myproject --with owner/repo/folder` also fetches all `.nv` files from a GitHub folder into `libs/`.
-- `nova install name owner/repo/folder` fetches a library into `libs/<name>/` in an existing project.
-- `nova remove name` removes `libs/<name>/`.
-- `cd myproject && nova run` runs the project.
-- `cd myproject && nova test` runs all tests.
-
-### Debugger Controls
-
-The `nova dbg` command opens a full-screen TUI step debugger with a
-3-column layout. See [`documentation/debugging.md`](debugging.md) for the
-full debugging guide with strategies, tips, and common mistakes.
-
-| Key | Action |
-|---|---|
-| `↓` / `j` / `Space` | Step forward one instruction |
-| `↑` / `k` | Step back (browse history) |
-| `u` / `d` | Scroll stack view up / down |
-| `PgDn` | Step forward 20 instructions |
-| `PgUp` | Step back 20 instructions |
-| `r` | Run to end (records every step so you can rewind) |
-| `n` | Step over (run until callstack returns to current depth) |
-| `p` | Play / pause (auto-step with visual animation) |
-| `+` / `=` | Speed up playback (decrease delay) |
-| `-` / `_` | Slow down playback (increase delay) |
-| `Tab` | Toggle between Stack view and Heap inspect view |
-| `Home` | Jump to first step |
-| `End` | Jump to latest step |
-| `:` | Enter command mode |
-| `?` | Toggle help screen |
-| `q` / `Esc` | Quit debugger |
-
-**Command mode:** Press `:` to enter command mode. Type a command and press
-Enter to execute, or Esc to cancel.
-
-| Command | Action |
-|---|---|
-| `:goto <addr>` | Jump to bytecode address (executes forward if needed) |
-| `:step <n>` | Execute n steps forward |
-| `:find <text>` | Search bytecode for text (opname or operand), wraps around |
-| `:speed <ms>` | Set playback speed in milliseconds (1–10000) |
-| `:heap` | Switch to heap inspect view |
-| `:stack` | Switch to stack view |
-| `:help` | Show the help screen |
-| `:quit` | Quit debugger |
-
-The debugger layout (3 columns):
-
-- **Left column — Bytecode** — Scrolling bytecode listing with `>` marking the
-  current instruction. The view auto-scrolls to keep the current instruction
-  centered. Instructions show resolved names (function names, variable names,
-  native function names) instead of raw indices.
-- **Middle column — Stack** — All entries on the stack, top-of-stack first.
-  Top-of-stack marked with `>`, local-frame entries marked with `•`. Entries
-  are annotated with names where possible (e.g. `Int(42) (x)`). Color-coded:
-  green for TOS, white for locals, grey for globals/below-offset.
-- **Right column — Variables** — Named local variables and their current values,
-  plus any globals that hold non-function values.
-- **Output** — Last 2 lines of program output captured from `print`/`println`.
-- **Heap/GC bar** — Live heap object count, heap capacity, free-list size,
-  stack depth, GC threshold info, callstack depth, and play speed. Shows
-  `LOCKED` when the GC is inhibited. Useful for diagnosing memory leaks and
-  understanding GC behavior.
-- **Header** — Step counter, instruction pointer, callstack depth, offset, and
-  play status.
-
-**Play mode:** Press `p` to auto-step through execution at a configurable speed
-(10ms–2000ms, default 100ms). Play works from any position — if you've scrolled
-back in history, play replays forward through existing snapshots before
-executing new instructions. Press `p` to pause, or any navigation key pauses
-automatically.
-
-**Full rewind:** Both `r` (run to end) and `n` (step over) record every
-instruction executed. After running, you can use `↑`, `PgUp`, and `Home` to
-scrub backwards through the entire execution history.
-
-### Disassembler Output
-
-The `nova dis` command shows a color-coded listing of the compiled
-instructions with control-flow visualization:
-
-- **Flow arrows** on the left margin show jumps and loops:
-  - **Magenta** arrows — backward jumps (loops)
-  - **Yellow** arrows — conditional jumps (`jif`)
-  - **Cyan** arrows — forward jumps
-  - Arrows use box-drawing characters (`┌`, `└`, `│`) and are assigned
-    non-overlapping columns so multiple arrows remain readable.
-- **Function / closure nesting** — indented with `│  ` to show body boundaries.
-- **Resolved names** — variable names on `STORE`/`GET`, function names on
-  `DCALL`/`STOREGLOBAL`/`GETGLOBAL`, native names on `NATIVE`, label names on
-  jumps.
-- **Color categories**: memory (green), arithmetic (yellow), control flow
-  (red), comparisons (magenta), I/O (blue), stack ops (white).
-- **Summary** at the bottom showing instruction counts, a globals table
-  mapping slot numbers to names, and a reading guide explaining the arrow
-  colors.

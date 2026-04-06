@@ -2965,7 +2965,7 @@ enum Shape { Circle: Float, Rect: (Float, Float) }
 fn extends area(s: Shape) -> Float {
     return match s {
         Circle(r) => 3.14159 * r * r,
-        Rect(wh) => wh.0 * wh.1,
+        Rect(wh) => wh[0] * wh[1],
     }
 }
 

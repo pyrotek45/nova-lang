@@ -1,0 +1,363 @@
+module test_doc_snippets
+
+import super.std.core
+import super.std.math
+import super.std.string
+import super.std.list
+import super.std.option
+import super.std.iter
+import super.std.functional
+import super.std.hashmap
+import super.std.set
+// ============================================================
+// Verify code snippets from reference.md and tutorial.md
+// Every snippet must be self-contained and runnable
+// ============================================================
+
+// ── reference.md: std/core — Box ─────────────────────────────
+let counter = Box(0)
+let inc = || { counter.value += 1 }
+inc()
+inc()
+assert(counter.value == 2, "ref: Box counter")
+
+// ── reference.md: std/core — Gen ─────────────────────────────
+let id = Gen(0)
+assert(id() == 0, "ref: Gen(0) first call")
+assert(id() == 1, "ref: Gen(0) second call")
+assert(id() == 2, "ref: Gen(0) third call")
+
+// ── reference.md: std/core — Maybe ──────────────────────────
+let mx = Maybe::Just(42)
+let my = Maybe::Nothing() @[A: Int]
+assert(mx.isJust(), "ref: Maybe::Just isJust")
+assert(my.isNothing(), "ref: Maybe::Nothing isNothing")
+assert(mx.unwrap() == 42, "ref: Maybe::Just unwrap")
+assert(my.orDefault(99) == 99, "ref: Maybe::Nothing orDefault")
+
+let m = Maybe::Just(10)
+let doubled = m.map(|n: Int| n * 2)
+assert(doubled.unwrap() == 20, "ref: Maybe map")
+assert(m.orDefault(0) == 10, "ref: Maybe orDefault on Just")
+
+// ── reference.md: std/core — Result ─────────────────────────
+fn divide(a: Int, b: Int) -> Result(Int, String) {
+    if b == 0 { return Result::Err("division by zero") @[A: Int] }
+    return Result::Ok(a / b) @[B: String]
+}
+
+let r = divide(10, 3)
+assert(r.unwrap() == 3, "ref: Result::Ok unwrap")
+let bad = divide(1, 0)
+assert(bad.orDefault(-1) == -1, "ref: Result::Err orDefault")
+
+// ── reference.md: std/core — Option Bridges ─────────────────
+let sm = Some(42).toMaybe()
+assert(sm.isJust(), "ref: Some.toMaybe isJust")
+assert(sm.unwrap() == 42, "ref: Some.toMaybe unwrap")
+
+let nm = None(Int).toMaybe()
+assert(nm.isNothing(), "ref: None.toMaybe isNothing")
+
+let sr = Some(10).toResult("missing")
+assert(sr.isOk(), "ref: Some.toResult isOk")
+let nr = None(Int).toResult("missing")
+assert(nr.isErr(), "ref: None.toResult isErr")
+
+// ── reference.md: std/core — Range Helpers ──────────────────
+assert(range(5) == [0, 1, 2, 3, 4], "ref: range(5)")
+assert(range(2, 6) == [2, 3, 4, 5], "ref: range(2,6)")
+assert(3.to(7) == [3, 4, 5, 6], "ref: 3.to(7)")
+assert(5.iota() == [0, 1, 2, 3, 4], "ref: 5.iota()")
+assert(0.toStep(10, 3) == [0, 3, 6, 9], "ref: 0.toStep(10,3)")
+
+// ── reference.md: std/math — Int Extensions ─────────────────
+assert((-5).abs() == 5, "ref: abs")
+assert(3.pow(4) == 81, "ref: pow")
+assert(10.clamp(0, 8) == 8, "ref: clamp")
+assert(5.factorial() == 120, "ref: factorial")
+assert(12.gcd(8) == 4, "ref: gcd")
+assert(12.lcm(8) == 24, "ref: lcm")
+assert(6.isEven(), "ref: isEven")
+assert(7.isOdd(), "ref: isOdd")
+assert((-3).sign() == -1, "ref: sign")
+assert(2.modpow(10, 1000) == 24, "ref: modpow")
+assert(17.isPrime(), "ref: isPrime")
+assert(1234.digitSum() == 10, "ref: digitSum")
+assert(1234.digits() == [1, 2, 3, 4], "ref: digits")
+assert(3.min(5) == 3, "ref: min")
+assert(3.max(5) == 5, "ref: max")
+
+// ── reference.md: std/math — Standalone Functions ───────────
+assert(fib(10) == 55, "ref: fib(10)")
+assert(fibSeq(6) == [0, 1, 1, 2, 3, 5], "ref: fibSeq(6)")
+assert(bin(42) == "101010", "ref: bin(42)")
+assert(hex(255) == "ff", "ref: hex(255)")
+assert(oct(8) == "10", "ref: oct(8)")
+assert(primes(20) == [2, 3, 5, 7, 11, 13, 17, 19], "ref: primes(20)")
+assert(collatz(6) == [6, 3, 10, 5, 16, 8, 4, 2, 1], "ref: collatz(6)")
+
+// ── reference.md: std/string — String Utilities ─────────────
+assert("hello".padLeft(10, '.') == ".....hello", "ref: padLeft")
+assert("hi".padRight(8, '-') == "hi------", "ref: padRight")
+assert("yes".center(9, '=') == "===yes===", "ref: center")
+assert("banana".count("an") == 2, "ref: count substring")
+assert("hello".countChar('l') == 2, "ref: countChar")
+assert("hello".indexOfChar('l') == 2, "ref: indexOfChar")
+assert("12345".isDigit(), "ref: isDigit")
+assert("Hello".isAlpha(), "ref: isAlpha")
+assert("hello".capitalize() == "Hello", "ref: capitalize")
+assert("hello world".title() == "Hello World", "ref: title")
+assert("a-b-c".removeChar('-') == "abc", "ref: removeChar")
+assert("a.b.c".replaceChar('.', '/') == "a/b/c", "ref: replaceChar")
+assert("one\ntwo\nthree".lines() == ["one", "two", "three"], "ref: lines")
+assert("  the  quick  fox ".words() == ["the", "quick", "fox"], "ref: words")
+assert("this is a long text".truncate(7, "...") == "this...", "ref: truncate")
+assert("Hello World".slugify() == "hello-world", "ref: slugify")
+assert("[hello]".between("[", "]").unwrap() == "hello", "ref: between")
+assert("foobar".stripPrefix("foo") == "bar", "ref: stripPrefix")
+assert("foobar".stripSuffix("bar") == "foo", "ref: stripSuffix")
+
+// ── reference.md: std/list — Transforming ───────────────────
+assert([1, 2, 3].map(|x: Int| x * 2) == [2, 4, 6], "ref: list map")
+assert([1, 2, 3, 4].filter(|x: Int| x > 2) == [3, 4], "ref: list filter")
+assert([[1,2],[3,4]].flatten() == [1, 2, 3, 4], "ref: list flatten")
+assert([1, 2, 3].flatmap(|x: Int| [x, x * 10]) == [1, 10, 2, 20, 3, 30], "ref: list flatmap")
+assert([1, 2, 3].reverse() == [3, 2, 1], "ref: list reverse")
+assert([1, 2, 2, 3, 3].unique() == [1, 2, 3], "ref: list unique")
+
+// ── reference.md: std/list — Sorting ────────────────────────
+assert([3, 1, 4, 1, 5].quicksort() == [1, 1, 3, 4, 5], "ref: quicksort")
+assert([3, 1, 2].bubblesort() == [1, 2, 3], "ref: bubblesort")
+assert([3, 1, 2].sortWith(|a: Int, b: Int| a > b) == [1, 2, 3], "ref: sortWith")
+
+// ── reference.md: std/list — Searching ──────────────────────
+assert([10, 20, 30].indexOf(20) == 1, "ref: indexOf")
+assert([1, 2, 3].contains(2), "ref: contains")
+assert([1, 2, 3, 4].find(|x: Int| x > 2).unwrap() == 3, "ref: find")
+assert([1, 2, 3, 4].count(|x: Int| x > 2) == 2, "ref: list count")
+assert([true, true, true].all(), "ref: all")
+assert([false, true, false].any(), "ref: any")
+assert([1, 2, 3].anyWith(|x: Int| x == 2), "ref: anyWith")
+assert([2, 4, 6].allWith(|x: Int| x % 2 == 0), "ref: allWith")
+assert([1, 2, 3].last().unwrap() == 3, "ref: list last")
+assert([1, 2, 3].isEmpty() == false, "ref: isEmpty")
+
+// ── reference.md: std/list — Slicing ────────────────────────
+assert([1, 2, 3, 4, 5].slice(1, 4) == [2, 3, 4], "ref: slice")
+assert([1, 2, 3, 4, 5].take(3) == [1, 2, 3], "ref: take")
+assert([1, 2, 3, 4, 5].drop(2) == [3, 4, 5], "ref: drop")
+assert([1, 2, 3, 4, 5].takeWhile(|x: Int| x < 4) == [1, 2, 3], "ref: takeWhile")
+assert([1, 2, 3, 4, 5].dropWhile(|x: Int| x < 3) == [3, 4, 5], "ref: dropWhile")
+
+// ── reference.md: std/list — Aggregation ────────────────────
+assert([1, 2, 3, 4].sum() == 10, "ref: sum")
+assert([1, 2, 3, 4].product() == 24, "ref: product")
+assert([3, 1, 4].max() == 4, "ref: list max")
+assert([3, 1, 4].min() == 1, "ref: list min")
+
+// ── reference.md: std/list — Combining ──────────────────────
+assert([1, 2, 3].concat([4, 5]) == [1, 2, 3, 4, 5], "ref: concat")
+assert([1, 2, 3].zip(["a", "b", "c"]) == [(1,"a"),(2,"b"),(3,"c")], "ref: zip")
+assert([1, 2, 3].intersperse(0) == [1, 0, 2, 0, 3], "ref: intersperse")
+
+// ── reference.md: std/list — Folding ────────────────────────
+assert([1, 2, 3].foldl(|a: Int, b: Int| a + b) == 6, "ref: foldl")
+assert([1, 2, 3, 4].reduce(|acc: Int, x: Int, i: Int| acc + x, 0) == 10, "ref: reduce")
+
+// ── reference.md: std/list — Partitioning ───────────────────
+let parts = [1, 2, 3, 4, 5, 6].partition(|x: Int| x % 2 == 0)
+assert(parts[0] == [2, 4, 6], "ref: partition evens")
+assert(parts[1] == [1, 3, 5], "ref: partition odds")
+
+// ── reference.md: std/list — Advanced ───────────────────────
+assert([1, 2, 3].indices() == [0, 1, 2], "ref: indices")
+assert([1, 2, 3, 4, 5].get(2).unwrap() == 3, "ref: get Some")
+assert([1, 2, 3, 4, 5].get(99).isNone(), "ref: get None")
+
+// ── reference.md: std/option — Combinators ──────────────────
+let xopt: Option(Int) = None(Int)
+assert(xopt.orDefault(42) == 42, "ref: orDefault None")
+assert(xopt.isNone(), "ref: isNone")
+
+assert(Some(3).map(|n: Int| n * 2).unwrap() == 6, "ref: option map Some")
+assert(None(Int).map(|n: Int| n * 2).isNone(), "ref: option map None")
+
+assert(Some(4).flatMap(|n: Int| if n > 3 { Some(n) } else { None(Int) }).unwrap() == 4, "ref: flatMap")
+
+assert(Some(10).filter(|n: Int| n > 5).unwrap() == 10, "ref: option filter pass")
+assert(Some(3).filter(|n: Int| n > 5).isNone(), "ref: option filter fail")
+
+assert(Some(7).toList() == [7], "ref: option toList Some")
+assert(None(Int).toList() == []: Int, "ref: option toList None")
+
+// ── reference.md: std/iter — Lazy Iterators ─────────────────
+let iter_result = Iter::fromRange(0, 10)
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * x)
+    .take(3)
+    .collect()
+assert(iter_result == [0, 4, 16], "ref: iter pipeline")
+
+assert(Iter::fromRange(1, 6).sum() == 15, "ref: iter sum")
+assert(Iter::fromRange(1, 6).count() == 5, "ref: iter count")
+assert(Iter::fromRange(1, 100).find(|x: Int| x > 50).unwrap() == 51, "ref: iter find")
+assert(Iter::fromRange(1, 6).reduce(|acc: Int, x: Int| acc + x, 0) == 15, "ref: iter reduce")
+assert(Iter::fromVec(["a","b","c"]).nth(1).unwrap() == "b", "ref: iter nth")
+assert(Iter::fromRange(1, 6).last().unwrap() == 5, "ref: iter last")
+
+// ── reference.md: std/functional — Higher-Order ─────────────
+let double2  = |x: Int| x * 2
+let addOne2  = |x: Int| x + 1
+let doubleThenAdd = pipe(double2, addOne2)
+assert(doubleThenAdd(3) == 7, "ref: pipe")
+
+let addThenDouble = compose(double2, addOne2)
+assert(addThenDouble(3) == 8, "ref: compose")
+
+let sub = |a: Int, b: Int| a - b
+let flipped = flip(sub)
+assert(flipped(3, 10) == 7, "ref: flip")
+
+assert(applyN(|x: Int| x * 2, 4, 1) == 16, "ref: applyN")
+
+let always5 = const_(5) @[B: String]
+assert(always5("anything") == 5, "ref: const_")
+assert(identity(42) == 42, "ref: identity")
+
+let isEven = |x: Int| x % 2 == 0
+let isPositive = |x: Int| x > 0
+let evenAndPositive = both(isEven, isPositive)
+assert(evenAndPositive(4), "ref: both true")
+assert(evenAndPositive(-2) == false, "ref: both false")
+
+let notEven = negate(isEven)
+assert(notEven(3), "ref: negate")
+
+// ── reference.md: std/hashmap ───────────────────────────────
+let hm = HashMap::new() @[K: String, V: Int]
+hm.insert("a", 1)
+hm.insert("b", 2)
+assert(hm.get("a").unwrap() == 1, "ref: hashmap get")
+assert(hm.size() == 2, "ref: hashmap size")
+assert(hm.has("b"), "ref: hashmap has")
+hm.delete("b")
+assert(hm.size() == 1, "ref: hashmap after delete")
+
+// ── reference.md: std/set ───────────────────────────────────
+let s1 = Set::empty() @[T: Int]
+s1.add(1)
+s1.add(2)
+s1.add(3)
+s1.add(2) // duplicate
+assert(s1.size() == 3, "ref: set size dedup")
+assert(s1.has(2), "ref: set has")
+
+let s2 = Set::empty() @[T: Int]
+s2.add(2)
+s2.add(3)
+s2.add(4)
+
+let u = s1.union(s2)
+assert(u.size() == 4, "ref: set union")
+let inter = s1.intersection(s2)
+assert(inter.size() == 2, "ref: set intersection")
+
+// ── tutorial.md §4 — Built-in Types ─────────────────────────
+let ti: Int = 42
+let tf: Float = 3.14
+let tb: Bool = true
+let ts: String = "hello"
+let tc: Char = 'A'
+assert(ti == 42, "tut: Int type")
+assert(tb, "tut: Bool type")
+assert(ts == "hello", "tut: String type")
+assert(tc == 'A', "tut: Char type")
+
+// ── tutorial.md §5 — Euclidean modulo ───────────────────────
+assert(-10 % 3 == 2, "tut: Euclidean modulo")
+
+// ── tutorial.md §6 — Block Expressions ──────────────────────
+let block_val = {
+    let a = 10
+    let b = 20
+    a + b
+}
+assert(block_val == 30, "tut: block expression")
+
+// ── tutorial.md §6 — if as expression ───────────────────────
+let x_pos = 5
+let msg = if x_pos > 0 { "positive" } else { "non-positive" }
+assert(msg == "positive", "tut: if expression")
+
+// ── tutorial.md §6 — match expression ───────────────────────
+enum Shape {
+    Circle: Float,
+    Square: Float,
+}
+
+let shape = Shape::Circle(5.0)
+let area = match shape {
+    Circle(r)  => { 3.14 * r * r }
+    Square(s)  => { s * s }
+}
+assert(area == 78.5, "tut: match expression")
+
+// ── tutorial.md §7 — Functions ──────────────────────────────
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+assert(add(2, 3) == 5, "tut: function")
+
+// ── tutorial.md §9 — Structs ───────────────────────────────
+struct Point {
+    x: Float,
+    y: Float,
+}
+
+let p = Point { x: 1.0, y: 2.0 }
+assert(p.x == 1.0, "tut: struct field x")
+assert(p.y == 2.0, "tut: struct field y")
+
+// ── tutorial.md §10 — Enums ────────────────────────────────
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Custom: (Int, Int, Int),
+}
+
+let c = Color::Custom((255, 128, 0))
+match c {
+    Custom(rgb) => {
+        assert(rgb[0] == 255, "tut: enum match r")
+        assert(rgb[1] == 128, "tut: enum match g")
+        assert(rgb[2] == 0, "tut: enum match b")
+    }
+    _ => { assert(false, "tut: enum wrong arm") }
+}
+
+// ── tutorial.md §13 — Closures ─────────────────────────────
+let mul = |a: Int, b: Int| a * b
+assert(mul(3, 4) == 12, "tut: closure")
+
+// ── tutorial.md §17 — Pipe Operator ────────────────────────
+fn double_fn(x: Int) -> Int { return x * 2 }
+fn addOne_fn(x: Int) -> Int { return x + 1 }
+
+let pipe_result = 5 |> double_fn() |> addOne_fn()
+assert(pipe_result == 11, "tut: pipe operator")
+
+// ── tutorial.md §14 — Generics ─────────────────────────────
+fn myfirst(list: [$A]) -> $A {
+    return list[0]
+}
+assert(myfirst([10, 20, 30]) == 10, "tut: generic function")
+
+// ── tutorial.md §15 — Tuples ───────────────────────────────
+let tup = (1, "hello", true)
+assert(tup[0] == 1, "tut: tuple [0]")
+assert(tup[1] == "hello", "tut: tuple [1]")
+assert(tup[2] == true, "tut: tuple [2]")
+
+println("PASS: all doc snippet tests passed")
