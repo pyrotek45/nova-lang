@@ -785,6 +785,38 @@ Available dunders: `__add__`, `__sub__`, `__mul__`, `__div__`, `__mod__`,
 `__eq__`, `__neq__`, `__lt__`, `__gt__`, `__lte__`, `__gte__`, `__neg__`,
 `__index__`, `__setindex__`, `__display__`.
 
+### Saving and Loading Structs
+
+Structs are one of the most common things you'll serialize.
+`Data::save` writes any struct to a JSON file; `Data::load` reads it
+back.  Field names, nesting, and types are preserved automatically:
+
+```rust
+struct Player { name: String, hp: Int, alive: Bool }
+
+let p = Player { name: "Alice", hp: 100, alive: true }
+Data::save("player.json", p)
+
+let loaded = Data::load("player.json") @[T: Player]
+if let p2 = loaded {
+    println(p2.name)    // "Alice"
+}
+```
+
+Nested structs work too — `Data` recurses through every field:
+
+```rust
+struct Vec2  { x: Float, y: Float }
+struct Enemy { pos: Vec2, hp: Int, tag: String }
+
+let e = Enemy { pos: Vec2 { x: 10.0, y: 20.0 }, hp: 3, tag: "goblin" }
+Data::save("enemy.json", e)
+```
+
+> **Tip:** This is how you implement save files in games.  Save the
+> entire game state struct to disk and load it back on startup.
+> See [§48 Game Dev Tips](#48-game-dev-tips-and-tricks) for a full example.
+
 ---
 
 ## 10. Enums
@@ -824,6 +856,30 @@ enum Maybe(A) { Just: $A, Nothing }
 let x = Maybe::Just(42)
 let n = Maybe::Nothing() @[A: Int]   // type annotation for no-data generic variant
 ```
+
+### Saving and Loading Enums
+
+Enums serialize with their variant name and data intact, so you can
+round-trip them through JSON:
+
+```rust
+enum PowerUp { Speed: Float, Shield: Int, None }
+
+let pu = PowerUp::Speed(1.5)
+Data::save("powerup.json", pu)
+
+let loaded = Data::load("powerup.json") @[T: PowerUp]
+if let p = loaded {
+    match p {
+        Speed(mult)  => println("speed x" + Cast::string(mult))
+        Shield(hits) => println("shield " + Cast::string(hits))
+        None()       => println("nothing")
+    }
+}
+```
+
+This is especially useful for saving game state that uses enums for
+items, enemy types, or game modes.
 
 ---
 
@@ -870,6 +926,23 @@ let strGrid  = Grid::new(3, 3, ".")     @[T: String]  // Grid(String)
 
 Generics are structurally typed — any type that supports the operations used in the
 body will work.
+
+### Generics and Data Serialization
+
+The `@[T: Type]` annotation is also how you tell `Data::load` and
+`Data::fromJson` what type to reconstruct.  You can use any concrete
+type — including generic ones:
+
+```rust
+// Load a list of structs
+let enemies = Data::load("enemies.json") @[T: [Enemy]]
+
+// Load a generic struct
+let box = Data::load("box.json") @[T: Box(Int)]
+
+// Word-form types work too
+let items = Data::fromJson(json) @[T: List(String)]
+```
 
 ---
 
@@ -1670,9 +1743,15 @@ Nova has no classes or inheritance. Instead:
 | Adapter | Dyn types for structural polymorphism |
 | Singleton | Closure-captured Box |
 | Template Method | Pluggable function parameters |
+| Persistence | `Data::save` / `Data::load` for save files, config, high scores |
 
 **Key insight:** Nova replaces OOP's virtual dispatch with closures, enums + match,
 Dyn types, and extends + UFCS.
+
+> **Persistence pattern:** Define a struct for your save data, call
+> `Data::save("save.json", state)` to persist it, and
+> `Data::load("save.json") @[T: GameState]` to restore it.
+> Works with structs, enums, lists, tuples, Option — anything the game needs.
 
 ---
 
@@ -1735,6 +1814,9 @@ Dyn types, and extends + UFCS.
 - `&&` and `||` work in `while` and `elif` conditions
 - Numeric literals support binary `0b1010`, octal `0o17`, hex `0xFF`, and underscores `1_000_000`
 - Raw strings `r"..."` skip escape processing
+- Use `Data::save`/`Data::load` to persist any value to JSON — great for save files, config, high scores
+- `Data::load` and `Data::fromJson` need `@[T: Type]` to know what type to reconstruct
+- `Data::toJson`/`Data::fromJson` work in-memory without touching the filesystem
 - See [`conventions.md`](conventions.md) for naming and formatting style
 
 ---
@@ -1898,6 +1980,26 @@ The syntax is `@[GenericName: ConcreteType]`. Multiple type parameters are comma
 
 ```rust
 let map = HashMap::new() @[K: String, V: Int]
+```
+
+### Data Serialization Functions
+
+Nova's built-in `Data` module lets you save and load **any** value as JSON.
+No imports needed — these are available everywhere:
+
+| Function | Signature | Description |
+|---|---|---|
+| `Data::save` | `fn(String, T) -> Bool` | Write value to a JSON file |
+| `Data::load` | `fn(String) -> Option(T)` | Read value from a JSON file (needs `@[T: Type]`) |
+| `Data::toJson` | `fn(T) -> String` | Serialize value to a JSON string |
+| `Data::fromJson` | `fn(String) -> Option(T)` | Parse JSON string to a value (needs `@[T: Type]`) |
+
+All types are supported: `Int`, `Float`, `Bool`, `Char`, `String`, `List`,
+`Tuple`, `Struct`, `Enum`, `Option`.  Closures and functions cannot be serialized.
+
+```rust
+Data::save("scores.json", [100, 95, 88])
+let scores = Data::load("scores.json") @[T: [Int]]
 ```
 
 ---
@@ -3114,6 +3216,31 @@ mgr.onPop.connect(||    { println("scene popped!")   })
 > transition logic. Analytics, audio, UI updates — connect them once and
 > forget.
 
+### Saving State Across Scenes
+
+When switching scenes, you often want to carry data (score, level, inventory)
+from one scene to the next.  Use `Data::save` / `Data::load` or pass
+data through a shared struct:
+
+```rust
+// Save the play-scene state before switching to game-over
+struct PlayState { score: Int, level: Int }
+Data::save("playstate.json", PlayState { score: score.value, level: level.value })
+mgr.switch(makeGameOverScene())
+
+// In the game-over scene, load it back
+fn makeGameOverScene() -> Scene {
+    let state = Data::load("playstate.json") @[T: PlayState]
+    let finalScore = if let s = state { s.score } else { 0 }
+    // ... use finalScore to display results
+}
+```
+
+> **Tip:** For data that only needs to survive a scene transition (not
+> persist to disk), you can also capture it in a closure or pass it as a
+> function argument.  Use `Data::save` when you need persistence across
+> game sessions.
+
 ---
 
 ## 38. Entity System
@@ -3202,6 +3329,38 @@ world.onClear.connect(||        { println("world cleared!")               })
 > **Tip:** Use `onKill` for score tracking, particle effects, or sound.
 > Use `onSpawn` for spawn animations.  This keeps game logic decoupled
 > from rendering and audio.
+
+### Saving and Loading Entity Data
+
+Because entities carry a struct as their `data` field, you can
+serialize the game state with `Data::save`.  The cleanest approach
+is to collect entity data into a list and save that:
+
+```rust
+struct EnemyData { hp: Int, speed: Float, loot: String }
+
+// ── Save all enemies ─────────────────────────────────────
+struct SavedEnemy { x: Float, y: Float, data: EnemyData }
+let toSave: [SavedEnemy] = []:SavedEnemy
+
+world.forEachTagged("enemy", fn(e: Entity(EnemyData)) {
+    toSave.push(SavedEnemy { x: e.pos.x, y: e.pos.y, data: clone(e.data) })
+})
+
+Data::save("enemies.json", toSave)
+
+// ── Load enemies back ────────────────────────────────────
+let loaded = Data::load("enemies.json") @[T: [SavedEnemy]]
+if let enemies = loaded {
+    for s in enemies {
+        world.spawn(s.x, s.y, "enemy", s.data)
+    }
+}
+```
+
+> **Tip:** Don't try to serialize the entire `EntityWorld` directly —
+> instead, extract the data you need into a plain struct and save that.
+> This gives you full control over what gets persisted.
 
 ---
 
@@ -3896,6 +4055,119 @@ if raylib::isKeyReleased("F3") { debugOn.value = !debugOn.value }
 
 if debugOn.value {
     // draw hitboxes, entity counts, FPS
+}
+```
+
+### Save System
+
+Use `Data::save` and `Data::load` to implement full save/load in any game.
+Put everything you want to persist into a single struct:
+
+```rust
+struct SaveData {
+    score: Int,
+    level: Int,
+    playerX: Float,
+    playerY: Float,
+    hp: Int,
+    inventory: [String],
+    unlockedLevels: [Int],
+}
+
+fn saveGame(state: SaveData) {
+    if Data::save("savegame.json", state) {
+        println("Game saved!")
+    }
+}
+
+fn loadGame() -> Option(SaveData) {
+    return Data::load("savegame.json") @[T: SaveData]
+}
+```
+
+Wire it into your game loop:
+
+```rust
+// Save on F5
+if raylib::isKeyReleased("F5") {
+    let state = SaveData {
+        score: score.value,
+        level: currentLevel.value,
+        playerX: player.pos.x,
+        playerY: player.pos.y,
+        hp: player.data.hp,
+        inventory: clone(inventory),
+        unlockedLevels: clone(unlocked),
+    }
+    saveGame(state)
+}
+
+// Load on F9
+if raylib::isKeyReleased("F9") {
+    let save = loadGame()
+    if let s = save {
+        score.value = s.score
+        currentLevel.value = s.level
+        player.pos = Vec2::new(s.playerX, s.playerY)
+        player.data.hp = s.hp
+        // ... restore inventory, levels, etc.
+        println("Game loaded!")
+    } else {
+        println("No save file found")
+    }
+}
+```
+
+> **Tip:** Save structs can contain anything serializable — lists,
+> nested structs, enums, Options, tuples.  If your game has multiple
+> save slots, use different filenames: `"save1.json"`, `"save2.json"`, etc.
+
+### High Scores
+
+A simple persistent high-score table:
+
+```rust
+struct HighScore { name: String, score: Int }
+
+fn loadHighScores() -> [HighScore] {
+    let loaded = Data::load("highscores.json") @[T: [HighScore]]
+    if let scores = loaded { return scores }
+    return []:HighScore
+}
+
+fn saveHighScore(name: String, score: Int) {
+    let scores = loadHighScores()
+    scores.push(HighScore { name: name, score: score })
+    // Sort descending (keep top 10)
+    import super.std.list
+    scores = bubblesort(scores, |a: HighScore, b: HighScore| a.score > b.score)
+    if scores.len() > 10 {
+        scores = scores[0:10]
+    }
+    Data::save("highscores.json", scores)
+}
+```
+
+### Settings / Config File
+
+Save and load player preferences:
+
+```rust
+struct Settings {
+    volume: Float,
+    fullscreen: Bool,
+    difficulty: String,
+}
+
+fn loadSettings() -> Settings {
+    let loaded = Data::load("settings.json") @[T: Settings]
+    if let s = loaded { return s }
+    // defaults
+    return Settings { volume: 0.8, fullscreen: false, difficulty: "normal" }
+}
+
+fn saveSettings(s: Settings) {
+    Data::save("settings.json", s)
 }
 ```
 
