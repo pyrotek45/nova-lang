@@ -362,6 +362,22 @@ let json = Data::toJson([1, 2, 3])
 let list = Data::fromJson(json) @[T: [Int]]     // or @[T: List(Int)]
 ```
 
+**Supported types:** `Int`, `Float`, `Bool`, `Char`, `String`, `List(T)`,
+`Tuple(A, B, …)`, `Struct`, `Enum`, `Option(T)`, and any nesting of these.
+
+**Not supported:** Closures, functions, and `Dyn` types cannot be serialized.
+
+**Error behavior:**
+- `Data::save` returns `false` if the path is not writable.
+- `Data::load` returns `None` if the file is missing or the JSON is malformed.
+- `Data::fromJson` returns `None` if the string is not valid JSON.
+
+**Word-form types** work in the `@[T:...]` annotation:
+```rust
+let xs = Data::load("list.json") @[T: List(Int)]
+let tp = Data::fromJson(s) @[T: Tuple(Int, String)]
+```
+
 ---
 
 ## 3. Language Syntax Notes
