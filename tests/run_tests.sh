@@ -126,6 +126,11 @@ fi
 echo ""
 if [ $TOTAL_FAIL -eq 0 ]; then
     echo "All tests passed! ✓"
+    echo ""
+    echo "── Reminder ──────────────────────────────────────────"
+    echo "  • git add any new test files before committing"
+    echo "  • after push: nix-env -if default.nix --option tarball-ttl 0"
+    echo "─────────────────────────────────────────────────────"
     exit 0
 else
     echo "$TOTAL_FAIL test(s) failed."
