@@ -213,5 +213,5 @@ Game development: `std/camera`, `std/entity`, `std/physics`, `std/scene`,
 
 ## License
 
-Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+Licensed under the [MIT License](LICENSE).
 
