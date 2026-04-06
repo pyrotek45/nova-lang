@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: match expression with incomplete coverage and no default
+enum Color { Red, Green, Blue }
+
+let c = Color::Red()
+let x = match c {
+    Red()   => 1
+    Green() => 2
+}
