@@ -175,6 +175,9 @@ fn entry_command() -> Option<()> {
         }
         "repl" => repl_session(),
         "help" => print_help(),
+        "version" | "--version" | "-V" => {
+            println!("Nova {} (alpha)", env!("CARGO_PKG_VERSION"));
+        }
         _ => {
             eprintln!("Error: unknown command '{}'.", command);
             eprintln!("  Run 'nova help' to see available commands.\n");
@@ -301,7 +304,7 @@ fn repl_session() -> ! {
         "{}",
         banners[rand::thread_rng().gen_range(0..banners.len())]
     );
-    println!("Welcome to Nova 0.1.0: Made with Love <3 : Pyrotek45 ");
+    println!("Welcome to Nova {} (alpha) — Made with Love <3 — Pyrotek45 ", env!("CARGO_PKG_VERSION"));
     println!("Type 'help' for a list of commands");
     // Assuming NovaRepl is defined elsewhere
     use reedline::{DefaultPrompt, Reedline, Signal};
@@ -554,7 +557,7 @@ fn repl_session() -> ! {
 }
 
 fn print_help() {
-    println!("Nova 0.1.0: by pyrotek45\n");
+    println!("Nova {} (alpha) — by pyrotek45\n", env!("CARGO_PKG_VERSION"));
     println!("COMMANDS");
     println!("\trun   [file]                    // run a file (or main.nv if inside a project)");
     println!("\trun   --git owner/repo/path     // run a file directly from GitHub");
@@ -571,6 +574,7 @@ fn print_help() {
     println!("\tinstall <name> <repo/path>      // install a library into libs/<name>/");
     println!("\tremove  <name>                  // remove a library from libs/<name>/");
     println!("\trepl                            // start the interactive repl");
+    println!("\tversion                         // print version information");
     println!("\thelp                            // display this menu");
     println!("\nPROJECT STRUCTURE");
     println!("\tA Nova project is any folder with a main.nv file.");
