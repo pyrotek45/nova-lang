@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: List::get returns Option — bare use is discard
+let xs = [1, 2, 3]
+xs.get(0)
+println("should not reach")

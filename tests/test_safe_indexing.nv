@@ -1,0 +1,148 @@
+module test_safe_indexing
+
+// ============================================================
+//  Test suite for safe indexing operations
+//
+//  List::get, String::get, List::trySwap, List::trySet
+// ============================================================
+
+// ── 1. List::get — basic ────────────────────────────────────────
+let xs = [10, 20, 30, 40, 50]
+
+assert(xs.get(0)? == 10, "1a: get first")
+assert(xs.get(1)? == 20, "1b: get second")
+assert(xs.get(4)? == 50, "1c: get last")
+
+// Out of bounds returns None
+assert(xs.get(5).isSome() == false, "1d: get OOB returns None")
+assert(xs.get(100).isSome() == false, "1e: get far OOB returns None")
+
+println("  GROUP 1 [List::get basic] OK")
+
+// ── 2. List::get — negative indices ─────────────────────────────
+assert(xs.get(-1)? == 50, "2a: get(-1) = last")
+assert(xs.get(-2)? == 40, "2b: get(-2) = second to last")
+assert(xs.get(-5)? == 10, "2c: get(-5) = first")
+
+// Too-negative returns None
+assert(xs.get(-6).isSome() == false, "2d: get(-6) OOB")
+assert(xs.get(-100).isSome() == false, "2e: get(-100) far OOB")
+
+println("  GROUP 2 [List::get negative] OK")
+
+// ── 3. List::get — empty list ───────────────────────────────────
+let empty = []: Int
+assert(empty.get(0).isSome() == false, "3a: get on empty list")
+assert(empty.get(-1).isSome() == false, "3b: get(-1) on empty list")
+
+println("  GROUP 3 [List::get empty] OK")
+
+// ── 4. List::get — with different types ─────────────────────────
+let strs = ["hello", "world"]
+assert(strs.get(0)? == "hello", "4a: get String")
+assert(strs.get(1)? == "world", "4b: get String index 1")
+
+let bools = [true, false, true]
+assert(bools.get(0)? == true, "4c: get Bool")
+assert(bools.get(1)? == false, "4d: get Bool false")
+
+let floats = [1.5, 2.5, 3.5]
+assert(floats.get(1)? == 2.5, "4e: get Float")
+
+println("  GROUP 4 [List::get types] OK")
+
+// ── 5. String::get — basic ──────────────────────────────────────
+let s = "hello"
+assert(s.get(0)? == 'h', "5a: String::get first")
+assert(s.get(1)? == 'e', "5b: String::get second")
+assert(s.get(4)? == 'o', "5c: String::get last")
+
+// Out of bounds
+assert(s.get(5).isSome() == false, "5d: String::get OOB")
+assert(s.get(100).isSome() == false, "5e: String::get far OOB")
+
+println("  GROUP 5 [String::get basic] OK")
+
+// ── 6. String::get — negative indices ───────────────────────────
+assert(s.get(-1)? == 'o', "6a: String::get(-1)")
+assert(s.get(-5)? == 'h', "6b: String::get(-5)")
+
+// Too-negative
+assert(s.get(-6).isSome() == false, "6c: String::get(-6) OOB")
+
+println("  GROUP 6 [String::get negative] OK")
+
+// ── 7. String::get — empty string ───────────────────────────────
+let es = ""
+assert(es.get(0).isSome() == false, "7a: empty string get(0)")
+assert(es.get(-1).isSome() == false, "7b: empty string get(-1)")
+
+println("  GROUP 7 [String::get empty] OK")
+
+// ── 8. List::trySwap ────────────────────────────────────────────
+let swap_list = [1, 2, 3, 4, 5]
+
+assert(swap_list.trySwap(0, 4) == true, "8a: trySwap valid")
+assert(swap_list[0] == 5, "8b: first is now 5")
+assert(swap_list[4] == 1, "8c: last is now 1")
+
+// OOB cases
+assert(swap_list.trySwap(0, 10) == false, "8d: trySwap OOB right")
+assert(swap_list.trySwap(10, 0) == false, "8e: trySwap OOB left")
+assert(swap_list.trySwap(10, 20) == false, "8f: trySwap both OOB")
+assert(swap_list.trySwap(-1, 0) == false, "8g: trySwap negative")
+
+// Verify list unchanged after failed swaps
+assert(swap_list[0] == 5, "8h: list unchanged after failed swap")
+
+println("  GROUP 8 [List::trySwap] OK")
+
+// ── 9. List::trySet ─────────────────────────────────────────────
+let set_list = [10, 20, 30]
+
+assert(set_list.trySet(0, 99) == true, "9a: trySet valid")
+assert(set_list[0] == 99, "9b: value updated")
+
+assert(set_list.trySet(2, 77) == true, "9c: trySet last")
+assert(set_list[2] == 77, "9d: last updated")
+
+// OOB cases
+assert(set_list.trySet(3, 0) == false, "9e: trySet OOB")
+assert(set_list.trySet(100, 0) == false, "9f: trySet far OOB")
+assert(set_list.trySet(-1, 0) == false, "9g: trySet negative")
+
+// Verify list unchanged after failed sets
+assert(set_list[0] == 99, "9h: list unchanged after failed set")
+
+println("  GROUP 9 [List::trySet] OK")
+
+// ── 10. Asserting swap/set still work ───────────────────────────
+let a_list = [1, 2, 3]
+a_list.swap(0, 2)      // asserting swap — Void return
+assert(a_list[0] == 3, "10a: asserting swap works")
+assert(a_list[2] == 1, "10b: asserting swap works")
+
+a_list.set(1, 99)      // asserting set — Void return
+assert(a_list[1] == 99, "10c: asserting set works")
+
+println("  GROUP 10 [asserting swap/set] OK")
+
+// ── 11. Combined patterns ───────────────────────────────────────
+// Use get() with if let for safe iteration patterns
+let data = [100, 200, 300]
+let sum = 0
+for let i = 0; i < 5; i += 1 {
+    if let v = data.get(i) {
+        sum += v
+    }
+}
+assert(sum == 600, "11a: safe iteration with get() + if let")
+
+// Chain get() with ?
+let s2 = "Nova"
+let ch = s2.get(0)?
+assert(ch == 'N', "11b: get() chained with ?")
+
+println("  GROUP 11 [combined patterns] OK")
+
+println("PASS: test_safe_indexing")

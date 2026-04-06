@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: bare readFile returns Option(String) — must be used
+readFile("some_file.txt")
+println("should not reach")

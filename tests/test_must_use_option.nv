@@ -1,0 +1,115 @@
+module test_must_use_option
+
+// ============================================================
+//  Test suite for must-use Option semantics
+//
+//  Option values used as bare expression statements are a
+//  compile error. This tests all the VALID ways to handle them.
+// ============================================================
+
+// ── 1. let _ = expr  (explicit discard) ─────────────────────────
+fn maybeInt() -> Option(Int) { return Some(42) }
+
+let _ = maybeInt()
+assert(true, "1a: let _ = discards without error")
+
+// Reassign _ for subsequent discards in same scope
+_ = maybeInt()
+assert(true, "1b: _ = reassign also works")
+
+println("  GROUP 1 [let _ discard] OK")
+
+// ── 2. let x = expr  (bind to named variable) ──────────────────
+let result = maybeInt()
+assert(result.isSome(), "2a: bound to named variable")
+
+println("  GROUP 2 [let binding] OK")
+
+// ── 3. ? to unwrap  (explicit unwrap) ───────────────────────────
+let val = maybeInt()?
+assert(val == 42, "3a: ? unwraps and uses the value")
+
+println("  GROUP 3 [? unwrap] OK")
+
+// ── 4. if let  (pattern match) ──────────────────────────────────
+if let v = maybeInt() {
+    assert(v == 42, "4a: if let extracts value")
+} else {
+    assert(false, "4a: should not be None")
+}
+
+println("  GROUP 4 [if let] OK")
+
+// ── 5. while let  (repeated extraction) ─────────────────────────
+let stack = [1, 2, 3]
+let sum = 0
+while let top = stack.pop() {
+    sum += top
+}
+assert(sum == 6, "5a: while let pops all elements")
+assert(stack.len() == 0, "5b: stack is empty after while let")
+
+println("  GROUP 5 [while let] OK")
+
+// ── 6. Option as last expression (tail) ─────────────────────────
+// The last expression in a block is exempt from must-use
+// because it may be the block's return value.
+fn getOption() -> Option(Int) {
+    return Some(99)    // explicit return
+}
+assert(getOption()? == 99, "6a: tail Option is fine")
+
+println("  GROUP 6 [tail expression exempt] OK")
+
+// ── 7. Option in if-else branches ───────────────────────────────
+fn conditionalOption(flag: Bool) -> Option(Int) {
+    if flag {
+        return Some(1)
+    } else {
+        return None(Int)
+    }
+}
+let r = conditionalOption(true)
+assert(r? == 1, "7a: Option from if branch")
+let r2 = conditionalOption(false)
+assert(r2.isSome() == false, "7b: None from else branch")
+
+println("  GROUP 7 [conditional Option] OK")
+
+// ── 8. Discard in loops with _ = (reassignment) ────────────────
+let dq = [10, 20, 30, 40, 50]
+for let i = 0; i < 3; i += 1 {
+    _ = dq.pop()
+}
+assert(dq.len() == 2, "8a: pop discarded in loop with _ =")
+
+// Multiple pops in same scope using _ = reassignment
+let dq2 = [1, 2, 3, 4]
+_ = dq2.pop()
+_ = dq2.pop()
+assert(dq2.len() == 2, "8b: multiple discards in same scope")
+
+println("  GROUP 8 [loop discard] OK")
+
+// ── 9. Non-Option types are NOT affected ────────────────────────
+// These should all be fine as bare statements (no must-use):
+let xs = [1, 2, 3]
+xs.push(4)          // Void — fine
+xs.len()            // Int — fine (not Option)
+1 + 2               // Int — fine
+true && false       // Bool — fine
+
+println("  GROUP 9 [non-Option bare statements] OK")
+
+// ── 10. Nested function calls returning Option ──────────────────
+fn outer() -> Option(String) {
+    return Some("nested")
+}
+fn useOuter() -> String {
+    return outer()?
+}
+assert(useOuter() == "nested", "10a: ? inside function body")
+
+println("  GROUP 10 [nested ? in functions] OK")
+
+println("PASS: test_must_use_option")

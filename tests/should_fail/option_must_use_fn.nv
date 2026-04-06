@@ -1,0 +1,9 @@
+module main
+
+// SHOULD FAIL: bare Option expression from function call is not allowed
+fn maybeFive() -> Option(Int) {
+    return Some(5)
+}
+
+maybeFive()
+println("should not reach")

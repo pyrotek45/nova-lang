@@ -258,8 +258,43 @@ x = "hello" // ERROR — cannot change type
 ```
 
 > **`let` is an expression** — it evaluates to `Void`, but syntactically it
-> can appear anywhere an expression is expected. This is rarely used directly
-> but is important for understanding the language grammar.
+> can appear anywhere an expression is expected. The most practical use is
+> in C-style `for` loops where the initializer slot expects an expression:
+>
+> ```rust
+> for let i = 0; i < 10; i += 1 {
+>     println(i)
+> }
+> ```
+>
+> Here `let i = 0` is an expression that introduces `i` and evaluates to
+> `Void`.  Because it's an expression, it slots into the `for` grammar
+> naturally.
+
+### Discarding Values with `_`
+
+The identifier `_` is a normal variable — there is no special language
+support for it.  However, it's the idiomatic way to discard a value you
+don't need:
+
+```rust
+let _ = readFile("config.txt")    // explicitly discard the Option
+```
+
+Because `_` is just a variable, there are a few rules to keep in mind:
+
+- You can only `let _` **once per scope**.  After that, use `_ = expr`:
+
+  ```rust
+  let _ = someOption()     // first discard
+  _ = anotherOption()      // second discard — reassign, don't redeclare
+  ```
+
+- `let _ = optionExpr` does bypass the must-use check because `let`
+  wraps the result as `Void`.
+
+- `_` otherwise behaves like any other variable — it occupies a scope
+  slot and can be read back (though you usually shouldn't).
 
 ---
 
@@ -663,6 +698,19 @@ fn extends sum_with(self: Int, xs: [Int]) -> Int {
 | `f(1, 2, 3)` where `f(xs: [Int])` exists | Trailing args wrapped into `[1,2,3]` |
 | `f("hi", 1, 2)` where `f(s: String, xs: [Int])` exists | `"hi"` kept, `1,2` → `[1,2]` |
 | `f(5)` where both `f(Int)` and `f([Int])` exist | Exact `f(Int)` wins |
+
+#### Built-in example: `format`
+
+The built-in `format(String, [String])` function is a natural fit for
+varargs — you never need to wrap the arguments in a list:
+
+```rust
+format("Hello, {}!", name)
+format("{} + {} = {}", "1", "2", "3")
+```
+
+Both the explicit-list form and varargs form are valid — use whichever
+reads better.
 
 ---
 
@@ -1897,10 +1945,16 @@ String concatenation uses `+` (String + String only):
 let msg = "Count: " + Cast::string(42)
 ```
 
-Use `format` for placeholders:
+Use `format` for placeholders (varargs — no list wrapper needed):
 
 ```rust
-let msg = format("Hello, {}! Age: {}", [name, Cast::string(age)])
+let msg = format("Hello, {}! Age: {}", name, Cast::string(age))
+```
+
+You can still pass an explicit list if you prefer:
+
+```rust
+let msg = format("Hello, {}!", [name])    // explicit list — also works
 ```
 
 ---
@@ -1998,6 +2052,13 @@ Dyn types, and extends + UFCS.
 - `Data::load` and `Data::fromJson` need `@[T: Type]` to know what type to reconstruct
 - `Data::toJson`/`Data::fromJson` work in-memory without touching the filesystem
 - See [`conventions.md`](conventions.md) for naming and formatting style
+- `format` and `printf` support **varargs**: `format("{} + {}", a, b)` — no list wrapper needed
+- `Regex` functions take **(pattern, text)**: `Regex::matches("\\d+", myString)`
+- `Regex::captures` returns all full-pattern matches, not sub-groups: `Regex::captures("\\d+", "a 1 b 2")` → `["1", "2"]`
+- `String::indexOf` returns `Int` (`-1` if not found) — not `Option`
+- Tuple fields are accessed with bracket syntax: `tup[0]`, not `tup.0`
+- `let _` can be used once per scope to discard; then use `_ = expr` for further discards
+- The must-use check fires **between** statements — a trailing Option at end-of-block is exempt (it's a tail expression)
 
 ---
 
@@ -2024,6 +2085,9 @@ Dyn types, and extends + UFCS.
 | Missing return on else branch | All paths must return |
 | Varargs with mixed types `f(1, "hi")` | All trailing varargs must be the same type |
 | Varargs on non-last param | The list param must be last in the signature |
+| `let _ = a; let _ = b` redeclare | Use `let _ = a; _ = b` (reassign, don't redeclare) |
+| `Regex::captures("text", "pattern")` | Args are **(pattern, text)**: `Regex::captures("\\d+", text)` |
+| Bare `readFile(...)` as statement | Must-use: wrap with `?`, `let`, or `if let` |
 
 ---
 
@@ -3218,7 +3282,7 @@ Use range and indexing together for index-value iteration:
 ```rust
 let names = ["Alice", "Bob", "Carol"]
 for i in 0..names.len() {
-    println(format("{}: {}", [Cast::string(i), names[i]]))
+    println(format("{}: {}", Cast::string(i), names[i]))
 }
 ```
 
@@ -5063,7 +5127,7 @@ struct AppState { x: Int, y: Int, score: Int, running: Bool }
 | `list` — dynamic, mixed types | `[T]` — typed, single type |
 | `[x for x in xs if p]` | `[x in xs \| x \| p]` |
 | `xs[1:3]`, `xs[-2:]` | Same slicing syntax |
-| `f"hello {x}"` | `format("hello {}", [x])` |
+| `f"hello {x}"` | `format("hello {}", x)` |
 | `lambda x: x+1` | `\|x: Int\| x + 1` |
 | `try / except` | `Option(T)` / `Result(T, E)` |
 

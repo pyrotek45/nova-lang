@@ -130,7 +130,7 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `String::toLower(String) -> String` | Convert to lowercase. |
 | `String::replace(String, String, String) -> String` | Replace all occurrences of a substring. |
 | `String::substring(String, Int, Int) -> String` | Extract substring by start index and length. |
-| `String::indexOf(String, String) -> Option(Int)` | First index of a substring, or None. |
+| `String::indexOf(String, String) -> Int` | First index of a substring, or `-1` if not found. |
 | `String::repeat(String, Int) -> String` | Repeat a string N times. |
 | `String::reverse(String) -> String` | Reverse the characters. |
 | `String::isEmpty(String) -> Bool` | Check if empty. |
@@ -204,8 +204,8 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `writeFile(String, String) -> Bool` | Write to file (creates or overwrites). Returns `false` on error. |
 | `appendFile(String, String) -> Bool` | Append to file. Returns `false` on error. |
 | `fileExists(String) -> Bool` | Check if file exists. |
-| `printf(String, [String]) -> Void` | Print formatted string (`{}` placeholders). |
-| `format(String, [String]) -> String` | Format string without printing. |
+| `printf(String, [String]) -> Void` | Print formatted string (`{}` placeholders). Supports varargs: `printf("{} {}", a, b)`. |
+| `format(String, [String]) -> String` | Format string without printing. Supports varargs: `format("{} {}", a, b)`. |
 
 ### Random
 
@@ -245,11 +245,19 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 
 ### Regex
 
+All regex functions take **(pattern, text)** — the pattern is the first argument.
+Invalid regex patterns are handled gracefully (no crash).
+
 | Signature | Description |
 |---|---|
-| `Regex::matches(String, String) -> Bool` | Test whether a string matches a regex pattern. Returns `false` on invalid regex. |
-| `Regex::first(String, String) -> Option((Int, Int, String))` | First match: (start, end, text). Returns `None` on invalid regex. |
-| `Regex::captures(String, String) -> [String]` | All capture groups from a match. Returns `[]` on invalid regex. |
+| `Regex::matches(pattern: String, text: String) -> Bool` | Test whether `text` matches `pattern`. Returns `false` on invalid regex. |
+| `Regex::first(pattern: String, text: String) -> Option((Int, Int, String))` | First match: `(start, end, matched_text)`. Returns `None` on invalid regex or no match. |
+| `Regex::captures(pattern: String, text: String) -> [String]` | All non-overlapping full-pattern matches in `text`. Returns `[]` on invalid regex or no match. |
+
+> **Note:** `Regex::captures` uses `find_iter` internally — it returns all
+> non-overlapping matches of the **entire pattern**, not individual capture
+> sub-groups.  For example, `Regex::captures("\\d+", "a 12 b 34")` returns
+> `["12", "34"]`.
 
 ### Program
 

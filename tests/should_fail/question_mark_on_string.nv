@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: ? on a String (not an Option)
+let s = "hello"
+let c = s?

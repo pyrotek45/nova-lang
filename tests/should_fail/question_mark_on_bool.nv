@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: ? on a Bool (not an Option)
+let b = true
+let x = b?

@@ -1,0 +1,156 @@
+module test_question_mark_operator
+
+// ============================================================
+//  Test suite for the `?` postfix operator
+//
+//  `expr?` is sugar for `expr.unwrap()`. It extracts the inner
+//  value from an Option(T), or panics if None.
+// ============================================================
+
+// ── 1. Basic unwrap on Some values ──────────────────────────────
+let a: Option(Int) = Some(42)
+assert(a? == 42, "1a: ? on Some(Int)")
+
+let b: Option(String) = Some("hello")
+assert(b? == "hello", "1b: ? on Some(String)")
+
+let c: Option(Bool) = Some(true)
+assert(c? == true, "1c: ? on Some(Bool)")
+
+let d: Option(Float) = Some(3.14)
+assert(d? == 3.14, "1d: ? on Some(Float)")
+
+let e: Option(Char) = Some('x')
+assert(e? == 'x', "1e: ? on Some(Char)")
+
+println("  GROUP 1 [basic unwrap] OK")
+
+// ── 2. ? on function return values ──────────────────────────────
+fn findFirst(xs: [Int], target: Int) -> Option(Int) {
+    for let i = 0; i < xs.len(); i += 1 {
+        if xs[i] == target {
+            return Some(i)
+        }
+    }
+    return None(Int)
+}
+
+assert(findFirst([10, 20, 30], 20)? == 1, "2a: ? on fn return")
+assert(findFirst([10, 20, 30], 10)? == 0, "2b: ? on fn return first")
+
+println("  GROUP 2 [function returns] OK")
+
+// ── 3. ? chained with method calls ─────────────────────────────
+let xs = [1, 2, 3, 4, 5]
+let popped = xs.pop()?
+assert(popped == 5, "3a: ? on pop()")
+
+// Chain ? with further operations
+let words = ["hello", "world"]
+let last = words.pop()?
+assert(last.len() == 5, "3b: ? then method call")
+
+println("  GROUP 3 [method chaining] OK")
+
+// ── 4. ? in expressions ─────────────────────────────────────────
+let x: Option(Int) = Some(10)
+let y: Option(Int) = Some(20)
+let sum = x? + y?
+assert(sum == 30, "4a: ? in arithmetic")
+
+let cond = Some(true)
+if cond? {
+    assert(true, "4b: ? in if condition")
+} else {
+    assert(false, "4b: should not reach")
+}
+
+// ? in function argument position
+fn double(n: Int) -> Int { return n * 2 }
+assert(double(Some(5)?) == 10, "4c: ? as function arg")
+
+println("  GROUP 4 [in expressions] OK")
+
+// ── 5. ? with nested Option values ──────────────────────────────
+fn getOuter() -> Option(Int) {
+    return Some(99)
+}
+assert(getOuter()? == 99, "5a: ? on nested call")
+
+// Using ? inside a let binding
+let val = Some(42)?
+assert(val == 42, "5b: ? in let binding")
+
+println("  GROUP 5 [nested/let] OK")
+
+// ── 6. ? with list operations that return Option ────────────────
+let nums = [10, 20, 30, 40, 50]
+
+// List::get returns Option(T)
+assert(nums.get(0)? == 10, "6a: ? on List::get(0)")
+assert(nums.get(4)? == 50, "6b: ? on List::get(4)")
+assert(nums.get(-1)? == 50, "6c: ? on List::get(-1)")
+assert(nums.get(-5)? == 10, "6d: ? on List::get(-5)")
+
+// String::get returns Option(Char)
+let s = "hello"
+assert(s.get(0)? == 'h', "6e: ? on String::get(0)")
+assert(s.get(-1)? == 'o', "6f: ? on String::get(-1)")
+
+println("  GROUP 6 [get() methods] OK")
+
+// ── 7. ? with struct fields ─────────────────────────────────────
+struct Config {
+    name: Option(String),
+    port: Option(Int),
+}
+
+let cfg = Config { name: Some("nova"), port: Some(8080) }
+assert(cfg.name? == "nova", "7a: ? on struct Option field")
+assert(cfg.port? == 8080, "7b: ? on struct Option field int")
+
+println("  GROUP 7 [struct fields] OK")
+
+// ── 8. ? preserves type correctly ───────────────────────────────
+// The result of ? should be T, not Option(T)
+let optStr: Option(String) = Some("test")
+let plain: String = optStr?    // Should compile — String = String
+assert(plain == "test", "8a: ? result type is T not Option(T)")
+
+let optList: Option([Int]) = Some([1, 2, 3])
+let plainList: [Int] = optList?
+assert(plainList.len() == 3, "8b: ? on Option([Int])")
+
+println("  GROUP 8 [type correctness] OK")
+
+// ── 9. ? in loop conditions and bodies ──────────────────────────
+let items = [Some(1), Some(2), Some(3)]
+let total = 0
+for item in items {
+    total += item?
+}
+assert(total == 6, "9a: ? inside for-in loop")
+
+println("  GROUP 9 [loops] OK")
+
+// ── 10. ? with multiple unwraps in one expression ───────────────
+fn safeAdd(a: Option(Int), b: Option(Int)) -> Int {
+    return a? + b?
+}
+assert(safeAdd(Some(3), Some(7)) == 10, "10a: multiple ? in one expr")
+
+// ? on charAt which returns Option(Char)
+let ch2 = "nova".charAt(0)?
+assert(ch2 == 'n', "10b: ? on charAt")
+
+// ? on Cast::int which returns Option(Int)
+let parsed = Cast::int("123")?
+assert(parsed == 123, "10c: ? on Cast::int")
+
+// ? on Cast::float which returns Option(Float)
+let pf = Cast::float("3.14")?
+assert(pf == 3.14, "10d: ? on Cast::float")
+
+println("  GROUP 10 [multiple ? expressions] OK")
+
+println("PASS: test_question_mark_operator")
