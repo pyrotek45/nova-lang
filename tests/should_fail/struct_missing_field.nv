@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: struct missing a required field
+struct Person { name: String, age: Int }
+let p = Person { name: "Alice" }

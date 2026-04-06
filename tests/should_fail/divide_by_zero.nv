@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: dividing by zero
+let x = 10 / 0

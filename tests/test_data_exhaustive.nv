@@ -1,0 +1,700 @@
+module test_data_exhaustive
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DATA SERIALIZATION — EXHAUSTIVE TESTS
+//  Tests every type combination through Data::save/load and toJson/fromJson.
+//  Tries hard to break things with edge cases, deep nesting, large data,
+//  wacky generic annotations, struct field ordering, enum variants, etc.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let base = "/tmp/nova_test_data_ex_"
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 1: PRIMITIVE TYPES — exhaustive edge cases
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Int: zero ────────────────────────────────────────────────────────────
+assert(Data::save(base + "int_zero.json", 0), "save int zero")
+let lz = Data::load(base + "int_zero.json") @[T: Int]
+assert(Option::unwrap(lz) == 0, "load int zero")
+
+// ── Int: max-ish positive ────────────────────────────────────────────────
+assert(Data::save(base + "int_big.json", 999999999), "save int big")
+let lb = Data::load(base + "int_big.json") @[T: Int]
+assert(Option::unwrap(lb) == 999999999, "load int big")
+
+// ── Int: large negative ──────────────────────────────────────────────────
+assert(Data::save(base + "int_neg_big.json", -999999999), "save int neg big")
+let lnb = Data::load(base + "int_neg_big.json") @[T: Int]
+assert(Option::unwrap(lnb) == -999999999, "load int neg big")
+
+// ── Float: zero ──────────────────────────────────────────────────────────
+assert(Data::save(base + "float_zero.json", 0.0), "save float zero")
+let fz = Data::load(base + "float_zero.json") @[T: Float]
+assert(Option::unwrap(fz) == 0.0, "load float zero")
+
+// ── Float: negative ──────────────────────────────────────────────────────
+assert(Data::save(base + "float_neg.json", -123.456), "save float neg")
+let fn_val = Data::load(base + "float_neg.json") @[T: Float]
+let fn_u = Option::unwrap(fn_val)
+assert(fn_u < -123.0, "load float neg lower")
+assert(fn_u > -124.0, "load float neg upper")
+
+// ── Float: very small ────────────────────────────────────────────────────
+assert(Data::save(base + "float_tiny.json", 0.000001), "save float tiny")
+let ft = Data::load(base + "float_tiny.json") @[T: Float]
+let ft_u = Option::unwrap(ft)
+assert(ft_u > 0.0, "load float tiny positive")
+assert(ft_u < 0.001, "load float tiny small")
+
+// ── Bool: both values ────────────────────────────────────────────────────
+assert(Data::save(base + "bool_t.json", true), "save bool true")
+assert(Data::save(base + "bool_f.json", false), "save bool false")
+assert(Option::unwrap(Data::load(base + "bool_t.json") @[T: Bool]) == true, "load bool true")
+assert(Option::unwrap(Data::load(base + "bool_f.json") @[T: Bool]) == false, "load bool false")
+
+// ── Char: various chars ──────────────────────────────────────────────────
+assert(Data::save(base + "char_a.json", 'a'), "save char a")
+assert(Option::unwrap(Data::load(base + "char_a.json") @[T: Char]) == 'a', "load char a")
+
+assert(Data::save(base + "char_space.json", ' '), "save char space")
+assert(Option::unwrap(Data::load(base + "char_space.json") @[T: Char]) == ' ', "load char space")
+
+assert(Data::save(base + "char_zero.json", '0'), "save char zero")
+assert(Option::unwrap(Data::load(base + "char_zero.json") @[T: Char]) == '0', "load char 0")
+
+assert(Data::save(base + "char_bang.json", '!'), "save char !")
+assert(Option::unwrap(Data::load(base + "char_bang.json") @[T: Char]) == '!', "load char !")
+
+// ── String: various ──────────────────────────────────────────────────────
+assert(Data::save(base + "str_empty.json", ""), "save empty string")
+assert(Option::unwrap(Data::load(base + "str_empty.json") @[T: String]) == "", "load empty string")
+
+assert(Data::save(base + "str_single.json", "x"), "save single char string")
+assert(Option::unwrap(Data::load(base + "str_single.json") @[T: String]) == "x", "load single char string")
+
+let long_str = "abcdefghijklmnopqrstuvwxyz0123456789"
+assert(Data::save(base + "str_long.json", long_str), "save long string")
+assert(Option::unwrap(Data::load(base + "str_long.json") @[T: String]) == long_str, "load long string")
+
+// String with special characters
+assert(Data::save(base + "str_special.json", "hello world\ttab"), "save string with tab")
+let ls_sp = Data::load(base + "str_special.json") @[T: String]
+assert(ls_sp.isSome(), "load special string isSome")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 2: LISTS — every shape and size
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Empty lists of every type ────────────────────────────────────────────
+assert(Data::save(base + "empty_int.json", []:Int), "save empty [Int]")
+assert(Option::unwrap(Data::load(base + "empty_int.json") @[T:[Int]]).len() == 0, "load empty [Int]")
+
+assert(Data::save(base + "empty_str.json", []:String), "save empty [String]")
+assert(Option::unwrap(Data::load(base + "empty_str.json") @[T:[String]]).len() == 0, "load empty [String]")
+
+assert(Data::save(base + "empty_bool.json", []:Bool), "save empty [Bool]")
+assert(Option::unwrap(Data::load(base + "empty_bool.json") @[T:[Bool]]).len() == 0, "load empty [Bool]")
+
+assert(Data::save(base + "empty_float.json", []:Float), "save empty [Float]")
+assert(Option::unwrap(Data::load(base + "empty_float.json") @[T:[Float]]).len() == 0, "load empty [Float]")
+
+// ── Single-element lists ─────────────────────────────────────────────────
+assert(Data::save(base + "single_int.json", [42]), "save [42]")
+let si = Option::unwrap(Data::load(base + "single_int.json") @[T:[Int]])
+assert(si.len() == 1, "single [Int] len")
+assert(si[0] == 42, "single [Int] value")
+
+assert(Data::save(base + "single_str.json", ["only"]), "save [only]")
+let ss = Option::unwrap(Data::load(base + "single_str.json") @[T:[String]])
+assert(ss.len() == 1, "single [String] len")
+assert(ss[0] == "only", "single [String] value")
+
+// ── Large list ───────────────────────────────────────────────────────────
+let big_list: [Int] = []:Int
+for let i = 0; i < 100; i += 1 {
+    big_list.push(i)
+}
+assert(Data::save(base + "big_list.json", big_list), "save 100-element list")
+let bl = Option::unwrap(Data::load(base + "big_list.json") @[T:[Int]])
+assert(bl.len() == 100, "load 100-element list len")
+assert(bl[0] == 0, "big list[0]")
+assert(bl[99] == 99, "big list[99]")
+assert(bl[50] == 50, "big list[50]")
+
+// ── List of Chars ────────────────────────────────────────────────────────
+assert(Data::save(base + "list_chars.json", ['a', 'b', 'c', 'd']), "save [Char]")
+let lc = Option::unwrap(Data::load(base + "list_chars.json") @[T:[Char]])
+assert(lc.len() == 4, "list chars len")
+assert(lc[0] == 'a', "list chars[0]")
+assert(lc[3] == 'd', "list chars[3]")
+
+// ── List of Floats ───────────────────────────────────────────────────────
+assert(Data::save(base + "list_floats.json", [1.1, 2.2, 3.3]), "save [Float]")
+let lf = Option::unwrap(Data::load(base + "list_floats.json") @[T:[Float]])
+assert(lf.len() == 3, "list floats len")
+assert(lf[0] > 1.0, "list floats[0]")
+assert(lf[2] > 3.0, "list floats[2]")
+
+// ── Nested lists: [[Int]] ────────────────────────────────────────────────
+let nested = [[1, 2], [3, 4, 5], [6]]
+assert(Data::save(base + "nested_list.json", nested), "save [[Int]]")
+let nl = Option::unwrap(Data::load(base + "nested_list.json") @[T:[[Int]]])
+assert(nl.len() == 3, "nested list outer len")
+assert(nl[0].len() == 2, "nested list[0] len")
+assert(nl[1].len() == 3, "nested list[1] len")
+assert(nl[2].len() == 1, "nested list[2] len")
+assert(nl[0][0] == 1, "nested [0][0]")
+assert(nl[1][2] == 5, "nested [1][2]")
+assert(nl[2][0] == 6, "nested [2][0]")
+
+// ── Triple-nested: [[[Int]]] ─────────────────────────────────────────────
+let triple = [[[1, 2], [3]], [[4, 5, 6]]]
+assert(Data::save(base + "triple_list.json", triple), "save [[[Int]]]")
+let tl = Option::unwrap(Data::load(base + "triple_list.json") @[T:[[[Int]]]])
+assert(tl.len() == 2, "triple outer len")
+assert(tl[0].len() == 2, "triple[0] len")
+assert(tl[0][0][1] == 2, "triple[0][0][1]")
+assert(tl[1][0][2] == 6, "triple[1][0][2]")
+
+// ── Nested list with empty inner lists ───────────────────────────────────
+let with_empties = [[1, 2], []:Int, [3], []:Int]
+assert(Data::save(base + "list_empties.json", with_empties), "save list with empties")
+let le = Option::unwrap(Data::load(base + "list_empties.json") @[T:[[Int]]])
+assert(le.len() == 4, "list empties outer len")
+assert(le[0].len() == 2, "empties[0] len")
+assert(le[1].len() == 0, "empties[1] empty")
+assert(le[2].len() == 1, "empties[2] len")
+assert(le[3].len() == 0, "empties[3] empty")
+
+// ── List of Bools ────────────────────────────────────────────────────────
+assert(Data::save(base + "bool_list.json", [true, false, true, false, true]), "save [Bool]")
+let blv = Option::unwrap(Data::load(base + "bool_list.json") @[T:[Bool]])
+assert(blv.len() == 5, "bool list len")
+assert(blv[0] == true, "bool list[0]")
+assert(blv[1] == false, "bool list[1]")
+assert(blv[4] == true, "bool list[4]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 3: TUPLES — every combination
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 2-tuple of Ints ──────────────────────────────────────────────────────
+let tup2 = (10, 20)
+assert(Data::save(base + "tup2.json", tup2), "save (Int,Int)")
+let lt2 = Option::unwrap(Data::load(base + "tup2.json") @[T:(Int, Int)])
+assert(lt2[0] == 10, "tup2[0]")
+assert(lt2[1] == 20, "tup2[1]")
+
+// ── 3-tuple mixed types ──────────────────────────────────────────────────
+let tup3 = (42, "hello", true)
+assert(Data::save(base + "tup3.json", tup3), "save (Int,String,Bool)")
+let lt3 = Option::unwrap(Data::load(base + "tup3.json") @[T:(Int, String, Bool)])
+assert(lt3[0] == 42, "tup3[0]")
+assert(lt3[1] == "hello", "tup3[1]")
+assert(lt3[2] == true, "tup3[2]")
+
+// ── 4-tuple ──────────────────────────────────────────────────────────────
+let tup4 = (1, 2.5, 'x', "yes")
+assert(Data::save(base + "tup4.json", tup4), "save 4-tuple")
+let lt4 = Option::unwrap(Data::load(base + "tup4.json") @[T:(Int, Float, Char, String)])
+assert(lt4[0] == 1, "tup4[0]")
+assert(lt4[2] == 'x', "tup4[2]")
+assert(lt4[3] == "yes", "tup4[3]")
+
+// ── 5-tuple ──────────────────────────────────────────────────────────────
+let tup5 = (true, false, true, false, true)
+assert(Data::save(base + "tup5.json", tup5), "save 5-bool-tuple")
+let lt5 = Option::unwrap(Data::load(base + "tup5.json") @[T:(Bool, Bool, Bool, Bool, Bool)])
+assert(lt5[0] == true, "tup5[0]")
+assert(lt5[1] == false, "tup5[1]")
+assert(lt5[4] == true, "tup5[4]")
+
+// ── Tuple of strings ────────────────────────────────────────────────────
+let tup_str = ("alpha", "beta", "gamma")
+assert(Data::save(base + "tup_str.json", tup_str), "save (String,String,String)")
+let lts = Option::unwrap(Data::load(base + "tup_str.json") @[T:(String, String, String)])
+assert(lts[0] == "alpha", "tup_str[0]")
+assert(lts[1] == "beta", "tup_str[1]")
+assert(lts[2] == "gamma", "tup_str[2]")
+
+// ── Tuple containing a list ──────────────────────────────────────────────
+let tup_list = ([1, 2, 3], "label")
+assert(Data::save(base + "tup_list.json", tup_list), "save ([Int],String)")
+let ltl = Option::unwrap(Data::load(base + "tup_list.json") @[T:([Int], String)])
+assert(ltl[0].len() == 3, "tup_list[0] len")
+assert(ltl[0][2] == 3, "tup_list[0][2]")
+assert(ltl[1] == "label", "tup_list[1]")
+
+// ── List of tuples ───────────────────────────────────────────────────────
+let lot = [(1, "one"), (2, "two"), (3, "three")]
+assert(Data::save(base + "list_tuples.json", lot), "save [(Int,String)]")
+let llot = Option::unwrap(Data::load(base + "list_tuples.json") @[T:[(Int, String)]])
+assert(llot.len() == 3, "list tuples len")
+assert(llot[0][0] == 1, "list tuples [0][0]")
+assert(llot[2][1] == "three", "list tuples [2][1]")
+
+// ── Tuple of tuples ──────────────────────────────────────────────────────
+let tot = ((1, 2), (3, 4))
+assert(Data::save(base + "tup_tup.json", tot), "save ((Int,Int),(Int,Int))")
+let ltot = Option::unwrap(Data::load(base + "tup_tup.json") @[T:((Int, Int), (Int, Int))])
+assert(ltot[0][0] == 1, "tup_tup[0][0]")
+assert(ltot[0][1] == 2, "tup_tup[0][1]")
+assert(ltot[1][0] == 3, "tup_tup[1][0]")
+assert(ltot[1][1] == 4, "tup_tup[1][1]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 4: STRUCTS — field ordering, nesting, many fields
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Player {
+    name: String,
+    hp: Int,
+    alive: Bool,
+}
+
+struct Rect {
+    origin: Point,
+    size: Point,
+}
+
+// ── Basic struct roundtrip ───────────────────────────────────────────────
+let pt = Point { x: 100, y: -50 }
+assert(Data::save(base + "point.json", pt), "save Point")
+let lpt = Option::unwrap(Data::load(base + "point.json") @[T: Point])
+assert(lpt.x == 100, "point.x")
+assert(lpt.y == -50, "point.y")
+
+// ── Struct with string fields ────────────────────────────────────────────
+let pl = Player { name: "TestHero", hp: 250, alive: true }
+assert(Data::save(base + "player.json", pl), "save Player")
+let lpl = Option::unwrap(Data::load(base + "player.json") @[T: Player])
+assert(lpl.name == "TestHero", "player.name")
+assert(lpl.hp == 250, "player.hp")
+assert(lpl.alive == true, "player.alive")
+
+// ── Nested struct ────────────────────────────────────────────────────────
+let r = Rect {
+    origin: Point { x: 0, y: 0 },
+    size: Point { x: 800, y: 600 },
+}
+assert(Data::save(base + "rect.json", r), "save Rect")
+let lr = Option::unwrap(Data::load(base + "rect.json") @[T: Rect])
+assert(lr.origin.x == 0, "rect.origin.x")
+assert(lr.origin.y == 0, "rect.origin.y")
+assert(lr.size.x == 800, "rect.size.x")
+assert(lr.size.y == 600, "rect.size.y")
+
+// ── Double-nested struct ─────────────────────────────────────────────────
+struct Scene {
+    bounds: Rect,
+    name: String,
+}
+
+let scene = Scene {
+    bounds: Rect {
+        origin: Point { x: 10, y: 20 },
+        size: Point { x: 300, y: 400 },
+    },
+    name: "Level1",
+}
+assert(Data::save(base + "scene.json", scene), "save Scene")
+let ls = Option::unwrap(Data::load(base + "scene.json") @[T: Scene])
+assert(ls.bounds.origin.x == 10, "scene.bounds.origin.x")
+assert(ls.bounds.size.y == 400, "scene.bounds.size.y")
+assert(ls.name == "Level1", "scene.name")
+
+// ── Struct with list field ───────────────────────────────────────────────
+struct Inventory {
+    items: [String],
+    count: Int,
+}
+
+let inv = Inventory { items: ["sword", "shield", "potion"], count: 3 }
+assert(Data::save(base + "inventory.json", inv), "save Inventory")
+let linv = Option::unwrap(Data::load(base + "inventory.json") @[T: Inventory])
+assert(linv.items.len() == 3, "inventory items len")
+assert(linv.items[0] == "sword", "inventory items[0]")
+assert(linv.items[2] == "potion", "inventory items[2]")
+assert(linv.count == 3, "inventory count")
+
+// ── Struct with tuple field ──────────────────────────────────────────────
+struct ColorPoint {
+    pos: (Int, Int),
+    color: (Int, Int, Int),
+}
+
+let cp = ColorPoint { pos: (100, 200), color: (255, 128, 0) }
+assert(Data::save(base + "colorpoint.json", cp), "save ColorPoint")
+let lcp = Option::unwrap(Data::load(base + "colorpoint.json") @[T: ColorPoint])
+assert(lcp.pos[0] == 100, "colorpoint pos[0]")
+assert(lcp.pos[1] == 200, "colorpoint pos[1]")
+assert(lcp.color[0] == 255, "colorpoint color[0]")
+assert(lcp.color[1] == 128, "colorpoint color[1]")
+assert(lcp.color[2] == 0, "colorpoint color[2]")
+
+// ── List of structs ──────────────────────────────────────────────────────
+let points = [
+    Point { x: 0, y: 0 },
+    Point { x: 1, y: 1 },
+    Point { x: 2, y: 4 },
+    Point { x: 3, y: 9 },
+    Point { x: 4, y: 16 },
+]
+assert(Data::save(base + "point_list.json", points), "save [Point]")
+let lps = Option::unwrap(Data::load(base + "point_list.json") @[T: [Point]])
+assert(lps.len() == 5, "[Point] len")
+assert(lps[0].x == 0, "[Point][0].x")
+assert(lps[4].y == 16, "[Point][4].y")
+assert(lps[3].x == 3, "[Point][3].x")
+
+// ── Struct with many fields ──────────────────────────────────────────────
+struct BigStruct {
+    a: Int,
+    b: Int,
+    c: String,
+    d: Bool,
+    e: Float,
+    f: Char,
+    g: Int,
+    h: String,
+}
+
+let big = BigStruct {
+    a: 1, b: 2, c: "three", d: true, e: 5.5, f: '6', g: 7, h: "eight",
+}
+assert(Data::save(base + "big_struct.json", big), "save BigStruct")
+let lbig = Option::unwrap(Data::load(base + "big_struct.json") @[T: BigStruct])
+assert(lbig.a == 1, "big.a")
+assert(lbig.b == 2, "big.b")
+assert(lbig.c == "three", "big.c")
+assert(lbig.d == true, "big.d")
+assert(lbig.f == '6', "big.f")
+assert(lbig.g == 7, "big.g")
+assert(lbig.h == "eight", "big.h")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 5: ENUMS
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+// ── Simple enum variants ─────────────────────────────────────────────────
+assert(Data::save(base + "enum_red.json", Color::Red()), "save Red")
+let lr_e = Data::load(base + "enum_red.json") @[T: Color]
+assert(lr_e.isSome(), "load Red isSome")
+
+assert(Data::save(base + "enum_green.json", Color::Green()), "save Green")
+let lg_e = Data::load(base + "enum_green.json") @[T: Color]
+assert(lg_e.isSome(), "load Green isSome")
+
+assert(Data::save(base + "enum_blue.json", Color::Blue()), "save Blue")
+let lb_e = Data::load(base + "enum_blue.json") @[T: Color]
+assert(lb_e.isSome(), "load Blue isSome")
+
+// ── Enum with data ───────────────────────────────────────────────────────
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float),
+    Triangle: (Float, Float, Float),
+    None,
+}
+
+assert(Data::save(base + "shape_circle.json", Shape::Circle(5.0)), "save Circle")
+let lsc = Data::load(base + "shape_circle.json") @[T: Shape]
+assert(lsc.isSome(), "load Circle isSome")
+
+assert(Data::save(base + "shape_rect.json", Shape::Rectangle((10.0, 20.0))), "save Rectangle")
+let lsr = Data::load(base + "shape_rect.json") @[T: Shape]
+assert(lsr.isSome(), "load Rectangle isSome")
+
+assert(Data::save(base + "shape_tri.json", Shape::Triangle((3.0, 4.0, 5.0))), "save Triangle")
+let lst = Data::load(base + "shape_tri.json") @[T: Shape]
+assert(lst.isSome(), "load Triangle isSome")
+
+assert(Data::save(base + "shape_none.json", Shape::None()), "save Shape::None")
+let lsn = Data::load(base + "shape_none.json") @[T: Shape]
+assert(lsn.isSome(), "load Shape::None isSome")
+
+// ── Enum with string data ────────────────────────────────────────────────
+enum Message {
+    Text: String,
+    Number: Int,
+    Empty,
+}
+
+assert(Data::save(base + "msg_text.json", Message::Text("hello")), "save Message::Text")
+let lmt = Data::load(base + "msg_text.json") @[T: Message]
+assert(lmt.isSome(), "load Message::Text isSome")
+
+assert(Data::save(base + "msg_num.json", Message::Number(42)), "save Message::Number")
+let lmn = Data::load(base + "msg_num.json") @[T: Message]
+assert(lmn.isSome(), "load Message::Number isSome")
+
+assert(Data::save(base + "msg_empty.json", Message::Empty()), "save Message::Empty")
+let lme = Data::load(base + "msg_empty.json") @[T: Message]
+assert(lme.isSome(), "load Message::Empty isSome")
+
+// ── List of enums ────────────────────────────────────────────────────────
+let colors = [Color::Red(), Color::Green(), Color::Blue(), Color::Red()]
+assert(Data::save(base + "enum_list.json", colors), "save [Color]")
+let lecl = Data::load(base + "enum_list.json") @[T: [Color]]
+assert(lecl.isSome(), "load [Color] isSome")
+let ecl = Option::unwrap(lecl)
+assert(ecl.len() == 4, "[Color] len")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 6: OPTION TYPE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Some values ──────────────────────────────────────────────────────────
+let some_int: Option(Int) = Some(42)
+assert(Data::save(base + "some_int.json", some_int), "save Some(42)")
+let lsi = Data::load(base + "some_int.json") @[T: Option(Int)]
+assert(lsi.isSome(), "load Some(Int) outer isSome")
+
+let some_str: Option(String) = Some("hello")
+assert(Data::save(base + "some_str.json", some_str), "save Some(hello)")
+let lss = Data::load(base + "some_str.json") @[T: Option(String)]
+assert(lss.isSome(), "load Some(String) outer isSome")
+
+// ── None values ──────────────────────────────────────────────────────────
+let none_int: Option(Int) = None(Int)
+assert(Data::save(base + "none_int.json", none_int), "save None(Int)")
+
+let none_str: Option(String) = None(String)
+assert(Data::save(base + "none_str.json", none_str), "save None(String)")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 7: toJson/fromJson — exhaustive roundtrips
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Primitives via toJson/fromJson ───────────────────────────────────────
+let ji = Data::toJson(42)
+assert(Option::unwrap(Data::fromJson(ji) @[T: Int]) == 42, "json roundtrip Int")
+
+let jf = Data::toJson(3.14)
+let jf_v = Option::unwrap(Data::fromJson(jf) @[T: Float])
+assert(jf_v > 3.0, "json roundtrip Float")
+
+let jb = Data::toJson(true)
+assert(Option::unwrap(Data::fromJson(jb) @[T: Bool]) == true, "json roundtrip Bool")
+
+let jc = Data::toJson('Z')
+assert(Option::unwrap(Data::fromJson(jc) @[T: Char]) == 'Z', "json roundtrip Char")
+
+let js = Data::toJson("roundtrip")
+assert(Option::unwrap(Data::fromJson(js) @[T: String]) == "roundtrip", "json roundtrip String")
+
+// ── Complex types via toJson/fromJson ────────────────────────────────────
+let jlist = Data::toJson([10, 20, 30])
+let jl_v = Option::unwrap(Data::fromJson(jlist) @[T: [Int]])
+assert(jl_v.len() == 3, "json roundtrip [Int] len")
+assert(jl_v[2] == 30, "json roundtrip [Int][2]")
+
+let jtup = Data::toJson((1, "two", true))
+let jt_v = Option::unwrap(Data::fromJson(jtup) @[T: (Int, String, Bool)])
+assert(jt_v[0] == 1, "json roundtrip tuple[0]")
+assert(jt_v[1] == "two", "json roundtrip tuple[1]")
+assert(jt_v[2] == true, "json roundtrip tuple[2]")
+
+let jstruct = Data::toJson(Point { x: 99, y: -1 })
+let js_v = Option::unwrap(Data::fromJson(jstruct) @[T: Point])
+assert(js_v.x == 99, "json roundtrip Point.x")
+assert(js_v.y == -1, "json roundtrip Point.y")
+
+// ── Nested struct via toJson/fromJson ────────────────────────────────────
+let jrect = Data::toJson(Rect {
+    origin: Point { x: 5, y: 10 },
+    size: Point { x: 50, y: 100 },
+})
+let jr_v = Option::unwrap(Data::fromJson(jrect) @[T: Rect])
+assert(jr_v.origin.x == 5, "json roundtrip Rect.origin.x")
+assert(jr_v.size.y == 100, "json roundtrip Rect.size.y")
+
+// ── Player via toJson/fromJson ───────────────────────────────────────────
+let jplayer = Data::toJson(Player { name: "Hero", hp: 50, alive: false })
+let jp_v = Option::unwrap(Data::fromJson(jplayer) @[T: Player])
+assert(jp_v.name == "Hero", "json roundtrip Player.name")
+assert(jp_v.hp == 50, "json roundtrip Player.hp")
+assert(jp_v.alive == false, "json roundtrip Player.alive")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 8: EDGE CASES — trying to break things
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Load from nonexistent file → None ────────────────────────────────────
+let missing = Data::load("/tmp/nova_no_such_file_ever.json") @[T: Int]
+assert(!missing.isSome(), "nonexistent file returns None")
+
+// ── Load from empty file → None ──────────────────────────────────────────
+writeFile(base + "empty_file.json", "")
+let empty_load = Data::load(base + "empty_file.json") @[T: Int]
+assert(!empty_load.isSome(), "empty file returns None")
+
+// ── Load from garbage → None ─────────────────────────────────────────────
+writeFile(base + "garbage.json", "not json at all {{{{}}}}")
+let garbage = Data::load(base + "garbage.json") @[T: Int]
+assert(!garbage.isSome(), "garbage returns None")
+
+// ── fromJson with garbage → None ─────────────────────────────────────────
+let bad1 = Data::fromJson("") @[T: Int]
+assert(!bad1.isSome(), "fromJson empty string None")
+
+let bad2 = Data::fromJson("{broken}") @[T: Int]
+assert(!bad2.isSome(), "fromJson broken json None")
+
+let bad3 = Data::fromJson("null") @[T: Int]
+assert(!bad3.isSome(), "fromJson null None for Int")
+
+// ── Overwrite file ───────────────────────────────────────────────────────
+assert(Data::save(base + "overwrite.json", 1), "overwrite save 1")
+assert(Data::save(base + "overwrite.json", 2), "overwrite save 2")
+assert(Data::save(base + "overwrite.json", 3), "overwrite save 3")
+let ow = Option::unwrap(Data::load(base + "overwrite.json") @[T: Int])
+assert(ow == 3, "overwrite loads last value")
+
+// ── Save and load same file many times ───────────────────────────────────
+for let i = 0; i < 20; i += 1 {
+    assert(Data::save(base + "repeat.json", i), "repeat save " + Cast::string(i))
+}
+let rep = Option::unwrap(Data::load(base + "repeat.json") @[T: Int])
+assert(rep == 19, "repeated save loads last")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 9: COMPLEX COMBINATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Struct containing enum and list ──────────────────────────────────────
+struct GameState {
+    score: Int,
+    color: Color,
+    history: [Int],
+}
+
+let gs = GameState {
+    score: 100,
+    color: Color::Blue(),
+    history: [10, 20, 30, 40],
+}
+assert(Data::save(base + "gamestate.json", gs), "save GameState")
+let lgs = Option::unwrap(Data::load(base + "gamestate.json") @[T: GameState])
+assert(lgs.score == 100, "gamestate score")
+assert(lgs.history.len() == 4, "gamestate history len")
+assert(lgs.history[3] == 40, "gamestate history[3]")
+
+// ── List of nested structs ───────────────────────────────────────────────
+let rects = [
+    Rect { origin: Point { x: 0, y: 0 }, size: Point { x: 10, y: 10 } },
+    Rect { origin: Point { x: 5, y: 5 }, size: Point { x: 20, y: 30 } },
+]
+assert(Data::save(base + "rect_list.json", rects), "save [Rect]")
+let lrects = Option::unwrap(Data::load(base + "rect_list.json") @[T: [Rect]])
+assert(lrects.len() == 2, "[Rect] len")
+assert(lrects[0].origin.x == 0, "[Rect][0].origin.x")
+assert(lrects[1].size.y == 30, "[Rect][1].size.y")
+
+// ── Struct with list of structs ──────────────────────────────────────────
+struct Team {
+    name: String,
+    members: [Player],
+}
+
+let team = Team {
+    name: "Heroes",
+    members: [
+        Player { name: "Alice", hp: 100, alive: true },
+        Player { name: "Bob", hp: 0, alive: false },
+        Player { name: "Carol", hp: 75, alive: true },
+    ],
+}
+assert(Data::save(base + "team.json", team), "save Team")
+let lteam = Option::unwrap(Data::load(base + "team.json") @[T: Team])
+assert(lteam.name == "Heroes", "team.name")
+assert(lteam.members.len() == 3, "team members len")
+assert(lteam.members[0].name == "Alice", "team member 0 name")
+assert(lteam.members[1].hp == 0, "team member 1 hp")
+assert(lteam.members[2].alive == true, "team member 2 alive")
+
+// ── List of tuples via toJson/fromJson ───────────────────────────────────
+let pairs = [(1, "a"), (2, "b"), (3, "c"), (4, "d"), (5, "e")]
+let jpairs = Data::toJson(pairs)
+let lpairs = Option::unwrap(Data::fromJson(jpairs) @[T: [(Int, String)]])
+assert(lpairs.len() == 5, "json list of tuples len")
+assert(lpairs[0][0] == 1, "json list of tuples [0][0]")
+assert(lpairs[4][1] == "e", "json list of tuples [4][1]")
+
+// ── Tuple with struct inside ─────────────────────────────────────────────
+let tup_struct = (Point { x: 1, y: 2 }, "label")
+assert(Data::save(base + "tup_struct.json", tup_struct), "save (Point,String)")
+let lts2 = Option::unwrap(Data::load(base + "tup_struct.json") @[T: (Point, String)])
+assert(lts2[0].x == 1, "tup_struct[0].x")
+assert(lts2[0].y == 2, "tup_struct[0].y")
+assert(lts2[1] == "label", "tup_struct[1]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 10: WORD-FORM TYPES IN @[T:...] annotations
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Use List(Int) in @[T:...]
+let json_list = Data::toJson([10, 20, 30])
+let from_list = Data::fromJson(json_list) @[T: List(Int)]
+assert(from_list.isSome(), "@[T:List(Int)] fromJson isSome")
+assert(Option::unwrap(from_list).len() == 3, "@[T:List(Int)] len")
+
+// Use Tuple(Int,String) in @[T:...]
+let json_tup = Data::toJson((42, "hi"))
+let from_tup = Data::fromJson(json_tup) @[T: Tuple(Int, String)]
+assert(from_tup.isSome(), "@[T:Tuple(Int,String)] fromJson isSome")
+let ft_v = Option::unwrap(from_tup)
+assert(ft_v[0] == 42, "@[T:Tuple] [0]")
+assert(ft_v[1] == "hi", "@[T:Tuple] [1]")
+
+// Nested word-form: List(Tuple(Int, String))
+let json_lt = Data::toJson([(1, "a"), (2, "b")])
+let from_lt = Data::fromJson(json_lt) @[T: List(Tuple(Int, String))]
+assert(from_lt.isSome(), "@[T:List(Tuple)] fromJson isSome")
+let flt_v = Option::unwrap(from_lt)
+assert(flt_v.len() == 2, "@[T:List(Tuple)] len")
+assert(flt_v[0][0] == 1, "@[T:List(Tuple)] [0][0]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 11: RAPID-FIRE ROUNDTRIP STRESS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Int roundtrip 50 times
+for let i = 0; i < 50; i += 1 {
+    let j = Data::toJson(i)
+    let v = Option::unwrap(Data::fromJson(j) @[T: Int])
+    assert(v == i, "rapid int roundtrip " + Cast::string(i))
+}
+
+// String roundtrip
+for let i = 0; i < 20; i += 1 {
+    let s = "str_" + Cast::string(i)
+    let j = Data::toJson(s)
+    let v = Option::unwrap(Data::fromJson(j) @[T: String])
+    assert(v == s, "rapid string roundtrip " + Cast::string(i))
+}
+
+// List roundtrip
+for let i = 0; i < 10; i += 1 {
+    let xs: [Int] = []:Int
+    for let k = 0; k < i; k += 1 {
+        xs.push(k)
+    }
+    let j = Data::toJson(xs)
+    let v = Option::unwrap(Data::fromJson(j) @[T: [Int]])
+    assert(v.len() == i, "rapid list roundtrip len " + Cast::string(i))
+}
+
+println("PASS: test_data_exhaustive")

@@ -1,0 +1,14 @@
+module main
+
+// SHOULD FAIL: wrong type inside nested generic annotation
+struct Wrapper {
+    data: None
+}
+
+fn unwrap@[T: Type](w: Wrapper) -> T {
+    return w.data
+}
+
+let w = Wrapper { data: 42 }
+// Annotating with String but the value is actually Int
+let result: String = unwrap@[String](w)

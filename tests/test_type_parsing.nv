@@ -1,0 +1,459 @@
+module test_type_parsing
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TYPE PARSING — EXHAUSTIVE TESTS
+//  Tests: List(T) word form, Tuple(T,...) word form, shorthand [T] and
+//         (T,T), @[T:Type] generic annotation, @(Type) overload selection,
+//         nested types, generic structs/enums with word-form types,
+//         type annotations in let/fn/struct/enum, edge cases.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 1. List(T) word form — basic ────────────────────────────────────────
+
+// List(Int) in let annotation
+let a1: List(Int) = [1, 2, 3]
+assert(a1.len() == 3, "List(Int) let annotation")
+assert(a1[0] == 1, "List(Int) elem 0")
+
+// List(String) in let annotation
+let a2: List(String) = ["hello", "world"]
+assert(a2.len() == 2, "List(String) let annotation")
+assert(a2[0] == "hello", "List(String) elem 0")
+
+// List(Bool) in let annotation
+let a3: List(Bool) = [true, false, true]
+assert(a3.len() == 3, "List(Bool) let annotation")
+assert(a3[2] == true, "List(Bool) elem 2")
+
+// List(Float) in let annotation
+let a4: List(Float) = [1.0, 2.5, 3.7]
+assert(a4.len() == 3, "List(Float) let annotation")
+
+// List(Char) in let annotation
+let a5: List(Char) = ['a', 'b', 'c']
+assert(a5.len() == 3, "List(Char) let annotation")
+assert(a5[1] == 'b', "List(Char) elem 1")
+
+// ─── 2. List(T) word form — empty list typed ────────────────────────────
+
+let empty_ints: List(Int) = []:Int
+assert(empty_ints.len() == 0, "empty List(Int)")
+
+// ─── 3. List(T) word form — in function signatures ──────────────────────
+
+fn sum_list(xs: List(Int)) -> Int {
+    let total = 0
+    for x in xs {
+        total += x
+    }
+    return total
+}
+assert(sum_list([10, 20, 30]) == 60, "fn param List(Int)")
+
+fn make_strings(n: Int) -> List(String) {
+    let result: List(String) = []:String
+    for let i = 0; i < n; i += 1 {
+        result.push("s")
+    }
+    return result
+}
+assert(make_strings(3).len() == 3, "fn return List(String)")
+
+// ─── 4. List(T) word form — nested: List(List(Int)) ─────────────────────
+
+let nested: List(List(Int)) = [[1, 2], [3, 4], [5]]
+assert(nested.len() == 3, "List(List(Int)) len")
+assert(nested[0].len() == 2, "List(List(Int)) inner len")
+assert(nested[1][1] == 4, "List(List(Int)) deep access")
+
+fn sum_nested(xss: List(List(Int))) -> Int {
+    let total = 0
+    for xs in xss {
+        for x in xs {
+            total += x
+        }
+    }
+    return total
+}
+assert(sum_nested(nested) == 15, "sum nested List(List(Int))")
+
+// ─── 5. List(T) word form — triple-nested ───────────────────────────────
+
+let deep: List(List(List(Int))) = [[[1, 2], [3]], [[4, 5, 6]]]
+assert(deep.len() == 2, "triple nested outer len")
+assert(deep[0].len() == 2, "triple nested mid len")
+assert(deep[0][0][1] == 2, "triple nested deep access")
+assert(deep[1][0][2] == 6, "triple nested deep access 2")
+
+// ─── 6. Tuple(T, T) word form — basic ───────────────────────────────────
+
+let t1: Tuple(Int, String) = (42, "hello")
+assert(t1[0] == 42, "Tuple(Int,String) elem 0")
+assert(t1[1] == "hello", "Tuple(Int,String) elem 1")
+
+let t2: Tuple(Bool, Float) = (true, 3.14)
+assert(t2[0] == true, "Tuple(Bool,Float) elem 0")
+assert(t2[1] > 3.0, "Tuple(Bool,Float) elem 1")
+
+let t3: Tuple(Char, Char, Char) = ('a', 'b', 'c')
+assert(t3[0] == 'a', "Tuple 3-elem 0")
+assert(t3[1] == 'b', "Tuple 3-elem 1")
+assert(t3[2] == 'c', "Tuple 3-elem 2")
+
+// ─── 7. Tuple(T,...) word form — in function signatures ──────────────────
+
+fn swap_pair(p: Tuple(Int, String)) -> Tuple(String, Int) {
+    return (p[1], p[0])
+}
+let swapped = swap_pair((10, "ten"))
+assert(swapped[0] == "ten", "swap pair[0]")
+assert(swapped[1] == 10, "swap pair[1]")
+
+fn make_triple(x: Int) -> Tuple(Int, Int, Int) {
+    return (x, x * 2, x * 3)
+}
+let tr = make_triple(5)
+assert(tr[0] == 5, "triple[0]")
+assert(tr[1] == 10, "triple[1]")
+assert(tr[2] == 15, "triple[2]")
+
+// ─── 8. Tuple(T,...) word form — 4 and 5 elements ───────────────────────
+
+let t4: Tuple(Int, Int, Int, Int) = (1, 2, 3, 4)
+assert(t4[0] == 1, "4-tuple[0]")
+assert(t4[3] == 4, "4-tuple[3]")
+
+let t5: Tuple(Int, String, Bool, Float, Char) = (1, "two", true, 4.0, '5')
+assert(t5[0] == 1, "5-tuple[0]")
+assert(t5[1] == "two", "5-tuple[1]")
+assert(t5[2] == true, "5-tuple[2]")
+assert(t5[4] == '5', "5-tuple[4]")
+
+// ─── 9. Mixed shorthand and word form ────────────────────────────────────
+
+// Use [T] and List(T) interchangeably
+let mix1: [Int] = [1, 2, 3]
+let mix2: List(Int) = mix1
+assert(mix2.len() == 3, "shorthand to word form list")
+
+// Use (T,T) and Tuple(T,T) interchangeably
+let mix3: (Int, String) = (99, "hi")
+let mix4: Tuple(Int, String) = mix3
+assert(mix4[0] == 99, "shorthand to word form tuple")
+
+// ─── 10. List of Tuples ──────────────────────────────────────────────────
+
+let lt: List(Tuple(Int, String)) = [(1, "one"), (2, "two"), (3, "three")]
+assert(lt.len() == 3, "List of Tuples len")
+assert(lt[0][0] == 1, "List of Tuples [0][0]")
+assert(lt[2][1] == "three", "List of Tuples [2][1]")
+
+// using shorthand
+let lt2: [(Int, String)] = [(1, "one"), (2, "two")]
+assert(lt2.len() == 2, "shorthand list of tuples")
+
+// ─── 11. Tuple containing Lists ──────────────────────────────────────────
+
+let tl: Tuple(List(Int), List(String)) = ([1, 2], ["a", "b", "c"])
+assert(tl[0].len() == 2, "Tuple of Lists [0] len")
+assert(tl[1].len() == 3, "Tuple of Lists [1] len")
+assert(tl[0][1] == 2, "Tuple of Lists [0][1]")
+assert(tl[1][2] == "c", "Tuple of Lists [1][2]")
+
+// ─── 12. Word-form types with @[T:Type] generic annotation ──────────────
+
+fn identity(x: $T) -> $T {
+    return x
+}
+
+// @[T:List(Int)]
+let li = identity([1, 2, 3]) @[T: List(Int)]
+assert(li.len() == 3, "@[T:List(Int)] generic annotation")
+
+// @[T:Tuple(Int,String)]
+let ti = identity((42, "hello")) @[T: Tuple(Int, String)]
+assert(ti[0] == 42, "@[T:Tuple(Int,String)] generic annotation")
+
+// ─── 13. Word-form types in struct field types ───────────────────────────
+
+struct Container {
+    items: List(Int),
+    label: String
+}
+
+let c = Container { items: [10, 20, 30], label: "test" }
+assert(c.items.len() == 3, "struct field List(Int)")
+assert(c.items[2] == 30, "struct field List(Int) access")
+assert(c.label == "test", "struct field String")
+
+struct PairContainer {
+    pair: Tuple(Int, String),
+    count: Int
+}
+
+let pc = PairContainer { pair: (42, "hello"), count: 1 }
+assert(pc.pair[0] == 42, "struct field Tuple(Int,String) [0]")
+assert(pc.pair[1] == "hello", "struct field Tuple(Int,String) [1]")
+
+// ─── 14. Word-form types in enum data ────────────────────────────────────
+
+enum DataHolder {
+    Numbers: List(Int),
+    Pair: Tuple(Int, String),
+    Empty
+}
+
+let dh1 = DataHolder::Numbers([1, 2, 3])
+let dh2 = DataHolder::Pair((42, "hi"))
+let dh3 = DataHolder::Empty()
+
+fn describe_dh(d: DataHolder) -> String {
+    match d {
+        Numbers(ns) => { return "nums:" + Cast::string(ns.len()) }
+        Pair(p)     => { return "pair:" + Cast::string(p[0]) }
+        Empty()     => { return "empty" }
+    }
+    return "?"
+}
+assert(describe_dh(dh1) == "nums:3", "enum data List(Int)")
+assert(describe_dh(dh2) == "pair:42", "enum data Tuple(Int,String)")
+assert(describe_dh(dh3) == "empty", "enum data Empty")
+
+// ─── 15. @(Type) overload selection ──────────────────────────────────────
+
+fn process(x: Int) -> String {
+    return "int:" + Cast::string(x)
+}
+fn process(x: String) -> String {
+    return "str:" + x
+}
+fn process(x: Bool) -> String {
+    if x { return "bool:true" }
+    return "bool:false"
+}
+
+assert(process(42) == "int:42", "overload int")
+assert(process("hi") == "str:hi", "overload string")
+assert(process(true) == "bool:true", "overload bool")
+
+// Using @(Type) to select
+let fi = process@(Int)
+assert(fi(99) == "int:99", "@(Int) overload selection")
+
+let fs = process@(String)
+assert(fs("world") == "str:world", "@(String) overload selection")
+
+let fb = process@(Bool)
+assert(fb(false) == "bool:false", "@(Bool) overload selection")
+
+// ─── 16. @(Type) with more complex types ─────────────────────────────────
+
+fn transform(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs { total += x }
+    return total
+}
+fn transform(xs: [String]) -> String {
+    let result = ""
+    for x in xs { result += x }
+    return result
+}
+
+assert(transform([1, 2, 3]) == 6, "overload [Int]")
+assert(transform(["a", "b", "c"]) == "abc", "overload [String]")
+
+// ─── 17. Deeply nested word-form types ───────────────────────────────────
+
+// List(List(Tuple(Int, String)))
+let deep_lt: List(List(Tuple(Int, String))) = [
+    [(1, "a"), (2, "b")],
+    [(3, "c")]
+]
+assert(deep_lt.len() == 2, "deep nested len")
+assert(deep_lt[0].len() == 2, "deep nested inner len")
+assert(deep_lt[0][0][0] == 1, "deep nested access [0][0][0]")
+assert(deep_lt[0][1][1] == "b", "deep nested access [0][1][1]")
+assert(deep_lt[1][0][0] == 3, "deep nested access [1][0][0]")
+
+// ─── 18. Tuple of tuples ────────────────────────────────────────────────
+
+let tt: Tuple(Tuple(Int, Int), Tuple(String, String)) = ((1, 2), ("a", "b"))
+assert(tt[0][0] == 1, "tuple of tuples [0][0]")
+assert(tt[0][1] == 2, "tuple of tuples [0][1]")
+assert(tt[1][0] == "a", "tuple of tuples [1][0]")
+assert(tt[1][1] == "b", "tuple of tuples [1][1]")
+
+// ─── 19. Option with word-form types ─────────────────────────────────────
+
+let opt_list: Option(List(Int)) = Some([1, 2, 3])
+assert(opt_list.isSome(), "Option(List(Int)) isSome")
+let unwrapped = Option::unwrap(opt_list)
+assert(unwrapped.len() == 3, "Option(List(Int)) unwrap len")
+
+let opt_tuple: Option(Tuple(Int, String)) = Some((42, "hi"))
+assert(opt_tuple.isSome(), "Option(Tuple(Int,String)) isSome")
+let ut = Option::unwrap(opt_tuple)
+assert(ut[0] == 42, "Option(Tuple) unwrap [0]")
+
+let none_list: Option(List(Int)) = None(List(Int))
+assert(!none_list.isSome(), "None(List(Int)) isNone")
+
+// ─── 20. Struct with all word-form types ─────────────────────────────────
+
+struct Complex {
+    ints: List(Int),
+    pair: Tuple(Int, String),
+    flag: Bool,
+    name: String,
+}
+
+let cx = Complex {
+    ints: [10, 20],
+    pair: (42, "x"),
+    flag: true,
+    name: "test",
+}
+assert(cx.ints.len() == 2, "complex struct ints len")
+assert(cx.pair[0] == 42, "complex struct pair[0]")
+assert(cx.flag == true, "complex struct flag")
+assert(cx.name == "test", "complex struct name")
+
+// ─── 21. Generic function returning List(T) ─────────────────────────────
+
+fn repeat_val(x: $T, n: Int) -> [$T] {
+    let result = []:$T
+    for let i = 0; i < n; i += 1 {
+        result.push(x)
+    }
+    return result
+}
+let rep_ints = repeat_val(7, 4)
+assert(rep_ints.len() == 4, "repeat_val len")
+assert(rep_ints[0] == 7, "repeat_val[0]")
+assert(rep_ints[3] == 7, "repeat_val[3]")
+
+let rep_strs = repeat_val("hi", 2)
+assert(rep_strs.len() == 2, "repeat_val strings len")
+assert(rep_strs[1] == "hi", "repeat_val strings[1]")
+
+// ─── 22. Chaining word-form annotations ──────────────────────────────────
+
+fn wrap(x: $T) -> Option($T) {
+    return Some(x)
+}
+
+let wr1 = wrap([1, 2]) @[T: List(Int)]
+assert(wr1.isSome(), "wrap List(Int) isSome")
+
+let wr2 = wrap((1, "hi")) @[T: Tuple(Int, String)]
+assert(wr2.isSome(), "wrap Tuple isSome")
+
+// ─── 23. Shorthand vs word form equivalence in structs ──────────────────
+
+struct UsesShorthand {
+    xs: [Int],
+    pair: (Int, String),
+}
+
+struct UsesWordForm {
+    xs: List(Int),
+    pair: Tuple(Int, String),
+}
+
+let sh = UsesShorthand { xs: [1, 2], pair: (3, "hi") }
+let wf = UsesWordForm { xs: [1, 2], pair: (3, "hi") }
+
+assert(sh.xs.len() == wf.xs.len(), "shorthand vs wordform xs len equal")
+assert(sh.pair[0] == wf.pair[0], "shorthand vs wordform pair[0] equal")
+assert(sh.pair[1] == wf.pair[1], "shorthand vs wordform pair[1] equal")
+
+// ─── 24. Function pointers with word-form types ─────────────────────────
+
+let fp_list: fn(List(Int)) -> Int = fn(xs: List(Int)) -> Int {
+    let s = 0
+    for x in xs { s += x }
+    return s
+}
+assert(fp_list([5, 10, 15]) == 30, "fn pointer with List(Int)")
+
+let fp_swap: fn(Tuple(Int, String)) -> Tuple(String, Int) = fn(p: Tuple(Int, String)) -> Tuple(String, Int) {
+    return (p[1], p[0])
+}
+let result_swap = fp_swap((1, "one"))
+assert(result_swap[0] == "one", "fn pointer with Tuple param [0]")
+assert(result_swap[1] == 1, "fn pointer with Tuple param [1]")
+
+// ─── 25. Lambda with word-form types ─────────────────────────────────────
+
+let lam = fn(xs: List(Int)) -> Int {
+    let s = 0
+    for x in xs { s += x }
+    return s
+}
+assert(lam([100, 200]) == 300, "lambda with List(Int)")
+
+let lam2 = fn(t: Tuple(Int, Int)) -> Int {
+    return t[0] + t[1]
+}
+assert(lam2((3, 7)) == 10, "lambda with Tuple(Int,Int)")
+
+// ─── 26. All primitive types in Tuple word form ──────────────────────────
+
+let all_prims: Tuple(Int, Float, Bool, Char, String) = (42, 3.14, true, 'z', "hey")
+assert(all_prims[0] == 42, "all prims [0] Int")
+assert(all_prims[2] == true, "all prims [2] Bool")
+assert(all_prims[3] == 'z', "all prims [3] Char")
+assert(all_prims[4] == "hey", "all prims [4] String")
+
+// ─── 27. Returning nested word-form types ────────────────────────────────
+
+fn build_matrix(rows: Int, cols: Int) -> List(List(Int)) {
+    let matrix: List(List(Int)) = []:List(Int)
+    for let r = 0; r < rows; r += 1 {
+        let row: List(Int) = []:Int
+        for let c = 0; c < cols; c += 1 {
+            row.push(r * cols + c)
+        }
+        matrix.push(row)
+    }
+    return matrix
+}
+let m = build_matrix(3, 4)
+assert(m.len() == 3, "matrix rows")
+assert(m[0].len() == 4, "matrix cols")
+assert(m[0][0] == 0, "matrix [0][0]")
+assert(m[2][3] == 11, "matrix [2][3]")
+
+// ─── 28. Multiple generics with word-form types ──────────────────────────
+
+struct Pair2(A, B) {
+    fst: $A,
+    snd: $B,
+}
+
+let p_lt = Pair2 { fst: [1, 2, 3], snd: ("a", "b") }
+assert(p_lt.fst.len() == 3, "generic pair with List fst len")
+assert(p_lt.snd[0] == "a", "generic pair with Tuple snd[0]")
+
+// ─── 29. Word-form types in for-each style ───────────────────────────────
+
+let items: List(Tuple(Int, String)) = [(1, "a"), (2, "b"), (3, "c")]
+let sum_items = 0
+for item in items {
+    sum_items += item[0]
+}
+assert(sum_items == 6, "for-each over List(Tuple(Int,String))")
+
+// ─── 30. Option(List(T)) and Option(Tuple(T,...)) ────────────────────────
+
+fn first_or_none(xs: List(Int)) -> Option(Int) {
+    if xs.len() > 0 {
+        return Some(xs[0])
+    }
+    return None(Int)
+}
+assert(first_or_none([10, 20]).isSome(), "first_or_none some")
+assert(Option::unwrap(first_or_none([10, 20])) == 10, "first_or_none value")
+assert(!first_or_none([]:Int).isSome(), "first_or_none none")
+
+println("PASS: test_type_parsing")

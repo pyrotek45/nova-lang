@@ -1,0 +1,10 @@
+module main
+
+// SHOULD FAIL: passing List(String) where List(Int) is expected
+fn sum(xs: List(Int)) -> Int {
+    let total = 0
+    for x in xs { total += x }
+    return total
+}
+
+sum(["hello", "world"])

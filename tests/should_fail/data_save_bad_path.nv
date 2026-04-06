@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: save to a path that doesn't exist (nested dirs)
+Data::save("/nonexistent/deeply/nested/path/data.json", 42)

@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: List(T) word form with wrong element type
+let xs: List(Int) = ["hello", "world"]

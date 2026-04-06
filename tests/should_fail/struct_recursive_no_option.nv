@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: recursive struct without indirection (infinite size)
+struct Node { value: Int, next: Node }
+let n = Node { value: 1, next: Node { value: 2, next: Node { value: 3, next: Node { value: 4, next: Node { value: 5, next: Node { value: 6 } } } } } }

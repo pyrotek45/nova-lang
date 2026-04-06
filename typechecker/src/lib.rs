@@ -225,8 +225,11 @@ impl TypeChecker {
         name: &Rc<str>,
     ) -> NovaResult<()> {
         let contract_names = c1.iter().map(|(n, _)| n).collect::<Vec<_>>();
+        // Use a prefixed key for the Dyn's own type variable so it never
+        // collides with function-level generics (e.g. both named "T").
+        let dyn_key: Rc<str> = format!("__dyn_{}", own).into();
         if let Some(fields) = self.environment.custom_types.get(name.as_ref()) {
-            if let Some(mapped_type) = type_map.get(own) {
+            if let Some(mapped_type) = type_map.get(&dyn_key) {
                 if mapped_type != t2 {
                     return Err(Box::new(NovaError::TypeMismatch {
                         expected: mapped_type.clone(),
@@ -235,7 +238,7 @@ impl TypeChecker {
                     }));
                 }
             } else {
-                type_map.insert(own.clone(), t2.clone());
+                type_map.insert(dyn_key.clone(), t2.clone());
             }
 
             if contract_names.len() > fields.len() {
@@ -456,11 +459,23 @@ impl TypeChecker {
                     elements: new_elements,
                 }
             }
-            TType::Dyn { own, .. } => {
-                if let Some(index) = x.iter().position(|x| x.as_ref() == own.deref()) {
-                    type_params[index].clone()
-                } else {
-                    ttype.clone()
+            TType::Dyn { own, contract } => {
+                // The Dyn's `own` parameter is a scoped type variable for the Dyn itself
+                // (used for self-referential types like fn($T) -> String in the contract).
+                // It must NOT be replaced by external generic substitution.
+                // However, contract field types may contain external generics that do need replacing.
+                let new_contract = contract
+                    .iter()
+                    .map(|(name, field_type)| {
+                        (
+                            name.clone(),
+                            Self::replace_generic_types(field_type, x, type_params),
+                        )
+                    })
+                    .collect();
+                TType::Dyn {
+                    own: own.clone(),
+                    contract: new_contract,
                 }
             }
         }

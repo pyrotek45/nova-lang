@@ -1,0 +1,11 @@
+module main
+
+// SHOULD FAIL: match on enum without handling all variants
+enum Color { Red, Green, Blue }
+
+let c = Color::Red
+
+match c {
+    Color::Red => println("red")
+}
+// Missing Green and Blue

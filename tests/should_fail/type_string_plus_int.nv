@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: String + Int without cast (type mismatch in binary op)
+let x = "hello" + 42

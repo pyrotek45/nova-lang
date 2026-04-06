@@ -1,5 +1,6 @@
 pub mod assert;
 pub mod char;
+pub mod data;
 pub mod float;
 pub mod io;
 pub mod list;

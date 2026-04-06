@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: Tuple word form with wrong element types
+let t: Tuple(Int, String) = (1, 2)
