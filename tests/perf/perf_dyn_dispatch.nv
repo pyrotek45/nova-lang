@@ -1,0 +1,105 @@
+module perf_dyn_dispatch
+
+import super.super.std.list
+import super.super.std.core
+
+// ============================================================
+// Dyn Dispatch Benchmarks (method-style)
+// ============================================================
+// Tests: Dyn dispatch overhead with different struct shapes,
+//   mixed-type list iteration, multi-field Dyn, polymorphic calls
+// ============================================================
+
+struct Dog {
+    name: String,
+    speed: Int,
+    loyalty: Int,
+}
+
+struct Cat {
+    name: String,
+    speed: Int,
+    stealth: Int,
+}
+
+struct Bird {
+    name: String,
+    speed: Int,
+    altitude: Int,
+}
+
+type speedy = Dyn(T = name: String + speed: Int)
+
+// ── BENCH 1: Dyn dispatch single function ───────────────────
+fn get_speed(a: speedy) -> Int { return a.speed }
+
+let dog = Dog { name: "Rex", speed: 30, loyalty: 95 }
+let cat = Cat { name: "Whiskers", speed: 25, stealth: 80 }
+let bird = Bird { name: "Eagle", speed: 60, altitude: 500 }
+
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    s1 = s1 + get_speed(dog) + get_speed(cat) + get_speed(bird)
+}
+let t1e = now()
+assert(s1 == 11500000, "dyn dispatch speed sum")
+println("  BENCH 1 [dyn_dispatch_100k]    " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Dyn field read alternating types ───────────────
+fn get_name(a: speedy) -> String { return a.name }
+
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    s2 = s2 + get_name(dog).len()
+    s2 = s2 + get_name(cat).len()
+    s2 = s2 + get_name(bird).len()
+}
+let t2e = now()
+assert(s2 > 0, "dyn name read sum")
+println("  BENCH 2 [dyn_name_read_100k]   " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Dyn dispatch with alternating types ────────────
+let t3 = now()
+let s3 = 0
+for i in 0..50000 {
+    s3 = s3 + get_speed(dog)
+    s3 = s3 + get_speed(cat)
+    s3 = s3 + get_speed(bird)
+}
+let t3e = now()
+assert(s3 == 5750000, "dyn alternating dispatch")
+println("  BENCH 3 [dyn_alternating_50k]  " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Dyn with computation ───────────────────────────
+fn speed_score(a: speedy) -> Int {
+    return a.speed * a.name.len()
+}
+
+let t4 = now()
+let s4 = 0
+for i in 0..100000 {
+    s4 = s4 + speed_score(dog)
+    s4 = s4 + speed_score(cat)
+    s4 = s4 + speed_score(bird)
+}
+let t4e = now()
+assert(s4 > 0, "dyn computation sum")
+println("  BENCH 4 [dyn_compute_100k]     " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Dyn construction + dispatch ────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..50000 {
+    let d = Dog { name: "D", speed: i, loyalty: 0 }
+    s5 = s5 + get_speed(d)
+}
+let t5e = now()
+assert(s5 == Cast::int(50000 * 49999 / 2).unwrap(), "dyn construct+dispatch")
+println("  BENCH 5 [dyn_construct_50k]    " + Cast::string(t5e - t5) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)
+println("  TOTAL [dyn_dispatch] " + Cast::string(total) + "ms")

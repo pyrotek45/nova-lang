@@ -60,6 +60,44 @@ for test_file in "${TEST_FILES[@]}"; do
 done
 
 # ============================================================
+# PERFORMANCE BENCHMARKS: tests/perf/perf_*.nv
+# Each must exit 0.  They print timing but we only check success.
+# ============================================================
+PERF_DIR="$SCRIPT_DIR/perf"
+PERF_PASS=0
+PERF_FAIL=0
+PERF_FAILURES=()
+
+if [ -d "$PERF_DIR" ]; then
+    PERF_FILES=("$PERF_DIR"/perf_*.nv)
+    if [ ${#PERF_FILES[@]} -gt 0 ] && [ -f "${PERF_FILES[0]}" ]; then
+        echo ""
+        echo "Running ${#PERF_FILES[@]} performance benchmarks (perf/)..."
+        echo ""
+
+        for bench_file in "${PERF_FILES[@]}"; do
+            bench_name="$(basename "$bench_file" .nv)"
+
+            output=$("$NOVA" run "$bench_file" 2>&1) && exit_code=0 || exit_code=$?
+
+            if [ $exit_code -eq 0 ]; then
+                echo "  ✓ $bench_name"
+                PERF_PASS=$((PERF_PASS + 1))
+            else
+                echo "  ✗ $bench_name"
+                PERF_FAILURES+=("$bench_name")
+                PERF_FAIL=$((PERF_FAIL + 1))
+                if [ -n "$output" ]; then
+                    echo "    Output:"
+                    echo "$output" | head -10 | sed 's/^/      /'
+                fi
+                echo ""
+            fi
+        done
+    fi
+fi
+
+# ============================================================
 # NEGATIVE TESTS: programs that MUST be rejected (non-zero exit)
 # These validate that the type system/parser correctly rejects
 # ill-typed or syntactically invalid programs.
@@ -100,12 +138,15 @@ fi
 # ============================================================
 # Summary
 # ============================================================
-TOTAL_PASS=$((PASS + SF_PASS))
-TOTAL_FAIL=$((FAIL + SF_FAIL))
+TOTAL_PASS=$((PASS + SF_PASS + PERF_PASS))
+TOTAL_FAIL=$((FAIL + SF_FAIL + PERF_FAIL))
 
 echo ""
 echo "========================================"
 echo "  Positive tests: $PASS passed, $FAIL failed"
+if [ -d "$PERF_DIR" ] && [ $((PERF_PASS + PERF_FAIL)) -gt 0 ]; then
+    echo "  Perf benchmarks: $PERF_PASS passed, $PERF_FAIL failed"
+fi
 if [ -d "$SF_DIR" ]; then
     echo "  Rejection tests: $SF_PASS passed, $SF_FAIL failed"
 fi
@@ -116,6 +157,14 @@ if [ ${#FAILURES[@]} -gt 0 ]; then
     echo ""
     echo "Failed positive tests:"
     for f in "${FAILURES[@]}"; do
+        echo "  - $f"
+    done
+fi
+
+if [ ${#PERF_FAILURES[@]} -gt 0 ]; then
+    echo ""
+    echo "Failed perf benchmarks:"
+    for f in "${PERF_FAILURES[@]}"; do
         echo "  - $f"
     done
 fi
