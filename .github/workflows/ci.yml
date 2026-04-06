@@ -19,15 +19,12 @@ jobs:
         include:
           - name: linux-x86_64
             os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
 
           - name: macos-aarch64
             os: macos-latest
-            target: aarch64-apple-darwin
 
           - name: windows-x86_64
             os: windows-latest
-            target: x86_64-pc-windows-msvc
 
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +45,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
           components: clippy
 
       - name: Cache cargo registry & build
@@ -58,27 +54,21 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --release --all-targets --all-features -- -D warnings
 
       - name: Run Nova test suite
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: bash tests/run_tests.sh
-
-      - name: Run Nova test suite (Windows)
-        if: matrix.os == 'windows-latest'
         shell: bash
         run: bash tests/run_tests.sh
 
       - name: Check version output
         shell: bash
         run: |
-          VERSION=$(cargo run --release --target ${{ matrix.target }} -- version 2>&1)
+          VERSION=$(./target/release/nova version 2>&1 || ./target/release/nova.exe version 2>&1)
           echo "Nova reports: $VERSION"
           echo "$VERSION" | grep -q "0.5.0-alpha" || { echo "ERROR: version mismatch"; exit 1; }

@@ -9,6 +9,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 NOVA="$PROJECT_DIR/target/release/nova"
 
+# Windows: the binary has a .exe extension
+if [ ! -f "$NOVA" ] && [ -f "$NOVA.exe" ]; then
+    NOVA="$NOVA.exe"
+fi
+
 if [ ! -f "$NOVA" ]; then
     echo "ERROR: Nova binary not found at $NOVA"
     echo "       Run 'cargo build --release' first."
