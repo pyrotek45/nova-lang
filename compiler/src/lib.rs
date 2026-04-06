@@ -1863,6 +1863,12 @@ impl Compiler {
             } => {
                 self.compile_expr(expr)?;
 
+                // `_` is a discard — just pop the value off the stack.
+                if identifier.as_ref() == "_" {
+                    self.asm.push(Asm::POP);
+                    return Ok(());
+                }
+
                 if *global {
                     if let Some(index) = self.global.get_index(identifier) {
                         self.asm.push(Asm::STOREGLOBAL(index as u32))

@@ -365,7 +365,7 @@ check(large_dq.peekBack().unwrap() == 499, "deque back")
 // Pop from both ends
 for let i = 0; i < 100; i += 1 {
     let _ = large_dq.popFront()
-    _ = large_dq.popBack()
+    let _ = large_dq.popBack()
 }
 check(large_dq.len() == 300, "deque after 100 pops each end")
 
