@@ -2,7 +2,32 @@
 
 ## Install
 
-Build from source (requires Rust, a C compiler, and cmake):
+### Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from
+[GitHub Releases](https://github.com/pyrotek45/nova-lang/releases):
+
+| Platform | File |
+|---|---|
+| Linux x86_64 | `nova-linux-x86_64.tar.gz` |
+| macOS x86_64 | `nova-macos-x86_64.tar.gz` |
+| macOS Apple Silicon | `nova-macos-aarch64.tar.gz` |
+| Windows x86_64 | `nova-windows-x86_64.zip` |
+
+Extract and place on your PATH:
+
+```bash
+# Linux / macOS
+tar xzf nova-*.tar.gz
+sudo cp nova /usr/local/bin/
+# or: cp nova ~/.local/bin/
+
+# Windows — extract the .zip and add the folder to your PATH
+```
+
+### Build from Source
+
+Requires Rust, a C compiler, and cmake:
 
 ```bash
 git clone https://github.com/pyrotek45/nova-lang

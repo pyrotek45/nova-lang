@@ -101,6 +101,28 @@ let safe = Cast::int("oops").orDefault(0)
 
 ## Get Started
 
+### Pre-built Binaries
+
+Download the latest release for your platform from
+[GitHub Releases](https://github.com/pyrotek45/nova-lang/releases).
+
+| Platform | File |
+|---|---|
+| Linux x86_64 | `nova-linux-x86_64.tar.gz` |
+| macOS x86_64 | `nova-macos-x86_64.tar.gz` |
+| macOS Apple Silicon | `nova-macos-aarch64.tar.gz` |
+| Windows x86_64 | `nova-windows-x86_64.zip` |
+
+Extract the archive and put the `nova` binary somewhere on your `PATH`:
+
+```bash
+# Linux / macOS
+tar xzf nova-*.tar.gz
+sudo cp nova /usr/local/bin/     # or ~/.local/bin/
+```
+
+### Build from Source
+
 ```bash
 git clone https://github.com/pyrotek45/nova-lang
 cd nova-lang
