@@ -894,6 +894,23 @@ fn nova_test(args: &mut std::env::Args) {
     }
     test_files.sort();
 
+    // Collect perf benchmarks from perf/ subdirectory
+    let mut perf_files: Vec<PathBuf> = Vec::new();
+    let perf_dir = test_dir.join("perf");
+    if perf_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&perf_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with("perf_") && name.ends_with(".nv") {
+                        perf_files.push(path);
+                    }
+                }
+            }
+        }
+    }
+    perf_files.sort();
+
     if test_files.is_empty() {
         eprintln!("No test files found in {}.", test_dir.display());
         eprintln!("  Test files must be named test_*.nv");
@@ -939,8 +956,53 @@ fn nova_test(args: &mut std::env::Args) {
         }
     }
 
+    // Run perf benchmarks
+    let mut perf_pass = 0;
+    let mut perf_fail = 0;
+    let mut perf_failures: Vec<String> = Vec::new();
+
+    if !perf_files.is_empty() {
+        println!("\nRunning {} perf benchmarks from perf/\n", perf_files.len());
+
+        for bench_file in &perf_files {
+            let bench_name = bench_file
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+
+            let result = novacore::NovaCore::new(bench_file);
+            match result {
+                Ok(novacore) => match novacore.run() {
+                    Ok(()) => {
+                        println!("  \u{2713} {}", bench_name);
+                        perf_pass += 1;
+                    }
+                    Err(e) => {
+                        println!("  \u{2717} {} (runtime error)", bench_name);
+                        e.show();
+                        perf_fail += 1;
+                        perf_failures.push(bench_name.to_string());
+                    }
+                },
+                Err(e) => {
+                    println!("  \u{2717} {} (compile error)", bench_name);
+                    e.show();
+                    perf_fail += 1;
+                    perf_failures.push(bench_name.to_string());
+                }
+            }
+        }
+    }
+
+    let total_pass = pass + perf_pass;
+    let total_fail = fail + perf_fail;
+
     println!("\n========================================");
-    println!("  {} passed, {} failed", pass, fail);
+    println!("  Positive tests: {} passed, {} failed", pass, fail);
+    if !perf_files.is_empty() {
+        println!("  Perf benchmarks: {} passed, {} failed", perf_pass, perf_fail);
+    }
+    println!("  Total: {} passed, {} failed", total_pass, total_fail);
     println!("========================================");
 
     if !failures.is_empty() {
@@ -948,6 +1010,16 @@ fn nova_test(args: &mut std::env::Args) {
         for f in &failures {
             println!("  - {}", f);
         }
+    }
+
+    if !perf_failures.is_empty() {
+        println!("\nFailed perf benchmarks:");
+        for f in &perf_failures {
+            println!("  - {}", f);
+        }
+    }
+
+    if total_fail > 0 {
         exit(1);
     } else {
         println!("\nAll tests passed! \u{2713}");

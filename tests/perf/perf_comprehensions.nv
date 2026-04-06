@@ -1,0 +1,85 @@
+module perf_comprehensions
+
+import super.super.std.list
+import super.super.std.core
+
+// ============================================================
+// List Comprehension Benchmarks
+// ============================================================
+// Tests: comprehension creation overhead, nested comprehensions,
+//   comprehensions with function calls, large comprehensions
+// ============================================================
+
+// ── BENCH 1: Simple comprehension ───────────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..1000 {
+    let xs = [x in 0.to(100) | x * 2]
+    s1 = s1 + xs.len()
+}
+let t1e = now()
+assert(s1 == 100000, "simple comprehension count")
+println("  BENCH 1 [simple_comp_1k]       " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Comprehension with function call ───────────────
+fn cube(x: Int) -> Int { return x * x * x }
+
+let t2 = now()
+let s2 = 0
+for i in 0..1000 {
+    let xs = [x in 1.to(51) | cube(x)]
+    s2 = s2 + xs.len()
+}
+let t2e = now()
+assert(s2 == 50000, "fn comprehension count")
+println("  BENCH 2 [fn_comp_1k]           " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Nested comprehension (cartesian) ───────────────
+let t3 = now()
+let s3 = 0
+for i in 0..500 {
+    let xs = [x in 0.to(10), y in 0.to(10) | x * 10 + y]
+    s3 = s3 + xs.len()
+}
+let t3e = now()
+assert(s3 == 50000, "nested comprehension count")
+println("  BENCH 3 [nested_comp_500]      " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Large comprehension ────────────────────────────
+let t4 = now()
+let big = [x in 0.to(50000) | x + 1]
+let s4 = 0
+for i in 0..big.len() {
+    s4 = s4 + big[i]
+}
+let t4e = now()
+assert(s4 == 1250025000, "large comp sum")
+assert(big.len() == 50000, "large comp len")
+println("  BENCH 4 [large_comp_50k]       " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Comprehension with expressions ─────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..1000 {
+    let xs = [x in 1.to(51) | (x * x) + 1]
+    s5 = s5 + xs[0]
+}
+let t5e = now()
+assert(s5 == 2000, "expr comprehension")
+println("  BENCH 5 [expr_comp_1k]         " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: String comprehension ───────────────────────────
+let t6 = now()
+let s6 = 0
+for i in 0..500 {
+    let xs = [x in 0.to(20) | Cast::string(x)]
+    s6 = s6 + xs.len()
+}
+let t6e = now()
+assert(s6 == 10000, "string comprehension count")
+println("  BENCH 6 [string_comp_500]      " + Cast::string(t6e - t6) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)
+println("  TOTAL [comprehensions] " + Cast::string(total) + "ms")

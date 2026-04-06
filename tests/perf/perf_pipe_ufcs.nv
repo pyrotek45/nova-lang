@@ -1,0 +1,103 @@
+module perf_pipe_ufcs
+
+import super.super.std.list
+import super.super.std.core
+
+// ============================================================
+// Pipe Operator & UFCS Benchmarks
+// ============================================================
+// Tests: |> pipe overhead, fn extends (UFCS) dispatch,
+//   chained pipes, UFCS on structs, mixed pipe+ufcs patterns
+// ============================================================
+
+fn add1(x: Int) -> Int { return x + 1 }
+fn double(x: Int) -> Int { return x * 2 }
+fn negate(x: Int) -> Int { return 0 - x }
+
+// ── BENCH 1: Simple pipe chain ──────────────────────────────
+let t1 = now()
+let s1 = 0
+for i in 0..100000 {
+    s1 = s1 + (i |> add1() |> double())
+}
+let t1e = now()
+assert(s1 > 0, "pipe chain sum")
+println("  BENCH 1 [pipe_chain_100k]      " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Deep pipe chain ────────────────────────────────
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    s2 = s2 + (i |> add1() |> double() |> add1() |> add1())
+}
+let t2e = now()
+assert(s2 > 0, "deep pipe sum")
+println("  BENCH 2 [deep_pipe_100k]       " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: UFCS on struct ─────────────────────────────────
+struct Vec2 {
+    x: Int,
+    y: Int,
+}
+
+fn extends magnitude_sq(self: Vec2) -> Int {
+    return self.x * self.x + self.y * self.y
+}
+
+fn extends translate(self: Vec2, dx: Int, dy: Int) -> Vec2 {
+    return Vec2(self.x + dx, self.y + dy)
+}
+
+let t3 = now()
+let s3 = 0
+let v = Vec2(3, 4)
+for i in 0..100000 {
+    s3 = s3 + v.magnitude_sq()
+}
+let t3e = now()
+assert(s3 == 2500000, "ufcs magnitude")
+println("  BENCH 3 [ufcs_method_100k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: UFCS chain ────────────────────────────────────
+let t4 = now()
+let s4 = 0
+for i in 0..50000 {
+    let r = Vec2(1, 1).translate(1, 0).translate(0, 1).magnitude_sq()
+    s4 = s4 + r
+}
+let t4e = now()
+assert(s4 == 400000, "ufcs chain")
+println("  BENCH 4 [ufcs_chain_50k]       " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Pipe with lambda ───────────────────────────────
+let t5 = now()
+let s5 = 0
+for i in 0..100000 {
+    let r = i |> add1() |> double()
+    s5 = s5 + r
+}
+let t5e = now()
+assert(s5 > 0, "pipe with ops")
+println("  BENCH 5 [pipe_ops_100k]        " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Mixed pipe + UFCS ──────────────────────────────
+fn extends add_x(self: Vec2, n: Int) -> Vec2 {
+    return Vec2(self.x + n, self.y)
+}
+
+fn vec_sum(v: Vec2) -> Int { return v.x + v.y }
+
+let t6 = now()
+let s6 = 0
+for i in 0..50000 {
+    let r = Vec2(0, i).add_x(i) |> vec_sum()
+    s6 = s6 + r
+}
+let t6e = now()
+assert(s6 > 0, "mixed pipe ufcs")
+println("  BENCH 6 [mixed_pipe_ufcs_50k]  " + Cast::string(t6e - t6) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)
+println("  TOTAL [pipe_ufcs] " + Cast::string(total) + "ms")

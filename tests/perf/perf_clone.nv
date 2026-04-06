@@ -1,0 +1,101 @@
+module perf_clone
+
+import super.super.std.list
+import super.super.std.core
+
+// ============================================================
+// Clone Benchmarks
+// ============================================================
+// Tests: clone overhead for lists, structs, nested structures,
+//   clone-in-loop patterns, deep clone correctness
+// ============================================================
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Rect {
+    origin: Point,
+    w: Int,
+    h: Int,
+}
+
+// ── BENCH 1: Clone list of ints ─────────────────────────────
+let base_list = 0.to(100)
+let t1 = now()
+let s1 = 0
+for i in 0..5000 {
+    let c = clone(base_list)
+    s1 = s1 + c.len()
+}
+let t1e = now()
+assert(s1 == 500000, "clone list count")
+println("  BENCH 1 [clone_int_list_5k]    " + Cast::string(t1e - t1) + "ms")
+
+// ── BENCH 2: Clone struct ───────────────────────────────────
+let p = Point(10, 20)
+let t2 = now()
+let s2 = 0
+for i in 0..100000 {
+    let c = clone(p)
+    s2 = s2 + c.x
+}
+let t2e = now()
+assert(s2 == 1000000, "clone struct sum")
+println("  BENCH 2 [clone_struct_100k]    " + Cast::string(t2e - t2) + "ms")
+
+// ── BENCH 3: Clone nested struct ────────────────────────────
+let r = Rect { origin: Point(1, 2), w: 10, h: 20 }
+let t3 = now()
+let s3 = 0
+for i in 0..50000 {
+    let c = clone(r)
+    s3 = s3 + c.origin.x + c.w
+}
+let t3e = now()
+assert(s3 == 550000, "clone nested struct")
+println("  BENCH 3 [clone_nested_50k]     " + Cast::string(t3e - t3) + "ms")
+
+// ── BENCH 4: Clone string ───────────────────────────────────
+let base_str = "hello world benchmark"
+let t4 = now()
+let s4 = 0
+for i in 0..100000 {
+    let c = clone(base_str)
+    s4 = s4 + c.len()
+}
+let t4e = now()
+assert(s4 == 2100000, "clone string len")
+println("  BENCH 4 [clone_string_100k]    " + Cast::string(t4e - t4) + "ms")
+
+// ── BENCH 5: Clone in accumulator pattern ───────────────────
+let t5 = now()
+let acc = []: [Int]
+let row = [1, 2, 3]
+for i in 0..10000 {
+    acc.push(clone(row))
+}
+let t5e = now()
+assert(acc.len() == 10000, "clone accumulator len")
+assert(acc[0][0] == 1, "clone accumulator val")
+println("  BENCH 5 [clone_accumulate_10k] " + Cast::string(t5e - t5) + "ms")
+
+// ── BENCH 6: Clone + mutate (independence check) ────────────
+let t6 = now()
+let s6 = 0
+let src = Point(0, 0)
+for i in 0..100000 {
+    let c = clone(src)
+    c.x = i
+    s6 = s6 + c.x
+}
+let t6e = now()
+assert(src.x == 0, "clone mutate original unchanged")
+assert(s6 == Cast::int(100000 * 99999 / 2).unwrap(), "clone mutate sum")
+println("  BENCH 6 [clone_mutate_100k]    " + Cast::string(t6e - t6) + "ms")
+
+// ── Summary ─────────────────────────────────────────────────
+println("")
+let total = (t1e-t1)+(t2e-t2)+(t3e-t3)+(t4e-t4)+(t5e-t5)+(t6e-t6)
+println("  TOTAL [clone] " + Cast::string(total) + "ms")
