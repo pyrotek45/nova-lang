@@ -141,17 +141,3 @@ else
     echo "$TOTAL_FAIL test(s) failed."
     exit 1
 fi
-
-
-if [ $FAIL -gt 0 ]; then
-    echo ""
-    echo "Failed tests:"
-    for f in "${FAILURES[@]}"; do
-        echo "  - $f"
-    done
-    exit 1
-fi
-
-echo ""
-echo "All tests passed! ✓"
-exit 0
