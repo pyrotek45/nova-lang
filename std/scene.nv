@@ -116,7 +116,7 @@ fn extends push(self: SceneManager, scene: Scene) {
 
 fn extends pop(self: SceneManager) {
     if self.stack.len() > 0 {
-        self.stack.pop()
+        let _ = self.stack.pop()
         self.onPop.emit()
     }
 }

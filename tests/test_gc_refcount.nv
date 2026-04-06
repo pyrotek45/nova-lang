@@ -74,7 +74,7 @@ fn push_pop_cycle() {
         }
         // Pop them all
         while l.len() > 0 {
-            l.pop()
+            let _ = l.pop()
         }
     }
     assert(l.len() == 0, "push pop cycle empty")

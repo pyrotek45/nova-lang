@@ -293,6 +293,24 @@ pub fn str_char_at(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
+/// String::get(s, index) -> Option(Char)
+/// Safe indexing with Python-style negative indices.
+pub fn str_get(state: &mut state::State) -> NovaResult<()> {
+    let idx = pop_int(state)?;
+    let s = pop_string(state)?;
+    let len = s.chars().count() as i64;
+    let resolved = if idx < 0 { idx + len } else { idx };
+    if resolved < 0 || resolved >= len {
+        state.memory.stack.push(VmData::None);
+    } else {
+        match s.chars().nth(resolved as usize) {
+            Some(c) => state.memory.stack.push(VmData::Char(c)),
+            None => state.memory.stack.push(VmData::None),
+        }
+    }
+    Ok(())
+}
+
 /// String::split(s, delim) -> [String]
 pub fn str_split(state: &mut state::State) -> NovaResult<()> {
     let delim = pop_string(state)?;

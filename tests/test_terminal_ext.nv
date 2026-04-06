@@ -27,8 +27,8 @@ fn terminalSmokeTest() {
     if false {
         terminal::rawmode(true)
         terminal::rawmode(false)
-        terminal::getch()
-        terminal::rawread(100)
+        let _ = terminal::getch()
+        _ = terminal::rawread(100)
         terminal::clearScreen()
         terminal::hideCursor()
         terminal::showCursor()

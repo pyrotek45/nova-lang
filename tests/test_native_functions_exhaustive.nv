@@ -401,17 +401,17 @@ assert(writeFile(test_path, "hello nova"), "writeFile")
 assert(fileExists(test_path), "fileExists true")
 assert(!fileExists("/tmp/nova_this_should_not_exist_12345.txt"), "fileExists false")
 
-let content = readFile(test_path)
+let content = readFile(test_path)?
 assert(content == "hello nova", "readFile matches")
 
 // ── appendFile ───────────────────────────────────────────────────────────
 assert(appendFile(test_path, " world"), "appendFile")
-let content2 = readFile(test_path)
+let content2 = readFile(test_path)?
 assert(content2 == "hello nova world", "appendFile appended")
 
 // ── writeFile overwrite ──────────────────────────────────────────────────
 assert(writeFile(test_path, "overwritten"), "writeFile overwrite")
-assert(readFile(test_path) == "overwritten", "readFile after overwrite")
+assert(readFile(test_path)? == "overwritten", "readFile after overwrite")
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SECTION 7: format function

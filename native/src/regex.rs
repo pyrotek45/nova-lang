@@ -32,10 +32,10 @@ pub fn regex_match(state: &mut state::State) -> NovaResult<()> {
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
-        Err(e) => {
-            return Err(Box::new(NovaError::Runtime {
-                msg: format!("Invalid regex pattern: {e}").into(),
-            }))
+        Err(_) => {
+            // Invalid regex pattern — return false instead of crashing
+            state.memory.stack.push(VmData::Bool(false));
+            return Ok(());
         }
     };
 
@@ -50,10 +50,10 @@ pub fn regex_captures(state: &mut state::State) -> NovaResult<()> {
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
-        Err(e) => {
-            return Err(Box::new(NovaError::Runtime {
-                msg: format!("Invalid regex pattern: {e}").into(),
-            }))
+        Err(_) => {
+            // Invalid regex pattern — return empty list instead of crashing
+            state.memory.push_list(vec![]);
+            return Ok(());
         }
     };
 
@@ -78,10 +78,10 @@ pub fn regex_first(state: &mut state::State) -> NovaResult<()> {
 
     let re = match regex::Regex::new(&pattern) {
         Ok(re) => re,
-        Err(e) => {
-            return Err(Box::new(NovaError::Runtime {
-                msg: format!("Invalid regex pattern: {}", e).into(),
-            }))
+        Err(_) => {
+            // Invalid regex pattern — return None instead of crashing
+            state.memory.stack.push(VmData::None);
+            return Ok(());
         }
     };
 

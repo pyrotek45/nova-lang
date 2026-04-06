@@ -626,6 +626,11 @@ impl Vm {
                         self.runtime_error("Modulo (%): expected two Int values on the stack")
                     );
                 };
+                if v1 == 0 {
+                    return Err(
+                        self.runtime_error("Integer modulo (%): division by zero")
+                    );
+                }
                 let result = v2.modulo(v1);
                 self.state.memory.stack.push(VmData::Int(result))
             }

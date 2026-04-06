@@ -27,7 +27,7 @@ for i in 0..50000 {
 }
 let t2 = now()
 for i in 0..50000 {
-    list2.pop()
+    let _ = list2.pop()
 }
 let t2e = now()
 assert(list2.len() == 0, "pop")
