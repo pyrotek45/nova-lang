@@ -273,28 +273,28 @@ x = "hello" // ERROR — cannot change type
 
 ### Discarding Values with `_`
 
-The identifier `_` is a normal variable — there is no special language
-support for it.  However, it's the idiomatic way to discard a value you
-don't need:
+The identifier `_` is a **discard pattern**, not a real variable.  It
+never enters the scope and takes zero space at runtime — the compiler
+simply pops the value off the stack.
 
 ```rust
 let _ = readFile("config.txt")    // explicitly discard the Option
 ```
 
-Because `_` is just a variable, there are a few rules to keep in mind:
+Key rules:
 
-- You can only `let _` **once per scope**.  After that, use `_ = expr`:
+- `let _ = expr` is the **only** way to use `_`.  Bare `_ = expr` and
+  reading `_` as a value are compile errors.
+- You can write `let _ = ...` **any number of times** in the same scope
+  because `_` never occupies a scope slot.
 
   ```rust
-  let _ = someOption()     // first discard
-  _ = anotherOption()      // second discard — reassign, don't redeclare
+  let _ = someOption()      // first discard
+  let _ = anotherOption()   // second discard — perfectly fine
   ```
 
-- `let _ = optionExpr` does bypass the must-use check because `let`
+- `let _ = optionExpr` bypasses the must-use check because `let`
   wraps the result as `Void`.
-
-- `_` otherwise behaves like any other variable — it occupies a scope
-  slot and can be read back (though you usually shouldn't).
 
 ---
 
@@ -2057,7 +2057,7 @@ Dyn types, and extends + UFCS.
 - `Regex::captures` returns all full-pattern matches, not sub-groups: `Regex::captures("\\d+", "a 1 b 2")` → `["1", "2"]`
 - `String::indexOf` returns `Int` (`-1` if not found) — not `Option`
 - Tuple fields are accessed with bracket syntax: `tup[0]`, not `tup.0`
-- `let _` can be used once per scope to discard; then use `_ = expr` for further discards
+- `let _` is a zero-cost discard pattern — use it any number of times in the same scope
 - The must-use check fires **between** statements — a trailing Option at end-of-block is exempt (it's a tail expression)
 
 ---
@@ -2085,7 +2085,7 @@ Dyn types, and extends + UFCS.
 | Missing return on else branch | All paths must return |
 | Varargs with mixed types `f(1, "hi")` | All trailing varargs must be the same type |
 | Varargs on non-last param | The list param must be last in the signature |
-| `let _ = a; let _ = b` redeclare | Use `let _ = a; _ = b` (reassign, don't redeclare) |
+| `_ = expr` or reading `_` | `_` is a discard, not a variable — use `let _ = expr` |
 | `Regex::captures("text", "pattern")` | Args are **(pattern, text)**: `Regex::captures("\\d+", text)` |
 | Bare `readFile(...)` as statement | Must-use: wrap with `?`, `let`, or `if let` |
 

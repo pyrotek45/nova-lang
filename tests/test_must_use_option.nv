@@ -13,9 +13,9 @@ fn maybeInt() -> Option(Int) { return Some(42) }
 let _ = maybeInt()
 assert(true, "1a: let _ = discards without error")
 
-// Reassign _ for subsequent discards in same scope
-_ = maybeInt()
-assert(true, "1b: _ = reassign also works")
+// Multiple let _ in same scope is allowed
+let _ = maybeInt()
+assert(true, "1b: second let _ = also works")
 
 println("  GROUP 1 [let _ discard] OK")
 
@@ -76,17 +76,17 @@ assert(r2.isSome() == false, "7b: None from else branch")
 
 println("  GROUP 7 [conditional Option] OK")
 
-// ── 8. Discard in loops with _ = (reassignment) ────────────────
+// ── 8. Discard in loops with let _ = ────────────────────────────
 let dq = [10, 20, 30, 40, 50]
 for let i = 0; i < 3; i += 1 {
-    _ = dq.pop()
+    let _ = dq.pop()
 }
-assert(dq.len() == 2, "8a: pop discarded in loop with _ =")
+assert(dq.len() == 2, "8a: pop discarded in loop with let _ =")
 
-// Multiple pops in same scope using _ = reassignment
+// Multiple pops in same scope using let _
 let dq2 = [1, 2, 3, 4]
-_ = dq2.pop()
-_ = dq2.pop()
+let _ = dq2.pop()
+let _ = dq2.pop()
 assert(dq2.len() == 2, "8b: multiple discards in same scope")
 
 println("  GROUP 8 [loop discard] OK")

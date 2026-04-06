@@ -2983,6 +2983,19 @@ impl Parser {
             }
             _ => {}
         }
+
+        // Bare `_` is not a valid identifier — it's only valid in `let _ = expr`.
+        // Reject it early with a clear message.
+        if let Some(Identifier(id)) = self.current_token_value() {
+            if id.deref() == "_" {
+                return Err(self.generate_error(
+                    "`_` can only be used with `let` to discard a value",
+                    "`_` is not a variable — it is a discard pattern.\n  \
+                     Use `let _ = expr` to evaluate an expression and throw away the result.",
+                ));
+            }
+        }
+
         let mut left_expr = self.logical_or_expr()?;
         let current_pos = self.get_current_token_position();
         while self.current_token().is_some_and(|t| t.is_assign()) {
@@ -6074,6 +6087,18 @@ impl Parser {
                 pos.clone(),
             ));
         }
+
+        // `_` is a discard — it never enters the scope and compiles to a POP.
+        // It can be used any number of times in the same scope.
+        if identifier.deref() == "_" {
+            return Ok(Expr::Let {
+                ttype: TType::Void,
+                identifier,
+                expr: Box::new(expr),
+                global: false,
+            });
+        }
+
         // make sure symbol doesnt already exist
         if self.typechecker.environment.has(&identifier) {
             Err(self.generate_error_with_pos(
