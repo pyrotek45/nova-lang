@@ -7,7 +7,7 @@ module test_data_exhaustive
 //  wacky generic annotations, struct field ordering, enum variants, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
-let base = "/tmp/nova_test_data_ex_"
+let base = tempDir() + "nova_test_data_ex_"
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SECTION 1: PRIMITIVE TYPES — exhaustive edge cases
@@ -533,7 +533,7 @@ assert(jp_v.alive == false, "json roundtrip Player.alive")
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Load from nonexistent file → None ────────────────────────────────────
-let missing = Data::load("/tmp/nova_no_such_file_ever.json") @[T: Int]
+let missing = Data::load(tempDir() + "nova_no_such_file_ever.json") @[T: Int]
 assert(!missing.isSome(), "nonexistent file returns None")
 
 // ── Load from empty file → None ──────────────────────────────────────────

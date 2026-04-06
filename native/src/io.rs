@@ -111,6 +111,21 @@ pub fn append_file(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
+/// tempDir() -> String
+/// Returns the OS temporary directory (e.g. "/tmp" on Unix, "C:\Users\...\AppData\Local\Temp" on Windows).
+/// The returned path always ends with a path separator so callers can append a filename directly.
+pub fn temp_dir(state: &mut state::State) -> NovaResult<()> {
+    let mut tmp = std::env::temp_dir()
+        .to_string_lossy()
+        .to_string();
+    // Ensure it ends with a separator so `tempDir() + "file.txt"` just works.
+    if !tmp.ends_with(std::path::MAIN_SEPARATOR) {
+        tmp.push(std::path::MAIN_SEPARATOR);
+    }
+    state.memory.push_string(tmp);
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // printf / format helpers
 // ---------------------------------------------------------------------------

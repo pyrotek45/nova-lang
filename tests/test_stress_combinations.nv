@@ -61,7 +61,7 @@ assert(r5.inner[1] == "two", "Wrapper(Tuple) roundtrip [1]")
 // ═══════════════════════════════════════════════════════════════════════════
 
 let save_and_load = fn(val: Int) -> Int {
-    let path = "/tmp/nova_stress_closure.json"
+    let path = tempDir() + "nova_stress_closure.json"
     Data::save(path, val)
     let loaded = Data::load(path) @[T: Int]
     return Option::unwrap(loaded)

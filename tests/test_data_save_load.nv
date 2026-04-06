@@ -4,7 +4,7 @@ module test_data_save_load
 // Data::save / Data::load / Data::toJson / Data::fromJson  tests
 // ═══════════════════════════════════════════════════════════════════
 
-let base = "/tmp/nova_test_data_"
+let base = tempDir() + "nova_test_data_"
 
 // ── Int ──────────────────────────────────────────────────────────
 let p = base + "int.json"
@@ -184,7 +184,7 @@ let nope: Option(Int) = None(Int)
 assert(Data::save(pn, nope), "save None")
 
 // ── Load nonexistent file → None ─────────────────────────────────
-let loaded_missing = Data::load("/tmp/nova_this_file_does_not_exist.json") @[T:Int]
+let loaded_missing = Data::load(tempDir() + "nova_this_file_does_not_exist.json") @[T:Int]
 assert(!loaded_missing.isSome(), "load missing file returns None")
 
 // ── Load corrupted JSON → None ───────────────────────────────────

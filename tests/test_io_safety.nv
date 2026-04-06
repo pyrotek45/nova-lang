@@ -52,7 +52,7 @@ if let bad = readFile("nonexistent_file.xyz") {
 println("  GROUP 4 [readFile with if let] OK")
 
 // ── 5. writeFile returns true on success ────────────────────────
-let tmp_path = "/tmp/nova_test_io_safety.txt"
+let tmp_path = tempDir() + "nova_test_io_safety.txt"
 let ok = writeFile(tmp_path, "hello from nova")
 assert(ok == true, "5a: writeFile returns true")
 
