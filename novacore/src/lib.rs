@@ -2016,14 +2016,14 @@ impl NovaCore {
     pub fn run_debug(mut self) -> NovaResult<()> {
         self.process()?;
         // Build debug info for the interactive debugger
-        let _debug_info = common::debug_info::extract_debug_info(
+        let debug_info = common::debug_info::extract_debug_info(
             &self.compiler.global,
             &self.compiler.native_functions,
             &self.compiler.variables,
             &self.compiler.asm,
             &self.compiler.fn_local_names,
         );
-        self.vm.run()?;
+        debugger::run_debug(&mut self.vm, debug_info)?;
         Ok(())
     }
 
