@@ -1,0 +1,190 @@
+module test_match_expression
+
+import super.std.core
+
+// ── 1. Basic match expression – simple enum, no data ─────────────
+enum Color { Red, Green, Blue }
+
+let c1 = Color::Red()
+let name1 = match c1 {
+    Red()   => "red"
+    Green() => "green"
+    Blue()  => "blue"
+}
+assert(name1 == "red", "match expr: simple enum Red")
+
+let c2 = Color::Blue()
+let name2 = match c2 {
+    Red()   => "red"
+    Green() => "green"
+    Blue()  => "blue"
+}
+assert(name2 == "blue", "match expr: simple enum Blue")
+
+// ── 2. Match expression with data-carrying variants ──────────────
+enum Shape {
+    Circle: Float,
+    Rect: (Float, Float),
+    Point
+}
+
+let s = Shape::Circle(3.14)
+let desc = match s {
+    Circle(r) => "circle:" + Cast::string(r)
+    Rect(dims) => "rect"
+    Point()    => "point"
+}
+assert(desc == "circle:3.14", "match expr: data-carrying Circle")
+
+let s2 = Shape::Point()
+let desc2 = match s2 {
+    Circle(r)  => "circle"
+    Rect(dims) => "rect"
+    Point()    => "point"
+}
+assert(desc2 == "point", "match expr: data-less Point")
+
+// ── 3. Match expression with default branch ──────────────────────
+enum Direction { North, South, East, West }
+
+let d = Direction::East()
+let dx = match d {
+    East() => 1
+    West() => -1
+    _ => 0
+}
+assert(dx == 1, "match expr: default branch East=1")
+
+let d2 = Direction::North()
+let dy = match d2 {
+    East() => 1
+    West() => -1
+    _ => 0
+}
+assert(dy == 0, "match expr: default branch North=0")
+
+// ── 4. Match expression returning Int ────────────────────────────
+let priority = match Color::Green() {
+    Red()   => 3
+    Green() => 2
+    Blue()  => 1
+}
+assert(priority == 2, "match expr: Int result")
+
+// ── 5. Match expression returning Float ──────────────────────────
+let weight = match Color::Red() {
+    Red()   => 1.0
+    Green() => 0.5
+    Blue()  => 0.25
+}
+assert(weight == 1.0, "match expr: Float result")
+
+// ── 6. Match expression returning Bool ───────────────────────────
+let is_warm = match Color::Red() {
+    Red()   => true
+    Green() => false
+    Blue()  => false
+}
+assert(is_warm == true, "match expr: Bool result")
+
+// ── 7. Match expression used inside a function ───────────────────
+fn color_score(c: Color) -> Int {
+    return match c {
+        Red()   => 10
+        Green() => 5
+        Blue()  => 1
+    }
+}
+assert(color_score(Color::Red()) == 10, "match expr: return match Red=10")
+assert(color_score(Color::Blue()) == 1, "match expr: return match Blue=1")
+
+// ── 8. Match expression used as function argument ────────────────
+fn double(x: Int) -> Int { return x * 2 }
+let result = double(match Direction::West() {
+    East()  => 10
+    West()  => -10
+    _ => 0
+})
+assert(result == -20, "match expr: as function arg")
+
+// ── 9. Match expression in arithmetic ────────────────────────────
+let val = 100 + match Color::Green() {
+    Red()   => 30
+    Green() => 20
+    Blue()  => 10
+}
+assert(val == 120, "match expr: in arithmetic 100+20=120")
+
+// ── 10. Match expression with block bodies ───────────────────────
+let msg = match Color::Blue() {
+    Red() => {
+        let x = "bright "
+        x + "red"
+    }
+    Green() => {
+        let x = "forest "
+        x + "green"
+    }
+    Blue() => {
+        let x = "deep "
+        x + "blue"
+    }
+}
+assert(msg == "deep blue", "match expr: block bodies")
+
+// ── 11. Nested match expressions ─────────────────────────────────
+let nested = match Color::Red() {
+    Red() => match Direction::South() {
+        North() => "north-red"
+        South() => "south-red"
+        _ => "other-red"
+    }
+    Green() => "green"
+    Blue()  => "blue"
+}
+assert(nested == "south-red", "match expr: nested match")
+
+// ── 12. Match expression assigned via let in loop ────────────────
+let total = 0
+let colors = [Color::Red(), Color::Green(), Color::Blue(), Color::Red()]
+for i in 0..4 {
+    let pts = match colors[i] {
+        Red()   => 3
+        Green() => 2
+        Blue()  => 1
+    }
+    total = total + pts
+}
+assert(total == 9, "match expr: in loop 3+2+1+3=9")
+
+// ── 13. Generic enum match expression ────────────────────────────
+enum Opt(T) { Some_: $T, None_ }
+
+let o = Opt::Some_(42) @[T:Int]
+let extracted = match o {
+    Some_(v) => v
+    None_()  => -1
+}
+assert(extracted == 42, "match expr: generic enum Some_=42")
+
+let o2 = Opt::None_() @[T:Int]
+let extracted2 = match o2 {
+    Some_(v) => v
+    None_()  => -1
+}
+assert(extracted2 == -1, "match expr: generic enum None_=-1")
+
+// ── 14. Match expression with data used in block ─────────────────
+enum Payload { Small: Int, Big: Int }
+
+let p = Payload::Small(7)
+let processed = match p {
+    Small(n) => {
+        let doubled = n * 2
+        doubled + 1
+    }
+    Big(n) => n + 100
+}
+assert(processed == 15, "match expr: data in block 7*2+1=15")
+
+println("PASS: test_match_expression")

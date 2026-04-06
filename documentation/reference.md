@@ -11,7 +11,7 @@ and raylib bindings.
 2. [Built-in Functions](#2-built-in-functions)
    — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program) · [Data Serialization](#data-serialization)
 3. [Language Syntax Notes](#3-language-syntax-notes)
-   — [Semicolons](#semicolons) · [Pipe Operator](#pipe-operator-) · [Closures](#closure-syntax) · [Logical Operators](#logical-operators--and-) · [Literal Formats](#literal-formats) · [Comments](#comments) · [Conventions](#conventions)
+   — [Semicolons](#semicolons) · [Pipe Operator](#pipe-operator-) · [Closures](#closure-syntax) · [Logical Operators](#logical-operators--and-) · [Literal Formats](#literal-formats) · [Comments](#comments) · [Block Expressions](#block-expressions) · [Match Expressions](#match-expressions) · [Conventions](#conventions)
 4. [Standard Library](#4-standard-library)
    - [`std/core`](#stdcore--foundation) — Box, Maybe, Result, range, Gen
    - [`std/math`](#stdmath--extended-mathematics) — Int/Float extensions, primes, fib
@@ -542,6 +542,74 @@ let label = {
     else { "C" }
 }
 ```
+
+### Match Expressions
+
+`match` can be used as an **expression** — the result of the matched arm is
+the value of the whole expression.  Every arm must produce the same type.
+
+```rust
+enum Color { Red, Green, Blue }
+
+let c = Color::Green()
+let name = match c {
+    Red()   => "red"
+    Green() => "green"
+    Blue()  => "blue"
+}
+// name == "green"
+```
+
+Match expressions work with data-carrying variants, default branches, block
+bodies, and can be nested inside other expressions:
+
+```rust
+enum Shape { Circle: Float, Rect: Float, Point }
+
+let s = Shape::Circle(3.14)
+
+// inline single-expression arms
+let label = match s {
+    Circle(r) => "circle:" + Cast::string(r)
+    Rect(w)   => "rect:" + Cast::string(w)
+    Point()   => "point"
+}
+
+// with default branch
+let is_round = match s {
+    Circle(r) => true
+    _ => false
+}
+
+// as a function argument
+println(Cast::string(match s {
+    Circle(r) => r
+    Rect(w)   => w
+    Point()   => 0.0
+}))
+
+// arms with block bodies
+let desc = match s {
+    Circle(r) => {
+        let d = r * 2.0
+        "diameter=" + Cast::string(d)
+    }
+    Rect(w) => { "width=" + Cast::string(w) }
+    Point() => { "origin" }
+}
+
+// in a return statement
+fn to_int(c: Color) -> Int {
+    return match c {
+        Red()   => 0
+        Green() => 1
+        Blue()  => 2
+    }
+}
+```
+
+> **Note:** All arms must return the same type.  If they don't, the compiler
+> will reject the program with a helpful error.
 
 ### Conventions
 

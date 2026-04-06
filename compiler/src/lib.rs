@@ -1013,6 +1013,7 @@ impl Compiler {
             Expr::StoreExpr { .. } => todo!(),
             Expr::Return { .. } => todo!(),
             Expr::IfExpr { .. } => todo!(),
+            Expr::MatchExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
             Expr::DynField {
@@ -1770,6 +1771,78 @@ impl Compiler {
                 self.asm.push(Asm::JMP(end));
                 self.asm.push(Asm::LABEL(next));
                 self.compile_expr(alternative)?;
+                self.asm.push(Asm::LABEL(end));
+                Ok(())
+            }
+            Expr::MatchExpr {
+                expr,
+                arms,
+                default,
+                position,
+                ..
+            } => {
+                let end = self.gen.generate();
+
+                self.compile_expr(expr)?;
+                // store in temp variable
+                self.variables
+                    .insert(format!("___matchexpr___{}", self.gen.generate()).into());
+                let temp_matchexpr = self.variables.len() - 1;
+                self.asm.push(Asm::STORE(temp_matchexpr as u32));
+
+                for arm in arms.iter() {
+                    let next = self.gen.generate();
+                    self.asm.push(Asm::INTEGER(1_i64));
+                    self.asm.push(Asm::GET(temp_matchexpr as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    self.asm.push(Asm::INTEGER(arm.0 as i64));
+                    self.asm.push(Asm::EQUALS);
+                    self.asm.push(Asm::JUMPIFFALSE(next));
+                    if let Some(vid) = &arm.1 {
+                        self.asm.push(Asm::INTEGER(0_i64));
+                        self.asm.push(Asm::GET(temp_matchexpr as u32));
+                        self.asm.push(Asm::LIN(position.clone()));
+
+                        if let Some(index) = self.variables.get_index(vid) {
+                            self.asm.push(Asm::STORE(index as u32))
+                        } else {
+                            self.variables.insert(vid.clone());
+                            let index = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(index as u32))
+                        }
+                    }
+
+                    let arm_ast = Ast {
+                        program: arm.2.clone(),
+                    };
+                    // keep=true so the arm's result stays on the stack
+                    self.compile_program(
+                        arm_ast,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        true,
+                    )?;
+                    self.asm.pop();
+
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(next));
+                }
+                if let Some(default) = default {
+                    let default_ast = Ast {
+                        program: default.clone(),
+                    };
+                    self.compile_program(
+                        default_ast,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        true,
+                    )?;
+                    self.asm.pop();
+                }
                 self.asm.push(Asm::LABEL(end));
                 Ok(())
             }

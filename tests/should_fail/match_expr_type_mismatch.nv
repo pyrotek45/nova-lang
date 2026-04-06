@@ -1,0 +1,11 @@
+module main
+
+// SHOULD FAIL: match expression arms return different types
+enum Color { Red, Green, Blue }
+
+let c = Color::Red()
+let x = match c {
+    Red()   => 42
+    Green() => "hello"
+    Blue()  => 1
+}

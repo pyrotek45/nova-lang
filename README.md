@@ -108,6 +108,15 @@ cargo build --release
 ./target/release/nova run demo/fib.nv
 ```
 
+> **Tip:** Copy the binary somewhere on your `PATH` so you can run `nova`
+> from any directory:
+>
+> ```bash
+> sudo cp target/release/nova /usr/local/bin/
+> # or, without sudo:
+> cp target/release/nova ~/.local/bin/
+> ```
+
 Or on NixOS:
 
 ```bash
@@ -118,12 +127,38 @@ nova run demo/fib.nv
 ### Project workflow
 
 ```bash
-nova init myapp               # scaffold a new project
-nova init myapp --with user/repo/libs   # ...with a GitHub dependency
+nova init myapp --with pyrotek45/nova-lang/std   # new project with stdlib
+cd myapp
 nova run                      # run main.nv in project mode
 nova test                     # run all test_*.nv files
-nova install utils pyrotek45/nova-utils/src   # add a library
-nova remove utils             # remove it
+```
+
+The `--with` flag fetches `.nv` files from a GitHub path into your
+project's `libs/` folder — that's all you need to get started.
+
+### Managing extra libraries
+
+For adding or removing libraries in an existing project, use `install` and
+`remove`.  The difference from `--with` is that you give the library a name
+so you can remove it later:
+
+```bash
+nova install utils maniospas/nova-helpers/src   # → libs/utils/
+nova remove  utils                               # deletes libs/utils/
+```
+
+Then import as usual:
+
+```rust
+import libs.utils.strings     // → libs/utils/strings.nv
+```
+
+### Try a game — no install needed
+
+You can run files directly from GitHub without downloading anything:
+
+```bash
+nova run --git pyrotek45/nova-lang/games/Breakout/breakout.nv
 ```
 
 ### All commands
@@ -136,6 +171,7 @@ nova time  <file.nv>          Run and show execution time
 nova dis   <file.nv>          Disassemble bytecode
 nova dbg   <file.nv>          Debug run
 nova init  <name>             New project
+nova init  <name> --with <repo/path>   New project with GitHub deps
 nova install <name> <repo>    Install library from GitHub
 nova remove  <name>           Remove a library
 nova test                     Run tests

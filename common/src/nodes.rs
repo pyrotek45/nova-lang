@@ -266,6 +266,13 @@ pub enum Expr {
         expr: Box<Expr>,
         position: FilePosition,
     },
+    MatchExpr {
+        ttype: TType,
+        expr: Box<Expr>,
+        arms: Vec<(usize, Option<Rc<str>>, Vec<Statement>)>,
+        default: Option<Vec<Statement>>,
+        position: FilePosition,
+    },
     None,
     Void,
 }
@@ -290,6 +297,7 @@ impl Expr {
             Expr::Block { ttype, .. } => ttype.clone(),
             Expr::Let { ttype, .. } => ttype.clone(),
             Expr::DynField { ttype, .. } => ttype.clone(),
+            Expr::MatchExpr { ttype, .. } => ttype.clone(),
             Expr::Void => TType::Void,
         }
     }

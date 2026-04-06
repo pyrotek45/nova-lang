@@ -419,17 +419,62 @@ while condition {
 
 ### if let / while let — Safe Option Unwrapping
 
+`Option(T)` is Nova's way of saying "this value might not exist."
+You create one with `Some(value)` or `None(Type)`:
+
 ```rust
-if let value = someOption {
-    println(value)      // runs only if Some
+let found: Option(Int) = Some(42)
+let missing: Option(Int) = None(Int)
+```
+
+`if let` unwraps an `Option` — the body runs only when the value is `Some`:
+
+```rust
+let maybeAge: Option(Int) = Some(25)
+
+if let age = maybeAge {
+    println("Age is " + Cast::string(age))   // "Age is 25"
 } else {
-    println("was None")
+    println("No age provided")
 }
 
-while let item = generator() {
-    println(item)       // loops until None
+let nothing: Option(Int) = None(Int)
+
+if let value = nothing {
+    println("won't print")
+} else {
+    println("was None")                       // "was None"
 }
 ```
+
+`while let` loops until the expression returns `None`.  A common pattern is
+draining a list with `.pop()`, which returns `Option(T)`:
+
+```rust
+let stack = [10, 20, 30]
+
+while let item = stack.pop() {
+    println(Cast::string(item))   // prints 30, 20, 10
+}
+// stack is now empty
+```
+
+Any function that returns `Option` works — for example, safe casts:
+
+```rust
+let inputs = ["10", "hello", "30"]
+for s in inputs {
+    if let n = Cast::int(s) {
+        println("parsed: " + Cast::string(n))
+    } else {
+        println("skipped: " + s)
+    }
+}
+// parsed: 10, skipped: hello, parsed: 30
+```
+
+> `Option` is covered in full in [§12 — Option Type](#12-option-type).
+> For now, just remember: `Some(value)` = has a value, `None(Type)` = empty.
 
 ---
 
@@ -1277,6 +1322,68 @@ match shape {
     Point()    => { println("point") },
 }
 ```
+
+### Match as an Expression
+
+`match` can be used as an **expression** — the value of the matched arm
+becomes the value of the entire expression.  All arms must return the
+same type.
+
+```rust
+enum Color { Red, Green, Blue }
+
+let c = Color::Green()
+let name = match c {
+    Red()   => "red"
+    Green() => "green"
+    Blue()  => "blue"
+}
+// name == "green"
+```
+
+This is useful anywhere an expression is expected — in `let` bindings,
+function arguments, arithmetic, and `return` statements:
+
+```rust
+// in a return statement
+fn to_score(c: Color) -> Int {
+    return match c {
+        Red()   => 10
+        Green() => 5
+        Blue()  => 1
+    }
+}
+
+// as a function argument
+println(Cast::string(match c {
+    Red()   => 0
+    Green() => 1
+    Blue()  => 2
+}))
+
+// in arithmetic
+let bonus = 100 + match c {
+    Red()   => 30
+    Green() => 20
+    Blue()  => 10
+}
+```
+
+Match expression arms can also use block bodies:
+
+```rust
+let desc = match c {
+    Red() => {
+        let prefix = "bright "
+        prefix + "red"
+    }
+    Green() => { "green" }
+    Blue()  => { "blue" }
+}
+```
+
+> **Type rule:** every arm must produce the same type.  Mismatched arm
+> types are caught at compile time.
 
 ### With Data Extraction
 

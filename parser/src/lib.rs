@@ -1673,6 +1673,10 @@ impl Parser {
                     alternative: Box::new(else_branch),
                 };
             }
+            // match expression: match expr { Variant() => expr, ... }
+            Some(Identifier(id)) if "match" == id.deref() => {
+                left = self.match_expr()?;
+            }
             Some(Identifier(id)) if "return" == id.deref() => {
                 self.advance();
                 let ret = self.expr()?;
@@ -4578,6 +4582,338 @@ impl Parser {
             body: parser.ast.program.clone(),
             filepath: Some(resolved_filepath),
         }))
+    }
+
+    fn match_expr(&mut self) -> NovaResult<Expr> {
+        self.consume_identifier(Some("match"))?;
+        let expr = self.expr()?;
+
+        let type_name = expr.get_type().custom_to_string().map(|s| s.to_string());
+        let is_enum = type_name
+            .as_deref()
+            .is_some_and(|n| self.typechecker.environment.custom_types.contains_key(n));
+
+        if !is_enum {
+            return Err(self.generate_error_with_pos(
+                format!(
+                    "Match expression expects an enum type, found `{}`",
+                    expr.get_type()
+                ),
+                format!(
+                    "The `match` keyword only works with enum types, but got `{}`.\n  \
+                     Example:\n    \
+                     enum Color {{ Red, Green, Blue }}\n    \
+                     let c = match my_color {{\n      \
+                     Red()       => \"red\"\n      \
+                     Green()     => \"green\"\n      \
+                     Blue()      => \"blue\"\n    \
+                     }}",
+                    expr.get_type()
+                ),
+                self.get_current_token_position(),
+            ));
+        }
+
+        let pos = self.get_current_token_position();
+        let mut branches: Vec<(usize, Option<Rc<str>>, Vec<Statement>)> = vec![];
+        self.consume_symbol(LeftBrace)?;
+        let mut default_branch: Option<Vec<Statement>> = None;
+
+        while !self
+            .current_token()
+            .is_some_and(|t| t.is_symbol(RightBrace))
+        {
+            let (variant, vpos) = self.get_identifier()?;
+
+            // ── Detect qualified variant names like `Color::Red` ──
+            if self
+                .current_token()
+                .is_some_and(|t| t.is_op(Operator::DoubleColon))
+            {
+                let next_variant = self
+                    .input
+                    .get(self.index + 1)
+                    .and_then(|t| {
+                        if let TokenValue::Identifier(id) = &t.value {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| "...".into());
+                return Err(self.generate_error_with_pos(
+                    format!(
+                        "Use just `{}` instead of qualifying with the enum type",
+                        next_variant
+                    ),
+                    format!(
+                        "Match arms use the variant name alone, not the fully-qualified path.\n  \
+                         Write `{nv}` instead of `{v}::{nv}`",
+                        nv = next_variant,
+                        v = variant
+                    ),
+                    vpos,
+                ));
+            }
+
+            if &*variant == "_" {
+                if default_branch.is_some() {
+                    return Err(self.generate_error_with_pos(
+                        "Default branch `_` is already defined",
+                        "A match expression can only have one default `_` branch. Remove the duplicate.",
+                        vpos,
+                    ));
+                }
+                self.consume_operator(Operator::FatArrow)?;
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                    default_branch = Some(self.block()?);
+                } else {
+                    let body = self.expr()?;
+                    default_branch = Some(vec![Statement::Expression {
+                        ttype: body.clone().get_type(),
+                        expr: body,
+                    }]);
+                };
+                while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                    self.advance();
+                }
+                continue;
+            }
+
+            // collect identifiers
+            let mut enum_id = None;
+            if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                self.consume_symbol(LeftParen)?;
+                if !self
+                    .current_token()
+                    .is_some_and(|t| t.is_symbol(RightParen))
+                {
+                    enum_id = Some(self.get_identifier()?.0);
+                }
+                self.consume_symbol(RightParen)?;
+            }
+            self.consume_operator(Operator::FatArrow)?;
+
+            if let Some(fields) = self
+                .typechecker
+                .environment
+                .custom_types
+                .get(expr.get_type().custom_to_string().unwrap())
+            {
+                let new_fields = if let Some(x) = self
+                    .typechecker
+                    .environment
+                    .generic_type_struct
+                    .get(expr.get_type().custom_to_string().unwrap())
+                {
+                    let TType::Custom { type_params, .. } = expr.get_type() else {
+                        return Err(self.generate_error_with_pos(
+                            format!(
+                                "Expected a generic custom type, found `{}`",
+                                expr.get_type()
+                            ),
+                            "This type has generic type parameters but the value does not carry type parameter information.\n  This is an internal type error — please report it.",
+                            pos,
+                        ));
+                    };
+                    fields
+                        .iter()
+                        .map(|(name, ttype)| {
+                            let new_ttype =
+                                TypeChecker::replace_generic_types(ttype, x, &type_params);
+                            (name.clone(), new_ttype)
+                        })
+                        .collect()
+                } else {
+                    fields.clone()
+                };
+                let mut tag = 0;
+                let mut found = false;
+                let mut vtype = TType::None;
+
+                for (i, field) in new_fields.iter().enumerate() {
+                    if variant == field.0 {
+                        tag = i;
+                        vtype = field.1.clone();
+                        found = true;
+                    }
+                }
+
+                if vtype != TType::None && enum_id.is_none() {
+                    return Err(self.generate_error_with_pos(
+                        format!(
+                            "Variant `{}` carries data but is missing a binding variable",
+                            variant
+                        ),
+                        format!(
+                            "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
+                            vtype, variant
+                        ),
+                        vpos,
+                    ));
+                }
+
+                if !found {
+                    let available: Vec<String> = new_fields
+                        .iter()
+                        .filter(|(name, _)| name.as_ref() != "type")
+                        .map(|(name, ttype)| {
+                            if *ttype == TType::None {
+                                format!("`{}`", name)
+                            } else {
+                                format!("`{}` (holds `{}`)", name, ttype)
+                            }
+                        })
+                        .collect();
+                    return Err(self.generate_error_with_pos(
+                        format!("Variant `{}` not found in this enum type", variant),
+                        format!(
+                            "Available variants: {}. Check for typos — variant names are case-sensitive.",
+                            available.join(", ")
+                        ),
+                        vpos,
+                    ));
+                }
+
+                self.typechecker.environment.push_block();
+                self.typechecker.environment.insert_symbol(
+                    enum_id.as_deref().unwrap_or_default(),
+                    vtype,
+                    None,
+                    SymbolKind::Variable,
+                );
+
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                    let body = self.block()?;
+                    branches.push((tag, enum_id.clone(), body));
+                } else {
+                    let body = self.expr()?;
+                    branches.push((
+                        tag,
+                        enum_id.clone(),
+                        vec![Statement::Expression {
+                            ttype: body.clone().get_type(),
+                            expr: body,
+                        }],
+                    ));
+                };
+
+                self.typechecker.environment.pop_block();
+            }
+
+            while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                self.advance();
+            }
+        }
+        self.consume_symbol(RightBrace)?;
+
+        // ── Exhaustiveness check ──
+        if default_branch.is_none() {
+            let mut covered = vec![];
+            for (tag, _, _) in branches.iter() {
+                covered.push(*tag);
+            }
+            if let Some(fields) = self
+                .typechecker
+                .environment
+                .custom_types
+                .get(expr.get_type().custom_to_string().unwrap())
+            {
+                let new_fields = if let Some(x) = self
+                    .typechecker
+                    .environment
+                    .generic_type_struct
+                    .get(expr.get_type().custom_to_string().unwrap())
+                {
+                    let TType::Custom { type_params, .. } = expr.get_type() else {
+                        return Err(self.generate_error_with_pos(
+                            format!(
+                                "Expected a generic custom type, found `{}`",
+                                expr.get_type()
+                            ),
+                            "This type has generic type parameters but the value does not carry type parameter information.\n  This is an internal type error — please report it.",
+                            pos,
+                        ));
+                    };
+                    fields
+                        .iter()
+                        .map(|(name, ttype)| {
+                            let new_ttype =
+                                TypeChecker::replace_generic_types(ttype, x, &type_params);
+                            (name.clone(), new_ttype)
+                        })
+                        .collect()
+                } else {
+                    fields.clone()
+                };
+                for (i, field) in new_fields.iter().enumerate() {
+                    if field.0.deref() != "type" && !covered.contains(&i) {
+                        let arm_hint = if field.1 == TType::None {
+                            format!("{}() => {{ ... }}", field.0)
+                        } else {
+                            format!("{}(val) => {{ ... }}", field.0)
+                        };
+                        return Err(self.generate_error_with_pos(
+                            format!("Variant `{}` is not covered in match", field.0),
+                            format!(
+                                "All enum variants must be handled.\n  Add: `{}`\n  Or add a default branch: `_ => {{ ... }}`",
+                                arm_hint
+                            ),
+                            pos,
+                        ));
+                    }
+                }
+            }
+        }
+
+        // ── Type-check: all arms must produce the same type ──
+        let mut result_type: Option<TType> = None;
+        for (_, _, arm_body) in branches.iter() {
+            if let Some(arm_ty) = Self::tail_type(arm_body) {
+                if let Some(ref prev) = result_type {
+                    if *prev != arm_ty {
+                        return Err(self.generate_error_with_pos(
+                            "All arms of a match expression must return the same type".to_string(),
+                            format!(
+                                "One arm returns `{}` but another returns `{}`.\n  All must be the same type since this is used as an expression.",
+                                prev, arm_ty
+                            ),
+                            pos,
+                        ));
+                    }
+                } else {
+                    result_type = Some(arm_ty);
+                }
+            }
+        }
+        if let Some(ref def) = default_branch {
+            if let Some(def_ty) = Self::tail_type(def) {
+                if let Some(ref prev) = result_type {
+                    if *prev != def_ty {
+                        return Err(self.generate_error_with_pos(
+                            "All arms of a match expression must return the same type".to_string(),
+                            format!(
+                                "The default `_` arm returns `{}` but other arms return `{}`.\n  All must be the same type since this is used as an expression.",
+                                def_ty, prev
+                            ),
+                            pos,
+                        ));
+                    }
+                } else {
+                    result_type = Some(def_ty);
+                }
+            }
+        }
+
+        let ttype = result_type.unwrap_or(TType::Void);
+
+        Ok(Expr::MatchExpr {
+            ttype,
+            expr: Box::new(expr),
+            arms: branches,
+            default: default_branch,
+            position: pos,
+        })
     }
 
     fn match_statement(&mut self) -> NovaResult<Option<Statement>> {

@@ -20,14 +20,6 @@ nix-shell --run "cargo clippy --release"
 ```
 Fix any warnings before committing.
 
-### 4. Install the newest version via NixOS
-After pushing to `main`, install/update the latest Nova on your system:
-```bash
-nix-env -if default.nix --option tarball-ttl 0
-```
-The `--option tarball-ttl 0` flag forces Nix to re-fetch the latest `main` tarball
-instead of using a cached version.
-
 ## Quick Reference
 
 | Task | Command |

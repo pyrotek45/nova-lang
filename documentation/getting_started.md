@@ -8,8 +8,23 @@ Build from source (requires Rust, a C compiler, and cmake):
 git clone https://github.com/pyrotek45/nova-lang
 cd nova-lang
 cargo build --release
-sudo cp target/release/nova /usr/local/bin/   # or ~/.local/bin/
 ```
+
+Then put the binary somewhere convenient:
+
+```bash
+# System-wide (needs sudo):
+sudo cp target/release/nova /usr/local/bin/
+
+# User-local (no sudo):
+cp target/release/nova ~/.local/bin/
+
+# Or just keep it in your project directory:
+cp target/release/nova ./nova
+```
+
+As long as the `nova` binary is on your `PATH` (or in your working
+directory), you're good to go.
 
 <details>
 <summary>System dependencies by distro</summary>
@@ -40,6 +55,20 @@ nix-env -if default.nix    # installs the nova binary directly
 
 For the full guide (troubleshooting, NixOS specifics, runtime deps for
 graphics), see [Installation](installation.md).
+
+---
+
+## Try Before You Install
+
+You can run Nova programs directly from GitHub without downloading
+anything:
+
+```bash
+nova run --git pyrotek45/nova-lang/demo/fib.nv           # Fibonacci
+nova run --git pyrotek45/nova-lang/games/Breakout/breakout.nv  # a game!
+```
+
+This works for any public repo.
 
 ---
 
@@ -225,7 +254,17 @@ nova test
 
 ## Installing and Removing Libraries
 
-Add a library from GitHub to an existing project:
+When you create a project with `--with`, Nova fetches files from GitHub
+into your `libs/` folder automatically — that's the easiest way to get
+started:
+
+```bash
+nova init myapp --with pyrotek45/nova-lang/std
+```
+
+For **adding libraries later** to an existing project, use `install`.
+You give the library a name (which becomes a subfolder under `libs/`)
+and point at a GitHub path:
 
 ```bash
 nova install std pyrotek45/nova-lang/std
@@ -238,10 +277,19 @@ import libs.std.core
 import libs.std.list
 ```
 
-Remove it:
+Remove it later by name:
 
 ```bash
 nova remove std
+```
+
+This makes it easy to share code.  If someone publishes a folder of Nova
+modules on GitHub, anyone can install them:
+
+```bash
+nova install helpers maniospas/nova-helpers/src   # → libs/helpers/
+import libs.helpers.strings                       # use it
+nova remove helpers                               # clean up
 ```
 
 ---

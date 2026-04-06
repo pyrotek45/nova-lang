@@ -716,7 +716,18 @@ fn nova_install(name: &str, github_path: &str) {
         exit(1);
     });
 
-    fetch_github_folder_to_libs(github_path, &target_dir);
+    let fetched = fetch_github_folder_to_libs(github_path, &target_dir);
+
+    if fetched == 0 {
+        // Clean up the empty directory so the user isn't left in a broken state
+        let _ = fs::remove_dir_all(&target_dir);
+        eprintln!(
+            "\nError: no files were fetched. Library '{}' was not installed.",
+            name
+        );
+        eprintln!("  Check that the repository and folder path are correct.");
+        exit(1);
+    }
 
     println!(
         "\nInstalled '{}' into libs/{}.",
@@ -744,14 +755,15 @@ fn nova_remove(name: &str) {
 
 /// Fetch all .nv files from a GitHub folder and save them into libs/.
 /// Uses the GitHub Contents API to list the directory, then fetches each file.
-fn fetch_github_folder_to_libs(github_path: &str, libs_dir: &Path) {
+/// Returns the number of files fetched, or 0 on failure.
+fn fetch_github_folder_to_libs(github_path: &str, libs_dir: &Path) -> usize {
     let parts: Vec<&str> = github_path.splitn(3, '/').collect();
     if parts.len() < 3 {
         eprintln!(
             "Warning: invalid --with path \"{}\". Expected owner/repo/folder. Skipping.",
             github_path
         );
-        return;
+        return 0;
     }
     let owner = parts[0];
     let repo = parts[1];
@@ -772,7 +784,7 @@ fn fetch_github_folder_to_libs(github_path: &str, libs_dir: &Path) {
             Ok(b) => b,
             Err(e) => {
                 eprintln!("Warning: could not read API response: {}", e);
-                return;
+                return 0;
             }
         },
         Err(e) => {
@@ -782,7 +794,7 @@ fn fetch_github_folder_to_libs(github_path: &str, libs_dir: &Path) {
                  Path: {}/{}/{}",
                 e, owner, repo, folder_path
             );
-            return;
+            return 0;
         }
     };
 
@@ -846,6 +858,7 @@ fn fetch_github_folder_to_libs(github_path: &str, libs_dir: &Path) {
     } else {
         println!("  Fetched {} files from {}", fetched, github_path);
     }
+    fetched
 }
 
 /// Run all test_*.nv files in a tests/ directory and report results.
