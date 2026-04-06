@@ -9,7 +9,35 @@ all dependencies are resolved at build time through Cargo and (optionally) Nix.
 
 ---
 
-## 1. Prerequisites
+## Pre-built Binaries
+
+The easiest way to install Nova is to download a pre-built binary from
+[GitHub Releases](https://github.com/pyrotek45/nova-lang/releases).
+
+| Platform | File |
+|---|---|
+| Linux x86_64 | `nova-linux-x86_64.tar.gz` |
+| macOS x86_64 | `nova-macos-x86_64.tar.gz` |
+| macOS Apple Silicon | `nova-macos-aarch64.tar.gz` |
+| Windows x86_64 | `nova-windows-x86_64.zip` |
+
+```bash
+# Linux / macOS
+tar xzf nova-*.tar.gz
+sudo cp nova /usr/local/bin/
+
+# Windows — extract the .zip and add the folder to your PATH
+```
+
+To verify:
+
+```bash
+nova version
+```
+
+---
+
+## 1. Prerequisites (Building from Source)
 
 ### Minimum Requirements
 
