@@ -257,6 +257,10 @@ x = 20      // OK — same type
 x = "hello" // ERROR — cannot change type
 ```
 
+> **`let` is an expression** — it evaluates to `Void`, but syntactically it
+> can appear anywhere an expression is expected. This is rarely used directly
+> but is important for understanding the language grammar.
+
 ---
 
 ## 4. Built-in Types
@@ -319,6 +323,11 @@ while running && !paused {
 ### Unary Minus
 
 `-x` negates a value.
+
+### Postfix `?` (Option Unwrap)
+
+`expr?` unwraps an `Option(T)` into `T`, panicking if `None`.
+See [Option Type](#12-option-type) for details.
 
 ---
 
@@ -1015,6 +1024,43 @@ if let value = found {
 }
 ```
 
+### The `?` Operator — Quick Unwrap
+
+Postfix `?` is shorthand for `.unwrap()`. It extracts the value from an
+`Option(T)` and panics at runtime if the value is `None`:
+
+```rust
+let data = readFile("config.txt")?     // String (panics if file missing)
+let first = [10, 20, 30].pop()?        // 30
+```
+
+`?` chains naturally with method calls:
+
+```rust
+let lines = readFile("data.txt")?.split("\n")
+```
+
+### Must-use Rule
+
+Option values **cannot be silently discarded**. The compiler will reject
+bare Option expressions used as statements:
+
+```rust
+readFile("data.txt")          // ✗ compile error
+```
+
+To fix, do one of:
+
+```rust
+readFile("data.txt")?              // unwrap it
+let data = readFile("data.txt")    // bind it
+if let d = readFile("data.txt") { ... }  // match it
+let _ = readFile("data.txt")       // explicitly discard
+```
+
+This rule prevents accidental loss of failure information. Functions that
+return `Void` or `Bool` are not affected.
+
 ### Standard Library Helpers
 
 ```rust
@@ -1208,6 +1254,33 @@ in assignment position (lists only).
 let s = "hello"
 s[-1]     // 'o'
 s[-5]     // 'h'
+```
+
+### Safe Indexing
+
+The `[]` operator errors at runtime if the index is out of bounds. For safe
+access, use the `.get()` method which returns `Option`:
+
+```rust
+let xs = [10, 20, 30]
+xs.get(0)     // Some(10)
+xs.get(99)    // None
+xs.get(-1)    // Some(30) — negative indices supported
+
+let s = "hello"
+s.get(0)      // Some('h')
+s.get(99)     // None
+s.get(-1)     // Some('o')
+```
+
+Similarly, `trySwap` and `trySet` return `Bool` instead of erroring:
+
+```rust
+let xs = [1, 2, 3]
+xs.trySwap(0, 2)   // true  — swapped successfully
+xs.trySwap(0, 99)  // false — index out of bounds
+xs.trySet(0, 42)   // true
+xs.trySet(99, 0)   // false
 ```
 
 ### List Comprehensions

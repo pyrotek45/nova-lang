@@ -66,7 +66,7 @@ fn extends move(snake: Snake, direction: Int, apple: Coord, points: Box(Int)) ->
         apple.y = random(0, W - 1)
         points.value += 1
     } else {
-        snake.body.pop()
+        let _ = snake.body.pop()
     }
 
     new_Snake.body.push(head)

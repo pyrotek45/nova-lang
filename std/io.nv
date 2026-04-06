@@ -60,7 +60,7 @@ fn eprintln(msg: String) {
 
 // Read all lines from a file into a list
 fn readLines(path: String) -> [String] {
-    return readFile(path).split("\n")
+    return readFile(path)?.split("\n")
 }
 
 // Write a list of lines to a file (joined by newlines)

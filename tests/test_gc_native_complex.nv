@@ -102,7 +102,7 @@ fn closure_native_capture() {
 
     // pop half through native pop
     for let i = 0; i < 100; i += 1 {
-        data.pop()
+        let _ = data.pop()
     }
     assert(data.len() == 100, "4: popped half")
 }
@@ -178,7 +178,7 @@ fn deque_gc_stress() {
 
     // pop half from front
     for let i = 0; i < 250; i += 1 {
-        dq.popFront()
+        let _ = dq.popFront()
     }
     assert(dq.len() == 250, "7: deque has 250 after pop front")
 }
@@ -372,7 +372,7 @@ fn mixed_native_ops() {
 
     // pop from back
     for let i = 0; i < 10; i += 1 {
-        list.pop()             // native pop
+        let _ = list.pop()    // native pop
     }
     assert(list.len() == 100, "16: popped 10 from back")
 }

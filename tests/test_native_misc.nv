@@ -40,18 +40,18 @@ assert(wrote, "writeFile returns true")
 assert(fileExists(test_path), "fileExists after write")
 
 // Read it back
-let content = readFile(test_path)
+let content = readFile(test_path)?
 assert(content == "hello nova", "readFile matches written content")
 
 // Append to file
 let appended = appendFile(test_path, "\nline2")
 assert(appended, "appendFile returns true")
-let content2 = readFile(test_path)
+let content2 = readFile(test_path)?
 assert(content2 == "hello nova\nline2", "readFile after append")
 
 // Overwrite
 writeFile(test_path, "overwritten")
-let content3 = readFile(test_path)
+let content3 = readFile(test_path)?
 assert(content3 == "overwritten", "readFile after overwrite")
 
 // fileExists on non-existent file

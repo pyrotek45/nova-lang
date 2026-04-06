@@ -2404,6 +2404,31 @@ impl Parser {
                     }
                     left = self.call(identifier, pos, Some(left))?;
                 }
+                Some(StructuralSymbol(QuestionMark)) => {
+                    let pos = self.get_current_token_position();
+                    self.consume_symbol(QuestionMark)?;
+                    // ? is syntax sugar for Option::unwrap
+                    if let TType::Option { inner } = left.get_type() {
+                        left = Expr::Literal {
+                            ttype: *inner,
+                            value: Atom::Call {
+                                name: "Option::unwrap".into(),
+                                arguments: vec![left],
+                                position: pos,
+                            },
+                        };
+                    } else {
+                        return Err(self.generate_error_with_pos(
+                            format!(
+                                "The `?` operator requires an Option type, found `{}`",
+                                left.get_type()
+                            ),
+                            "The `?` operator is shorthand for `.unwrap()` and can only be used on Option values.\n  \
+                             Example: `readFile(\"data.txt\")?` unwraps the Option(String) to String.",
+                            pos,
+                        ));
+                    }
+                }
                 _ => {
                     // Detect `tuple.0` pattern: `.N` is lexed as float (e.g. .0→0.0, .1→0.1),
                     // not as dot + int
@@ -6504,7 +6529,6 @@ impl Parser {
     }
 
     fn expression_statement(&mut self) -> NovaResult<Option<Statement>> {
-        // check for return statement
         self.expr().map(|expr| {
             Some(Statement::Expression {
                 ttype: expr.get_type(),
@@ -6603,6 +6627,7 @@ impl Parser {
 
     fn compound_statement(&mut self) -> NovaResult<Vec<Statement>> {
         let mut initial_statements = vec![];
+        let mut last_stmt_pos = self.get_current_token_position();
         if let Some(statement) = self.statement()? {
             initial_statements.push(statement)
         };
@@ -6622,6 +6647,27 @@ impl Parser {
                 {
                     break;
                 }
+
+                // Must-use check: before parsing the next statement, verify that
+                // the PREVIOUS statement (if it was an expression) didn't silently
+                // drop an Option value.  The last statement is exempt because it
+                // may serve as a tail expression (block result, implicit return, etc.).
+                if let Some(Statement::Expression { ttype: TType::Option { inner }, .. }) = statements.last() {
+                    return Err(self.generate_error_with_pos(
+                        format!(
+                            "Option({}) value must be used — it cannot be silently discarded",
+                            inner
+                        ),
+                        "An Option value was used as a statement but its result is being dropped.\n  \
+                         Handle it with one of:\n  \
+                         • `?` to unwrap:          `readFile(\"data.txt\")?`\n  \
+                         • `if let` to match:      `if let data = readFile(\"data.txt\") { ... }`\n  \
+                         • assign to a variable:   `let result = readFile(\"data.txt\")`",
+                        last_stmt_pos.clone(),
+                    ));
+                }
+
+                last_stmt_pos = self.get_current_token_position();
                 if let Some(statement) = self.statement()? {
                     statements.push(statement);
                 }

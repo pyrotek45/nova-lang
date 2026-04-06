@@ -49,7 +49,7 @@ assert(afterAppend.len() >= 4, "readLines after append has >=4 entries")
 // ── writeFile / readFile (native) ────────────────────────────────
 let written = writeFile(tmpPath, "simple content")
 assert(written, "writeFile returned true")
-let content = readFile(tmpPath)
+let content = readFile(tmpPath)?
 assert(content == "simple content", "readFile roundtrip")
 
 // ── fileExists (native) ──────────────────────────────────────────

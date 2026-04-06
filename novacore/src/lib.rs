@@ -1002,7 +1002,9 @@ impl NovaCore {
             "readFile",
             TType::Function {
                 parameters: vec![TType::String],
-                return_type: Box::new(TType::String),
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::String),
+                }),
             },
             common::nodes::SymbolKind::Function,
             native::io::read_file,
@@ -1146,6 +1148,17 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::str::str_char_at,
+        );
+        self.add_function(
+            "String::get",
+            TType::Function {
+                parameters: vec![TType::String, TType::Int],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Char),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_get,
         );
         self.add_function(
             "String::split",
@@ -1482,6 +1495,21 @@ impl NovaCore {
             native::list::swap,
         );
         self.add_function(
+            "List::trySwap",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "T".into() }),
+                    },
+                    TType::Int,
+                    TType::Int,
+                ],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::try_swap,
+        );
+        self.add_function(
             "List::clear",
             TType::Function {
                 parameters: vec![TType::List {
@@ -1506,6 +1534,37 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::GenericFunction,
             native::list::set,
+        );
+        self.add_function(
+            "List::trySet",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "T".into() }),
+                    },
+                    TType::Int,
+                    TType::Generic { name: "T".into() },
+                ],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::try_set,
+        );
+        self.add_function(
+            "List::get",
+            TType::Function {
+                parameters: vec![
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "T".into() }),
+                    },
+                    TType::Int,
+                ],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Generic { name: "T".into() }),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::get,
         );
         // ---------------------------------------------------------------
         // Random functions

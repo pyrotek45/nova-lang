@@ -132,7 +132,7 @@ pub fn insert(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
-/// List::swap(list, i, j)
+/// List::swap(list, i, j)  — asserts in-bounds (runtime error on OOB)
 pub fn swap(state: &mut state::State) -> NovaResult<()> {
     let j = pop_int(state)? as usize;
     let i = pop_int(state)? as usize;
@@ -142,11 +142,31 @@ pub fn swap(state: &mut state::State) -> NovaResult<()> {
             if i < obj.data.len() && j < obj.data.len() {
                 obj.data.swap(i, j);
             } else {
+                state.memory.dec(list_index);
                 return Err(runtime_err("List::swap: index out of bounds"));
             }
         }
     }
     state.memory.dec(list_index);
+    Ok(())
+}
+
+/// List::trySwap(list, i, j) -> Bool  — safe version, returns false on OOB
+pub fn try_swap(state: &mut state::State) -> NovaResult<()> {
+    let j = pop_int(state)? as usize;
+    let i = pop_int(state)? as usize;
+    let list_index = pop_list(state)?;
+    let mut ok = false;
+    if let Some(obj) = state.memory.ref_from_heap_mut(list_index) {
+        if let ObjectType::List = obj.object_type {
+            if i < obj.data.len() && j < obj.data.len() {
+                obj.data.swap(i, j);
+                ok = true;
+            }
+        }
+    }
+    state.memory.dec(list_index);
+    state.memory.stack.push(VmData::Bool(ok));
     Ok(())
 }
 
@@ -171,7 +191,7 @@ pub fn clear(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
-/// List::set(list, index, value)
+/// List::set(list, index, value)  — asserts in-bounds (runtime error on OOB)
 pub fn set(state: &mut state::State) -> NovaResult<()> {
     let value = pop(state)?;
     let idx = pop_int(state)? as usize;
@@ -184,11 +204,70 @@ pub fn set(state: &mut state::State) -> NovaResult<()> {
                 obj.data[idx] = value;
                 state.memory.dec_value(old);
             } else {
+                state.memory.dec_value(value);
+                state.memory.dec(list_index);
                 return Err(runtime_err("List::set: index out of bounds"));
             }
         }
     }
     state.memory.dec_value(value);
+    state.memory.dec(list_index);
+    Ok(())
+}
+
+/// List::trySet(list, index, value) -> Bool  — safe version, returns false on OOB
+pub fn try_set(state: &mut state::State) -> NovaResult<()> {
+    let value = pop(state)?;
+    let idx = pop_int(state)? as usize;
+    let list_index = pop_list(state)?;
+    state.memory.inc_value(value);
+    let mut ok = false;
+    if let Some(obj) = state.memory.ref_from_heap_mut(list_index) {
+        if let ObjectType::List = obj.object_type {
+            if idx < obj.data.len() {
+                let old = obj.data[idx];
+                obj.data[idx] = value;
+                state.memory.dec_value(old);
+                ok = true;
+            }
+        }
+    }
+    if !ok {
+        state.memory.dec_value(value);
+    }
+    state.memory.dec(list_index);
+    state.memory.stack.push(VmData::Bool(ok));
+    Ok(())
+}
+
+/// List::get(list, index) -> Option(T)  — safe indexing
+pub fn get(state: &mut state::State) -> NovaResult<()> {
+    let idx = pop_int(state)?;
+    let list_index = pop_list(state)?;
+    let item = {
+        if let Some(obj) = state.memory.ref_from_heap(list_index) {
+            if let ObjectType::List = obj.object_type {
+                let len = obj.data.len() as i64;
+                let resolved = if idx < 0 { idx + len } else { idx };
+                if resolved >= 0 && resolved < len {
+                    Some(obj.data[resolved as usize])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+    match item {
+        Some(value) => {
+            state.memory.stack.push(value);
+            state.memory.inc_value(value);
+        }
+        None => state.memory.stack.push(VmData::None),
+    }
     state.memory.dec(list_index);
     Ok(())
 }

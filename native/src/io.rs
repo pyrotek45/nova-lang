@@ -49,7 +49,7 @@ pub fn read_line(state: &mut state::State) -> NovaResult<()> {
     Ok(())
 }
 
-/// readFile(path: String) -> String
+/// readFile(path: String) -> Option(String)
 pub fn read_file(state: &mut state::State) -> NovaResult<()> {
     let path = pop_string(state)?;
     match fs::read_to_string(&path) {
@@ -57,9 +57,10 @@ pub fn read_file(state: &mut state::State) -> NovaResult<()> {
             state.memory.push_string(string);
             Ok(())
         }
-        Err(e) => Err(Box::new(NovaError::Runtime {
-            msg: format!("Error reading file '{}': {}", path, e).into(),
-        })),
+        Err(_) => {
+            state.memory.stack.push(VmData::None);
+            Ok(())
+        }
     }
 }
 
@@ -72,9 +73,10 @@ pub fn write_file(state: &mut state::State) -> NovaResult<()> {
             state.memory.stack.push(VmData::Bool(true));
             Ok(())
         }
-        Err(e) => Err(Box::new(NovaError::Runtime {
-            msg: format!("Error writing file '{}': {}", path, e).into(),
-        })),
+        Err(_) => {
+            state.memory.stack.push(VmData::Bool(false));
+            Ok(())
+        }
     }
 }
 
@@ -93,21 +95,19 @@ pub fn append_file(state: &mut state::State) -> NovaResult<()> {
     use std::io::Write;
     let content = pop_string(state)?;
     let path = pop_string(state)?;
-    let mut file = std::fs::OpenOptions::new()
+    let result = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&path)
-        .map_err(|e| {
-            Box::new(NovaError::Runtime {
-                msg: format!("Error opening file '{}': {}", path, e).into(),
-            })
-        })?;
-    file.write_all(content.as_bytes()).map_err(|e| {
-        Box::new(NovaError::Runtime {
-            msg: format!("Error appending to file '{}': {}", path, e).into(),
-        })
-    })?;
-    state.memory.stack.push(VmData::Bool(true));
+        .and_then(|mut file| file.write_all(content.as_bytes()));
+    match result {
+        Ok(()) => {
+            state.memory.stack.push(VmData::Bool(true));
+        }
+        Err(_) => {
+            state.memory.stack.push(VmData::Bool(false));
+        }
+    }
     Ok(())
 }
 

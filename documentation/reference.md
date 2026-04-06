@@ -79,6 +79,22 @@ These functions are available without any imports.
 | `isSome(Option(a)) -> Bool` | Check if an Option contains a value. |
 | `unwrap(Option(a)) -> a` | Extract the value. Panics if None. |
 
+**The `?` operator** — shorthand for `.unwrap()`:
+
+```rust
+let data = readFile("config.txt")?   // unwraps the Option(String), panics if None
+```
+
+**Must-use rule:** Option values cannot be silently discarded as expression
+statements. The compiler rejects bare Option expressions:
+
+```rust
+readFile("data.txt")    // ✗ compile error — Option(String) must be used
+readFile("data.txt")?   // ✓ unwrap the result
+let _ = readFile("x")   // ✓ explicitly discard
+if let d = readFile("x") { ... }  // ✓ handle both cases
+```
+
 ### Type Conversion
 
 | Signature | Description |
@@ -119,6 +135,7 @@ These functions are available without any imports.
 | `String::reverse(String) -> String` | Reverse the characters. |
 | `String::isEmpty(String) -> Bool` | Check if empty. |
 | `String::charAt(String, Int) -> Option(Char)` | Character at index, or None. |
+| `String::get(String, Int) -> Option(Char)` | Safe character index — supports negative indices (`-1` = last). |
 | `String::split(String, String) -> [String]` | Split by a delimiter. |
 | `join([String], String) -> String` | Join strings with a separator. |
 | `String::toInt(String) -> Option(Int)` | Parse a string as an integer. |
@@ -171,18 +188,21 @@ These functions are available without any imports.
 | `pop([a]) -> Option(a)` | Remove and return the last element. |
 | `remove([a], Int) -> Void` | Remove element at index. |
 | `insert([a], Int, a) -> Void` | Insert element at index. |
-| `swap([a], Int, Int) -> Void` | Swap two elements by index. |
+| `swap([a], Int, Int) -> Void` | Swap two elements by index. Errors if out of bounds. |
+| `trySwap([a], Int, Int) -> Bool` | Safe swap — returns `false` if either index is out of bounds. |
 | `clear([a]) -> Void` | Remove all elements. |
-| `set([a], Int, a) -> Void` | Set element at index. |
+| `set([a], Int, a) -> Void` | Set element at index. Errors if out of bounds. |
+| `trySet([a], Int, a) -> Bool` | Safe set — returns `false` if index is out of bounds. |
+| `get([a], Int) -> Option(a)` | Safe index — returns `None` if out of bounds. Supports negative indices (`-1` = last). |
 
 ### I/O
 
 | Signature | Description |
 |---|---|
 | `readln() -> String` | Read a line from stdin. |
-| `readFile(String) -> String` | Read file contents. |
-| `writeFile(String, String) -> Void` | Write to file (creates or overwrites). |
-| `appendFile(String, String) -> Void` | Append to file. |
+| `readFile(String) -> Option(String)` | Read file contents. Returns `None` on error. |
+| `writeFile(String, String) -> Bool` | Write to file (creates or overwrites). Returns `false` on error. |
+| `appendFile(String, String) -> Bool` | Append to file. Returns `false` on error. |
 | `fileExists(String) -> Bool` | Check if file exists. |
 | `printf(String, [String]) -> Void` | Print formatted string (`{}` placeholders). |
 | `format(String, [String]) -> String` | Format string without printing. |
@@ -227,9 +247,9 @@ These functions are available without any imports.
 
 | Signature | Description |
 |---|---|
-| `Regex::matches(String, String) -> Bool` | Test whether a string matches a regex pattern. |
-| `Regex::first(String, String) -> Option((Int, Int, String))` | First match: (start, end, text). |
-| `Regex::captures(String, String) -> [String]` | All capture groups from a match. |
+| `Regex::matches(String, String) -> Bool` | Test whether a string matches a regex pattern. Returns `false` on invalid regex. |
+| `Regex::first(String, String) -> Option((Int, Int, String))` | First match: (start, end, text). Returns `None` on invalid regex. |
+| `Regex::captures(String, String) -> [String]` | All capture groups from a match. Returns `[]` on invalid regex. |
 
 ### Program
 

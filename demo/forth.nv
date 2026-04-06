@@ -46,7 +46,7 @@ fn run(input: [String]) -> Maybe(String) {
             } elif word == "dup" {
                 stack.push(stack[stack.len() - 1])
             } elif word == "drop" {
-                stack.pop()
+                let _ = stack.pop()
             } elif word == "swap" {
                 if let a = stack.pop() {
                     if let b = stack.pop() {
@@ -113,7 +113,7 @@ fn run(input: [String]) -> Maybe(String) {
 }
 
 if let args = terminal::args() {
-    let input = readFile(args[0])
+    let input = readFile(args[0])?
         .split('\n')
         .filter(|x: String| x.len() > 0)
 
