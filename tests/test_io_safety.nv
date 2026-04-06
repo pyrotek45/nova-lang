@@ -1,0 +1,93 @@
+module test_io_safety
+
+// ============================================================
+//  Test suite for IO function safety
+//
+//  readFile  -> Option(String)
+//  writeFile -> Bool
+//  appendFile -> Bool
+// ============================================================
+
+// ── 1. readFile returns Some on valid file ──────────────────────
+// We know this test file exists
+let self_content = readFile("tests/test_io_safety.nv")
+assert(self_content.isSome(), "1a: readFile returns Some for existing file")
+assert(self_content?.len() > 0, "1b: content is non-empty")
+
+println("  GROUP 1 [readFile Some] OK")
+
+// ── 2. readFile returns None on missing file ────────────────────
+let missing = readFile("this_file_does_not_exist_at_all.txt")
+assert(missing.isSome() == false, "2a: readFile returns None for missing file")
+
+let missing2 = readFile("")
+assert(missing2.isSome() == false, "2b: readFile returns None for empty path")
+
+let missing3 = readFile("/absolutely/nonexistent/path/file.txt")
+assert(missing3.isSome() == false, "2c: readFile returns None for bad absolute path")
+
+println("  GROUP 2 [readFile None] OK")
+
+// ── 3. readFile with ? ──────────────────────────────────────────
+let content = readFile("tests/test_io_safety.nv")?
+assert(content.len() > 0, "3a: readFile? unwraps successfully")
+
+// Using readFile? in a chain
+let lines = readFile("tests/test_io_safety.nv")?.split("\n")
+assert(lines.len() > 5, "3b: readFile? chain with split")
+
+println("  GROUP 3 [readFile with ?] OK")
+
+// ── 4. readFile with if let ─────────────────────────────────────
+if let data = readFile("tests/test_io_safety.nv") {
+    assert(data.len() > 0, "4a: if let extracts content")
+} else {
+    assert(false, "4a: should have found the file")
+}
+
+if let bad = readFile("nonexistent_file.xyz") {
+    assert(false, "4b: should not find nonexistent file")
+}
+
+println("  GROUP 4 [readFile with if let] OK")
+
+// ── 5. writeFile returns true on success ────────────────────────
+let tmp_path = "/tmp/nova_test_io_safety.txt"
+let ok = writeFile(tmp_path, "hello from nova")
+assert(ok == true, "5a: writeFile returns true")
+
+// Verify the content
+let read_back = readFile(tmp_path)?
+assert(read_back == "hello from nova", "5b: content matches")
+
+println("  GROUP 5 [writeFile success] OK")
+
+// ── 6. writeFile returns false on bad path ──────────────────────
+let bad_write = writeFile("/nonexistent_dir/subdir/file.txt", "data")
+assert(bad_write == false, "6a: writeFile returns false for bad path")
+
+println("  GROUP 6 [writeFile failure] OK")
+
+// ── 7. appendFile returns true on success ───────────────────────
+let ok2 = appendFile(tmp_path, " world")
+assert(ok2 == true, "7a: appendFile returns true")
+
+let read_back2 = readFile(tmp_path)?
+assert(read_back2 == "hello from nova world", "7b: appended content matches")
+
+println("  GROUP 7 [appendFile success] OK")
+
+// ── 8. appendFile returns false on bad path ─────────────────────
+let bad_append = appendFile("/nonexistent_dir/file.txt", "data")
+assert(bad_append == false, "8a: appendFile returns false for bad path")
+
+println("  GROUP 8 [appendFile failure] OK")
+
+// ── 9. writeFile overwrites existing content ────────────────────
+let _ = writeFile(tmp_path, "overwritten")
+let read_back3 = readFile(tmp_path)?
+assert(read_back3 == "overwritten", "9a: writeFile overwrites")
+
+println("  GROUP 9 [overwrite] OK")
+
+println("PASS: test_io_safety")

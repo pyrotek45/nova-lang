@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: bare Option expression is not allowed (must-use)
+let xs = [1, 2, 3]
+xs.pop()
+println("should not reach")

@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: ? on a function return that is not Option
+fn getInt() -> Int { return 42 }
+let x = getInt()?

@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: ? on a non-Option type (Int)
+let x = 42
+let y = x?

@@ -1,0 +1,98 @@
+module test_regex_safety
+
+// ============================================================
+//  Test suite for regex function safety
+//
+//  All regex functions gracefully handle invalid patterns:
+//  - Regex::matches  -> false
+//  - Regex::captures -> []
+//  - Regex::first    -> None
+// ============================================================
+
+// ── 1. Regex::matches — valid patterns ──────────────────────────
+// Signature: Regex::matches(pattern, text) -> Bool
+assert(Regex::matches("hello", "hello world") == true, "1a: simple match")
+assert(Regex::matches("\\d+", "abc123") == true, "1b: digit pattern")
+assert(Regex::matches("^nova", "nova-lang") == true, "1c: anchored match")
+assert(Regex::matches("^xyz$", "test") == false, "1d: no match returns false")
+
+println("  GROUP 1 [matches valid] OK")
+
+// ── 2. Regex::matches — invalid patterns ────────────────────────
+assert(Regex::matches("[invalid", "hello") == false, "2a: unclosed bracket")
+assert(Regex::matches("(unclosed", "hello") == false, "2b: unclosed paren")
+assert(Regex::matches("*bad", "hello") == false, "2c: leading quantifier")
+assert(Regex::matches("(?P<", "hello") == false, "2d: incomplete named group")
+
+println("  GROUP 2 [matches invalid] OK")
+
+// ── 3. Regex::captures — valid patterns ─────────────────────────
+// Signature: Regex::captures(pattern, text) -> [String]
+// NOTE: captures uses find_iter — it returns all non-overlapping
+//       full-pattern matches, NOT individual capture sub-groups.
+
+// Single match in text
+let caps = Regex::captures("\\d{4}-\\d{2}-\\d{2}", "2024-01-15")
+assert(caps.len() == 1, "3a: one full match")
+assert(caps[0] == "2024-01-15", "3b: full date matched")
+
+// Multiple matches in text
+let multi = Regex::captures("\\d+", "abc 123 def 456 ghi 789")
+assert(multi.len() == 3, "3c: three number matches")
+assert(multi[0] == "123", "3d: first number")
+assert(multi[1] == "456", "3e: second number")
+assert(multi[2] == "789", "3f: third number")
+
+// No match returns empty
+let no_caps = Regex::captures("\\d+", "hello")
+assert(no_caps.len() == 0, "3g: no match -> empty captures")
+
+println("  GROUP 3 [captures valid] OK")
+
+// ── 4. Regex::captures — invalid patterns ───────────────────────
+let bad_caps = Regex::captures("[bad", "hello")
+assert(bad_caps.len() == 0, "4a: invalid regex -> empty captures")
+
+let bad_caps2 = Regex::captures("(unclosed", "hello")
+assert(bad_caps2.len() == 0, "4b: invalid regex -> empty captures")
+
+println("  GROUP 4 [captures invalid] OK")
+
+// ── 5. Regex::first — valid patterns ────────────────────────────
+// Signature: Regex::first(pattern, text) -> Option((Int, Int, String))
+let first = Regex::first("\\d+", "hello 42 world")
+assert(first.isSome(), "5a: first match found")
+if let match_tuple = first {
+    // match_tuple is (Int, Int, String) = (start, end, text)
+    assert(match_tuple[2] == "42", "5b: matched text is 42")
+}
+
+// No match
+let no_first = Regex::first("\\d+", "hello world")
+assert(no_first.isSome() == false, "5c: no match -> None")
+
+println("  GROUP 5 [first valid] OK")
+
+// ── 6. Regex::first — invalid patterns ──────────────────────────
+let bad_first = Regex::first("[bad", "hello")
+assert(bad_first.isSome() == false, "6a: invalid regex -> None")
+
+let bad_first2 = Regex::first("*quantifier", "hello")
+assert(bad_first2.isSome() == false, "6b: invalid regex -> None")
+
+println("  GROUP 6 [first invalid] OK")
+
+// ── 7. Edge cases ───────────────────────────────────────────────
+// Empty pattern
+assert(Regex::matches("", "hello") == true, "7a: empty pattern matches")
+
+// Empty string
+assert(Regex::matches(".*", "") == true, "7b: empty string with .* matches")
+assert(Regex::matches(".+", "") == false, "7c: empty string with .+ no match")
+
+// Empty string with empty pattern
+assert(Regex::matches("", "") == true, "7d: both empty matches")
+
+println("  GROUP 7 [edge cases] OK")
+
+println("PASS: test_regex_safety")
