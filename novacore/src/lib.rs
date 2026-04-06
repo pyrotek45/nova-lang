@@ -1638,6 +1638,15 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::io::append_file,
         );
+        self.add_function(
+            "tempDir",
+            TType::Function {
+                parameters: vec![TType::None],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::io::temp_dir,
+        );
         // ---------------------------------------------------------------
         // Raylib audio functions
         // ---------------------------------------------------------------

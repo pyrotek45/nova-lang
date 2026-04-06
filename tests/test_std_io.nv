@@ -26,7 +26,7 @@ printSep([]:String, "|")
 eprintln("test error message")
 
 // ── writeLines / readLines ───────────────────────────────────────
-let tmpPath = "/tmp/nova_test_io_tmp.txt"
+let tmpPath = tempDir() + "nova_test_io_tmp.txt"
 let testLines = ["hello", "world", "nova"]
 let wrote = writeLines(tmpPath, testLines)
 assert(wrote, "writeLines returned true")
@@ -54,6 +54,6 @@ assert(content == "simple content", "readFile roundtrip")
 
 // ── fileExists (native) ──────────────────────────────────────────
 assert(fileExists(tmpPath), "fileExists true")
-assert(!fileExists("/tmp/nova_nonexistent_xyz_abc_123.txt"), "fileExists false")
+assert(!fileExists(tempDir() + "nova_nonexistent_xyz_abc_123.txt"), "fileExists false")
 
 println("PASS: test_std_io")

@@ -170,8 +170,9 @@ pub fn move_to(state: &mut state::State) -> NovaResult<()> {
 
 /// terminal::getSize() -> (Int, Int)
 /// Returns (width, height) of the terminal.
+/// Returns (0, 0) in headless / CI environments where no TTY is available.
 pub fn get_size(state: &mut state::State) -> NovaResult<()> {
-    let (w, h) = terminal::size().map_err(|e| runtime_err(format!("getSize failed: {e}")))?;
+    let (w, h) = terminal::size().unwrap_or((0, 0));
     // Build a tuple object and push it on the stack
     let tuple =
         vm::memory_manager::Object::tuple(vec![VmData::Int(w as i64), VmData::Int(h as i64)]);

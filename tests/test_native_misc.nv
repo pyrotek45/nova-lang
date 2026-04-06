@@ -32,7 +32,7 @@ let ts = nowSec()
 assert(ts > 0.0, "nowSec returns positive seconds")
 
 // --- writeFile / readFile / fileExists / appendFile ---
-let test_path = "/tmp/nova_test_io.txt"
+let test_path = tempDir() + "nova_test_io.txt"
 
 // Write a file
 let wrote = writeFile(test_path, "hello nova")
@@ -55,6 +55,6 @@ let content3 = readFile(test_path)?
 assert(content3 == "overwritten", "readFile after overwrite")
 
 // fileExists on non-existent file
-assert(!fileExists("/tmp/nova_nonexistent_file_12345.txt"), "fileExists false for missing")
+assert(!fileExists(tempDir() + "nova_nonexistent_file_12345.txt"), "fileExists false for missing")
 
 println("PASS: test_native_misc")

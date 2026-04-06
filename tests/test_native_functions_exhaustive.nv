@@ -396,10 +396,10 @@ assert(cf1.isSome(), "Cast::float 42 isSome")
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── writeFile / readFile / fileExists ────────────────────────────────────
-let test_path = "/tmp/nova_test_native_io.txt"
+let test_path = tempDir() + "nova_test_native_io.txt"
 assert(writeFile(test_path, "hello nova"), "writeFile")
 assert(fileExists(test_path), "fileExists true")
-assert(!fileExists("/tmp/nova_this_should_not_exist_12345.txt"), "fileExists false")
+assert(!fileExists(tempDir() + "nova_this_should_not_exist_12345.txt"), "fileExists false")
 
 let content = readFile(test_path)?
 assert(content == "hello nova", "readFile matches")
