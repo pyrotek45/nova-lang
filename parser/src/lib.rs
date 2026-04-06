@@ -122,9 +122,9 @@ fn create_typechecker() -> TypeChecker {
         "Option::unwrap",
         TType::Function {
             parameters: vec![TType::Option {
-                inner: Box::new(TType::Generic { name: "a".into() }),
+                inner: Box::new(TType::Generic { name: "T".into() }),
             }],
-            return_type: Box::new(TType::Generic { name: "a".into() }),
+            return_type: Box::new(TType::Generic { name: "T".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -132,9 +132,9 @@ fn create_typechecker() -> TypeChecker {
     tc.environment.insert_symbol(
         "Some",
         TType::Function {
-            parameters: vec![TType::Generic { name: "a".into() }],
+            parameters: vec![TType::Generic { name: "T".into() }],
             return_type: Box::new(TType::Option {
-                inner: Box::new(TType::Generic { name: "a".into() }),
+                inner: Box::new(TType::Generic { name: "T".into() }),
             }),
         },
         None,
@@ -161,8 +161,8 @@ fn create_typechecker() -> TypeChecker {
     tc.environment.insert_symbol(
         "clone",
         TType::Function {
-            parameters: vec![TType::Generic { name: "a".into() }],
-            return_type: Box::new(TType::Generic { name: "a".into() }),
+            parameters: vec![TType::Generic { name: "T".into() }],
+            return_type: Box::new(TType::Generic { name: "T".into() }),
         },
         None,
         SymbolKind::GenericFunction,
@@ -3987,6 +3987,38 @@ impl Parser {
                 Ok(TType::List {
                     inner: Box::new(inner),
                 })
+            }
+            Some(Identifier(id)) if "List" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
+                let inner = self.ttype()?;
+                self.consume_symbol(RightParen)?;
+                Ok(TType::List {
+                    inner: Box::new(inner),
+                })
+            }
+            Some(Identifier(id)) if "Tuple" == id.deref() => {
+                self.advance();
+                self.consume_symbol(LeftParen)?;
+                let mut elements = vec![self.ttype()?];
+                while self.current_token().is_some_and(|t| t.is_symbol(Comma)) {
+                    self.consume_symbol(Comma)?;
+                    if self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(RightParen))
+                    {
+                        break;
+                    }
+                    elements.push(self.ttype()?);
+                }
+                self.consume_symbol(RightParen)?;
+                if elements.len() < 2 {
+                    return Err(self.generate_error(
+                        "Tuple type must contain at least two elements",
+                        "A tuple type requires at least two elements, e.g. `Tuple(Int, String)`.\n  For a single-element tuple, use: `(Int,)`",
+                    ));
+                }
+                Ok(TType::Tuple { elements })
             }
             Some(Identifier(id)) if "Dyn" == id.deref() => {
                 self.advance();

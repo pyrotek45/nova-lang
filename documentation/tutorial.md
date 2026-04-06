@@ -28,6 +28,7 @@ A comprehensive guide to writing Nova — from first program to full games.
 18. [Dyn Types](#18-dyn-types)
 19. [Box and Mutable Shared State](#19-box-and-mutable-shared-state)
 20. [Imports and the Standard Library](#20-imports-and-the-standard-library)
+20b. [Data Serialization](#20b-data-serialization)
 21. [Type System Rules](#21-type-system-rules)
 22. [Memory Model](#22-memory-model)
 23. [Cast and Type Conversion](#23-cast-and-type-conversion)
@@ -1025,6 +1026,13 @@ let xs = [1, 2, 3]            // [Int]
 let empty = []: Int            // empty list — type annotation required
 ```
 
+Type annotations can use either shorthand `[Int]` or word form `List(Int)`:
+
+```rust
+let a: [Int] = [1, 2, 3]        // shorthand
+let b: List(Int) = [4, 5, 6]    // word form — identical
+```
+
 ### Operations
 
 ```rust
@@ -1124,6 +1132,13 @@ Fixed-size typed collections:
 let t = (42, "hello", true)
 t[0]   // 42
 t[1]   // "hello"
+```
+
+Type annotations can use either shorthand `(Int, String)` or word form `Tuple(Int, String)`:
+
+```rust
+let a: (Int, String) = (1, "hi")            // shorthand
+let b: Tuple(Int, String) = (2, "hello")    // word form — identical
 ```
 
 ### Single-Element Tuples
@@ -1373,6 +1388,74 @@ the module name and prevents duplicate imports. Everything the file exports
    the module name comes from the `module` declaration inside the fetched file.
 5. **Duplicate prevention:** if a module with the same name was already imported,
    the import is silently skipped regardless of import method.
+
+---
+
+## 20b. Data Serialization
+
+Nova has a built-in `Data` module for saving and loading values as JSON.
+It supports all core types — `Int`, `Float`, `Bool`, `Char`, `String`,
+`List`, `Tuple`, `Struct`, `Enum`, and `Option` — including nested combinations.
+
+### Saving to a File
+
+```rust
+struct Player {
+    name: String,
+    hp: Int,
+}
+
+let p = Player("Alice", 100)
+Data::save("player.json", p)   // returns true on success
+```
+
+### Loading from a File
+
+`Data::load` returns `Option(T)` — use `@[T:Type]` to tell Nova what type
+to reconstruct:
+
+```rust
+struct Player {
+    name: String,
+    hp: Int,
+}
+
+let loaded = Data::load("player.json")@[T:Player]
+match loaded {
+    Some(p) => println(p.name),   // "Alice"
+    None    => println("no save found"),
+}
+```
+
+If the file is missing or the JSON is malformed, `Data::load` returns `None`.
+
+### In-Memory JSON Strings
+
+Use `Data::toJson` and `Data::fromJson` when you need the JSON string
+directly (e.g. for networking or logging):
+
+```rust
+let nums = [1, 2, 3]
+let json = Data::toJson(nums)       // "[1,2,3]"
+
+let back = Data::fromJson(json)@[T:[Int]]
+// back == Some([1, 2, 3])
+```
+
+### Supported Types
+
+| Type | JSON representation |
+|------|---------------------|
+| `Int` | number |
+| `Float` | number |
+| `Bool` | `true` / `false` |
+| `Char` | single-character string |
+| `String` | string |
+| `List(T)` | array |
+| `Tuple(A, B, …)` | array |
+| `Struct` | object (field names → values) |
+| `Enum` | `{"variant": "Name", "data": …}` |
+| `Option(T)` | value or `null` |
 
 ---
 

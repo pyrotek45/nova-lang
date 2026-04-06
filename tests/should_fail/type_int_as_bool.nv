@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: assigning Int to a Bool variable
+let x: Bool = 42

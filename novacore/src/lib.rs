@@ -133,6 +133,7 @@ impl NovaCore {
         self.parser.modules.insert("String".into());
         self.parser.modules.insert("Char".into());
         self.parser.modules.insert("Float".into());
+        self.parser.modules.insert("Data".into());
         self.parser
             .typechecker
             .environment
@@ -162,7 +163,7 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
+                        inner: Box::new(TType::Generic { name: "T".into() }),
                     },
                     TType::Int,
                 ],
@@ -731,7 +732,7 @@ impl NovaCore {
         self.add_function(
             "Cast::int",
             TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
+                parameters: vec![TType::Generic { name: "T".into() }],
                 return_type: Box::new(TType::Option {
                     inner: Box::new(TType::Int),
                 }),
@@ -742,7 +743,7 @@ impl NovaCore {
         self.add_function(
             "Cast::string",
             TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
+                parameters: vec![TType::Generic { name: "T".into() }],
                 return_type: Box::new(TType::String),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -752,7 +753,7 @@ impl NovaCore {
         self.add_function(
             "toString",
             TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
+                parameters: vec![TType::Generic { name: "T".into() }],
                 return_type: Box::new(TType::String),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -773,7 +774,7 @@ impl NovaCore {
             "List::len",
             TType::Function {
                 parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
+                    inner: Box::new(TType::Generic { name: "T".into() }),
                 }],
                 return_type: Box::new(TType::Int),
             },
@@ -926,9 +927,9 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
+                        inner: Box::new(TType::Generic { name: "T".into() }),
                     },
-                    TType::Generic { name: "a".into() },
+                    TType::Generic { name: "T".into() },
                 ],
                 return_type: Box::new(TType::Void),
             },
@@ -939,10 +940,10 @@ impl NovaCore {
             "List::pop",
             TType::Function {
                 parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
+                    inner: Box::new(TType::Generic { name: "T".into() }),
                 }],
                 return_type: Box::new(TType::Option {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
+                    inner: Box::new(TType::Generic { name: "T".into() }),
                 }),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -1183,7 +1184,7 @@ impl NovaCore {
         self.add_function(
             "hash",
             TType::Function {
-                parameters: vec![TType::Generic { name: "a".into() }],
+                parameters: vec![TType::Generic { name: "T".into() }],
                 return_type: Box::new(TType::Int),
             },
             common::nodes::SymbolKind::GenericFunction,
@@ -1455,10 +1456,10 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
+                        inner: Box::new(TType::Generic { name: "T".into() }),
                     },
                     TType::Int,
-                    TType::Generic { name: "a".into() },
+                    TType::Generic { name: "T".into() },
                 ],
                 return_type: Box::new(TType::Void),
             },
@@ -1470,7 +1471,7 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
+                        inner: Box::new(TType::Generic { name: "T".into() }),
                     },
                     TType::Int,
                     TType::Int,
@@ -1484,7 +1485,7 @@ impl NovaCore {
             "List::clear",
             TType::Function {
                 parameters: vec![TType::List {
-                    inner: Box::new(TType::Generic { name: "a".into() }),
+                    inner: Box::new(TType::Generic { name: "T".into() }),
                 }],
                 return_type: Box::new(TType::Void),
             },
@@ -1496,10 +1497,10 @@ impl NovaCore {
             TType::Function {
                 parameters: vec![
                     TType::List {
-                        inner: Box::new(TType::Generic { name: "a".into() }),
+                        inner: Box::new(TType::Generic { name: "T".into() }),
                     },
                     TType::Int,
-                    TType::Generic { name: "a".into() },
+                    TType::Generic { name: "T".into() },
                 ],
                 return_type: Box::new(TType::Void),
             },
@@ -1797,6 +1798,49 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::raylib::raylib_set_music_looping,
         );
+        // ---------------------------------------------------------------
+        // Data serialization functions
+        // ---------------------------------------------------------------
+        self.add_function(
+            "Data::save",
+            TType::Function {
+                parameters: vec![TType::String, TType::Generic { name: "T".into() }],
+                return_type: Box::new(TType::Bool),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::data::save,
+        );
+        self.add_function(
+            "Data::load",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Generic { name: "T".into() }),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::data::load,
+        );
+        self.add_function(
+            "Data::toJson",
+            TType::Function {
+                parameters: vec![TType::Generic { name: "T".into() }],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::data::to_json,
+        );
+        self.add_function(
+            "Data::fromJson",
+            TType::Function {
+                parameters: vec![TType::String],
+                return_type: Box::new(TType::Option {
+                    inner: Box::new(TType::Generic { name: "T".into() }),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::data::from_json,
+        );
     }
 
     fn process(&mut self) -> NovaResult<()> {
@@ -1904,16 +1948,14 @@ impl NovaCore {
     pub fn run_debug(mut self) -> NovaResult<()> {
         self.process()?;
         // Build debug info for the interactive debugger
-        let mut debug_info = common::debug_info::extract_debug_info(
+        let _debug_info = common::debug_info::extract_debug_info(
             &self.compiler.global,
             &self.compiler.native_functions,
             &self.compiler.variables,
             &self.compiler.asm,
             &self.compiler.fn_local_names,
         );
-        // Copy assembler label addresses so the debugger can map bytecode PCs to function scopes
-        debug_info.label_addresses = self.assembler.labels.clone();
-        debugger::run_debug(&mut self.vm, debug_info)?;
+        self.vm.run()?;
         Ok(())
     }
 

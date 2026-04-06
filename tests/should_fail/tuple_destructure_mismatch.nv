@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: Tuple destructuring with wrong number of bindings
+let t = (1, "hello", true)
+let (a, b) = t

@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: accessing a field that doesn't exist on a struct
+struct Point { x: Int, y: Int }
+let p = Point { x: 1, y: 2 }
+println(p.z)

@@ -1,0 +1,6 @@
+module main
+
+// SHOULD FAIL: calling a non-existent method on a struct
+struct Foo { x: Int }
+let f = Foo { x: 10 }
+f.nonExistentMethod()

@@ -1,0 +1,531 @@
+module test_stress_combinations
+
+import super.std.core
+import super.std.list
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STRESS COMBINATIONS — WACKY TESTS
+//  Tries bizarre type combos, deep nesting, closures + generics +
+//  serialization + pipes, closures capturing serialized data, etc.
+//  Goal: find edge cases that break the compiler or runtime.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  1. Deeply nested generic structs serialized
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct Wrapper(T) {
+    inner: $T,
+}
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+// Wrapper around Int
+let w1 = Wrapper { inner: 42 }
+let j1 = Data::toJson(w1)
+let r1 = Option::unwrap(Data::fromJson(j1) @[T: Wrapper(Int)])
+assert(r1.inner == 42, "Wrapper(Int) roundtrip")
+
+// Wrapper around String
+let w2 = Wrapper { inner: "hello" }
+let j2 = Data::toJson(w2)
+let r2 = Option::unwrap(Data::fromJson(j2) @[T: Wrapper(String)])
+assert(r2.inner == "hello", "Wrapper(String) roundtrip")
+
+// Wrapper around List
+let w3 = Wrapper { inner: [1, 2, 3] }
+let j3 = Data::toJson(w3)
+let r3 = Option::unwrap(Data::fromJson(j3) @[T: Wrapper([Int])])
+assert(r3.inner.len() == 3, "Wrapper([Int]) roundtrip len")
+assert(r3.inner[2] == 3, "Wrapper([Int]) roundtrip [2]")
+
+// Wrapper around Point
+let w4 = Wrapper { inner: Point { x: 10, y: 20 } }
+let j4 = Data::toJson(w4)
+let r4 = Option::unwrap(Data::fromJson(j4) @[T: Wrapper(Point)])
+assert(r4.inner.x == 10, "Wrapper(Point) roundtrip x")
+assert(r4.inner.y == 20, "Wrapper(Point) roundtrip y")
+
+// Wrapper around Tuple
+let w5 = Wrapper { inner: (1, "two") }
+let j5 = Data::toJson(w5)
+let r5 = Option::unwrap(Data::fromJson(j5) @[T: Wrapper((Int, String))])
+assert(r5.inner[0] == 1, "Wrapper(Tuple) roundtrip [0]")
+assert(r5.inner[1] == "two", "Wrapper(Tuple) roundtrip [1]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  2. Closures + serialization: serialize inside closure
+// ═══════════════════════════════════════════════════════════════════════════
+
+let save_and_load = fn(val: Int) -> Int {
+    let path = "/tmp/nova_stress_closure.json"
+    Data::save(path, val)
+    let loaded = Data::load(path) @[T: Int]
+    return Option::unwrap(loaded)
+}
+assert(save_and_load(42) == 42, "closure save/load 42")
+assert(save_and_load(0) == 0, "closure save/load 0")
+assert(save_and_load(-100) == -100, "closure save/load -100")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  3. Pipe operator + type annotations + Data
+// ═══════════════════════════════════════════════════════════════════════════
+
+let piped_json = 42 |> Data::toJson()
+assert(piped_json.len() > 0, "pipe to Data::toJson")
+
+let piped_back = piped_json |> Data::fromJson() @[T: Int]
+assert(piped_back.isSome(), "pipe fromJson isSome")
+assert(Option::unwrap(piped_back) == 42, "pipe fromJson value")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  4. Closure returning Option + generics
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn make_finder(xs: [Int], target: Int) -> Option(Int) {
+    for let i = 0; i < xs.len(); i += 1 {
+        if xs[i] == target {
+            return Some(i)
+        }
+    }
+    return None(Int)
+}
+
+let found = make_finder([10, 20, 30, 40], 30)
+assert(found.isSome(), "finder found isSome")
+assert(Option::unwrap(found) == 2, "finder found index")
+
+let not_found = make_finder([10, 20, 30], 99)
+assert(!not_found.isSome(), "finder not found None")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  5. Generic identity through multiple layers
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn id(x: $T) -> $T {
+    return x
+}
+
+fn id2(x: $T) -> $T {
+    return id(x)
+}
+
+fn id3(x: $T) -> $T {
+    return id2(x)
+}
+
+assert(id3(42) == 42, "triple nested generic id Int")
+assert(id3("hello") == "hello", "triple nested generic id String")
+assert(id3(true) == true, "triple nested generic id Bool")
+assert(id3('z') == 'z', "triple nested generic id Char")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  6. Overloaded functions + @(Type) + closures
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn convert(x: Int) -> String {
+    return "int:" + Cast::string(x)
+}
+fn convert(x: String) -> String {
+    return "str:" + x
+}
+fn convert(x: Bool) -> String {
+    if x { return "bool:true" }
+    return "bool:false"
+}
+
+// Get specific overload as function pointer
+let f_int = convert@(Int)
+let f_str = convert@(String)
+let f_bool = convert@(Bool)
+
+// Use them in map
+let results_int = [1, 2, 3].map(f_int)
+assert(results_int[0] == "int:1", "map with @(Int) overload [0]")
+assert(results_int[2] == "int:3", "map with @(Int) overload [2]")
+
+let results_str = ["a", "b"].map(f_str)
+assert(results_str[0] == "str:a", "map with @(String) overload [0]")
+
+let results_bool = [true, false].map(f_bool)
+assert(results_bool[0] == "bool:true", "map with @(Bool) overload [0]")
+assert(results_bool[1] == "bool:false", "map with @(Bool) overload [1]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  7. Complex struct with everything + serialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum Status {
+    Active,
+    Inactive,
+    Pending: String,
+}
+
+struct Config {
+    name: String,
+    values: [Int],
+    metadata: (String, Int, Bool),
+    status: Status,
+}
+
+let cfg = Config {
+    name: "test_config",
+    values: [1, 2, 3, 4, 5],
+    metadata: ("v1.0", 42, true),
+    status: Status::Pending("review"),
+}
+
+let cfg_json = Data::toJson(cfg)
+let cfg_back = Option::unwrap(Data::fromJson(cfg_json) @[T: Config])
+assert(cfg_back.name == "test_config", "complex struct name")
+assert(cfg_back.values.len() == 5, "complex struct values len")
+assert(cfg_back.values[4] == 5, "complex struct values[4]")
+assert(cfg_back.metadata[0] == "v1.0", "complex struct metadata[0]")
+assert(cfg_back.metadata[1] == 42, "complex struct metadata[1]")
+assert(cfg_back.metadata[2] == true, "complex struct metadata[2]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  8. Enum match after deserialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum Animal {
+    Dog: String,
+    Cat: String,
+    Fish,
+}
+
+fn describe_animal(a: Animal) -> String {
+    match a {
+        Dog(name) => { return "dog:" + name }
+        Cat(name) => { return "cat:" + name }
+        Fish()    => { return "fish" }
+    }
+    return "unknown"
+}
+
+let dog = Animal::Dog("Rex")
+let json_dog = Data::toJson(dog)
+let dog_back = Option::unwrap(Data::fromJson(json_dog) @[T: Animal])
+assert(describe_animal(dog_back) == "dog:Rex", "enum match after deser Dog")
+
+let fish = Animal::Fish()
+let json_fish = Data::toJson(fish)
+let fish_back = Option::unwrap(Data::fromJson(json_fish) @[T: Animal])
+assert(describe_animal(fish_back) == "fish", "enum match after deser Fish")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  9. Serialize/deserialize inside a loop
+// ═══════════════════════════════════════════════════════════════════════════
+
+for let i = 0; i < 30; i += 1 {
+    let pt = Point { x: i, y: i * i }
+    let jp = Data::toJson(pt)
+    let rp = Option::unwrap(Data::fromJson(jp) @[T: Point])
+    assert(rp.x == i, "loop serialize x " + Cast::string(i))
+    assert(rp.y == i * i, "loop serialize y " + Cast::string(i))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  10. Deeply nested data structure
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct Node {
+    value: Int,
+    children: [Node],
+}
+
+// Build a 3-level tree
+let tree = Node {
+    value: 1,
+    children: [
+        Node { value: 2, children: [
+            Node { value: 4, children: []:Node },
+            Node { value: 5, children: []:Node },
+        ]},
+        Node { value: 3, children: [
+            Node { value: 6, children: []:Node },
+        ]},
+    ],
+}
+
+let jtree = Data::toJson(tree)
+let rtree = Option::unwrap(Data::fromJson(jtree) @[T: Node])
+assert(rtree.value == 1, "tree root")
+assert(rtree.children.len() == 2, "tree children len")
+assert(rtree.children[0].value == 2, "tree child 0")
+assert(rtree.children[1].value == 3, "tree child 1")
+assert(rtree.children[0].children.len() == 2, "tree grandchildren len")
+assert(rtree.children[0].children[0].value == 4, "tree grandchild 0")
+assert(rtree.children[0].children[1].value == 5, "tree grandchild 1")
+assert(rtree.children[1].children[0].value == 6, "tree grandchild 2")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  11. List comprehension + serialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+let squares = [x in range(10) | x * x]
+assert(squares.len() == 10, "comprehension len")
+assert(squares[0] == 0, "comprehension [0]")
+assert(squares[9] == 81, "comprehension [9]")
+
+let json_squares = Data::toJson(squares)
+let r_squares = Option::unwrap(Data::fromJson(json_squares) @[T: [Int]])
+assert(r_squares == squares, "comprehension serialize roundtrip")
+
+// filtered comprehension via map + filter
+let even_squares = range(10)
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * x)
+assert(even_squares.len() == 5, "filtered comprehension len")
+assert(even_squares[0] == 0, "filtered comprehension [0]")
+assert(even_squares[4] == 64, "filtered comprehension [4]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  12. UFCS + generics + serialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn extends toJsonStr(x: [Int]) -> String {
+    return Data::toJson(x)
+}
+
+fn extends fromJsonStr(s: String) -> Option([Int]) {
+    return Data::fromJson(s) @[T: [Int]]
+}
+
+let items = [10, 20, 30]
+let json_items = items.toJsonStr()
+let back_items = Option::unwrap(json_items.fromJsonStr())
+assert(back_items.len() == 3, "UFCS json roundtrip len")
+assert(back_items[0] == 10, "UFCS json roundtrip [0]")
+assert(back_items[2] == 30, "UFCS json roundtrip [2]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  13. Multiple structs same json file
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct Pos { x: Int, y: Int }
+struct Vel { dx: Int, dy: Int }
+
+// They have the same shape — serialize Pos, load as Vel should still work
+// because field names differ, but the JSON has "x","y" vs "dx","dy"
+// Actually this SHOULD produce correct data based on field positions
+let pos = Pos { x: 5, y: 10 }
+let jpos = Data::toJson(pos)
+// Load it back as Pos
+let rpos = Option::unwrap(Data::fromJson(jpos) @[T: Pos])
+assert(rpos.x == 5, "same-shape struct x")
+assert(rpos.y == 10, "same-shape struct y")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  14. Struct with Option fields
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct MaybePoint {
+    x: Int,
+    label: Option(String),
+}
+
+let mp1 = MaybePoint { x: 42, label: Some("origin") }
+let jmp1 = Data::toJson(mp1)
+let rmp1 = Option::unwrap(Data::fromJson(jmp1) @[T: MaybePoint])
+assert(rmp1.x == 42, "struct with Some field x")
+assert(rmp1.label.isSome(), "struct with Some field label isSome")
+assert(Option::unwrap(rmp1.label) == "origin", "struct with Some field label value")
+
+let mp2 = MaybePoint { x: 0, label: None(String) }
+let jmp2 = Data::toJson(mp2)
+let rmp2 = Option::unwrap(Data::fromJson(jmp2) @[T: MaybePoint])
+assert(rmp2.x == 0, "struct with None field x")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  15. Enum with struct data
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum GameEvent {
+    Move: Point,
+    Spawn: (Int, Int),
+    Die,
+}
+
+let ev1 = GameEvent::Move(Point { x: 100, y: 200 })
+let jev1 = Data::toJson(ev1)
+let rev1 = Option::unwrap(Data::fromJson(jev1) @[T: GameEvent])
+
+let ev2 = GameEvent::Spawn((5, 10))
+let jev2 = Data::toJson(ev2)
+let rev2 = Data::fromJson(jev2) @[T: GameEvent]
+assert(rev2.isSome(), "enum with tuple data loads")
+
+let ev3 = GameEvent::Die()
+let jev3 = Data::toJson(ev3)
+let rev3 = Data::fromJson(jev3) @[T: GameEvent]
+assert(rev3.isSome(), "enum unit variant loads")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  16. Stress: serialize list of complex structs
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct Entity {
+    id: Int,
+    name: String,
+    position: Point,
+    alive: Bool,
+}
+
+let entities: [Entity] = []:Entity
+for let i = 0; i < 20; i += 1 {
+    entities.push(Entity {
+        id: i,
+        name: "entity_" + Cast::string(i),
+        position: Point { x: i * 10, y: i * 20 },
+        alive: i % 3 != 0,
+    })
+}
+
+let jents = Data::toJson(entities)
+let rents = Option::unwrap(Data::fromJson(jents) @[T: [Entity]])
+assert(rents.len() == 20, "entity list len")
+assert(rents[0].id == 0, "entity[0].id")
+assert(rents[0].name == "entity_0", "entity[0].name")
+assert(rents[0].alive == false, "entity[0].alive (0 % 3 == 0)")
+assert(rents[1].alive == true, "entity[1].alive")
+assert(rents[19].id == 19, "entity[19].id")
+assert(rents[19].position.x == 190, "entity[19].position.x")
+assert(rents[19].position.y == 380, "entity[19].position.y")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  17. Closures capturing serialized/deserialized data
+// ═══════════════════════════════════════════════════════════════════════════
+
+let data = [100, 200, 300]
+let json_data = Data::toJson(data)
+let loaded_data = Option::unwrap(Data::fromJson(json_data) @[T: [Int]])
+
+let sum_fn = fn() -> Int {
+    let total = 0
+    for x in loaded_data {
+        total += x
+    }
+    return total
+}
+assert(sum_fn() == 600, "closure over deserialized data")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  18. Pattern matching over list of enums after deserialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum Token {
+    Number: Int,
+    Word: String,
+    Punct: Char,
+}
+
+let tokens = [
+    Token::Number(42),
+    Token::Word("hello"),
+    Token::Punct('!'),
+    Token::Number(0),
+    Token::Word("world"),
+]
+
+let jtokens = Data::toJson(tokens)
+let rtokens = Option::unwrap(Data::fromJson(jtokens) @[T: [Token]])
+assert(rtokens.len() == 5, "token list len")
+
+fn count_numbers(ts: [Token]) -> Int {
+    let count = 0
+    for t in ts {
+        match t {
+            Number(n) => { count += 1 }
+            Word(w)   => {}
+            Punct(c)  => {}
+        }
+    }
+    return count
+}
+assert(count_numbers(rtokens) == 2, "count numbers after deser")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  19. Word-form types everywhere at once
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn make_data() -> List(Tuple(Int, String)) {
+    let result: List(Tuple(Int, String)) = []:(Int, String)
+    result.push((1, "one"))
+    result.push((2, "two"))
+    result.push((3, "three"))
+    return result
+}
+
+let md = make_data()
+assert(md.len() == 3, "make_data len")
+
+let jmd = Data::toJson(md)
+let rmd = Option::unwrap(Data::fromJson(jmd) @[T: List(Tuple(Int, String))])
+assert(rmd.len() == 3, "word-form deser len")
+assert(rmd[0][0] == 1, "word-form deser [0][0]")
+assert(rmd[2][1] == "three", "word-form deser [2][1]")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  20. Fibonacci list serialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn fib_list(n: Int) -> [Int] {
+    let fibs: [Int] = []:Int
+    fibs.push(0)
+    if n <= 1 { return fibs }
+    fibs.push(1)
+    for let i = 2; i < n; i += 1 {
+        let next = fibs[i - 1] + fibs[i - 2]
+        fibs.push(next)
+    }
+    return fibs
+}
+
+let fibs = fib_list(15)
+assert(fibs.len() == 15, "fib list len")
+assert(fibs[0] == 0, "fib[0]")
+assert(fibs[1] == 1, "fib[1]")
+assert(fibs[6] == 8, "fib[6]")
+assert(fibs[14] == 377, "fib[14]")
+
+let jfibs = Data::toJson(fibs)
+let rfibs = Option::unwrap(Data::fromJson(jfibs) @[T: [Int]])
+assert(rfibs == fibs, "fib list roundtrip equality")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  21. Recursive struct to maximum depth
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Build a "linked list" style chain
+struct Link {
+    value: Int,
+    next: [Link],
+}
+
+let chain = Link {
+    value: 1,
+    next: [Link {
+        value: 2,
+        next: [Link {
+            value: 3,
+            next: [Link {
+                value: 4,
+                next: []:Link,
+            }],
+        }],
+    }],
+}
+
+let jchain = Data::toJson(chain)
+let rchain = Option::unwrap(Data::fromJson(jchain) @[T: Link])
+assert(rchain.value == 1, "chain[0]")
+assert(rchain.next[0].value == 2, "chain[1]")
+assert(rchain.next[0].next[0].value == 3, "chain[2]")
+assert(rchain.next[0].next[0].next[0].value == 4, "chain[3]")
+assert(rchain.next[0].next[0].next[0].next.len() == 0, "chain end")
+
+println("PASS: test_stress_combinations")

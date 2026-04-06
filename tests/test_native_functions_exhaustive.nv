@@ -1,0 +1,524 @@
+module test_native_functions_exhaustive
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NATIVE FUNCTIONS — EXHAUSTIVE TESTS
+//  Tests every registered native function (non-raylib, non-terminal)
+//  String::*, Char::*, Float::*, List::*, Cast::*, IO, random, format, hash
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 1: String functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── String::len ──────────────────────────────────────────────────────────
+assert("".len() == 0, "strlen empty")
+assert("a".len() == 1, "strlen single")
+assert("hello".len() == 5, "strlen hello")
+assert("hello world".len() == 11, "strlen with space")
+
+// ── String::contains ─────────────────────────────────────────────────────
+assert("hello world".contains("world"), "contains match")
+assert("hello world".contains("hello"), "contains start")
+assert("hello world".contains("lo wo"), "contains middle")
+assert(!"hello".contains("xyz"), "contains no match")
+assert("hello".contains(""), "contains empty needle")
+assert("".contains(""), "empty contains empty")
+assert(!"".contains("x"), "empty not contains x")
+
+// ── String::startsWith ──────────────────────────────────────────────────
+assert("hello".startsWith("hel"), "startsWith match")
+assert("hello".startsWith("hello"), "startsWith full")
+assert("hello".startsWith(""), "startsWith empty")
+assert(!"hello".startsWith("world"), "startsWith no match")
+assert(!"hello".startsWith("hellox"), "startsWith too long")
+
+// ── String::endsWith ────────────────────────────────────────────────────
+assert("hello".endsWith("llo"), "endsWith match")
+assert("hello".endsWith("hello"), "endsWith full")
+assert("hello".endsWith(""), "endsWith empty")
+assert(!"hello".endsWith("world"), "endsWith no match")
+
+// ── String::trim ─────────────────────────────────────────────────────────
+assert("  hello  ".trim() == "hello", "trim both")
+assert("hello".trim() == "hello", "trim none")
+assert("   ".trim() == "", "trim all spaces")
+assert("".trim() == "", "trim empty")
+
+// ── String::trimStart ────────────────────────────────────────────────────
+assert("  hello".trimStart() == "hello", "trimStart")
+assert("hello  ".trimStart() == "hello  ", "trimStart no leading")
+assert("".trimStart() == "", "trimStart empty")
+
+// ── String::trimEnd ──────────────────────────────────────────────────────
+assert("hello  ".trimEnd() == "hello", "trimEnd")
+assert("  hello".trimEnd() == "  hello", "trimEnd no trailing")
+assert("".trimEnd() == "", "trimEnd empty")
+
+// ── String::toUpper / toLower ────────────────────────────────────────────
+assert("hello".toUpper() == "HELLO", "toUpper")
+assert("HELLO".toLower() == "hello", "toLower")
+assert("Hello World".toUpper() == "HELLO WORLD", "toUpper mixed")
+assert("Hello World".toLower() == "hello world", "toLower mixed")
+assert("".toUpper() == "", "toUpper empty")
+assert("".toLower() == "", "toLower empty")
+assert("123".toUpper() == "123", "toUpper digits unchanged")
+
+// ── String::replace ──────────────────────────────────────────────────────
+assert("hello world".replace("world", "nova") == "hello nova", "replace basic")
+assert("aaa".replace("a", "bb") == "bbbbbb", "replace all")
+assert("hello".replace("xyz", "abc") == "hello", "replace no match")
+assert("".replace("a", "b") == "", "replace in empty")
+
+// ── String::substring ────────────────────────────────────────────────────
+assert("hello world".substring(0, 5) == "hello", "substring start")
+assert("hello world".substring(6, 11) == "world", "substring end")
+assert("hello".substring(0, 0) == "", "substring zero len")
+assert("hello".substring(2, 4) == "ll", "substring middle")
+
+// ── String::indexOf ──────────────────────────────────────────────────────
+assert("hello world".indexOf("world") == 6, "indexOf found")
+assert("hello world".indexOf("hello") == 0, "indexOf start")
+assert("hello world".indexOf("xyz") == -1, "indexOf not found")
+assert("hello".indexOf("") == 0, "indexOf empty needle")
+
+// ── String::repeat ───────────────────────────────────────────────────────
+assert("ab".repeat(3) == "ababab", "repeat 3")
+assert("x".repeat(5) == "xxxxx", "repeat 5")
+assert("hi".repeat(0) == "", "repeat 0")
+assert("hi".repeat(1) == "hi", "repeat 1")
+
+// ── String::reverse ──────────────────────────────────────────────────────
+assert("hello".reverse() == "olleh", "reverse hello")
+assert("a".reverse() == "a", "reverse single")
+assert("".reverse() == "", "reverse empty")
+assert("ab".reverse() == "ba", "reverse two")
+assert("racecar".reverse() == "racecar", "reverse palindrome")
+
+// ── String::isEmpty ──────────────────────────────────────────────────────
+assert("".isEmpty(), "isEmpty true")
+assert(!"hello".isEmpty(), "isEmpty false")
+assert(!" ".isEmpty(), "isEmpty space not empty")
+
+// ── String::charAt ───────────────────────────────────────────────────────
+let ch0 = "hello".charAt(0)
+assert(ch0.isSome(), "charAt 0 isSome")
+assert(Option::unwrap(ch0) == 'h', "charAt 0 value")
+
+let ch4 = "hello".charAt(4)
+assert(ch4.isSome(), "charAt 4 isSome")
+assert(Option::unwrap(ch4) == 'o', "charAt 4 value")
+
+let ch_oob = "hello".charAt(10)
+assert(!ch_oob.isSome(), "charAt oob None")
+
+let ch_neg = "hello".charAt(-1)
+assert(!ch_neg.isSome(), "charAt neg None")
+
+// ── String::split ────────────────────────────────────────────────────────
+let parts = "a,b,c".split(",")
+assert(parts.len() == 3, "split comma len")
+assert(parts[0] == "a", "split[0]")
+assert(parts[1] == "b", "split[1]")
+assert(parts[2] == "c", "split[2]")
+
+let parts2 = "hello".split(",")
+assert(parts2.len() == 1, "split no match len")
+assert(parts2[0] == "hello", "split no match value")
+
+let parts3 = "a::b::c".split("::")
+assert(parts3.len() == 3, "split :: len")
+
+// ── String::chars ────────────────────────────────────────────────────────
+let chars = "abc".chars()
+assert(chars.len() == 3, "chars len")
+assert(chars[0] == 'a', "chars[0]")
+assert(chars[2] == 'c', "chars[2]")
+
+let empty_chars = "".chars()
+assert(empty_chars.len() == 0, "chars empty")
+
+// ── List::string (chars back to string) ──────────────────────────────────
+let clist = ['h', 'i']
+let back = clist.string()
+assert(back == "hi", "chars to string")
+
+// ── join (list join, not string join) ─────────────────────────────────────
+// join interleaves a delimiter element between list elements
+import super.std.list
+let joined = [1, 2, 3].join(0)
+assert(joined == [1, 0, 2, 0, 3], "join int list")
+
+let joined2 = [10].join(0)
+assert(joined2 == [10], "join single elem")
+
+let joined3 = [1, 2].join(99)
+assert(joined3 == [1, 99, 2], "join two elem")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 2: Char functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Char::isAlpha ────────────────────────────────────────────────────────
+assert(Char::isAlpha('a'), "isAlpha a")
+assert(Char::isAlpha('Z'), "isAlpha Z")
+assert(!Char::isAlpha('5'), "isAlpha 5 false")
+assert(!Char::isAlpha(' '), "isAlpha space false")
+assert(!Char::isAlpha('!'), "isAlpha ! false")
+
+// ── Char::isDigit ────────────────────────────────────────────────────────
+assert(Char::isDigit('0'), "isDigit 0")
+assert(Char::isDigit('9'), "isDigit 9")
+assert(!Char::isDigit('a'), "isDigit a false")
+assert(!Char::isDigit(' '), "isDigit space false")
+
+// ── Char::isWhitespace ──────────────────────────────────────────────────
+assert(Char::isWhitespace(' '), "isWhitespace space")
+assert(!Char::isWhitespace('a'), "isWhitespace a false")
+assert(!Char::isWhitespace('0'), "isWhitespace 0 false")
+
+// ── Char::isAlphanumeric ─────────────────────────────────────────────────
+assert(Char::isAlphanumeric('a'), "isAlphanumeric a")
+assert(Char::isAlphanumeric('0'), "isAlphanumeric 0")
+assert(!Char::isAlphanumeric('!'), "isAlphanumeric ! false")
+assert(!Char::isAlphanumeric(' '), "isAlphanumeric space false")
+
+// ── Char::toUpper / toLower ──────────────────────────────────────────────
+assert(Char::toUpper('a') == 'A', "char toUpper")
+assert(Char::toLower('A') == 'a', "char toLower")
+assert(Char::toUpper('Z') == 'Z', "char toUpper already upper")
+assert(Char::toLower('z') == 'z', "char toLower already lower")
+assert(Char::toUpper('5') == '5', "char toUpper digit unchanged")
+
+// ── Char::isUpper / isLower ──────────────────────────────────────────────
+assert(Char::isUpper('A'), "isUpper A")
+assert(!Char::isUpper('a'), "isUpper a false")
+assert(!Char::isUpper('5'), "isUpper 5 false")
+assert(Char::isLower('a'), "isLower a")
+assert(!Char::isLower('A'), "isLower A false")
+
+// ── chr (int to char) ────────────────────────────────────────────────────
+assert(chr(65) == 'A', "chr 65 = A")
+assert(chr(48) == '0', "chr 48 = 0")
+assert(chr(97) == 'a', "chr 97 = a")
+
+// ── Cast::charToInt ──────────────────────────────────────────────────────
+assert(Cast::charToInt('A') == 65, "charToInt A")
+assert(Cast::charToInt('0') == 48, "charToInt 0")
+assert(Cast::charToInt('a') == 97, "charToInt a")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 3: Float math functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Float::floor / ceil / round ──────────────────────────────────────────
+assert(Float::floor(3.7) == 3.0, "floor 3.7")
+assert(Float::floor(3.0) == 3.0, "floor 3.0")
+assert(Float::floor(-1.5) == -2.0, "floor -1.5")
+
+assert(Float::ceil(3.1) == 4.0, "ceil 3.1")
+assert(Float::ceil(3.0) == 3.0, "ceil 3.0")
+assert(Float::ceil(-1.5) == -1.0, "ceil -1.5")
+
+assert(Float::round(3.5) == 4.0, "round 3.5")
+assert(Float::round(3.4) == 3.0, "round 3.4")
+assert(Float::round(-2.5) == -3.0, "round -2.5 (rust rounds away from zero for .5 depending)")
+
+// ── Float::abs ───────────────────────────────────────────────────────────
+assert(Float::abs(5.0) == 5.0, "abs positive")
+assert(Float::abs(-5.0) == 5.0, "abs negative")
+assert(Float::abs(0.0) == 0.0, "abs zero")
+
+// ── Float::sqrt ──────────────────────────────────────────────────────────
+assert(Float::sqrt(4.0) == 2.0, "sqrt 4")
+assert(Float::sqrt(9.0) == 3.0, "sqrt 9")
+assert(Float::sqrt(0.0) == 0.0, "sqrt 0")
+assert(Float::sqrt(1.0) == 1.0, "sqrt 1")
+
+// ── Float::sin / cos / tan ───────────────────────────────────────────────
+let sin0 = Float::sin(0.0)
+assert(Float::abs(sin0) < 0.001, "sin 0 ~ 0")
+
+let cos0 = Float::cos(0.0)
+assert(Float::abs(cos0 - 1.0) < 0.001, "cos 0 ~ 1")
+
+let tan0 = Float::tan(0.0)
+assert(Float::abs(tan0) < 0.001, "tan 0 ~ 0")
+
+// ── Float::atan2 ─────────────────────────────────────────────────────────
+let at = Float::atan2(1.0, 1.0)
+let pi4 = Float::pi() / 4.0
+assert(Float::abs(at - pi4) < 0.001, "atan2(1,1) ~ pi/4")
+
+// ── Float::log / log10 ──────────────────────────────────────────────────
+let ln_e = Float::log(Float::e())
+assert(Float::abs(ln_e - 1.0) < 0.001, "log(e) ~ 1")
+
+let log10_100 = Float::log10(100.0)
+assert(Float::abs(log10_100 - 2.0) < 0.001, "log10(100) ~ 2")
+
+// ── Float::pow ───────────────────────────────────────────────────────────
+assert(Float::pow(2.0, 10.0) == 1024.0, "2^10")
+assert(Float::pow(3.0, 0.0) == 1.0, "3^0")
+assert(Float::pow(5.0, 1.0) == 5.0, "5^1")
+
+// ── Float::exp ───────────────────────────────────────────────────────────
+let exp0 = Float::exp(0.0)
+assert(Float::abs(exp0 - 1.0) < 0.001, "exp(0) ~ 1")
+
+let exp1 = Float::exp(1.0)
+assert(Float::abs(exp1 - Float::e()) < 0.001, "exp(1) ~ e")
+
+// ── Float::min / max / clamp ─────────────────────────────────────────────
+assert(Float::min(3.0, 5.0) == 3.0, "min 3,5")
+assert(Float::min(5.0, 3.0) == 3.0, "min 5,3")
+assert(Float::max(3.0, 5.0) == 5.0, "max 3,5")
+assert(Float::max(5.0, 3.0) == 5.0, "max 5,3")
+
+assert(Float::clamp(5.0, 0.0, 10.0) == 5.0, "clamp in range")
+assert(Float::clamp(-5.0, 0.0, 10.0) == 0.0, "clamp below")
+assert(Float::clamp(15.0, 0.0, 10.0) == 10.0, "clamp above")
+
+// ── Float::isNan / isInfinite ────────────────────────────────────────────
+assert(!Float::isNan(1.0), "isNan 1 false")
+assert(!Float::isInfinite(1.0), "isInfinite 1 false")
+
+// ── Float::pi / Float::e ────────────────────────────────────────────────
+let pi = Float::pi()
+assert(pi > 3.14, "pi > 3.14")
+assert(pi < 3.15, "pi < 3.15")
+
+let e = Float::e()
+assert(e > 2.71, "e > 2.71")
+assert(e < 2.72, "e < 2.72")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 4: List functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── List::len ────────────────────────────────────────────────────────────
+assert([]:Int.len() == 0, "len empty")
+assert([1].len() == 1, "len 1")
+assert([1, 2, 3, 4, 5].len() == 5, "len 5")
+
+// ── List::push ───────────────────────────────────────────────────────────
+let xs: [Int] = []:Int
+xs.push(1)
+xs.push(2)
+xs.push(3)
+assert(xs.len() == 3, "push 3 items")
+assert(xs[0] == 1, "push order [0]")
+assert(xs[2] == 3, "push order [2]")
+
+// ── List::pop ────────────────────────────────────────────────────────────
+let ys = [10, 20, 30]
+let popped = ys.pop()
+assert(popped.isSome(), "pop isSome")
+assert(Option::unwrap(popped) == 30, "pop value")
+assert(ys.len() == 2, "pop reduces len")
+
+let popped2 = ys.pop()
+assert(Option::unwrap(popped2) == 20, "pop second")
+
+let popped3 = ys.pop()
+assert(Option::unwrap(popped3) == 10, "pop third")
+
+let popped4 = ys.pop()
+assert(!popped4.isSome(), "pop empty None")
+
+// ── List::remove ─────────────────────────────────────────────────────────
+let zs = [1, 2, 3, 4, 5]
+zs.remove(2)
+assert(zs.len() == 4, "remove reduces len")
+assert(zs[2] == 4, "remove shifts elements")
+
+// ── List::insert ─────────────────────────────────────────────────────────
+let ins = [1, 3, 4]
+ins.insert(1, 2)
+assert(ins.len() == 4, "insert increases len")
+assert(ins[0] == 1, "insert [0] unchanged")
+assert(ins[1] == 2, "insert [1] new")
+assert(ins[2] == 3, "insert [2] shifted")
+
+// ── List::swap ───────────────────────────────────────────────────────────
+let sw = [10, 20, 30]
+sw.swap(0, 2)
+assert(sw[0] == 30, "swap [0]")
+assert(sw[2] == 10, "swap [2]")
+assert(sw[1] == 20, "swap [1] unchanged")
+
+// ── List::clear ──────────────────────────────────────────────────────────
+let cl = [1, 2, 3]
+cl.clear()
+assert(cl.len() == 0, "clear makes empty")
+
+// ── List::set ────────────────────────────────────────────────────────────
+let st = [1, 2, 3]
+st.set(1, 99)
+assert(st[1] == 99, "set changes value")
+assert(st[0] == 1, "set doesn't change others")
+assert(st[2] == 3, "set doesn't change others 2")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 5: Cast functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Cast::string ─────────────────────────────────────────────────────────
+assert(Cast::string(42) == "42", "Cast::string int")
+assert(Cast::string(true) == "true", "Cast::string bool true")
+assert(Cast::string(false) == "false", "Cast::string bool false")
+assert(Cast::string('a') == "a", "Cast::string char")
+
+// ── toString (alias) ─────────────────────────────────────────────────────
+assert(toString(42) == "42", "toString int")
+assert(toString(true) == "true", "toString bool")
+
+// ── Cast::int ────────────────────────────────────────────────────────────
+let ci1 = Cast::int("42")
+assert(ci1.isSome(), "Cast::int 42 isSome")
+assert(Option::unwrap(ci1) == 42, "Cast::int 42 value")
+
+let ci2 = Cast::int("-10")
+assert(ci2.isSome(), "Cast::int -10 isSome")
+assert(Option::unwrap(ci2) == -10, "Cast::int -10 value")
+
+let ci3 = Cast::int("not a number")
+assert(!ci3.isSome(), "Cast::int NaN None")
+
+let ci4 = Cast::int("")
+assert(!ci4.isSome(), "Cast::int empty None")
+
+// ── Cast::float ──────────────────────────────────────────────────────────
+let cf1 = Cast::float(42)
+assert(cf1.isSome(), "Cast::float 42 isSome")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 6: IO functions (non-interactive)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── writeFile / readFile / fileExists ────────────────────────────────────
+let test_path = "/tmp/nova_test_native_io.txt"
+assert(writeFile(test_path, "hello nova"), "writeFile")
+assert(fileExists(test_path), "fileExists true")
+assert(!fileExists("/tmp/nova_this_should_not_exist_12345.txt"), "fileExists false")
+
+let content = readFile(test_path)
+assert(content == "hello nova", "readFile matches")
+
+// ── appendFile ───────────────────────────────────────────────────────────
+assert(appendFile(test_path, " world"), "appendFile")
+let content2 = readFile(test_path)
+assert(content2 == "hello nova world", "appendFile appended")
+
+// ── writeFile overwrite ──────────────────────────────────────────────────
+assert(writeFile(test_path, "overwritten"), "writeFile overwrite")
+assert(readFile(test_path) == "overwritten", "readFile after overwrite")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 7: format function
+// ═══════════════════════════════════════════════════════════════════════════
+
+let formatted = format("Hello, {}! You are {} years old.", ["Alice", "30"])
+assert(formatted == "Hello, Alice! You are 30 years old.", "format basic")
+
+let formatted2 = format("{} + {} = {}", ["1", "2", "3"])
+assert(formatted2 == "1 + 2 = 3", "format math")
+
+let formatted3 = format("no placeholders", []:String)
+assert(formatted3 == "no placeholders", "format no placeholders")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 8: hash function
+// ═══════════════════════════════════════════════════════════════════════════
+
+let h1 = hash(42)
+let h2 = hash(42)
+assert(h1 == h2, "hash deterministic int")
+
+let h3 = hash("hello")
+let h4 = hash("hello")
+assert(h3 == h4, "hash deterministic string")
+
+// Different values should (almost certainly) produce different hashes
+let h5 = hash(1)
+let h6 = hash(2)
+assert(h5 != h6, "hash different ints differ")
+
+let h7 = hash("abc")
+let h8 = hash("def")
+assert(h7 != h8, "hash different strings differ")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 9: random functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── random (Int) ─────────────────────────────────────────────────────────
+let r1 = random(0, 10)
+assert(r1 >= 0, "random lower bound")
+assert(r1 <= 10, "random upper bound")
+
+// Call multiple times to check range
+for let i = 0; i < 20; i += 1 {
+    let rv = random(5, 15)
+    assert(rv >= 5, "random range lower")
+    assert(rv <= 15, "random range upper")
+}
+
+// ── randomFloat ──────────────────────────────────────────────────────────
+let rf = randomFloat(0.0, 1.0)
+assert(rf >= 0.0, "randomFloat lower")
+assert(rf <= 1.0, "randomFloat upper")
+
+// ── randomBool ───────────────────────────────────────────────────────────
+// Just call it, shouldn't crash
+let rb = randomBool()
+assert(rb == true || rb == false, "randomBool is bool")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 10: time functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+let t1 = now()
+assert(t1 > 0, "now > 0")
+
+let t2 = nowSec()
+assert(t2 > 0.0, "nowSec > 0")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 11: Regex functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Regex::matches (pattern, text) ───────────────────────────────────────
+assert(Regex::matches("[a-z]+[0-9]+", "hello123"), "regex matches")
+assert(!Regex::matches("^[0-9]+$", "hello"), "regex no match")
+assert(Regex::matches("^[0-9]+$", "42"), "regex digits match")
+
+// ── Regex::captures (pattern, text) ──────────────────────────────────────
+let caps = Regex::captures("([a-z]+) ([a-z]+) ([0-9]+)", "hello world 42")
+assert(caps.len() > 0, "regex captures has results")
+
+// ── Regex::first (pattern, text) ─────────────────────────────────────────
+let first = Regex::first("[0-9]+", "abc 123 def")
+assert(first.isSome(), "regex first isSome")
+
+let no_first = Regex::first("[0-9]+", "abc def")
+assert(!no_first.isSome(), "regex first no match None")
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 12: Chaining string operations
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Chain multiple string operations
+let result = "  Hello, World!  ".trim().toLower().replace("world", "nova")
+assert(result == "hello, nova!", "chained string ops")
+
+let result2 = "abc".toUpper().reverse()
+assert(result2 == "CBA", "chained toUpper reverse")
+
+let result3 = "1,2,3,4,5".split(",")
+assert(result3.len() == 5, "split then len")
+
+let result4 = "hello".chars()
+assert(result4.len() == 5, "chars len")
+assert(result4[0] == 'h', "chars[0]")
+
+println("PASS: test_native_functions_exhaustive")

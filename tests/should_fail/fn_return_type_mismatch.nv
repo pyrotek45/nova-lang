@@ -1,0 +1,7 @@
+module main
+
+// SHOULD FAIL: return type mismatch
+fn getNumber() -> Int {
+    return "hello"
+}
+getNumber()

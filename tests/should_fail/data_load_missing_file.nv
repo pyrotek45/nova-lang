@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: load from a file that doesn't exist
+let x = Data::load@[Int]("this_file_does_not_exist_at_all.json")

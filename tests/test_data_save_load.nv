@@ -1,0 +1,246 @@
+module test_data_save_load
+
+// ═══════════════════════════════════════════════════════════════════
+// Data::save / Data::load / Data::toJson / Data::fromJson  tests
+// ═══════════════════════════════════════════════════════════════════
+
+let base = "/tmp/nova_test_data_"
+
+// ── Int ──────────────────────────────────────────────────────────
+let p = base + "int.json"
+assert(Data::save(p, 42), "save int")
+let loaded_int = Data::load(p) @[T:Int]
+assert(loaded_int.isSome(), "load int isSome")
+assert(Option::unwrap(loaded_int) == 42, "load int value")
+
+// ── Negative Int ─────────────────────────────────────────────────
+let p2 = base + "neg_int.json"
+assert(Data::save(p2, -99), "save neg int")
+let loaded_neg = Data::load(p2) @[T:Int]
+assert(Option::unwrap(loaded_neg) == -99, "load neg int")
+
+// ── Float ────────────────────────────────────────────────────────
+let pf = base + "float.json"
+assert(Data::save(pf, 3.14), "save float")
+let loaded_float = Data::load(pf) @[T:Float]
+assert(loaded_float.isSome(), "load float isSome")
+let fval = Option::unwrap(loaded_float)
+assert(fval > 3.13, "load float > 3.13")
+assert(fval < 3.15, "load float < 3.15")
+
+// ── Bool ─────────────────────────────────────────────────────────
+let pb = base + "bool.json"
+assert(Data::save(pb, true), "save bool true")
+let loaded_bool = Data::load(pb) @[T:Bool]
+assert(Option::unwrap(loaded_bool) == true, "load bool true")
+
+assert(Data::save(base + "bool_f.json", false), "save bool false")
+let loaded_bf = Data::load(base + "bool_f.json") @[T:Bool]
+assert(Option::unwrap(loaded_bf) == false, "load bool false")
+
+// ── Char ─────────────────────────────────────────────────────────
+let pc = base + "char.json"
+assert(Data::save(pc, 'Z'), "save char")
+let loaded_char = Data::load(pc) @[T:Char]
+assert(Option::unwrap(loaded_char) == 'Z', "load char")
+
+// ── String ───────────────────────────────────────────────────────
+let ps = base + "string.json"
+assert(Data::save(ps, "hello nova"), "save string")
+let loaded_str = Data::load(ps) @[T:String]
+assert(Option::unwrap(loaded_str) == "hello nova", "load string")
+
+// ── Empty String ─────────────────────────────────────────────────
+let pes = base + "empty_str.json"
+assert(Data::save(pes, ""), "save empty string")
+let loaded_es = Data::load(pes) @[T:String]
+assert(Option::unwrap(loaded_es) == "", "load empty string")
+
+// ── List of Ints ─────────────────────────────────────────────────
+let pl = base + "list_int.json"
+let nums = [1, 2, 3, 4, 5]
+assert(Data::save(pl, nums), "save list int")
+let loaded_list = Data::load(pl) @[T:[Int]]
+assert(loaded_list.isSome(), "load list isSome")
+let lv = Option::unwrap(loaded_list)
+assert(lv.len() == 5, "load list len")
+assert(lv[0] == 1, "load list[0]")
+assert(lv[4] == 5, "load list[4]")
+
+// ── Empty List ───────────────────────────────────────────────────
+let pel = base + "empty_list.json"
+assert(Data::save(pel, []:Int), "save empty list")
+let loaded_el = Data::load(pel) @[T:[Int]]
+assert(Option::unwrap(loaded_el).len() == 0, "load empty list")
+
+// ── List of Strings ──────────────────────────────────────────────
+let pls = base + "list_str.json"
+assert(Data::save(pls, ["alpha", "beta", "gamma"]), "save list str")
+let loaded_ls = Data::load(pls) @[T:[String]]
+let lsv = Option::unwrap(loaded_ls)
+assert(lsv.len() == 3, "load list str len")
+assert(lsv[1] == "beta", "load list str[1]")
+
+// ── Tuple ────────────────────────────────────────────────────────
+let pt = base + "tuple.json"
+let tup = (10, "ten", true)
+assert(Data::save(pt, tup), "save tuple")
+let loaded_tup = Data::load(pt) @[T:(Int, String, Bool)]
+assert(loaded_tup.isSome(), "load tuple isSome")
+let tv = Option::unwrap(loaded_tup)
+assert(tv[0] == 10, "load tuple[0]")
+assert(tv[1] == "ten", "load tuple[1]")
+assert(tv[2] == true, "load tuple[2]")
+
+// ── Struct (simple) ──────────────────────────────────────────────
+struct Point {
+    x: Int,
+    y: Int
+}
+
+let pp = base + "point.json"
+let pt1 = Point { x: 10, y: 20 }
+assert(Data::save(pp, pt1), "save struct")
+let loaded_pt = Data::load(pp) @[T:Point]
+assert(loaded_pt.isSome(), "load struct isSome")
+let ptv = Option::unwrap(loaded_pt)
+assert(ptv.x == 10, "load struct.x")
+assert(ptv.y == 20, "load struct.y")
+
+// ── Struct (with String fields) ──────────────────────────────────
+struct Player {
+    name: String,
+    hp: Int,
+    alive: Bool
+}
+
+let ppl = base + "player.json"
+let player = Player { name: "Nova", hp: 100, alive: true }
+assert(Data::save(ppl, player), "save player struct")
+let loaded_player = Data::load(ppl) @[T:Player]
+let plv = Option::unwrap(loaded_player)
+assert(plv.name == "Nova", "load player.name")
+assert(plv.hp == 100, "load player.hp")
+assert(plv.alive == true, "load player.alive")
+
+// ── Nested Struct ────────────────────────────────────────────────
+struct Rect {
+    origin: Point,
+    size: Point
+}
+
+let pr = base + "rect.json"
+let rect = Rect {
+    origin: Point { x: 0, y: 0 },
+    size: Point { x: 100, y: 50 }
+}
+assert(Data::save(pr, rect), "save nested struct")
+let loaded_rect = Data::load(pr) @[T:Rect]
+let rv = Option::unwrap(loaded_rect)
+assert(rv.origin.x == 0, "load nested.origin.x")
+assert(rv.size.x == 100, "load nested.size.x")
+assert(rv.size.y == 50, "load nested.size.y")
+
+// ── Enum ─────────────────────────────────────────────────────────
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+let pe = base + "enum.json"
+assert(Data::save(pe, Color::Green()), "save enum")
+let loaded_enum = Data::load(pe) @[T:Color]
+assert(loaded_enum.isSome(), "load enum isSome")
+
+// ── Enum with data ───────────────────────────────────────────────
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float)
+}
+
+let pes2 = base + "enum_data.json"
+assert(Data::save(pes2, Shape::Rectangle((10.0, 20.0))), "save enum with data")
+let loaded_shape = Data::load(pes2) @[T:Shape]
+assert(loaded_shape.isSome(), "load enum with data isSome")
+
+// ── List of Structs ──────────────────────────────────────────────
+let plst = base + "list_structs.json"
+let points = [
+    Point { x: 1, y: 2 },
+    Point { x: 3, y: 4 },
+    Point { x: 5, y: 6 }
+]
+assert(Data::save(plst, points), "save list of structs")
+let loaded_pts = Data::load(plst) @[T:[Point]]
+let pts = Option::unwrap(loaded_pts)
+assert(pts.len() == 3, "load list of structs len")
+assert(pts[0].x == 1, "load list structs[0].x")
+assert(pts[2].y == 6, "load list structs[2].y")
+
+// ── None value ───────────────────────────────────────────────────
+let pn = base + "none.json"
+let nope: Option(Int) = None(Int)
+assert(Data::save(pn, nope), "save None")
+
+// ── Load nonexistent file → None ─────────────────────────────────
+let loaded_missing = Data::load("/tmp/nova_this_file_does_not_exist.json") @[T:Int]
+assert(!loaded_missing.isSome(), "load missing file returns None")
+
+// ── Load corrupted JSON → None ───────────────────────────────────
+let pbad = base + "bad.json"
+writeFile(pbad, "this is not json {{{")
+let loaded_bad = Data::load(pbad) @[T:Int]
+assert(!loaded_bad.isSome(), "load bad json returns None")
+
+// ── Data::toJson / Data::fromJson ────────────────────────────────
+let json_str = Data::toJson(42)
+assert(json_str.len() > 0, "toJson produces non-empty string")
+
+let from_int = Data::fromJson(json_str) @[T:Int]
+assert(from_int.isSome(), "fromJson int isSome")
+assert(Option::unwrap(from_int) == 42, "fromJson int value")
+
+// toJson + fromJson roundtrip with string
+let str_json = Data::toJson("round trip")
+let from_str = Data::fromJson(str_json) @[T:String]
+assert(Option::unwrap(from_str) == "round trip", "fromJson string roundtrip")
+
+// toJson + fromJson roundtrip with struct
+let player_json = Data::toJson(Player { name: "Test", hp: 50, alive: false })
+let from_player = Data::fromJson(player_json) @[T:Player]
+let fp = Option::unwrap(from_player)
+assert(fp.name == "Test", "fromJson player.name")
+assert(fp.hp == 50, "fromJson player.hp")
+assert(fp.alive == false, "fromJson player.alive")
+
+// fromJson with bad input → None
+let from_bad = Data::fromJson("not valid json") @[T:Int]
+assert(!from_bad.isSome(), "fromJson bad input returns None")
+
+// ── Overwrite existing file ──────────────────────────────────────
+let pow = base + "overwrite.json"
+assert(Data::save(pow, 1), "save overwrite first")
+assert(Data::save(pow, 2), "save overwrite second")
+let loaded_ow = Data::load(pow) @[T:Int]
+assert(Option::unwrap(loaded_ow) == 2, "overwrite loads latest value")
+
+// ── List of Bools ────────────────────────────────────────────────
+let plb = base + "list_bool.json"
+assert(Data::save(plb, [true, false, true]), "save list bool")
+let loaded_lb = Data::load(plb) @[T:[Bool]]
+let lbv = Option::unwrap(loaded_lb)
+assert(lbv.len() == 3, "load list bool len")
+assert(lbv[0] == true, "load list bool[0]")
+assert(lbv[1] == false, "load list bool[1]")
+
+// ── Nested List ──────────────────────────────────────────────────
+let pnl = base + "nested_list.json"
+assert(Data::save(pnl, [[1, 2], [3, 4], [5, 6]]), "save nested list")
+let loaded_nl = Data::load(pnl) @[T:[[Int]]]
+let nlv = Option::unwrap(loaded_nl)
+assert(nlv.len() == 3, "load nested list len")
+assert(nlv[0][0] == 1, "load nested list[0][0]")
+assert(nlv[1][1] == 4, "load nested list[1][1]")
+
+println("PASS: test_data_save_load")

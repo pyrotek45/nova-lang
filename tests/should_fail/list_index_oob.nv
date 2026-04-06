@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: index out of bounds on a list
+let xs = [1, 2, 3]
+println(xs[10])

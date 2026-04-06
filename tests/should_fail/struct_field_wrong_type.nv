@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: assigning wrong type to a struct field
+struct Config { count: Int }
+let c = Config { count: "not an int" }

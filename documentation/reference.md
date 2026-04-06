@@ -9,7 +9,7 @@ and raylib bindings.
 
 1. [Built-in Types](#1-built-in-types)
 2. [Built-in Functions](#2-built-in-functions)
-   — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program)
+   — [Output](#output) · [Type Inspection](#type-inspection) · [Option Handling](#option-handling) · [Type Conversion](#type-conversion) · [Hashing](#hashing) · [String Functions](#string-functions-string) · [Char Functions](#char-functions-char) · [Float Functions](#float-functions-float) · [List Functions](#list-functions) · [I/O](#io) · [Random](#random) · [Time](#time) · [Terminal](#terminal) · [Regex](#regex) · [Program](#program) · [Data Serialization](#data-serialization)
 3. [Language Syntax Notes](#3-language-syntax-notes)
    — [Semicolons](#semicolons) · [Pipe Operator](#pipe-operator-) · [Closures](#closure-syntax) · [Logical Operators](#logical-operators--and-) · [Literal Formats](#literal-formats) · [Comments](#comments) · [Conventions](#conventions)
 4. [Standard Library](#4-standard-library)
@@ -69,12 +69,22 @@ and raylib bindings.
 
 ### Composite Types
 
-| Type | Syntax | Description |
-|---|---|---|
-| `Option(T)` | `Some(value)` / `None(T)` | An optional value — either present or absent. |
-| `List` | `[T]` | A dynamically-sized sequence of elements of a single type. |
-| `Tuple` | `(A, B, ...)` | A fixed-size, heterogeneous collection. |
-| `Function` | `fn(A, B) -> R` | A callable value with typed parameters and a return type. |
+| Type | Shorthand | Word Form | Description |
+|---|---|---|---|
+| `Option(T)` | — | `Option(T)` | An optional value — either present or absent. |
+| `List` | `[T]` | `List(T)` | A dynamically-sized sequence of elements of a single type. |
+| `Tuple` | `(A, B, ...)` | `Tuple(A, B, ...)` | A fixed-size, heterogeneous collection. |
+| `Function` | — | `fn(A, B) -> R` | A callable value with typed parameters and a return type. |
+
+Both forms are interchangeable everywhere a type is expected (annotations, generics, `@[T: ...]`):
+
+```rust
+let xs: [Int] = [1, 2, 3]           // shorthand
+let ys: List(Int) = [4, 5, 6]       // word form — identical
+
+let pair: (Int, String) = (1, "a")  // shorthand
+let p2: Tuple(Int, String) = (2, "b") // word form — identical
+```
 
 ### User-defined Types
 
@@ -295,15 +305,61 @@ if args.isSome() {
 }
 ```
 
-### Generic Annotation
+### Generic Annotation `@[T: Type]`
 
-When calling `todo()`, `unreachable()`, or other generic functions where the return
-type cannot be inferred, use `@[T: Type]`:
+When calling a generic function where a type parameter cannot be inferred from
+the arguments (e.g. it only appears in the return type), use `@[T: Type]`
+**after** the call to tell the typechecker what the generic resolves to:
 
 ```rust
 return todo() @[T: String]
 return unreachable() @[T: Int]
 let map = HashMap::new() @[K: String, V: Int]
+let loaded = Data::load("save.json") @[T: Int]
+```
+
+Multiple generic parameters are comma-separated: `@[K: String, V: Int]`.
+
+### Overload Selection `@(Type)`
+
+When a function name has multiple overloaded signatures and you need a
+reference to a *specific* overload (e.g. to pass it as a value), use
+`@(Type)` **after** the function name, **before** the call parentheses.
+This selects the overload whose parameter types match:
+
+```rust
+let f = someFunc@(Int)    // selects the Int overload of someFunc
+```
+
+### Data Serialization
+
+Save and load any Nova value as JSON.  The JSON embeds `_type` tags so values
+round-trip with full type fidelity.  Closures and functions cannot be serialized.
+
+| Signature | Description |
+|---|---|
+| `Data::save(path: String, value: T) -> Bool` | Serialize `value` to a JSON file. Returns `true` on success. |
+| `Data::load(path: String) -> Option(T)` | Deserialize a value from a JSON file. Returns `None` on failure. Needs `@[T: Type]`. |
+| `Data::toJson(value: T) -> String` | Serialize `value` to a JSON string. |
+| `Data::fromJson(json: String) -> Option(T)` | Deserialize a value from a JSON string. Returns `None` on failure. Needs `@[T: Type]`. |
+
+Because `Data::load` and `Data::fromJson` have a generic return type,
+you must annotate the expected type with `@[T: Type]`:
+
+```rust
+// Save
+Data::save("player.json", Player { name: "Nova", hp: 100 })
+
+// Load — specify the expected type
+let p = Data::load("player.json") @[T: Player]
+if p.isSome() {
+    let player = p.unwrap()
+    println(player.name)
+}
+
+// In-memory JSON round-trip
+let json = Data::toJson([1, 2, 3])
+let list = Data::fromJson(json) @[T: [Int]]     // or @[T: List(Int)]
 ```
 
 ---

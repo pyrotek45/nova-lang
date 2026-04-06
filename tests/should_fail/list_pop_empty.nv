@@ -1,0 +1,5 @@
+module main
+
+// SHOULD FAIL: pop from empty list
+let xs: [Int] = []
+xs.pop()

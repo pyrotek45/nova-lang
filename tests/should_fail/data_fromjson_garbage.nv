@@ -1,0 +1,4 @@
+module main
+
+// SHOULD FAIL: fromJson with garbage / non-JSON string
+let x = Data::fromJson@[Int]("this is not json at all {{{")

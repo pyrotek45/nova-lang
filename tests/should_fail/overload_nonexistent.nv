@@ -1,0 +1,8 @@
+module main
+
+// SHOULD FAIL: using overload syntax with a type that has no overload
+fn greet(name: String) -> String {
+    return "Hello, " + name
+}
+
+greet@(Int)("Alice")
