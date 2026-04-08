@@ -1889,8 +1889,13 @@ All imports flatten into the caller's scope — call by name, not with a prefix.
 
 ### Adding Functions to a Module (`fn mod`)
 
-After importing a module you can inject new functions into its namespace
-with `fn mod(ModuleName)`:
+`fn mod(ModuleName)` adds a function to a module's namespace. Call it
+with `ModuleName::funcName(...)`. The module must already exist — either
+declared in the current file (`module mymod`) or imported.
+
+#### Extending an imported module
+
+After importing a module you can inject new functions into its namespace:
 
 ```rust
 import super.std.math
@@ -1901,11 +1906,83 @@ fn mod(math) clamp(x: Int, lo: Int, hi: Int) -> Int {
     return x
 }
 
-math::clamp(15, 0, 10)   // 10
+fn mod(math) isInRange(x: Int, lo: Int, hi: Int) -> Bool {
+    if x < lo { return false }
+    if x > hi { return false }
+    return true
+}
+
+math::clamp(15, 0, 10)        // 10
+math::isInRange(5, 0, 10)     // true
 ```
 
-The module must already exist (imported or declared) before you can add
-functions to it.
+You can add as many `fn mod` functions to the same module as you like.
+
+#### Using your own module as a namespace
+
+Every file has a `module` declaration. You can use `fn mod` on your own
+module to group related functions under a `::` namespace — no struct
+required:
+
+```rust
+module myapp
+
+fn mod(myapp) version() -> String { return "1.0.0" }
+fn mod(myapp) maxHP() -> Int { return 100 }
+
+fn mod(myapp) safeDivide(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+
+println(myapp::version())           // "1.0.0"
+println(myapp::maxHP())             // 100
+println(myapp::safeDivide(10, 3)?)  // 3
+```
+
+This is how `std/color.nv` works — every colour function is
+`fn mod(color) red() -> (Int, Int, Int)`, called as `color::red()`.
+
+#### `fn mod` functions can return closures
+
+```rust
+module myapp
+
+fn mod(myapp) multiplier(n: Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int { return x * n }
+}
+
+let times5 = myapp::multiplier(5)
+times5(3)   // 15
+```
+
+#### `fn mod` works with generics
+
+```rust
+module myapp
+
+fn mod(myapp) wrap(val: $T) -> [$T] {
+    let result = [val]
+    return result
+}
+
+myapp::wrap(42)       // [42]
+myapp::wrap("hello")  // ["hello"]
+```
+
+#### `fn mod` vs `fn extends` — when to use which
+
+| Feature | `fn mod(M)` | `fn extends(T)` |
+|---|---|---|
+| Called as | `M::funcName(args)` | `value.methodName(args)` |
+| First param is receiver? | No | Yes (`self`) |
+| Needs a struct? | No — works on any module | Yes (or built-in type) |
+| Best for | Constants, constructors, utilities | Methods on values |
+
+**Use `fn mod`** when you want static namespace functions (like
+`color::red()` or `math::clamp()`).
+**Use `fn extends`** when you want dot-callable methods on values
+(like `5.double()` or `myPoint.translate(1, 2)`).
 
 ### Importing from GitHub
 
