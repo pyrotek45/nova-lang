@@ -450,6 +450,16 @@ x *= 2   // x is now 24
 x /= 4   // x is now 6
 ```
 
+`+=` also works for **String** concatenation and **List** concatenation:
+
+```nova
+let s = "hello"
+s += " world"    // s is now "hello world"
+
+let xs = [1, 2, 3]
+xs += [4, 5]     // xs is now [1, 2, 3, 4, 5]
+```
+
 These also work on struct fields and list elements:
 
 ```nova
@@ -1271,6 +1281,8 @@ let abs = |x: Int| if x >= 0 { x } else { 0 - x }
 Bar closures are ideal as inline arguments to higher-order functions:
 
 ```rust
+import super.std.list   // .map(), .filter(), .reduce() live here
+
 let doubled = [1, 2, 3].map(|x: Int| x * 2)        // [2, 4, 6]
 let evens = [1, 2, 3, 4].filter(|x: Int| x % 2 == 0)  // [2, 4]
 let sum = [1, 2, 3].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)  // 6
@@ -1500,13 +1512,27 @@ xs[-1] = 99   // write to last element (xs is now [10, 20, 30, 40, 99])
 ```
 
 This works for lists, strings, and tuples. Negative indices also work
-in assignment position (lists only).
+in assignment position for lists and strings.
 
 ```rust
 let s = "hello"
 s[-1]     // 'o'
 s[-5]     // 'h'
 ```
+
+### String Index Assignment
+
+Strings support index-write — you can replace individual characters:
+
+```rust
+let s = "hello"
+s[0] = 'H'     // s is now "Hello"
+s[-1] = '!'    // s is now "Hell!"
+```
+
+> **Note:** Strings are reference types. If `let s2 = s`, then writing
+> to `s2[0]` also changes `s` (they alias the same object).
+> Use `clone(s)` if you need an independent copy.
 
 ### Safe Indexing
 
@@ -1562,7 +1588,7 @@ import super.std.list
 [1,2,3].foreach(|x: Int| { println(x) })
 [[1,2],[3,4]].flatten()                                     // [1, 2, 3, 4]
 [3,1,2].bubblesort()                                        // [1, 2, 3]
-[0]: Int.fill(0, 5)                                         // [0, 0, 0, 0, 0]
+[]: Int.fill(0, 5)                                          // [0, 0, 0, 0, 0]
 ```
 
 ---
@@ -1853,8 +1879,8 @@ import super.std.color      // named RGB color tuples
 import super.std.tui        // terminal UI helpers
 import super.std.widget     // raylib GUI widgets
 import super.std.option     // Option extensions
-import super.std.maybe      // Maybe(T) enum
-import super.std.result     // Result(A,B) enum
+import super.std.maybe      // Maybe(T) enum  (already in core — use standalone only if you don't import core)
+import super.std.result     // Result(A,B) enum (already in core — use standalone only if you don't import core)
 import super.std.grid       // Grid(T) — generic 2D grid
 import super.std.plot       // PlotArea — charts & graphs (raylib)
 ```
@@ -1963,26 +1989,24 @@ directly (e.g. for networking or logging):
 
 ```rust
 let nums = [1, 2, 3]
-let json = Data::toJson(nums)       // "[1,2,3]"
+let json = Data::toJson(nums)       // typed JSON string
 
 let back = Data::fromJson(json)@[T:[Int]]
 // back == Some([1, 2, 3])
 ```
 
+> **Note:** Nova's JSON format uses a typed envelope (e.g. `{"_type": "Int", "value": 42}`)
+> rather than plain JSON. This preserves type information for reliable round-tripping.
+> You don't need to understand the format — just use `toJson`/`fromJson` as a pair.
+
 ### Supported Types
 
-| Type | JSON representation |
-|------|---------------------|
-| `Int` | number |
-| `Float` | number |
-| `Bool` | `true` / `false` |
-| `Char` | single-character string |
-| `String` | string |
-| `List(T)` | array |
-| `Tuple(A, B, …)` | array |
-| `Struct` | object (field names → values) |
-| `Enum` | `{"variant": "Name", "data": …}` |
-| `Option(T)` | value or `null` |
+All core types are supported. Each value is wrapped in a typed envelope
+so that `fromJson` can reconstruct the exact type. You don't need to
+understand the internal format — just use `toJson`/`fromJson` as a pair.
+
+Supported: `Int`, `Float`, `Bool`, `Char`, `String`, `List`, `Tuple`,
+`Struct`, `Enum`, `Option`.  Closures and functions cannot be serialized.
 
 ---
 
@@ -2241,8 +2265,9 @@ Dyn types, and extends + UFCS.
 | `::` (no self) | `s::fn_field()` | Call stored fn without self |
 | `->` (with self) | `s->fn_field()` | Call stored fn with s as arg |
 | List concat | `[1,2] + [3,4]` | Produces `[1,2,3,4]` |
+| Compound assign | `x += 1`, `x *= 2` | `+=`, `-=`, `*=`, `/=` (also `+=` for String/List) |
 | Block expression | `let x = { ...; expr }` | Last expression is the value |
-| `pass` body | `fn f(x: Int) -> Int { pass }` | Placeholder (returns default) |
+| `pass` body | `fn todo(x: Int) { pass }` | Placeholder for Void functions (compile-time stub) |
 | `fn extends` infer | `fn extends m(s: T, ...)` | Infers extends type from first param |
 | `fn mod` | `fn mod(M) f(x: Int) -> Int { }` | Add function to module M |
 | Match commas | `A() => { ... }, B() => ...` | Optional commas between arms |
@@ -2265,7 +2290,7 @@ Dyn types, and extends + UFCS.
 - Closures with control flow need full `fn` syntax (not short lambda)
 - Bar closures (`||`) cannot have `-> Type` annotations — use `fn()` instead
 - Every function returning a value needs explicit `return`
-- Compound assignment: `+=`, `-=`, `*=`, `/=` work on `Int` and `Float` (also on struct fields and list elements)
+- Compound assignment: `+=`, `-=`, `*=`, `/=` work on `Int` and `Float`; `+=` also works for `String` and `List` concatenation (also on struct fields and list elements)
 - Empty lists need type annotation: `let xs = []: Int`
 - No-data enum variants need `()`: `Color::Red()`
 - String concatenation: only `String + String`; use `Cast::string` to convert
@@ -2306,7 +2331,7 @@ Dyn types, and extends + UFCS.
 | Mistake | Fix |
 |---|---|
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
-| `x *= 2` | Works! `*=` and `/=` are supported for `Int` and `Float` |
+| `x *= 2` | Works! `*=` and `/=` are supported for `Int` and `Float`; `+=` also works for `String` and `List` concat |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
 | `5 \|> println` | Pipe needs `()` — write `5 \|> println()` |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends |
@@ -3053,37 +3078,24 @@ module core
 
 // A generic Stack built on lists
 struct Stack(T) {
-    items: [T]
+    items: [$T],
 }
 
-fn Stack::new() -> Stack(T) {
-    Stack([])
+fn extends push(s: Stack($T), val: $T) {
+    s.items.push(val)
 }
 
-extends Stack(T) {
-    fn push(self: Stack(T), item: T) -> Stack(T) {
-        self.items.append(item)
-        self
-    }
+fn extends pop(s: Stack($T)) -> Option($T) {
+    return s.items.pop()
+}
 
-    fn pop(self: Stack(T)) -> (Stack(T), Option(T)) {
-        if self.items.length() == 0 {
-            return (self, None)
-        }
-        let last = self.items[self.items.length() - 1]
-        (Stack(self.items.slice(0, self.items.length() - 1)), Some(last))
-    }
+fn extends peek(s: Stack($T)) -> Option($T) {
+    if s.items.len() == 0 { return None($T) }
+    return Some(s.items[s.items.len() - 1])
+}
 
-    fn peek(self: Stack(T)) -> Option(T) {
-        if self.items.length() == 0 {
-            return None
-        }
-        Some(self.items[self.items.length() - 1])
-    }
-
-    fn size(self: Stack(T)) -> Int {
-        self.items.length()
-    }
+fn extends size(s: Stack($T)) -> Int {
+    return s.items.len()
 }
 ```
 
@@ -3091,26 +3103,24 @@ extends Stack(T) {
 // helpers.nv
 module helpers
 
-fn repeat_string(s: String, n: Int) -> String {
+fn repeatString(s: String, n: Int) -> String {
     let result = ""
-    let i = 0
-    while i < n {
+    for let i = 0; i < n; i += 1 {
         result = result + s
-        i = i + 1
     }
-    result
+    return result
 }
 
-fn pad_left(s: String, width: Int, fill: String) -> String {
-    let padding = width - s.length()
+fn padLeft(s: String, width: Int, fill: String) -> String {
+    let padding = width - s.len()
     if padding <= 0 { return s }
-    repeat_string(fill, padding) + s
+    return repeatString(fill, padding) + s
 }
 
-fn pad_right(s: String, width: Int, fill: String) -> String {
-    let padding = width - s.length()
+fn padRight(s: String, width: Int, fill: String) -> String {
+    let padding = width - s.len()
     if padding <= 0 { return s }
-    s + repeat_string(fill, padding)
+    return s + repeatString(fill, padding)
 }
 ```
 
@@ -3154,7 +3164,7 @@ A collection of useful data structures and helpers for Nova.
 | Module | Description |
 |---|---|
 | `core` | Stack(T) data structure |
-| `helpers` | String utilities: repeat, pad_left, pad_right |
+| `helpers` | String utilities: repeatString, padLeft, padRight |
 | `types` | Common type aliases and constructors |
 ```
 
@@ -3179,12 +3189,14 @@ module test_core
 
 import super.core
 
-let s = Stack::new()
-let s = s.push(1).push(2).push(3)
+let s = Stack { items: []: Int }
+s.push(1)
+s.push(2)
+s.push(3)
 assert(s.size() == 3, "stack has 3 items")
 assert(s.peek() == Some(3), "peek returns top")
 
-let (s, top) = s.pop()
+let top = s.pop()
 assert(top == Some(3), "pop returns 3")
 assert(s.size() == 2, "stack has 2 after pop")
 
@@ -3228,11 +3240,15 @@ with shared type definitions is better than one giant `everything.nv`.
 extend your types so users get a fluent interface:
 
 ```rust
-// Prefer this:
-let s = Stack::new().push(1).push(2)
+// Prefer this (method-style):
+let s = Stack { items: []: Int }
+s.push(1)
+s.push(2)
 
-// Over this:
-let s = push(push(Stack::new(), 1), 2)
+// Over this (free-function style):
+let s = Stack { items: []: Int }
+push(s, 1)
+push(s, 2)
 ```
 
 **Document with comments.** Nova doesn't have a doc generator yet, but clear
@@ -3349,11 +3365,10 @@ fn extends area(s: Shape) -> Float {
 }
 
 // Approach 2: Dyn-based dispatch (structural)
-struct Drawable { draw: fn(Int, Int) -> Void }
-
-fn renderAll(items: [Dyn(Drawable)], x: Int, y: Int) {
+// Any struct with a `draw` field of type fn(Int, Int) qualifies
+fn renderAll(items: [Dyn(T = draw: fn($T, Int, Int))], x: Int, y: Int) {
     for item in items {
-        item.draw(x, y)
+        item->draw(x, y)       // -> calls a function stored in a field
     }
 }
 ```
@@ -3412,6 +3427,8 @@ fn extends color(p: Priority) -> String {
 Create specialized functions from general ones:
 
 ```rust
+import super.std.list   // .map() lives here
+
 fn adder(n: Int) -> fn(Int) -> Int {
     return fn(x: Int) -> Int { return x + n }
 }
@@ -3426,12 +3443,14 @@ let nums = [1, 2, 3, 4, 5]
 let incremented = nums.map(adder(1))  // [2, 3, 4, 5, 6]
 ```
 
-### Module Namespaces + Extends for Library Design
+### Struct Namespaces + Extends for Library Design
 
-Use `fn mod(Module)` to organize library functions alongside extends:
+Use `fn extends(Struct)` to create a namespace alongside method-style extends:
 
 ```rust
-fn mod(MathUtils) clamp(val: Int, lo: Int, hi: Int) -> Int {
+struct MathUtils {}
+
+fn extends(MathUtils) clamp(val: Int, lo: Int, hi: Int) -> Int {
     if val < lo { return lo }
     if val > hi { return hi }
     return val
@@ -3446,6 +3465,11 @@ MathUtils::clamp(150, 0, 100)  // 100
 150.clampTo(0, 100)             // 100
 ```
 
+> **Note:** `fn mod(Module)` adds functions to an *existing imported module*
+> (e.g. `fn mod(math) myFunc(...)` after `import super.std.math`).
+> For creating your own namespaces from scratch, use the struct namespace
+> pattern shown above.
+
 ### Generics + Dunder Operators for Reusable Types
 
 Define custom container types with operator overloading:
@@ -3453,20 +3477,19 @@ Define custom container types with operator overloading:
 ```rust
 struct Stack(T) { data: [$T] }
 
-fn extends push(s: Stack(T), val: $T) {
+fn extends push(s: Stack($T), val: $T) {
     s.data.push(val)
 }
 
-fn extends pop(s: Stack(T)) -> Option($T) {
-    if s.data.len() == 0 { return None(T) }
-    return Some(s.data.remove(s.data.len() - 1))
+fn extends pop(s: Stack($T)) -> Option($T) {
+    return s.data.pop()
 }
 
-fn extends __eq__(a: Stack(T), b: Stack(T)) -> Bool {
+fn extends __eq__(a: Stack($T), b: Stack($T)) -> Bool {
     return a.data == b.data
 }
 
-fn extends len(s: Stack(T)) -> Int {
+fn extends len(s: Stack($T)) -> Int {
     return s.data.len()
 }
 ```
@@ -3491,11 +3514,13 @@ fn findUserName(db: Database, id: Int) -> String {
 Closures capture their environment, creating lightweight stateful objects:
 
 ```rust
+import super.std.core   // provides Box
+
 fn counter(start: Int) -> fn() -> Int {
-    let n = start
+    let n = Box(start)
     return fn() -> Int {
-        n = n + 1
-        return n
+        n.value = n.value + 1
+        return n.value
     }
 }
 
@@ -3505,16 +3530,22 @@ c()  // 2
 c()  // 3
 ```
 
-### Arrow Syntax for Compact Struct Field Access
+### Arrow Syntax for Struct Field Function Calls
 
-The `->` operator combines field access with a function call:
+The `->` operator calls a function stored in a struct field and
+**prepends the struct itself** as the first argument:
 
 ```rust
-struct EventHandler { onClick: fn(Int) -> Void }
+struct Entity { name: String, greet: fn(Entity) -> String }
 
-fn fireClick(handler: EventHandler, x: Int) {
-    handler->onClick(x)    // same as handler.onClick(x) but calls the fn
+let e = Entity {
+    name: "Nova",
+    greet: fn(self: Entity) -> String {
+        return "Hi, I'm " + self.name
+    }
 }
+
+e->greet()   // calls greet(e) → "Hi, I'm Nova"
 ```
 
 ### for-in + Enumerate Pattern
@@ -3595,7 +3626,7 @@ my_game/
 
 ## 36. Critical Rules for Game Dev
 
-### 31.1 Box-Wrap Mutable Scalars in Closures
+### 36.1 Box-Wrap Mutable Scalars in Closures
 
 > **The #1 Nova game-dev gotcha.**
 
@@ -3617,14 +3648,14 @@ let update = fn(dt: Float) { score.value += 10 }  // mutates heap cell
 **Rule:** Wrap in `Box` if the variable is a scalar, declared outside a closure,
 and mutated inside. Heap objects (Vec2, EntityWorld, etc.) never need `Box`.
 
-### 31.2 Entity Movement — Manual vs `world.update(dt)`
+### 36.2 Entity Movement — Manual vs `world.update(dt)`
 
 `world.update(dt)` integrates `pos += vel * dt` AND purges dead entities.
 If you move entities manually, call `world.update(0.0)` to only purge dead.
 
 **Never** call `world.update(dt)` with real dt AND also manually move — that doubles movement.
 
-### 31.3 Forward Declarations for Scenes
+### 36.3 Forward Declarations for Scenes
 
 Scene factory functions often reference each other. Declare signatures first:
 
@@ -3637,7 +3668,7 @@ fn makeMenuScene() -> Scene {
 }
 ```
 
-### 31.4 `elif` Not `else if`
+### 36.4 `elif` Not `else if`
 
 Nova uses `elif` for chained conditionals. In expression context, only `if/else` pairs.
 

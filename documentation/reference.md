@@ -103,8 +103,6 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `Cast::int(a) -> Option(Int)` | Convert a value to Int. Returns None on failure. |
 | `Cast::float(a) -> Option(Float)` | Convert a value to Float. Returns None on failure. |
 | `Cast::charToInt(Char) -> Int` | Get the Unicode codepoint of a character. |
-| `toStr(a) -> String` | Alias for `Cast::string`. |
-| `toInt(a) -> Option(Int)` | Alias for `Cast::int`. |
 | `chr(Int) -> Char` | Convert an integer (codepoint) to a character. |
 
 ### Hashing
@@ -117,9 +115,9 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 
 | Signature | Description |
 |---|---|
-| `strlen(String) -> Int` | Length of a string. |
-| `strToChars(String) -> [Char]` | String to list of characters. |
-| `charsToStr([Char]) -> String` | List of characters to string. |
+| `String::len(String) -> Int` | Length of a string (UFCS: `s.len()`). |
+| `String::chars(String) -> [Char]` | String to list of characters (UFCS: `s.chars()`). |
+| `List::string([Char]) -> String` | List of characters to string (UFCS: `chars.string()`). |
 | `String::contains(String, String) -> Bool` | Check if a string contains a substring. |
 | `String::startsWith(String, String) -> Bool` | Check if a string starts with a prefix. |
 | `String::endsWith(String, String) -> Bool` | Check if a string ends with a suffix. |
@@ -132,7 +130,7 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `String::toUpper(String) -> String` | Convert to uppercase. |
 | `String::toLower(String) -> String` | Convert to lowercase. |
 | `String::replace(String, String, String) -> String` | Replace all occurrences of a substring. |
-| `String::substring(String, Int, Int) -> String` | Extract substring by start index and length. |
+| `String::substring(String, Int, Int) -> String` | Extract substring by start index and end index (exclusive). |
 | `String::indexOf(String, String) -> Int` | First index of a substring, or `-1` if not found. |
 | `String::repeat(String, Int) -> String` | Repeat a string N times. |
 | `String::reverse(String) -> String` | Reverse the characters. |
@@ -142,7 +140,8 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `String::split(String, String) -> [String]` | Split by a delimiter. |
 | `String::splitAny(String, String) -> [String]` | Split on any character in the second string. |
 | `join([String], String) -> String` | Join strings with a separator. |
-| `String::toInt(String) -> Option(Int)` | Parse a string as an integer. |
+
+> **Note:** To parse a string as an integer, use `Cast::int("42")`.
 
 ### Char Functions (`Char::`)
 
@@ -156,7 +155,8 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `Char::toLower(Char) -> Char` | To lowercase. |
 | `Char::isUpper(Char) -> Bool` | Uppercase? |
 | `Char::isLower(Char) -> Bool` | Lowercase? |
-| `Char::toInt(Char) -> Int` | Unicode codepoint. |
+
+> **Note:** To get the Unicode codepoint of a character as an `Int`, use `Cast::charToInt('A')`.
 
 ### Float Functions (`Float::`)
 
@@ -185,19 +185,21 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 
 ### List Functions
 
+All list functions use UFCS — call them as methods with dot notation.
+
 | Signature | Description |
 |---|---|
-| `len([a]) -> Int` | Length of a list. |
-| `push([a], a) -> Void` | Append an element. |
-| `pop([a]) -> Option(a)` | Remove and return the last element. |
-| `remove([a], Int) -> Void` | Remove element at index. |
-| `insert([a], Int, a) -> Void` | Insert element at index. |
-| `swap([a], Int, Int) -> Void` | Swap two elements by index. Errors if out of bounds. |
-| `trySwap([a], Int, Int) -> Bool` | Safe swap — returns `false` if either index is out of bounds. |
-| `clear([a]) -> Void` | Remove all elements. |
-| `set([a], Int, a) -> Void` | Set element at index. Errors if out of bounds. |
-| `trySet([a], Int, a) -> Bool` | Safe set — returns `false` if index is out of bounds. |
-| `get([a], Int) -> Option(a)` | Safe index — returns `None` if out of bounds. Supports negative indices (`-1` = last). |
+| `.len() -> Int` | Length of a list. |
+| `.push(a) -> Void` | Append an element. |
+| `.pop() -> Option(a)` | Remove and return the last element. |
+| `.remove(Int) -> Void` | Remove element at index. |
+| `.insert(Int, a) -> Void` | Insert element at index. |
+| `.swap(Int, Int) -> Void` | Swap two elements by index. Errors if out of bounds. |
+| `.trySwap(Int, Int) -> Bool` | Safe swap — returns `false` if either index is out of bounds. |
+| `.clear() -> Void` | Remove all elements. |
+| `.set(Int, a) -> Void` | Set element at index. Errors if out of bounds. |
+| `.trySet(Int, a) -> Bool` | Safe set — returns `false` if index is out of bounds. |
+| `.get(Int) -> Option(a)` | Safe index — returns `None` if out of bounds. Supports negative indices (`-1` = last). |
 
 ### I/O
 
@@ -225,7 +227,7 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 |---|---|
 | `sleep(Int) -> Void` | Pause for milliseconds. |
 | `now() -> Int` | Current time in milliseconds since Unix epoch. |
-| `nowSec() -> Int` | Current time in seconds since Unix epoch. |
+| `nowSec() -> Float` | Current time in seconds since Unix epoch (with fractional part). |
 
 ### Terminal
 
@@ -1151,7 +1153,7 @@ a.distance(b)           // ~4.47
 a.angle()               // 0.927... radians
 a.rotate(Float::pi())   // Vec2(-3.0, -4.0)
 a.lerp(b, 0.5)          // Vec2(2.0, 2.0)
-a.reflect(Vec2::up())   // reflect across y-axis
+a.reflect(Vec2::up())   // reflect across x-axis (normal = up)
 a.perpendicular()       // Vec2(4.0, -3.0)
 a.clampLength(3.0)      // scaled down to length 3
 a.negate()              // Vec2(-3.0, -4.0)
@@ -1179,7 +1181,7 @@ Vec2::fromAngle(1.57)   // unit vector at ~90°
 | `.perpendicular()` | 90° clockwise rotation |
 | `.clampLength(max)` | Scale down if too long |
 | `.equals(v)` / `.isZero()` | Equality |
-| `.toString()` | `"(3.0, 4.0)"` |
+| `.toString()` | `"(3, 4)"` (integer-valued floats omit `.0`) |
 
 ---
 
@@ -1277,18 +1279,19 @@ import super.std.ansi
 ```
 
 Wrap strings with ANSI escape codes for coloured terminal output.
+All functions live under the `Ansi` namespace.
 
 ```rust
-println(bold("important"))
-println(red("error: something failed"))
-println(green("success!"))
-println(italic(cyan("stylish")))
-println(rgb(255, 128, 0, "orange text"))
-println(bgRgb(0, 0, 128, "blue background"))
-println(color256(196, "bright red"))
+println(Ansi::bold("important"))
+println(Ansi::red("error: something failed"))
+println(Ansi::green("success!"))
+println(Ansi::italic(Ansi::cyan("stylish")))
+println(Ansi::rgb(255, 128, 0, "orange text"))
+println(Ansi::bgRgb(0, 0, 128, "blue background"))
+println(Ansi::color256(196, "bright red"))
 ```
 
-| Category | Functions |
+| Category | Functions (all `Ansi::` prefixed) |
 |---|---|
 | Styles | `bold`, `dim`, `italic`, `underline`, `blink`, `invert`, `strikethrough` |
 | Foreground | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
@@ -1306,21 +1309,25 @@ import super.std.color
 ```
 
 Named RGB tuples and colour manipulation for use with raylib or terminal.
+All functions live under the `color` namespace and must be called with `()`.
 
 ```rust
-let c = red          // (255, 0, 0)
-let mixed = lerpColor(red, blue, 0.5)  // purple-ish
-let dark = darken(green, 0.5)          // half-brightness green
-let light = lighten(blue, 0.3)         // lighter blue
-let inv = invert(white)                // (0, 0, 0)
-let custom = rgb(128, 64, 200)         // (128, 64, 200)
+let c = color::red()          // (230, 41, 55)  — raylib palette
+let mixed = color::lerpColor(color::red(), color::blue(), 0.5)  // purple-ish
+let dark = color::darken(color::green(), 0.5)          // half-brightness green
+let light = color::lighten(color::blue(), 0.3)         // lighter blue
+let inv = color::invert(color::white())                // (0, 0, 0)
+let custom = color::rgb(128, 64, 200)                  // (128, 64, 200)
 ```
 
-| Name / Function | Description |
+| Function (all `color::` prefixed) | Description |
 |---|---|
-| `red`, `green`, `blue`, `white`, `black` | Primary colours `(R,G,B)` |
-| `yellow`, `cyan`, `magenta` | Secondary colours |
-| `orange`, `purple`, `pink`, `brown`, `gray` | Extended palette |
+| `red()`, `green()`, `blue()`, `white()`, `black()` | Primary colours `(R,G,B)` |
+| `yellow()`, `magenta()` | Secondary colours |
+| `orange()`, `purple()`, `pink()`, `brown()`, `gray()` | Extended palette |
+| `lightGray()`, `darkGray()`, `darkBlue()`, `skyBlue()` | Extended palette |
+| `lime()`, `darkGreen()`, `darkPurple()`, `violet()` | Extended palette |
+| `beige()`, `darkBrown()`, `maroon()`, `gold()` | Extended palette |
 | `rgb(r, g, b)` | Construct an RGB tuple |
 | `lerpColor(a, b, t)` | Interpolate between two colours (t = 0.0–1.0) |
 | `invert(c)` | Invert an RGB colour |
@@ -2399,14 +2406,16 @@ debugging utilities designed for game development.
 
 #### Log Levels
 
-| Constant | Value | Colour |
+These are namespace functions (call with parentheses).
+
+| Function | Value | Colour |
 |---|---|---|
-| `Log::TRACE` | 0 | dim grey |
-| `Log::DEBUG` | 1 | cyan |
-| `Log::INFO` | 2 | green |
-| `Log::WARN` | 3 | yellow |
-| `Log::ERROR` | 4 | bold red |
-| `Log::OFF` | 5 | (silent) |
+| `Log::TRACE()` | 0 | dim grey |
+| `Log::DEBUG()` | 1 | cyan |
+| `Log::INFO()` | 2 | green |
+| `Log::WARN()` | 3 | yellow |
+| `Log::ERROR()` | 4 | bold red |
+| `Log::OFF()` | 5 | (silent) |
 
 Only messages **at or above** the logger's level are printed.
 
@@ -2435,7 +2444,7 @@ log.debug("pos = " + Cast::string(x)) // hidden at INFO level
 | `.setColors(on)` | Toggle ANSI colours |
 | `.sep()` | Print a separator line |
 | `.header(title)` | Print a boxed header |
-| `.dump(label, value)` | Print `label = value` at INFO |
+| `.dump(label, value)` | Print `label = value` at INFO (both args must be `String`) |
 | `.table(headers, rows)` | Print an ASCII table |
 | `.assert(cond, msg)` | Log ERROR if `cond` is false |
 | `.timer(label) → Int` | Start a timer (returns `now()`) |

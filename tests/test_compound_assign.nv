@@ -1,0 +1,227 @@
+module test_compound_assign
+
+// =============================================================
+//  Comprehensive tests for compound-assignment operators
+//  +=  -=  *=  /=
+// =============================================================
+
+// ─── Int += ──────────────────────────────────────────────────
+let a: Int = 10
+a += 5
+assert(a == 15)
+a += 0
+assert(a == 15)
+a += -3
+assert(a == 12)
+
+// ─── Int -= ──────────────────────────────────────────────────
+let b: Int = 20
+b -= 7
+assert(b == 13)
+b -= 0
+assert(b == 13)
+b -= -2
+assert(b == 15)
+
+// ─── Int *= ──────────────────────────────────────────────────
+let c: Int = 6
+c *= 7
+assert(c == 42)
+c *= 1
+assert(c == 42)
+c *= 0
+assert(c == 0)
+
+// ─── Int /= ──────────────────────────────────────────────────
+let d: Int = 100
+d /= 5
+assert(d == 20)
+d /= 1
+assert(d == 20)
+d /= 4
+assert(d == 5)
+
+// ─── Float += ────────────────────────────────────────────────
+let fa: Float = 1.5
+fa += 2.5
+assert(fa == 4.0)
+fa += 0.0
+assert(fa == 4.0)
+
+// ─── Float -= ────────────────────────────────────────────────
+let fb: Float = 10.0
+fb -= 3.5
+assert(fb == 6.5)
+
+// ─── Float *= ────────────────────────────────────────────────
+let fc: Float = 2.5
+fc *= 4.0
+assert(fc == 10.0)
+fc *= 0.5
+assert(fc == 5.0)
+
+// ─── Float /= ────────────────────────────────────────────────
+let fd: Float = 20.0
+fd /= 4.0
+assert(fd == 5.0)
+fd /= 2.5
+assert(fd == 2.0)
+
+// ─── Chaining multiple compound ops ─────────────────────────
+let chain: Int = 2
+chain += 3    // 5
+chain *= 4    // 20
+chain -= 2    // 18
+chain /= 3   // 6
+assert(chain == 6)
+
+let fchain: Float = 1.0
+fchain += 3.0   // 4.0
+fchain *= 2.5   // 10.0
+fchain -= 1.0   // 9.0
+fchain /= 3.0   // 3.0
+assert(fchain == 3.0)
+
+// ─── Struct field compound assignment ────────────────────────
+struct Point { x: Int, y: Int }
+
+let p = Point { x: 10, y: 20 }
+p.x += 5
+assert(p.x == 15)
+p.x -= 3
+assert(p.x == 12)
+p.x *= 2
+assert(p.x == 24)
+p.x /= 6
+assert(p.x == 4)
+
+p.y += 10
+assert(p.y == 30)
+p.y *= 3
+assert(p.y == 90)
+p.y /= 9
+assert(p.y == 10)
+p.y -= 10
+assert(p.y == 0)
+
+// ─── Nested struct field compound assignment ─────────────────
+struct Rect { origin: Point, w: Int, h: Int }
+let r = Rect { origin: Point { x: 0, y: 0 }, w: 100, h: 50 }
+r.origin.x += 10
+r.origin.y += 20
+assert(r.origin.x == 10)
+assert(r.origin.y == 20)
+r.w *= 2
+assert(r.w == 200)
+r.h /= 5
+assert(r.h == 10)
+
+// ─── Float struct fields ─────────────────────────────────────
+struct Vec2 { x: Float, y: Float }
+let v = Vec2 { x: 1.0, y: 2.0 }
+v.x *= 3.0
+v.y /= 2.0
+assert(v.x == 3.0)
+assert(v.y == 1.0)
+v.x += 0.5
+v.y -= 0.5
+assert(v.x == 3.5)
+assert(v.y == 0.5)
+
+// ─── List element compound assignment ────────────────────────
+let nums = [10, 20, 30, 40, 50]
+nums[0] += 5
+assert(nums[0] == 15)
+nums[1] -= 5
+assert(nums[1] == 15)
+nums[2] *= 3
+assert(nums[2] == 90)
+nums[3] /= 8
+assert(nums[3] == 5)
+nums[4] *= 0
+assert(nums[4] == 0)
+
+// ─── Float list elements ─────────────────────────────────────
+let floats = [1.0, 2.0, 3.0]
+floats[0] *= 10.0
+floats[1] /= 0.5
+floats[2] += 7.0
+assert(floats[0] == 10.0)
+assert(floats[1] == 4.0)
+assert(floats[2] == 10.0)
+
+// ─── Negative-index compound assignment ──────────────────────
+let ni = [10, 20, 30]
+ni[-1] *= 2
+assert(ni[2] == 60)
+ni[-2] += 100
+assert(ni[1] == 120)
+ni[-3] /= 5
+assert(ni[0] == 2)
+
+// ─── String += (concat) ─────────────────────────────────────
+let s = "hello"
+s += " world"
+assert(s == "hello world")
+s += ""
+assert(s == "hello world")
+s += "!"
+assert(s == "hello world!")
+
+// ─── List += (concat) ───────────────────────────────────────
+let xs = [1, 2, 3]
+xs += [4, 5]
+assert(xs.len() == 5)
+assert(xs[4] == 5)
+xs += []: Int
+assert(xs.len() == 5)
+
+// ─── Compound assign inside for loop ────────────────────────
+let total: Int = 0
+for i in 0..10 {
+    total += i
+}
+assert(total == 45)
+
+let prod: Int = 1
+let factors = [2, 3, 5]
+for f in factors {
+    prod *= f
+}
+assert(prod == 30)
+
+// ─── Compound assign inside while loop ──────────────────────
+let wval: Int = 100
+let iter_count: Int = 0
+while wval > 1 {
+    wval /= 2
+    iter_count += 1
+}
+assert(wval == 1)
+
+// ─── Compound assign in nested loops ────────────────────────
+let mat_sum: Int = 0
+for i in 0..3 {
+    for j in 0..4 {
+        mat_sum += 1
+    }
+}
+assert(mat_sum == 12)
+
+// ─── Compound assign with expressions on the right side ─────
+let e: Int = 10
+e *= 2 + 3
+assert(e == 50)
+
+let e2: Int = 100
+e2 /= 5 - 3
+assert(e2 == 50)
+
+// ─── Large values ────────────────────────────────────────────
+let big: Int = 1
+for i in 0..20 {
+    big *= 2
+}
+assert(big == 1048576)
+
+println("PASS: test_compound_assign (50 assertions)")

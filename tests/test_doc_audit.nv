@@ -1,0 +1,537 @@
+module test_doc_audit
+
+// =============================================================
+//  Tests that verify tutorial documentation claims against
+//  actual Nova behavior. Each section references the tutorial §.
+// =============================================================
+
+// ─── §4 Number Literals ──────────────────────────────────────
+assert(0b1010 == 10)
+assert(0b0 == 0)
+assert(0b11111111 == 255)
+assert(0o17 == 15)
+assert(0o0 == 0)
+assert(0o777 == 511)
+assert(0xFF == 255)
+assert(0x0 == 0)
+assert(0xDEAD == 57005)
+assert(1_000_000 == 1000000)
+assert(0xFF_AA == 65450)
+assert(0b1111_0000 == 240)
+
+// ─── §4 Escape Sequences ────────────────────────────────────
+assert("\n".len() == 1)
+assert("\t".len() == 1)
+assert("\r".len() == 1)
+assert("\0".len() == 1)
+assert("\\".len() == 1)
+assert("\"".len() == 1)
+
+// ─── §4 Raw Strings ─────────────────────────────────────────
+let raw = r#"hello\nworld"#
+assert(raw.len() == 12)    // backslash-n is two chars in raw
+assert(raw[5] == '\\')
+
+// ─── §4 Comments ─────────────────────────────────────────────
+// Single-line comment
+/* Block comment */
+let comment_val = 42 /* inline block comment */
+assert(comment_val == 42)
+
+// ─── §5 Compound Assignment (including String/List += ) ──────
+let sa = "hi"
+sa += " there"
+assert(sa == "hi there")
+
+let la = [1, 2]
+la += [3, 4]
+assert(la.len() == 4)
+assert(la[3] == 4)
+
+// ─── §5 Euclidean modulo ────────────────────────────────────
+assert(-10 % 3 == 2)
+assert(10 % 3 == 1)
+assert(-1 % 5 == 4)
+assert(7 % 7 == 0)
+
+// ─── §5 Precedence: && binds tighter than || ────────────────
+// a || b && c  → a || (b && c)
+assert(true || false && false)        // true || (false && false) → true
+assert(!(false || false && true))     // false || (false && true) → false
+
+// ─── §6 if as expression ────────────────────────────────────
+let ie1 = if 5 > 0 { "pos" } else { "neg" }
+assert(ie1 == "pos")
+let ie2 = if false { 1 } else { 2 }
+assert(ie2 == 2)
+
+// ─── §6 Block expressions ───────────────────────────────────
+let be = {
+    let aa = 10
+    let bb = 20
+    aa + bb
+}
+assert(be == 30)
+
+// ─── §6 for-in range (exclusive) ────────────────────────────
+let exc_sum = 0
+for i in 0..5 { exc_sum += i }
+assert(exc_sum == 10)    // 0+1+2+3+4
+
+// ─── §6 for-in range (inclusive) ─────────────────────────────
+let inc_sum = 0
+for i in 0..=5 { inc_sum += i }
+assert(inc_sum == 15)    // 0+1+2+3+4+5
+
+// ─── §6 for-in list ─────────────────────────────────────────
+let list_sum = 0
+for item in [10, 20, 30] { list_sum += item }
+assert(list_sum == 60)
+
+// ─── §6 while let draining a list ───────────────────────────
+let stack = [10, 20, 30]
+let popped = []: Int
+while let item = stack.pop() {
+    popped.push(item)
+}
+assert(stack.len() == 0)
+assert(popped.len() == 3)
+assert(popped[0] == 30)
+
+// ─── §6 if let / else ───────────────────────────────────────
+let found: Option(Int) = Some(42)
+let missing: Option(Int) = None(Int)
+
+if let val = found {
+    assert(val == 42)
+} else {
+    assert(false)
+}
+
+if let val2 = missing {
+    assert(false)
+} else {
+    assert(true)
+}
+
+// ─── §6 C-style for loop ────────────────────────────────────
+let cfor_sum = 0
+for let ci = 0; ci < 5; ci += 1 {
+    cfor_sum += ci
+}
+assert(cfor_sum == 10)
+
+// ─── §7 Functions: explicit return required ──────────────────
+fn add_fn(a: Int, b: Int) -> Int {
+    return a + b
+}
+assert(add_fn(3, 4) == 7)
+
+// ─── §7 Overloading ─────────────────────────────────────────
+fn describe(x: Int) -> String { return "int" }
+fn describe(x: String) -> String { return "str" }
+assert(describe(42) == "int")
+assert(describe("hi") == "str")
+
+// ─── §7 Forward declarations ────────────────────────────────
+fn isEven(n: Int) -> Bool
+fn isOdd(n: Int) -> Bool {
+    if n == 0 { return false }
+    return isEven(n - 1)
+}
+fn isEven(n: Int) -> Bool {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+}
+assert(isEven(4))
+assert(isOdd(3))
+
+// ─── §7 pass statement ──────────────────────────────────────
+fn placeholder(x: Int) { pass }
+placeholder(99)
+
+// ─── §7 Varargs ─────────────────────────────────────────────
+fn sum_list(xs: [Int]) -> Int {
+    let total = 0
+    for x in xs { total += x }
+    return total
+}
+assert(sum_list([1, 2, 3]) == 6)
+assert(sum_list(1, 2, 3) == 6)
+assert(sum_list(42) == 42)
+
+// Leading params + varargs
+fn tag(label: String, xs: [Int]) -> String {
+    let total = 0
+    for x in xs { total += x }
+    return label + Cast::string(total)
+}
+assert(tag("sum=", 1, 2, 3) == "sum=6")
+
+// Varargs: exact match wins
+fn ov_desc(x: Int) -> String { return "single" }
+fn ov_desc(xs: [Int]) -> String { return "list" }
+assert(ov_desc(42) == "single")
+assert(ov_desc(1, 2, 3) == "list")
+
+// ─── §7 Recursion ───────────────────────────────────────────
+fn factorial(n: Int) -> Int {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+assert(factorial(5) == 120)
+assert(factorial(0) == 1)
+
+// ─── §8 Extends and UFCS ────────────────────────────────────
+fn extends double(x: Int) -> Int { return x * 2 }
+fn extends add_n(x: Int, n: Int) -> Int { return x + n }
+assert(5.double() == 10)
+assert(5.double().add_n(3) == 13)
+
+// Auto-infer extends type
+fn extends isPositive(n: Int) -> Bool { return n > 0 }
+assert(5.isPositive())
+assert(!(-1).isPositive())
+
+// ─── §9 Structs: positional construction ─────────────────────
+struct Pair { a: Int, b: Int }
+let pp = Pair(1, 2)
+assert(pp.a == 1)
+assert(pp.b == 2)
+
+// ─── §9 .type field ─────────────────────────────────────────
+struct Dog { name: String }
+let dog = Dog { name: "Rex" }
+assert(dog.type == "Dog")
+
+// ─── §9 :: call without self ─────────────────────────────────
+struct Config { transform: fn(Int) -> Int }
+let cfg = Config { transform: fn(x: Int) -> Int { return x * 2 } }
+assert(cfg::transform(5) == 10)
+
+// ─── §9 -> call with self ───────────────────────────────────
+struct Entity { name: String, greet: fn(Entity) -> String }
+let ent = Entity {
+    name: "Nova",
+    greet: fn(self: Entity) -> String { return "Hi, I'm " + self.name }
+}
+assert(ent->greet() == "Hi, I'm Nova")
+
+// ─── §9 Dunder operators ────────────────────────────────────
+struct V2 { x: Int, y: Int }
+fn extends __add__(a: V2, b: V2) -> V2 { return V2 { x: a.x + b.x, y: a.y + b.y } }
+fn extends __sub__(a: V2, b: V2) -> V2 { return V2 { x: a.x - b.x, y: a.y - b.y } }
+fn extends __mul__(a: V2, b: V2) -> V2 { return V2 { x: a.x * b.x, y: a.y * b.y } }
+fn extends __div__(a: V2, b: V2) -> V2 { return V2 { x: a.x / b.x, y: a.y / b.y } }
+fn extends __mod__(a: V2, b: V2) -> V2 { return V2 { x: a.x % b.x, y: a.y % b.y } }
+fn extends __eq__(a: V2, b: V2) -> Bool { return a.x == b.x && a.y == b.y }
+fn extends __ne__(a: V2, b: V2) -> Bool { return a.x != b.x || a.y != b.y }
+fn extends __lt__(a: V2, b: V2) -> Bool { return a.x < b.x }
+fn extends __gt__(a: V2, b: V2) -> Bool { return a.x > b.x }
+fn extends __le__(a: V2, b: V2) -> Bool { return a.x <= b.x }
+fn extends __ge__(a: V2, b: V2) -> Bool { return a.x >= b.x }
+
+let va = V2 { x: 10, y: 20 }
+let vb = V2 { x: 3, y: 5 }
+let vc = va + vb
+assert(vc.x == 13 && vc.y == 25)
+let vd = va - vb
+assert(vd.x == 7 && vd.y == 15)
+let ve = va * vb
+assert(ve.x == 30 && ve.y == 100)
+let vf = va / vb
+assert(vf.x == 3 && vf.y == 4)
+let vg = va % vb
+assert(vg.x == 1 && vg.y == 0)
+assert(va == V2 { x: 10, y: 20 })
+assert(va != vb)
+assert(vb < va)
+assert(va > vb)
+assert(vb <= va)
+assert(va >= vb)
+
+// ─── §10 Enums ──────────────────────────────────────────────
+enum Shape {
+    Circle: Float,
+    Rectangle: (Float, Float),
+    Point
+}
+
+let sh = Shape::Circle(5.0)
+match sh {
+    Circle(r) => { assert(r == 5.0) }
+    Rectangle(dims) => { assert(false) }
+    Point() => { assert(false) }
+}
+
+// Match as expression
+enum Color { Red, Green, Blue }
+let col = Color::Green()
+let col_name = match col {
+    Red() => "red"
+    Green() => "green"
+    Blue() => "blue"
+}
+assert(col_name == "green")
+
+// No-data variant needs ()
+let pt = Shape::Point()
+
+// ─── §11 Generics ───────────────────────────────────────────
+struct Wrapper(T) { inner: $T }
+fn extends(Wrapper) unwrap_w(self: Wrapper($T)) -> $T { return self.inner }
+let wi = Wrapper { inner: 42 }
+assert(wi.unwrap_w() == 42)
+let ws = Wrapper { inner: "hey" }
+assert(ws.unwrap_w() == "hey")
+
+fn identity_g(x: $T) -> $T { return x }
+assert(identity_g(99) == 99)
+assert(identity_g("ok") == "ok")
+
+// ─── §12 Option ─────────────────────────────────────────────
+let opt_s: Option(Int) = Some(42)
+let opt_n: Option(Int) = None(Int)
+assert(opt_s.isSome())
+assert(!opt_n.isSome())
+assert(opt_s.unwrap() == 42)
+let unwrapped_q = opt_s?
+assert(unwrapped_q == 42)
+
+// ─── §13 Closures ───────────────────────────────────────────
+// Bar closure
+let dbl = |x: Int| x * 2
+assert(dbl(5) == 10)
+
+// fn closure
+let clamp_fn = fn(x: Int) -> Int {
+    if x < 0 { return 0 }
+    elif x > 100 { return 100 }
+    return x
+}
+assert(clamp_fn(-5) == 0)
+assert(clamp_fn(200) == 100)
+assert(clamp_fn(50) == 50)
+
+// Bar closure with block expression
+let abs_fn = |x: Int| if x >= 0 { x } else { 0 - x }
+assert(abs_fn(5) == 5)
+assert(abs_fn(-3) == 3)
+
+// @(Type) function ref
+fn square_fn(x: Int) -> Int { return x * x }
+let sq_ref = square_fn@(Int)
+assert(sq_ref(5) == 25)
+
+// Trailing closure
+import super.std.list
+let filtered = [1, 2, 3, 4, 5].filter(): |x: Int| x > 3
+assert(filtered.len() == 2)
+assert(filtered[0] == 4)
+
+// Bind operator (~>)
+let bound = [1, 2, 3, 4, 5].len() ~> n { n * n }
+assert(bound == 25)
+
+// Chained bind
+let chain_bind = 100 ~> a {
+    let half = a / 2
+    half
+} ~> b {
+    b + 10
+}
+assert(chain_bind == 60)
+
+// Capturing state with Box
+import super.std.core
+let counter = Box(0)
+let inc_box = fn() { counter.value += 1 }
+inc_box(); inc_box(); inc_box()
+assert(counter.value == 3)
+
+// Closures share list mutations
+let log = []: String
+let add_log = fn(msg: String) { log.push(msg) }
+add_log("a"); add_log("b")
+assert(log.len() == 2)
+assert(log[0] == "a")
+
+// ─── §14 Lists ──────────────────────────────────────────────
+let xs = [1, 2, 3]
+xs.push(4)
+assert(xs.len() == 4)
+let popped_v = xs.pop()
+assert(popped_v.isSome())
+assert(popped_v.unwrap() == 4)
+
+// Empty list with type
+let empty = []: Int
+assert(empty.len() == 0)
+
+// Negative indexing
+let neg = [10, 20, 30, 40, 50]
+assert(neg[-1] == 50)
+assert(neg[-5] == 10)
+
+// Negative index write
+neg[-1] = 99
+assert(neg[4] == 99)
+
+// Concat
+let cat = [1, 2] + [3, 4]
+assert(cat.len() == 4)
+assert(cat[3] == 4)
+
+// Safe indexing (.get)
+assert(neg.get(0).isSome())
+assert(neg.get(99).isSome() == false)
+assert(neg.get(-1).unwrap() == 99)
+
+// trySwap, trySet
+let trys = [1, 2, 3]
+assert(trys.trySwap(0, 2))
+assert(trys[0] == 3 && trys[2] == 1)
+assert(!trys.trySwap(0, 99))
+assert(trys.trySet(0, 42))
+assert(trys[0] == 42)
+assert(!trys.trySet(99, 0))
+
+// List comprehension
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+assert(squares.len() == 5)
+assert(squares[0] == 1)
+assert(squares[4] == 25)
+
+// Filtered comprehension
+let evens = [x in [1,2,3,4,5,6] | x | x % 2 == 0]
+assert(evens.len() == 3)
+assert(evens[0] == 2)
+
+// Cross-product comprehension
+let cross = [x in [1, 2], y in [10, 20] | x + y]
+assert(cross.len() == 4)
+
+// ─── §15 Tuples ─────────────────────────────────────────────
+let tup = (42, "hello", true)
+assert(tup[0] == 42)
+assert(tup[1] == "hello")
+assert(tup[2] == true)
+
+// Single-element tuple
+let single = (42,)
+assert(typeof(single) == "(Int)")
+let grouped = (42)
+assert(typeof(grouped) == "Int")
+
+// Function returning tuple
+fn my_divmod(a: Int, b: Int) -> (Int, Int) {
+    return (a / b, a % b)
+}
+let dm = my_divmod(17, 5)
+assert(dm[0] == 3)
+assert(dm[1] == 2)
+
+// ─── §16 Pattern Matching ───────────────────────────────────
+// match expression with block bodies
+let match_result = match col {
+    Red() => {
+        let prefix = "bright "
+        prefix + "red"
+    }
+    Green() => { "green" }
+    Blue() => { "blue" }
+}
+assert(match_result == "green")
+
+// match with commas
+match Color::Blue() {
+    Red()   => { assert(false) },
+    Green() => { assert(false) },
+    Blue()  => { assert(true) },
+}
+
+// ─── §17 Pipe Operator ──────────────────────────────────────
+fn inc_p(x: Int) -> Int { return x + 1 }
+let piped = 4 |> inc_p() |> square_fn()
+assert(piped == 25)
+
+// ─── §18 Dyn Types ──────────────────────────────────────────
+struct Robot { name: String, model: Int }
+
+fn get_dyn_name(thing: Dyn(T = name: String)) -> String {
+    return thing.name
+}
+assert(get_dyn_name(dog) == "Rex")
+assert(get_dyn_name(Robot { name: "R2", model: 2 }) == "R2")
+
+// .type through Dyn
+fn get_dyn_type(thing: Dyn(T = name: String)) -> String {
+    return thing.type
+}
+assert(get_dyn_type(dog) == "Dog")
+assert(get_dyn_type(Robot { name: "X", model: 1 }) == "Robot")
+
+// ─── §19 Box mutable shared state ───────────────────────────
+let shared = Box(0)
+let inc_sh = fn() { shared.value += 1 }
+let get_sh = fn() -> Int { return shared.value }
+inc_sh(); inc_sh(); inc_sh()
+assert(get_sh() == 3)
+
+// ─── §22 Memory Model ───────────────────────────────────────
+// Reference aliasing
+let alias_a = [1, 2, 3]
+let alias_b = alias_a
+alias_b.push(4)
+assert(alias_a.len() == 4)
+
+// clone breaks aliasing
+let clone_a = [1, 2, 3]
+let clone_b = clone(clone_a)
+clone_b.push(4)
+assert(clone_a.len() == 3)
+assert(clone_b.len() == 4)
+
+// ─── §23 Cast ────────────────────────────────────────────────
+assert(Cast::string(42) == "42")
+assert(Cast::string(3.14) == "3.14")
+assert(Cast::string(true) == "true")
+let cast_i = Cast::int("42")
+assert(cast_i.isSome() && cast_i.unwrap() == 42)
+let cast_bad = Cast::int("abc")
+assert(!cast_bad.isSome())
+let cast_f = Cast::float(42)
+assert(cast_f.isSome())
+
+// ─── §25 String operations ──────────────────────────────────
+assert("hello".len() == 5)
+assert("hello"[0] == 'h')
+assert("hello"[-1] == 'o')
+assert("hello".get(0).unwrap() == 'h')
+assert("hello".get(99).isSome() == false)
+assert("hello".get(-1).unwrap() == 'o')
+
+// ─── §27 Syntax sugar: fn mod ────────────────────────────────
+import super.std.math
+fn mod(math) clamp_m(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+assert(math::clamp_m(15, 0, 10) == 10)
+assert(math::clamp_m(-5, 0, 10) == 0)
+assert(math::clamp_m(5, 0, 10) == 5)
+
+// ─── §30 Built-in Functions ─────────────────────────────────
+assert(typeof(42) == "Int")
+assert(typeof(3.14) == "Float")
+assert(typeof("hi") == "String")
+assert(typeof(true) == "Bool")
+assert(typeof('a') == "Char")
+assert(typeof([1, 2]) == "[Int]")
+assert(typeof((1, "a")) == "(Int,String)")
+assert(typeof(dog) == "Dog")
+assert(typeof(None(Int)) == "Option(Int)")
+assert(typeof(Some(42)) == "Option(Int)")
+
+println("PASS: test_doc_audit (100+ assertions)")
