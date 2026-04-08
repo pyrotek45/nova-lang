@@ -2059,8 +2059,8 @@ pub fn run_debug(vm: &mut Vm, info: DebugInfo) -> NovaResult<()> {
 //   • No alternate screen, no raw mode — terminal output stays clean.
 //   • The VM runs freely between frame boundaries (raylib::rendering
 //     calls), keeping the window responsive.
-//   • The debugger only prints a summary when the program finishes or
-//     hits an error, so it never interferes with the game loop.
+//   • Periodic status lines show game-relevant metrics (FPS, draw calls,
+//     sprites, heap, GC) instead of raw VM internals.
 
 fn run_debug_raylib_mode(
     vm: &mut Vm,
@@ -2068,6 +2068,7 @@ fn run_debug_raylib_mode(
     rendering_index: Option<u64>,
 ) -> NovaResult<()> {
     use common::code::Code;
+    use std::time::Instant;
 
     // ── Helper: peek the native index at the current IP ─────────
     fn peek_native_index(vm: &Vm) -> Option<u64> {
@@ -2090,37 +2091,68 @@ fn run_debug_raylib_mode(
     }
 
     // ── Banner ──────────────────────────────────────────────────
-    eprintln!("╔══════════════════════════════════════════════════════════╗");
-    eprintln!("║           Nova Debugger — Raylib Mode                  ║");
-    eprintln!("╠══════════════════════════════════════════════════════════╣");
-    eprintln!("║  Raylib program detected.                              ║");
-    eprintln!("║  The full TUI debugger is disabled so the raylib       ║");
-    eprintln!("║  window can run without interference.                  ║");
-    eprintln!("║                                                        ║");
-    eprintln!("║  The game will run at full speed.                      ║");
-    eprintln!("║  Frame and error information is printed to stderr.     ║");
-    eprintln!("║  Close the raylib window or press Ctrl+C to stop.     ║");
-    eprintln!("╚══════════════════════════════════════════════════════════╝");
+    eprintln!();
+    eprintln!("  Nova Debugger — Raylib Mode");
+    eprintln!("  ──────────────────────────────────────────");
+    eprintln!("  Raylib program detected.");
+    eprintln!("  TUI disabled — game runs at full speed.");
+    eprintln!("  Close the window or Ctrl+C to stop.");
     eprintln!();
 
     let mut frame_count: u64 = 0;
     let mut step_count: u64 = 0;
-    // Print a status line every N frames so the user knows it's alive:
-    let report_interval: u64 = 300;
+    let mut last_report = Instant::now();
+    let mut frames_since_report: u64 = 0;
+    let mut peak_heap: usize = 0;
+    let mut peak_draw_calls: usize = 0;
+    let mut total_draw_calls: u64 = 0;
+    // Track the draw queue size just before each rendering call.
+    // After rendering it gets cleared, so we peek right before.
+    let mut last_draw_count: usize = 0;
+    #[allow(unused_assignments)]
+    let _ = last_draw_count; // suppress initial-value-never-read warning
+
+    // Print status every ~2 seconds
+    let report_secs: f64 = 2.0;
+
+    let start_time = Instant::now();
 
     // No raw mode, no alternate screen — just run the VM.
     loop {
         if vm.state.current_instruction >= vm.state.program.len() {
-            eprintln!(
-                "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
-                frame_count, step_count,
-            );
+            let elapsed = start_time.elapsed().as_secs_f64();
+            eprintln!();
+            eprintln!("  ── Program finished ──────────────────────");
+            eprintln!("  Frames:      {}", frame_count);
+            eprintln!("  Instructions:{}", step_count);
+            eprintln!("  Run time:    {:.1}s", elapsed);
+            if elapsed > 0.0 {
+                eprintln!("  Avg FPS:     {:.1}", frame_count as f64 / elapsed);
+            }
+            eprintln!("  Peak heap:   {} objects", peak_heap);
+            eprintln!("  Peak draws:  {}/frame", peak_draw_calls);
+            eprintln!("  Sprites:     {}", vm.state.sprites.len());
+            if vm.state.audio_initialized {
+                eprintln!(
+                    "  Audio:       {} sounds, {} music",
+                    vm.state.sounds.len(),
+                    vm.state.music.len(),
+                );
+            }
+            eprintln!();
             return Ok(());
         }
 
         // Check if the next instruction is raylib::rendering
         if let (Some(ri), Some(ni)) = (rendering_index, peek_native_index(vm)) {
             if ni == ri {
+                // Capture draw queue size before rendering clears it
+                last_draw_count = vm.state.draw_queue.len();
+                total_draw_calls += last_draw_count as u64;
+                if last_draw_count > peak_draw_calls {
+                    peak_draw_calls = last_draw_count;
+                }
+
                 // Execute the rendering call so the frame is drawn
                 match vm.step_one_debug() {
                     StepResult::Continue { output, .. } => {
@@ -2132,17 +2164,19 @@ fn run_debug_raylib_mode(
                         if let Some(ref o) = output {
                             println!("{}", o);
                         }
-                        eprintln!(
-                            "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
-                            frame_count, step_count,
-                        );
+                        let elapsed = start_time.elapsed().as_secs_f64();
+                        eprintln!();
+                        eprintln!("  ── Program finished ──────────────────────");
+                        eprintln!("  Frames:      {}", frame_count);
+                        eprintln!("  Run time:    {:.1}s", elapsed);
+                        eprintln!();
                         return Ok(());
                     }
                     StepResult::Error(msg) => {
-                        eprintln!(
-                            "\n[dbg-raylib] ERROR at frame {}, step {}: {}",
-                            frame_count, step_count, msg,
-                        );
+                        eprintln!();
+                        eprintln!("  ── ERROR at frame {} ─────────────────────", frame_count);
+                        eprintln!("  {}", msg);
+                        eprintln!();
                         return Err(Box::new(NovaError::Runtime {
                             msg: msg.into(),
                         }));
@@ -2150,16 +2184,35 @@ fn run_debug_raylib_mode(
                 }
                 step_count += 1;
                 frame_count += 1;
+                frames_since_report += 1;
 
-                // Periodic status
-                if frame_count % report_interval == 0 {
+                // Track peak heap
+                let live = vm.state.memory.live_count();
+                if live > peak_heap {
+                    peak_heap = live;
+                }
+
+                // Periodic status — every ~2s of real time
+                let since = last_report.elapsed().as_secs_f64();
+                if since >= report_secs {
+                    let fps = frames_since_report as f64 / since;
+                    let avg_draws = if frames_since_report > 0 {
+                        total_draw_calls as f64 / frame_count as f64
+                    } else {
+                        0.0
+                    };
                     eprintln!(
-                        "[dbg-raylib] frame {} | ip {} | stack {} | heap {} live",
+                        "  [frame {:>6}]  {:.0} fps  |  {} draws/frame (avg {:.0})  |  heap: {} live, {} capacity  |  sprites: {}",
                         frame_count,
-                        vm.state.current_instruction,
-                        vm.state.memory.stack.len(),
-                        vm.state.memory.live_count(),
+                        fps,
+                        last_draw_count,
+                        avg_draws,
+                        live,
+                        vm.state.memory.heap_capacity(),
+                        vm.state.sprites.len(),
                     );
+                    last_report = Instant::now();
+                    frames_since_report = 0;
                 }
                 continue;
             }
@@ -2176,17 +2229,20 @@ fn run_debug_raylib_mode(
                 if let Some(ref o) = output {
                     println!("{}", o);
                 }
-                eprintln!(
-                    "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
-                    frame_count, step_count,
-                );
+                let elapsed = start_time.elapsed().as_secs_f64();
+                eprintln!();
+                eprintln!("  ── Program finished ──────────────────────");
+                eprintln!("  Frames:      {}", frame_count);
+                eprintln!("  Instructions:{}", step_count);
+                eprintln!("  Run time:    {:.1}s", elapsed);
+                eprintln!();
                 return Ok(());
             }
             StepResult::Error(msg) => {
-                eprintln!(
-                    "\n[dbg-raylib] ERROR at step {}: {}",
-                    step_count, msg,
-                );
+                eprintln!();
+                eprintln!("  ── ERROR at step {} ──────────────────────", step_count);
+                eprintln!("  {}", msg);
+                eprintln!();
                 return Err(Box::new(NovaError::Runtime {
                     msg: msg.into(),
                 }));
