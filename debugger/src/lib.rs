@@ -1199,7 +1199,7 @@ pub fn run_debug(vm: &mut Vm, info: DebugInfo) -> NovaResult<()> {
         let raylib_rendering_index: Option<u64> = info
             .native_names
             .iter()
-            .find(|(_, name)| name.as_str() == "raylib::rendering")
+            .find(|(_, name)| name.starts_with("raylib::rendering"))
             .map(|(idx, _)| *idx);
 
         if uses_raylib {
@@ -2052,19 +2052,19 @@ pub fn run_debug(vm: &mut Vm, info: DebugInfo) -> NovaResult<()> {
 //   1. crossterm's alternate screen hides the raylib GLFW window.
 //   2. Step-by-step pausing starves the raylib window of events, causing
 //      the OS / window manager to flag it as "not responding" and kill it.
+//   3. crossterm raw mode breaks \n → \r\n translation, garbling any
+//      output that raylib (or the program) writes via C-level printf.
 //
-// This mode solves both problems:
-//   • No alternate screen — the raylib window is fully visible.
+// This mode solves all three problems:
+//   • No alternate screen, no raw mode — terminal output stays clean.
 //   • The VM runs freely between frame boundaries (raylib::rendering
 //     calls), keeping the window responsive.
-//   • Crossterm raw mode is used only for non-blocking key detection.
-//   • At each frame boundary the debugger checks for keypresses:
-//     'p' pauses, 'q' quits, etc.  When paused, frame-by-frame stepping
-//     is available while the raylib window continues to be painted.
+//   • The debugger only prints a summary when the program finishes or
+//     hits an error, so it never interferes with the game loop.
 
 fn run_debug_raylib_mode(
     vm: &mut Vm,
-    info: &DebugInfo,
+    _info: &DebugInfo,
     rendering_index: Option<u64>,
 ) -> NovaResult<()> {
     use common::code::Code;
@@ -2089,401 +2089,109 @@ fn run_debug_raylib_mode(
         }
     }
 
-    /// Run all instructions until the next raylib::rendering call (or end).
-    /// Returns Ok(true) if rendering was hit, Ok(false) if program ended.
-    fn run_to_next_frame(
-        vm: &mut Vm,
-        rendering_index: Option<u64>,
-        step_count: &mut u64,
-        frame_count: &mut u64,
-        output_buf: &mut Vec<String>,
-    ) -> NovaResult<bool> {
-        loop {
-            if vm.state.current_instruction >= vm.state.program.len() {
-                return Ok(false);
-            }
-
-            // Check if the next instruction is raylib::rendering
-            if let (Some(ri), Some(ni)) = (rendering_index, peek_native_index(vm)) {
-                if ni == ri {
-                    // Execute the rendering call so the frame is drawn
-                    match vm.step_one_debug() {
-                        StepResult::Continue { output, .. } => {
-                            if let Some(ref o) = output {
-                                output_buf.push(o.clone());
-                            }
-                        }
-                        StepResult::Finished { output } => {
-                            if let Some(ref o) = output {
-                                output_buf.push(o.clone());
-                            }
-                            return Ok(false);
-                        }
-                        StepResult::Error(msg) => {
-                            return Err(Box::new(NovaError::Runtime {
-                                msg: msg.into(),
-                            }));
-                        }
-                    }
-                    *step_count += 1;
-                    *frame_count += 1;
-                    return Ok(true);
-                }
-            }
-
-            // Execute the instruction normally
-            match vm.step_one_debug() {
-                StepResult::Continue { output, .. } => {
-                    if let Some(ref o) = output {
-                        output_buf.push(o.clone());
-                    }
-                }
-                StepResult::Finished { output } => {
-                    if let Some(ref o) = output {
-                        output_buf.push(o.clone());
-                    }
-                    return Ok(false);
-                }
-                StepResult::Error(msg) => {
-                    return Err(Box::new(NovaError::Runtime {
-                        msg: msg.into(),
-                    }));
-                }
-            }
-            *step_count += 1;
-        }
-    }
-
     // ── Banner ──────────────────────────────────────────────────
     eprintln!("╔══════════════════════════════════════════════════════════╗");
-    eprintln!("║        Nova Debugger  —  Raylib Mode                   ║");
+    eprintln!("║           Nova Debugger — Raylib Mode                  ║");
     eprintln!("╠══════════════════════════════════════════════════════════╣");
-    eprintln!("║  Raylib detected — using frame-stepping debugger.      ║");
-    eprintln!("║  The TUI is disabled so the raylib window can run.     ║");
-    eprintln!("║  The game runs at full speed by default.               ║");
+    eprintln!("║  Raylib program detected.                              ║");
+    eprintln!("║  The full TUI debugger is disabled so the raylib       ║");
+    eprintln!("║  window can run without interference.                  ║");
     eprintln!("║                                                        ║");
-    eprintln!("║  Keyboard (while game is running):                     ║");
-    eprintln!("║    p          pause at next frame boundary             ║");
-    eprintln!("║    q          quit debugger                            ║");
-    eprintln!("║                                                        ║");
-    eprintln!("║  When paused:                                          ║");
-    eprintln!("║    Space / n  step one frame                           ║");
-    eprintln!("║    c          continue (resume full speed)             ║");
-    eprintln!("║    s          show stack (top 20 entries)              ║");
-    eprintln!("║    l          show local variables                     ║");
-    eprintln!("║    g          show changed globals                     ║");
-    eprintln!("║    h          show heap summary                        ║");
-    eprintln!("║    i          show instruction pointer details         ║");
-    eprintln!("║    q          quit debugger                            ║");
+    eprintln!("║  The game will run at full speed.                      ║");
+    eprintln!("║  Frame and error information is printed to stderr.     ║");
+    eprintln!("║  Close the raylib window or press Ctrl+C to stop.     ║");
     eprintln!("╚══════════════════════════════════════════════════════════╝");
     eprintln!();
 
     let mut frame_count: u64 = 0;
     let mut step_count: u64 = 0;
-    let mut output_buf: Vec<String> = Vec::new();
-    let mut paused = false;
-    // In running mode, print a status line every N frames:
+    // Print a status line every N frames so the user knows it's alive:
     let report_interval: u64 = 300;
 
-    // Enable raw mode for non-blocking key detection, but do NOT
-    // enter alternate screen so the raylib window remains visible.
-    terminal::enable_raw_mode().map_err(|e| {
-        Box::new(NovaError::Runtime {
-            msg: format!("raw mode: {}", e).into(),
-        })
-    })?;
+    // No raw mode, no alternate screen — just run the VM.
+    loop {
+        if vm.state.current_instruction >= vm.state.program.len() {
+            eprintln!(
+                "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
+                frame_count, step_count,
+            );
+            return Ok(());
+        }
 
-    let result = (|| -> NovaResult<()> {
-        loop {
-            // ── Run one frame ───────────────────────────────────
-            let still_running = run_to_next_frame(
-                vm,
-                rendering_index,
-                &mut step_count,
-                &mut frame_count,
-                &mut output_buf,
-            )?;
-
-            // Flush any captured print output
-            if !output_buf.is_empty() {
-                // Temporarily leave raw mode so println works cleanly
-                let _ = terminal::disable_raw_mode();
-                for line in &output_buf {
-                    println!("{}", line);
+        // Check if the next instruction is raylib::rendering
+        if let (Some(ri), Some(ni)) = (rendering_index, peek_native_index(vm)) {
+            if ni == ri {
+                // Execute the rendering call so the frame is drawn
+                match vm.step_one_debug() {
+                    StepResult::Continue { output, .. } => {
+                        if let Some(ref o) = output {
+                            println!("{}", o);
+                        }
+                    }
+                    StepResult::Finished { output } => {
+                        if let Some(ref o) = output {
+                            println!("{}", o);
+                        }
+                        eprintln!(
+                            "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
+                            frame_count, step_count,
+                        );
+                        return Ok(());
+                    }
+                    StepResult::Error(msg) => {
+                        eprintln!(
+                            "\n[dbg-raylib] ERROR at frame {}, step {}: {}",
+                            frame_count, step_count, msg,
+                        );
+                        return Err(Box::new(NovaError::Runtime {
+                            msg: msg.into(),
+                        }));
+                    }
                 }
-                output_buf.clear();
-                let _ = terminal::enable_raw_mode();
-            }
+                step_count += 1;
+                frame_count += 1;
 
-            if !still_running {
-                let _ = terminal::disable_raw_mode();
+                // Periodic status
+                if frame_count % report_interval == 0 {
+                    eprintln!(
+                        "[dbg-raylib] frame {} | ip {} | stack {} | heap {} live",
+                        frame_count,
+                        vm.state.current_instruction,
+                        vm.state.memory.stack.len(),
+                        vm.state.memory.live_count(),
+                    );
+                }
+                continue;
+            }
+        }
+
+        // Execute the instruction normally
+        match vm.step_one_debug() {
+            StepResult::Continue { output, .. } => {
+                if let Some(ref o) = output {
+                    println!("{}", o);
+                }
+            }
+            StepResult::Finished { output } => {
+                if let Some(ref o) = output {
+                    println!("{}", o);
+                }
                 eprintln!(
-                    "[dbg-raylib] Program finished after {} frames, {} instructions.",
+                    "\n[dbg-raylib] Program finished after {} frames, {} instructions.",
                     frame_count, step_count,
                 );
                 return Ok(());
             }
-
-            // ── Periodic status in running mode ─────────────────
-            if !paused && frame_count % report_interval == 0 {
-                let _ = terminal::disable_raw_mode();
+            StepResult::Error(msg) => {
                 eprintln!(
-                    "[dbg-raylib] frame {} | ip {} | stack {} | heap {} live",
-                    frame_count,
-                    vm.state.current_instruction,
-                    vm.state.memory.stack.len(),
-                    vm.state.memory.live_count(),
+                    "\n[dbg-raylib] ERROR at step {}: {}",
+                    step_count, msg,
                 );
-                let _ = terminal::enable_raw_mode();
-            }
-
-            // ── Check for keypresses (non-blocking) ─────────────
-            while event::poll(Duration::ZERO).unwrap_or(false) {
-                if let Ok(Event::Key(KeyEvent { code: key, .. })) = event::read() {
-                    match key {
-                        KeyCode::Char('q') => {
-                            let _ = terminal::disable_raw_mode();
-                            eprintln!("[dbg-raylib] Quit.");
-                            return Ok(());
-                        }
-                        KeyCode::Char('p') if !paused => {
-                            paused = true;
-                            let _ = terminal::disable_raw_mode();
-                            eprintln!();
-                            eprintln!(
-                                "[PAUSED] frame {} | ip {} | stack {} | heap {} | (Space=step, c=continue, q=quit)",
-                                frame_count,
-                                vm.state.current_instruction,
-                                vm.state.memory.stack.len(),
-                                vm.state.memory.live_count(),
-                            );
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char(' ') | KeyCode::Char('n') if paused => {
-                            // Step one frame — the outer loop will do this
-                            // (stay paused, just let the loop iterate once)
-                        }
-                        KeyCode::Char('c') if paused => {
-                            paused = false;
-                            let _ = terminal::disable_raw_mode();
-                            eprintln!("[dbg-raylib] Resuming...");
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char('s') if paused => {
-                            let _ = terminal::disable_raw_mode();
-                            let st = &vm.state.memory.stack;
-                            if st.is_empty() {
-                                eprintln!("  (stack empty)");
-                            } else {
-                                let start = st.len().saturating_sub(20);
-                                for (i, v) in st.iter().enumerate().skip(start) {
-                                    let name = info
-                                        .global_names
-                                        .get(&(i as u32))
-                                        .cloned()
-                                        .unwrap_or_default();
-                                    if name.is_empty() {
-                                        eprintln!("  [{}] {:?}", i, v);
-                                    } else {
-                                        eprintln!("  [{}] {:?}  ({})", i, v, name);
-                                    }
-                                }
-                                if start > 0 {
-                                    eprintln!("  ... ({} more entries below)", start);
-                                }
-                            }
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char('l') if paused => {
-                            let _ = terminal::disable_raw_mode();
-                            let offset = vm.state.offset;
-                            let scope = 0u64;
-                            if let Some(local_names) = info.local_names.get(&scope) {
-                                for (idx, name) in local_names {
-                                    let abs_idx = offset + *idx as usize;
-                                    if abs_idx < vm.state.memory.stack.len() {
-                                        eprintln!(
-                                            "  {} = {:?}",
-                                            name, vm.state.memory.stack[abs_idx]
-                                        );
-                                    }
-                                }
-                            } else {
-                                eprintln!("  (no locals in current scope)");
-                            }
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char('g') if paused => {
-                            let _ = terminal::disable_raw_mode();
-                            for (idx, name) in &info.global_names {
-                                let i = *idx as usize;
-                                if i < vm.state.memory.stack.len() {
-                                    let v = &vm.state.memory.stack[i];
-                                    match v {
-                                        VmData::Function(_) | VmData::None => {}
-                                        _ => eprintln!("  {} = {:?}", name, v),
-                                    }
-                                }
-                            }
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char('h') if paused => {
-                            let _ = terminal::disable_raw_mode();
-                            eprintln!(
-                                "  live: {}  capacity: {}  free: {}  gc_threshold: {}",
-                                vm.state.memory.live_count(),
-                                vm.state.memory.heap_capacity(),
-                                vm.state.memory.free_count(),
-                                vm.state.memory.gc_threshold(),
-                            );
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        KeyCode::Char('i') if paused => {
-                            let _ = terminal::disable_raw_mode();
-                            let ip = vm.state.current_instruction;
-                            let prog = &vm.state.program;
-                            eprintln!("  IP: {} / {}", ip, prog.len());
-                            if ip < prog.len() {
-                                let opname = code::byte_to_string(prog[ip]);
-                                eprintln!("  next: {}", opname);
-                            }
-                            eprintln!("  callstack depth: {}", vm.state.callstack.len());
-                            eprintln!("  offset: {}", vm.state.offset);
-                            let _ = terminal::enable_raw_mode();
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // ── When paused, wait for a key before continuing ───
-            if paused {
-                // Block until the user presses a key.
-                // We use a short poll+sleep loop so that even while
-                // "blocked" on input the OS doesn't consider the
-                // process hung.  The raylib window is already painted
-                // for the current frame, so it will look frozen but
-                // that is intentional (we're paused).
-                loop {
-                    if event::poll(Duration::from_millis(100)).unwrap_or(false) {
-                        if let Ok(Event::Key(KeyEvent { code: key, .. })) = event::read() {
-                            match key {
-                                KeyCode::Char('q') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    eprintln!("[dbg-raylib] Quit.");
-                                    return Ok(());
-                                }
-                                KeyCode::Char(' ') | KeyCode::Char('n') => {
-                                    // Step one frame
-                                    let _ = terminal::disable_raw_mode();
-                                    eprintln!(
-                                        "[step] frame {} | ip {} | stack {}",
-                                        frame_count,
-                                        vm.state.current_instruction,
-                                        vm.state.memory.stack.len(),
-                                    );
-                                    let _ = terminal::enable_raw_mode();
-                                    break;
-                                }
-                                KeyCode::Char('c') => {
-                                    paused = false;
-                                    let _ = terminal::disable_raw_mode();
-                                    eprintln!("[dbg-raylib] Resuming...");
-                                    let _ = terminal::enable_raw_mode();
-                                    break;
-                                }
-                                KeyCode::Char('s') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    let st = &vm.state.memory.stack;
-                                    if st.is_empty() {
-                                        eprintln!("  (stack empty)");
-                                    } else {
-                                        let start = st.len().saturating_sub(20);
-                                        for (i, v) in st.iter().enumerate().skip(start) {
-                                            let name = info
-                                                .global_names
-                                                .get(&(i as u32))
-                                                .cloned()
-                                                .unwrap_or_default();
-                                            if name.is_empty() {
-                                                eprintln!("  [{}] {:?}", i, v);
-                                            } else {
-                                                eprintln!("  [{}] {:?}  ({})", i, v, name);
-                                            }
-                                        }
-                                        if start > 0 {
-                                            eprintln!("  ... ({} more entries below)", start);
-                                        }
-                                    }
-                                    let _ = terminal::enable_raw_mode();
-                                }
-                                KeyCode::Char('l') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    let offset = vm.state.offset;
-                                    let scope = 0u64;
-                                    if let Some(local_names) = info.local_names.get(&scope) {
-                                        for (idx, name) in local_names {
-                                            let abs_idx = offset + *idx as usize;
-                                            if abs_idx < vm.state.memory.stack.len() {
-                                                eprintln!(
-                                                    "  {} = {:?}",
-                                                    name, vm.state.memory.stack[abs_idx]
-                                                );
-                                            }
-                                        }
-                                    } else {
-                                        eprintln!("  (no locals in current scope)");
-                                    }
-                                    let _ = terminal::enable_raw_mode();
-                                }
-                                KeyCode::Char('g') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    for (idx, name) in &info.global_names {
-                                        let i = *idx as usize;
-                                        if i < vm.state.memory.stack.len() {
-                                            let v = &vm.state.memory.stack[i];
-                                            match v {
-                                                VmData::Function(_) | VmData::None => {}
-                                                _ => eprintln!("  {} = {:?}", name, v),
-                                            }
-                                        }
-                                    }
-                                    let _ = terminal::enable_raw_mode();
-                                }
-                                KeyCode::Char('h') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    eprintln!(
-                                        "  live: {}  capacity: {}  free: {}  gc_threshold: {}",
-                                        vm.state.memory.live_count(),
-                                        vm.state.memory.heap_capacity(),
-                                        vm.state.memory.free_count(),
-                                        vm.state.memory.gc_threshold(),
-                                    );
-                                    let _ = terminal::enable_raw_mode();
-                                }
-                                KeyCode::Char('i') => {
-                                    let _ = terminal::disable_raw_mode();
-                                    let ip = vm.state.current_instruction;
-                                    let prog = &vm.state.program;
-                                    eprintln!("  IP: {} / {}", ip, prog.len());
-                                    if ip < prog.len() {
-                                        let opname = code::byte_to_string(prog[ip]);
-                                        eprintln!("  next: {}", opname);
-                                    }
-                                    eprintln!("  callstack depth: {}", vm.state.callstack.len());
-                                    eprintln!("  offset: {}", vm.state.offset);
-                                    let _ = terminal::enable_raw_mode();
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
+                return Err(Box::new(NovaError::Runtime {
+                    msg: msg.into(),
+                }));
             }
         }
-    })();
-
-    // Always restore terminal state
-    let _ = terminal::disable_raw_mode();
-    result
+        step_count += 1;
+    }
 }
