@@ -106,7 +106,7 @@ nix-shell --run "cargo build --release"
 
 ## 3. Project Structure
 
-Nova is a Cargo **workspace** with 12 crates:
+Nova is a Cargo **workspace** with 14 crates:
 
 ```
 nova-lang/
@@ -118,6 +118,7 @@ nova-lang/
 ├── optimizer/     Bytecode optimisation passes
 ├── assembler/     Bytecode assembler
 ├── disassembler/  Bytecode disassembler (nova dis)
+├── debugger/      Interactive bytecode debugger (nova dbg)
 ├── vm/            Stack-based virtual machine
 ├── common/        Shared types (opcodes, environment, TType, etc.)
 ├── native/        Native function bindings (raylib, crossterm, regex, rand)
@@ -203,7 +204,7 @@ import super.std.grid
 - For games in `games/Dungeon/`, the import is `import super.super.std.grid`
   (two levels up to reach the `std/` directory).
 
-### Standard Library Modules (29 files)
+### Standard Library Modules (35 files)
 
 | Module | Purpose |
 |---|---|
@@ -216,6 +217,7 @@ import super.std.grid
 | `hashmap.nv` | O(1) HashMap |
 | `set.nv` | Hash set |
 | `deque.nv` | Double-ended queue |
+| `container.nv` | Godot-style layout containers for UI |
 | `maybe.nv` | Maybe(T) — Just/Nothing |
 | `result.nv` | Result(A,B) — Ok/Err |
 | `option.nv` | Option extensions |
@@ -236,6 +238,11 @@ import super.std.grid
 | `physics.nv` | Simple physics |
 | `timer.nv` | Timer utilities |
 | `tween.nv` | Easing/tween functions |
+| `datetime.nv` | Date and time utilities |
+| `gameloop.nv` | Automatic update system for game objects |
+| `log.nv` | Structured logging & debug utilities |
+| `particle.nv` | Simple particle system for games |
+| `signal.nv` | Godot-style signal/event system |
 
 ---
 
@@ -270,12 +277,12 @@ bash tests/run_tests.sh
 The runner finds all `tests/test_*.nv` files (positive tests) and all
 `tests/should_fail/*.nv` files (rejection tests).
 
-**Current count:** 301 tests (124 positive + 177 rejection), all passing.
+**Current count:** 365 tests (153 positive + 212 rejection), all passing.
 
 | Test category | Count | What it tests |
 |---|---|---|
-| Positive (`test_*.nv`) | 124 | Correct programs that must compile and output "PASS:" |
-| Rejection (`should_fail/`) | 177 | Invalid programs that must be rejected by the type checker or parser |
+| Positive (`test_*.nv`) | 153 | Correct programs that must compile and output "PASS:" |
+| Rejection (`should_fail/`) | 212 | Invalid programs that must be rejected by the type checker or parser |
 
 ### Key Test Files
 
@@ -355,10 +362,10 @@ directory would need manual placement.
    raylib because native functions are registered unconditionally. A future
    feature-flag could make raylib optional.
 
-3. **No package manager:** There is no `nova install <package>` mechanism.
-   Third-party libraries can be fetched from GitHub using `import @` in
-   source code or `nova init --with` to download an entire folder, but
-   there is no versioned dependency resolution or lockfile.
+3. **No versioned package registry:** `nova install` fetches raw source files
+   from GitHub into `libs/` — there is no versioned dependency resolution,
+   lockfile, or central package registry. Pin to a specific commit with
+   `import @ "..." ! "hash"` for reproducibility.
 
 4. **Single-file compilation:** Each `nova run` re-compiles from source.
    There is no separate "compile to `.nvbc`" then "run `.nvbc`" workflow
