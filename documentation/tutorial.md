@@ -1974,9 +1974,10 @@ struct Player {
 }
 
 let loaded = Data::load("player.json")@[T:Player]
-match loaded {
-    Some(p) => println(p.name),   // "Alice"
-    None    => println("no save found"),
+if let p = loaded {
+    println(p.name)               // "Alice"
+} else {
+    println("no save found")
 }
 ```
 

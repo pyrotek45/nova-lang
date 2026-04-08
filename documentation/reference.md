@@ -1761,7 +1761,8 @@ import super.std.tween
 Animate values from start to end with various easing curves.
 
 ```rust
-let slide = Tween::easeOut(0.0, 400.0, 1.0)  // 0→400 in 1 second
+// Use Tween::new with an Ease function for any curve
+let slide = Tween::new(0.0, 400.0, 1.0, fn(t: Float) -> Float { return Ease::easeOut(t) })
 
 while raylib::rendering() {
     let dt = raylib::getFrameTime()
@@ -1774,24 +1775,61 @@ while raylib::rendering() {
 }
 ```
 
-| Constructor | Easing |
+#### Constructors
+
+| Constructor | Description |
 |---|---|
-| `Tween::linear(start, end, duration)` | Constant speed |
-| `Tween::easeIn(start, end, duration)` | Accelerating (quadratic) |
-| `Tween::easeOut(start, end, duration)` | Decelerating (quadratic) |
-| `Tween::smooth(start, end, duration)` | Ease-in-out |
-| `Tween::easeOutBounce(start, end, duration)` | Bouncy landing |
-| `Tween::easeOutElastic(start, end, duration)` | Spring overshoot |
-| `Tween::easeOutBack(start, end, duration)` | Snappy overshoot |
-| `Tween::sineInOut(start, end, duration)` | Gentle sine wave |
+| `Tween::new(from, to, duration, easeFn)` | Create with custom easing function |
+| `Tween::linear(from, to, duration)` | Shorthand for constant-speed interpolation |
+| `Tween::smooth(from, to, duration)` | Shorthand for ease-in-out quadratic |
+
+#### Ease Functions
+
+All take `t` in `[0.0, 1.0]` and return `[0.0, 1.0]`. Pass to `Tween::new`:
+
+```rust
+// Example: create a bounce tween
+let bounce = Tween::new(0.0, 100.0, 2.0, fn(t: Float) -> Float { return Ease::easeOutBounce(t) })
+```
+
+| Function | Easing |
+|---|---|
+| `Ease::linear(t)` | Constant speed |
+| `Ease::easeIn(t)` | Quadratic accelerating |
+| `Ease::easeOut(t)` | Quadratic decelerating |
+| `Ease::easeInOut(t)` | Quadratic ease-in-out |
+| `Ease::easeInCubic(t)` | Cubic accelerating |
+| `Ease::easeOutCubic(t)` | Cubic decelerating |
+| `Ease::easeInOutCubic(t)` | Cubic ease-in-out |
+| `Ease::sineIn(t)` | Sine accelerating |
+| `Ease::sineOut(t)` | Sine decelerating |
+| `Ease::sineInOut(t)` | Sine ease-in-out |
+| `Ease::easeInBack(t)` | Back (overshoot) in |
+| `Ease::easeOutBack(t)` | Back (overshoot) out |
+| `Ease::easeInBounce(t)` | Bounce in |
+| `Ease::easeOutBounce(t)` | Bounce out |
+| `Ease::easeInElastic(t)` | Elastic in |
+| `Ease::easeOutElastic(t)` | Elastic out |
+
+#### Tween Methods
 
 | Method | Description |
 |---|---|
 | `.update(dt)` | Advance and return current value |
+| `.tweenValue()` | Current value without advancing |
 | `.isDone()` | True when reached end |
+| `.progress()` | Normalized progress `0.0..1.0` |
+| `.remaining()` | Seconds remaining |
 | `.ping()` | Reverse direction (start ↔ end) |
 | `.reset()` | Restart from beginning |
-| `.value()` | Current value without advancing |
+| `.restart(from, to)` | Set new endpoints and restart |
+
+#### Lerp Helpers
+
+| Function | Description |
+|---|---|
+| `lerpF(a, b, t)` → `Float` | Linear interpolation (Float) |
+| `lerpI(a, b, t)` → `Int` | Linear interpolation (Int) |
 
 ---
 
