@@ -668,6 +668,18 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::regex::regex_first,
         );
+        // Regex::split(pattern, text) -> [String]
+        self.add_function(
+            "Regex::split",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::regex::regex_split,
+        );
         // add printf function (overload with list)
         self.add_function(
             "printf",
@@ -1066,6 +1078,36 @@ impl NovaCore {
             common::nodes::SymbolKind::Function,
             native::str::str_trim_end,
         );
+        // String::trimChars(s, chars) -> String
+        self.add_function(
+            "String::trimChars",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim_chars,
+        );
+        // String::trimStartChars(s, chars) -> String
+        self.add_function(
+            "String::trimStartChars",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim_start_chars,
+        );
+        // String::trimEndChars(s, chars) -> String
+        self.add_function(
+            "String::trimEndChars",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::String),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_trim_end_chars,
+        );
         self.add_function(
             "String::toUpper",
             TType::Function {
@@ -1170,6 +1212,18 @@ impl NovaCore {
             },
             common::nodes::SymbolKind::Function,
             native::str::str_split,
+        );
+        // String::splitAny(s, chars) -> [String]
+        self.add_function(
+            "String::splitAny",
+            TType::Function {
+                parameters: vec![TType::String, TType::String],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::String),
+                }),
+            },
+            common::nodes::SymbolKind::Function,
+            native::str::str_split_any,
         );
         self.add_function(
             "join",

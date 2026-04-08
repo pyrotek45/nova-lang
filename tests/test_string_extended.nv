@@ -1,0 +1,246 @@
+module test_string_extended
+
+// ============================================================
+//  Tests for extended string manipulation functions
+//
+//  Covers:
+//    String::splitAny(s, chars)        -> [String]
+//    String::trimChars(s, chars)       -> String
+//    String::trimStartChars(s, chars)  -> String
+//    String::trimEndChars(s, chars)    -> String
+//    Regex::split(pattern, text)       -> [String]
+//    Dyn .type field access
+// ============================================================
+
+// ────────────────────────────────────────────────────────────
+// 1. String::splitAny
+// ────────────────────────────────────────────────────────────
+
+// Basic multi-delimiter split
+let p1 = "hello,world;foo:bar".splitAny(",;:")
+assert(p1.len() == 4, "splitAny basic count")
+assert(p1[0] == "hello", "splitAny[0]")
+assert(p1[1] == "world", "splitAny[1]")
+assert(p1[2] == "foo", "splitAny[2]")
+assert(p1[3] == "bar", "splitAny[3]")
+
+// Single delimiter (same as regular split)
+let p2 = "a-b-c".splitAny("-")
+assert(p2.len() == 3, "splitAny single delim count")
+assert(p2[0] == "a", "splitAny single[0]")
+assert(p2[1] == "b", "splitAny single[1]")
+assert(p2[2] == "c", "splitAny single[2]")
+
+// Consecutive delimiters produce empty strings
+let p3 = "a,,b".splitAny(",")
+assert(p3.len() == 3, "splitAny consecutive count")
+assert(p3[0] == "a", "splitAny consec[0]")
+assert(p3[1] == "", "splitAny consec[1] empty")
+assert(p3[2] == "b", "splitAny consec[2]")
+
+// Delimiter at start/end
+let p4 = ",hello,".splitAny(",")
+assert(p4.len() == 3, "splitAny edges count")
+assert(p4[0] == "", "splitAny edge[0] empty")
+assert(p4[1] == "hello", "splitAny edge[1]")
+assert(p4[2] == "", "splitAny edge[2] empty")
+
+// No delimiters found → single-element list
+let p5 = "hello".splitAny(",;:")
+assert(p5.len() == 1, "splitAny no match count")
+assert(p5[0] == "hello", "splitAny no match[0]")
+
+// Empty string
+let p6 = "".splitAny(",")
+assert(p6.len() == 1, "splitAny empty str count")
+assert(p6[0] == "", "splitAny empty str[0]")
+
+// Split on whitespace characters
+let p7 = "hello world\tfoo".splitAny(" \t")
+assert(p7.len() == 3, "splitAny whitespace count")
+assert(p7[0] == "hello", "splitAny ws[0]")
+assert(p7[1] == "world", "splitAny ws[1]")
+assert(p7[2] == "foo", "splitAny ws[2]")
+
+// PL dev use case: tokenizer splitting on operators
+let p8 = "x+y*z-w".splitAny("+-*")
+assert(p8.len() == 4, "splitAny operators count")
+assert(p8[0] == "x", "splitAny op[0]")
+assert(p8[1] == "y", "splitAny op[1]")
+assert(p8[2] == "z", "splitAny op[2]")
+assert(p8[3] == "w", "splitAny op[3]")
+
+println("PASS: splitAny (8 groups)")
+
+// ────────────────────────────────────────────────────────────
+// 2. String::trimChars
+// ────────────────────────────────────────────────────────────
+
+// Trim dots from both ends
+assert("...hello...".trimChars(".") == "hello", "trimChars dots")
+
+// Trim multiple different characters
+assert("xyhelloxy".trimChars("xy") == "hello", "trimChars multi chars")
+
+// Trim hash
+assert("##hello##".trimChars("#") == "hello", "trimChars hash")
+
+// Trim nothing (chars not present at edges)
+assert("hello".trimChars(".") == "hello", "trimChars no-op")
+
+// Trim everything
+assert("xxxx".trimChars("x") == "", "trimChars all gone")
+
+// Empty string
+assert("".trimChars("xyz") == "", "trimChars empty")
+
+// Trim whitespace + punctuation (PL dev: cleaning source tokens)
+assert("  ,hello,  ".trimChars(" ,") == "hello", "trimChars ws+punct")
+
+// Only trim from edges, not interior
+assert(".he.llo.".trimChars(".") == "he.llo", "trimChars interior preserved")
+
+println("PASS: trimChars (8 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 3. String::trimStartChars
+// ────────────────────────────────────────────────────────────
+
+assert("...hello...".trimStartChars(".") == "hello...", "trimStartChars basic")
+assert("xxyhello".trimStartChars("xy") == "hello", "trimStartChars multi")
+assert("hello".trimStartChars(".") == "hello", "trimStartChars no-op")
+assert("".trimStartChars("x") == "", "trimStartChars empty")
+assert("###".trimStartChars("#") == "", "trimStartChars all")
+
+// PL dev: strip leading comment markers
+assert("// hello".trimStartChars("/ ") == "hello", "trimStartChars comments")
+
+println("PASS: trimStartChars (6 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 4. String::trimEndChars
+// ────────────────────────────────────────────────────────────
+
+assert("hello...".trimEndChars(".") == "hello", "trimEndChars basic")
+assert("helloxyy".trimEndChars("xy") == "hello", "trimEndChars multi")
+assert("hello".trimEndChars(".") == "hello", "trimEndChars no-op")
+assert("".trimEndChars("x") == "", "trimEndChars empty")
+assert("###".trimEndChars("#") == "", "trimEndChars all")
+
+// PL dev: strip trailing semicolons/whitespace
+assert("hello;  ".trimEndChars("; ") == "hello", "trimEndChars semi+ws")
+
+println("PASS: trimEndChars (6 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 5. Regex::split
+// ────────────────────────────────────────────────────────────
+
+// Split on whitespace runs
+let r1 = Regex::split("\\s+", "hello   world  foo")
+assert(r1.len() == 3, "Regex::split ws count")
+assert(r1[0] == "hello", "Regex::split ws[0]")
+assert(r1[1] == "world", "Regex::split ws[1]")
+assert(r1[2] == "foo", "Regex::split ws[2]")
+
+// Split on digits
+let r2 = Regex::split("\\d+", "abc123def456ghi")
+assert(r2.len() == 3, "Regex::split digits count")
+assert(r2[0] == "abc", "Regex::split dig[0]")
+assert(r2[1] == "def", "Regex::split dig[1]")
+assert(r2[2] == "ghi", "Regex::split dig[2]")
+
+// Split on punctuation
+let r3 = Regex::split("[,;:]+", "a,,b;c:d")
+assert(r3.len() == 4, "Regex::split punct count")
+assert(r3[0] == "a", "Regex::split punct[0]")
+assert(r3[1] == "b", "Regex::split punct[1]")
+assert(r3[2] == "c", "Regex::split punct[2]")
+assert(r3[3] == "d", "Regex::split punct[3]")
+
+// No match → single element
+let r4 = Regex::split("\\d+", "hello")
+assert(r4.len() == 1, "Regex::split no match count")
+assert(r4[0] == "hello", "Regex::split no match[0]")
+
+// Invalid regex → single element [text]
+let r5 = Regex::split("[invalid", "hello world")
+assert(r5.len() == 1, "Regex::split invalid count")
+assert(r5[0] == "hello world", "Regex::split invalid[0]")
+
+// PL dev use case: split on operator tokens
+let r6 = Regex::split("[+\\-*/=<>!&|]+", "x+y==z*w")
+assert(r6.len() == 4, "Regex::split ops count")
+assert(r6[0] == "x", "Regex::split ops[0]")
+assert(r6[1] == "y", "Regex::split ops[1]")
+assert(r6[2] == "z", "Regex::split ops[2]")
+assert(r6[3] == "w", "Regex::split ops[3]")
+
+println("PASS: Regex::split (6 groups)")
+
+// ────────────────────────────────────────────────────────────
+// 6. Dyn .type field access
+// ────────────────────────────────────────────────────────────
+
+struct Dog {
+    name: String,
+    age: Int
+}
+
+struct Cat {
+    name: String,
+    lives: Int
+}
+
+struct Robot {
+    name: String,
+    model: Int
+}
+
+let d = Dog { name: "Rex", age: 5 }
+let c = Cat { name: "Whiskers", lives: 9 }
+let r = Robot { name: "R2D2", model: 2 }
+
+// Direct .type access
+assert(d.type == "Dog", "direct type Dog")
+assert(c.type == "Cat", "direct type Cat")
+assert(r.type == "Robot", "direct type Robot")
+
+// .type through Dyn function
+fn get_type(thing: Dyn(T = name: String)) -> String {
+    return thing.type
+}
+
+assert(get_type(d) == "Dog", "dyn type Dog")
+assert(get_type(c) == "Cat", "dyn type Cat")
+assert(get_type(r) == "Robot", "dyn type Robot")
+
+// isinstance pattern
+fn isInstanceOf(thing: Dyn(T = name: String), typeName: String) -> Bool {
+    return thing.type == typeName
+}
+
+assert(isInstanceOf(d, "Dog") == true, "isinstance dog=Dog")
+assert(isInstanceOf(d, "Cat") == false, "isinstance dog!=Cat")
+assert(isInstanceOf(c, "Cat") == true, "isinstance cat=Cat")
+assert(isInstanceOf(r, "Robot") == true, "isinstance robot=Robot")
+
+// Dynamic dispatch via .type
+fn describe(thing: Dyn(T = name: String)) -> String {
+    if thing.type == "Dog" {
+        return thing.name + " is a dog"
+    } elif thing.type == "Cat" {
+        return thing.name + " is a cat"
+    } else {
+        return thing.name + " is a " + thing.type
+    }
+}
+
+assert(describe(d) == "Rex is a dog", "dispatch Dog")
+assert(describe(c) == "Whiskers is a cat", "dispatch Cat")
+assert(describe(r) == "R2D2 is a Robot", "dispatch Robot")
+
+println("PASS: Dyn .type (15 assertions)")
+
+// ────────────────────────────────────────────────────────────
+println("All extended string tests passed!")

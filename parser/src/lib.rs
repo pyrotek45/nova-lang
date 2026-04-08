@@ -990,7 +990,16 @@ impl Parser {
         } else {
             // check if dynamic type with fields in contract
             if let TType::Dyn { contract, .. } = lhs.get_type() {
-                if let Some((name, field_type)) = contract
+                if identifier.as_ref() == "type" {
+                    // Every struct has an implicit "type" field (String) at runtime.
+                    // Allow it on Dyn even though it's not in the contract.
+                    lhs = Expr::DynField {
+                        ttype: TType::String,
+                        name: "type".into(),
+                        expr: Box::new(lhs),
+                        position: pos.clone(),
+                    };
+                } else if let Some((name, field_type)) = contract
                     .iter()
                     .find(|(name, _)| name.as_ref() == identifier.as_ref())
                 {

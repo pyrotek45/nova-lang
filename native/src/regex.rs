@@ -103,3 +103,31 @@ pub fn regex_first(state: &mut state::State) -> NovaResult<()> {
     state.memory.push_list(list_data);
     Ok(())
 }
+
+/// Regex::split(pattern: String, text: String) -> [String]
+/// Split `text` by all non-overlapping matches of `pattern`.
+/// Returns the original text in a single-element list on invalid regex.
+pub fn regex_split(state: &mut state::State) -> NovaResult<()> {
+    let text = pop_string(state)?;
+    let pattern = pop_string(state)?;
+
+    let re = match regex::Regex::new(&pattern) {
+        Ok(re) => re,
+        Err(_) => {
+            // Invalid regex pattern — return [text] unchanged
+            let idx = state.memory.allocate(Object::string(text));
+            state.memory.push_list(vec![VmData::Object(idx)]);
+            return Ok(());
+        }
+    };
+
+    let parts: Vec<VmData> = re
+        .split(&text)
+        .map(|p| {
+            let idx = state.memory.allocate(Object::string(p.to_string()));
+            VmData::Object(idx)
+        })
+        .collect();
+    state.memory.push_list(parts);
+    Ok(())
+}

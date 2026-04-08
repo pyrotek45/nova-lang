@@ -1593,6 +1593,28 @@ fn drawAll(items: [drawable]) {
 }
 ```
 
+### Runtime `.type` through Dyn
+
+Every struct has a built-in `.type` field (see section 9). This field is
+also accessible through Dyn, even when `type` is not listed in the contract.
+This enables runtime type inspection and `instanceof`-style dispatch:
+
+```rust
+fn describe(thing: Dyn(T = name: String)) -> String {
+    if thing.type == "Dog" {
+        return thing.name + " is a dog"
+    } elif thing.type == "Cat" {
+        return thing.name + " is a cat"
+    } else {
+        return thing.name + " is a " + thing.type
+    }
+}
+
+fn isInstanceOf(thing: Dyn(T = name: String), typeName: String) -> Bool {
+    return thing.type == typeName
+}
+```
+
 ---
 
 ## 19. Box and Mutable Shared State

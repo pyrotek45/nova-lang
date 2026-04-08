@@ -126,6 +126,9 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `String::trim(String) -> String` | Remove leading and trailing whitespace. |
 | `String::trimStart(String) -> String` | Remove leading whitespace. |
 | `String::trimEnd(String) -> String` | Remove trailing whitespace. |
+| `String::trimChars(String, String) -> String` | Trim any character in `chars` from both ends. |
+| `String::trimStartChars(String, String) -> String` | Trim any character in `chars` from the start. |
+| `String::trimEndChars(String, String) -> String` | Trim any character in `chars` from the end. |
 | `String::toUpper(String) -> String` | Convert to uppercase. |
 | `String::toLower(String) -> String` | Convert to lowercase. |
 | `String::replace(String, String, String) -> String` | Replace all occurrences of a substring. |
@@ -137,6 +140,7 @@ if let d = readFile("x") { ... }  // ✓ handle both cases
 | `String::charAt(String, Int) -> Option(Char)` | Character at index, or None. |
 | `String::get(String, Int) -> Option(Char)` | Safe character index — supports negative indices (`-1` = last). |
 | `String::split(String, String) -> [String]` | Split by a delimiter. |
+| `String::splitAny(String, String) -> [String]` | Split on any character in the second string. |
 | `join([String], String) -> String` | Join strings with a separator. |
 | `String::toInt(String) -> Option(Int)` | Parse a string as an integer. |
 
@@ -253,6 +257,7 @@ Invalid regex patterns are handled gracefully (no crash).
 | `Regex::matches(pattern: String, text: String) -> Bool` | Test whether `text` matches `pattern`. Returns `false` on invalid regex. |
 | `Regex::first(pattern: String, text: String) -> Option((Int, Int, String))` | First match: `(start, end, matched_text)`. Returns `None` on invalid regex or no match. |
 | `Regex::captures(pattern: String, text: String) -> [String]` | All non-overlapping full-pattern matches in `text`. Returns `[]` on invalid regex or no match. |
+| `Regex::split(pattern: String, text: String) -> [String]` | Split `text` by all non-overlapping matches of `pattern`. Returns `[text]` on invalid regex. |
 
 > **Note:** `Regex::captures` uses `find_iter` internally — it returns all
 > non-overlapping matches of the **entire pattern**, not individual capture
@@ -523,6 +528,30 @@ collatz(6)   // [6, 3, 10, 5, 16, 8, 4, 2, 1]
 | `isPrime(n)` | Standalone primality test |
 | `primes(n)` | All primes ≤ n (Sieve of Eratosthenes) |
 | `collatz(n)` | Collatz sequence from n to 1 |
+
+---
+
+### Native String Splitting & Trimming (UFCS)
+
+These built-in functions work out of the box — no import needed.
+
+```rust
+// splitAny: split on any character in a set
+"hello,world;foo:bar".splitAny(",;:")    // ["hello", "world", "foo", "bar"]
+"x+y*z-w".splitAny("+-*")               // ["x", "y", "z", "w"]
+
+// trimChars: trim specific characters from both ends
+"...hello...".trimChars(".")             // "hello"
+"xyhelloxy".trimChars("xy")             // "hello"
+
+// trimStartChars / trimEndChars: trim from one end only
+"// comment".trimStartChars("/ ")        // "comment"
+"hello;  ".trimEndChars("; ")            // "hello"
+
+// Regex::split: split by a regex pattern
+Regex::split("\\s+", "hello   world  foo")  // ["hello", "world", "foo"]
+Regex::split("[,;:]+", "a,,b;c:d")          // ["a", "b", "c", "d"]
+```
 
 ---
 

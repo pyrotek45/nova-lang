@@ -415,3 +415,58 @@ pub fn hash_value(state: &mut state::State) -> NovaResult<()> {
     state.memory.stack.push(VmData::Int(h.wrapping_abs()));
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Extended string manipulation
+// ---------------------------------------------------------------------------
+
+/// String::splitAny(s: String, chars: String) -> [String]
+/// Split `s` on any character that appears in `chars`.
+/// Empty segments between consecutive delimiters are preserved (matches Python behaviour).
+pub fn str_split_any(state: &mut state::State) -> NovaResult<()> {
+    let chars = pop_string(state)?;
+    let s = pop_string(state)?;
+    let parts: Vec<VmData> = s
+        .split(|c: char| chars.contains(c))
+        .map(|p| {
+            let idx = state.memory.allocate(Object::string(p.to_string()));
+            VmData::Object(idx)
+        })
+        .collect();
+    state.memory.push_list(parts);
+    Ok(())
+}
+
+/// String::trimChars(s: String, chars: String) -> String
+/// Trim any character in `chars` from both ends of `s`.
+pub fn str_trim_chars(state: &mut state::State) -> NovaResult<()> {
+    let chars = pop_string(state)?;
+    let s = pop_string(state)?;
+    let trimmed = s.trim_matches(|c: char| chars.contains(c)).to_string();
+    state.memory.push_string(trimmed);
+    Ok(())
+}
+
+/// String::trimStartChars(s: String, chars: String) -> String
+/// Trim any character in `chars` from the start of `s`.
+pub fn str_trim_start_chars(state: &mut state::State) -> NovaResult<()> {
+    let chars = pop_string(state)?;
+    let s = pop_string(state)?;
+    let trimmed = s
+        .trim_start_matches(|c: char| chars.contains(c))
+        .to_string();
+    state.memory.push_string(trimmed);
+    Ok(())
+}
+
+/// String::trimEndChars(s: String, chars: String) -> String
+/// Trim any character in `chars` from the end of `s`.
+pub fn str_trim_end_chars(state: &mut state::State) -> NovaResult<()> {
+    let chars = pop_string(state)?;
+    let s = pop_string(state)?;
+    let trimmed = s
+        .trim_end_matches(|c: char| chars.contains(c))
+        .to_string();
+    state.memory.push_string(trimmed);
+    Ok(())
+}
