@@ -440,8 +440,22 @@ while running && !paused {
 
 ### Compound Assignment
 
-`+=` and `-=` are available. There is **no `*=` or `/=`** — write `x = x * 2`
-or `x = x / 2`.
+`+=`, `-=`, `*=`, and `/=` are available for `Int` and `Float` types.
+
+```nova
+let x: Int = 10
+x += 5   // x is now 15
+x -= 3   // x is now 12
+x *= 2   // x is now 24
+x /= 4   // x is now 6
+```
+
+These also work on struct fields and list elements:
+
+```nova
+p.x *= 2
+arr[0] /= 5
+```
 
 ### Unary Minus
 
@@ -972,8 +986,7 @@ fn extends __eq__(a: Point, b: Point) -> Bool {
 ```
 
 Available dunders: `__add__`, `__sub__`, `__mul__`, `__div__`, `__mod__`,
-`__eq__`, `__neq__`, `__lt__`, `__gt__`, `__lte__`, `__gte__`, `__neg__`,
-`__index__`, `__setindex__`, `__display__`.
+`__eq__`, `__ne__`, `__lt__`, `__gt__`, `__le__`, `__ge__`.
 
 ### Saving and Loading Structs
 
@@ -2252,7 +2265,7 @@ Dyn types, and extends + UFCS.
 - Closures with control flow need full `fn` syntax (not short lambda)
 - Bar closures (`||`) cannot have `-> Type` annotations — use `fn()` instead
 - Every function returning a value needs explicit `return`
-- No `*=` or `/=` operators — write `x = x * 2` or `x = x / 2`
+- Compound assignment: `+=`, `-=`, `*=`, `/=` work on `Int` and `Float` (also on struct fields and list elements)
 - Empty lists need type annotation: `let xs = []: Int`
 - No-data enum variants need `()`: `Color::Red()`
 - String concatenation: only `String + String`; use `Cast::string` to convert
@@ -2293,7 +2306,7 @@ Dyn types, and extends + UFCS.
 | Mistake | Fix |
 |---|---|
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
-| `x *= 2` | No `*=` or `/=` — use `x = x * 2` |
+| `x *= 2` | Works! `*=` and `/=` are supported for `Int` and `Float` |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
 | `5 \|> println` | Pipe needs `()` — write `5 \|> println()` |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends |
