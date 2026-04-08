@@ -126,10 +126,12 @@ fn ranges() {
 #[test]
 fn operators() {
     assert_input_output(
-        "+= -= && || :: : >= <= == = -> > < + - / * % != ! ~> ..= ..",
+        "+= -= *= /= && || :: : >= <= == = -> > < + - / * % != ! ~> ..= ..",
         [
             AddAssign,
             SubAssign,
+            MulAssign,
+            DivAssign,
             And,
             Or,
             DoubleColon,

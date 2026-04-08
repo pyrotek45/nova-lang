@@ -26,11 +26,14 @@ impl Display for Unary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operator {
-    // TODO: Add MulAssign, DivAssign and similar variants for the rest of the binary operators
     /// +=
     AddAssign,
     /// -=
     SubAssign,
+    /// *=
+    MulAssign,
+    /// /=
+    DivAssign,
     /// &&
     And,
     /// ||
@@ -96,6 +99,8 @@ impl Display for Operator {
         let s = match self {
             Operator::AddAssign => "+=",
             Operator::SubAssign => "-=",
+            Operator::MulAssign => "*=",
+            Operator::DivAssign => "/=",
             Operator::And => "&&",
             Operator::Or => "||",
             Operator::DoubleColon => "::",
@@ -334,7 +339,7 @@ impl Token {
     pub const fn is_assign(&self) -> bool {
         matches!(
             self.value,
-            TokenValue::Operator(Operator::Assignment | Operator::AddAssign | Operator::SubAssign)
+            TokenValue::Operator(Operator::Assignment | Operator::AddAssign | Operator::SubAssign | Operator::MulAssign | Operator::DivAssign)
         )
     }
 

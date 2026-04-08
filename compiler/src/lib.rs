@@ -1425,6 +1425,66 @@ impl Compiler {
                             _ => self.asm.push(Asm::ASSIGN),
                         }
                     }
+                    common::tokens::Operator::MulAssign => {
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::IMUL);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FMUL);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.getref_expr(lhs)?;
+
+                        match **lhs {
+                            Expr::Field { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            Expr::Indexed { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            _ => self.asm.push(Asm::ASSIGN),
+                        }
+                    }
+                    common::tokens::Operator::DivAssign => {
+                        self.compile_expr(lhs)?;
+                        self.compile_expr(rhs)?;
+                        if lhs.get_type() == TType::Int {
+                            self.asm.push(Asm::IDIV);
+                        } else if lhs.get_type() == TType::Float {
+                            self.asm.push(Asm::FDIV);
+                        } else {
+                            dbg!(&ttype);
+                        }
+                        self.getref_expr(lhs)?;
+
+                        match **lhs {
+                            Expr::Field { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            Expr::Indexed { .. } => {
+                                self.asm.push(Asm::PIN(FilePosition {
+                                    filepath: None,
+                                    line: 0,
+                                    col: 0,
+                                }));
+                            }
+                            _ => self.asm.push(Asm::ASSIGN),
+                        }
+                    }
                     common::tokens::Operator::Concat => {
                         self.compile_expr(lhs)?;
                         self.compile_expr(rhs)?;
