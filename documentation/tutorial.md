@@ -935,9 +935,12 @@ struct Button {
 }
 
 let b = Button { label: "Go", onClick: fn() { println("clicked!") } }
-b::onClick()    // :: calls without passing self
-b->onClick()    // -> calls with b as first argument
+b::onClick()    // :: calls without passing self — works with fn()
 ```
+
+> **`::` vs `->` rule of thumb** — use `::` when the closure does *not*
+> need the struct (`fn()`). Use `->` when the closure's **first
+> parameter** matches the struct type (`fn(Button) -> …`).
 
 ### `::` — Call without Self
 
@@ -972,6 +975,45 @@ e->greet()   // "Hi, I'm Nova"  —  greet(e) is called
 ```
 
 Both operators also work through `Dyn` types (see section 18).
+
+### The `Self` Type Alias
+
+Inside a struct or enum definition, `Self` is a built-in type alias that
+refers to the type being defined — including its generic parameters.
+This avoids repeating the full type name in function-field signatures:
+
+```rust
+struct Counter {
+    count: Int,
+    increment: fn(Self) -> Self,   // same as fn(Counter) -> Counter
+}
+
+let c = Counter {
+    count: 0,
+    increment: fn(self: Counter) -> Counter {
+        return Counter { count: self.count + 1, increment: self.increment }
+    },
+}
+c->increment().count   // 1
+```
+
+`Self` also works with generic structs and enums:
+
+```rust
+struct Wrapper(T) {
+    value: $T,
+    map: fn(Self, fn($T) -> $T) -> Self,   // Self = Wrapper($T)
+}
+
+enum Expr {
+    Num: Int,
+    Add: (Self, Self),   // Self = Expr (recursive)
+}
+```
+
+> `Self` is only valid inside the `{ … }` body of a `struct` or `enum`
+> declaration. It cannot be used in standalone functions or `extends`
+> blocks.
 
 ### The `type` Field
 
@@ -1137,8 +1179,11 @@ let strGrid  = Grid::new(3, 3, ".")     @[T: String]  // Grid(String)
 
 ### Constraints
 
-Generics are structurally typed — any type that supports the operations used in the
-body will work.
+Generics are **type-erased** — a generic parameter accepts any concrete
+type at the call site. There are no trait bounds or structural
+requirements on the type parameter itself. If you need structural
+constraints (e.g., "must have a `.name` field"), use `Dyn` instead
+(see section 18).
 
 ### Generics and Data Serialization
 
