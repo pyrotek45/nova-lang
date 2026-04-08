@@ -2195,7 +2195,6 @@ Generics give you:
 - **Compile-time type checking** on every operation
 - **No code bloat** — Nova uses *type erasure*, not monomorphisation. The compiler emits the **same opcodes** regardless of the concrete type, so a `Grid(Int)` and a `Grid(String)` share identical bytecode. The type parameter exists only at compile time for safety; at runtime the VM handles all values uniformly.
 - **Better error messages** — the compiler knows the exact types
-- **Full IDE/editor support** — auto-complete, hover info, etc.
 
 Reserve `Any` for truly polymorphic built-in operations (printing,
 debugging) where the concrete type genuinely doesn't matter.

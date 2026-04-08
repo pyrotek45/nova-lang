@@ -76,8 +76,8 @@ These functions are available without any imports.
 |---|---|
 | `Some(a) -> Option(a)` | Wrap a value in an Option. |
 | `None(T) -> Option(T)` | Create an empty Option of a given type. |
-| `isSome(Option(a)) -> Bool` | Check if an Option contains a value. |
-| `unwrap(Option(a)) -> a` | Extract the value. Panics if None. |
+| `Option::isSome(Option(a)) -> Bool` | Check if an Option contains a value. UFCS: `opt.isSome()`. |
+| `Option::unwrap(Option(a)) -> a` | Extract the value. Panics if None. UFCS: `opt.unwrap()`. |
 
 **The `?` operator** — shorthand for `.unwrap()`:
 
