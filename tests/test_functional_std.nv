@@ -1,0 +1,317 @@
+module test_functional_std
+
+import super.std.functional
+
+// ============================================================
+//  Comprehensive test for every function in std/functional.nv
+//
+//  Functions tested:
+//    compose, pipe, flip, const_, identity,
+//    applyN, applyWhile, memoize, negate, both, either
+// ============================================================
+
+// ────────────────────────────────────────────────────────────
+// 1. compose(f, g)  —  fn(x) -> f(g(x))
+// ────────────────────────────────────────────────────────────
+
+let double  = |x: Int| x * 2
+let inc     = |x: Int| x + 1
+
+// compose applies g first, then f: double(inc(3)) = double(4) = 8
+let doubleAfterInc = compose(double, inc)
+assert(doubleAfterInc(3) == 8,  "compose: double(inc(3)) == 8")
+assert(doubleAfterInc(0) == 2,  "compose: double(inc(0)) == 2")
+assert(doubleAfterInc(10) == 22, "compose: double(inc(10)) == 22")
+
+// compose with string functions
+let exclaim = |s: String| s + "!"
+let greet   = |s: String| "Hello " + s
+let greetExclaim = compose(exclaim, greet)
+assert(greetExclaim("Nova") == "Hello Nova!", "compose strings")
+
+println("PASS: compose (4 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 2. pipe(f, g)  —  fn(x) -> g(f(x))
+// ────────────────────────────────────────────────────────────
+
+// pipe applies f first, then g: double(inc(3)) = 8
+let incThenDouble = pipe(inc, double)
+assert(incThenDouble(3) == 8,  "pipe: inc then double(3) == 8")
+assert(incThenDouble(0) == 2,  "pipe: inc then double(0) == 2")
+assert(incThenDouble(10) == 22, "pipe: inc then double(10) == 22")
+
+// pipe is reversed compose: pipe(f,g)(x) == compose(g,f)(x)
+let a = pipe(inc, double)(5)
+let b = compose(double, inc)(5)
+assert(a == b, "pipe == reversed compose")
+
+// chain multiple pipes
+let triple = |x: Int| x * 3
+let incDoubleThenTriple = pipe(pipe(inc, double), triple)
+assert(incDoubleThenTriple(2) == 18, "chained pipe: triple(double(inc(2))) == 18")
+
+println("PASS: pipe (5 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 3. flip(f)  —  swap arguments of a binary function
+// ────────────────────────────────────────────────────────────
+
+let sub = |a: Int, b: Int| a - b
+let flippedSub = flip(sub)
+
+// sub(10, 3) = 7, flipped: sub(3, 10) = 7
+assert(sub(10, 3) == 7,         "sub(10,3) == 7")
+assert(flippedSub(10, 3) == -7, "flip(sub)(10,3) == -7")
+assert(flippedSub(3, 10) == 7,  "flip(sub)(3,10) == 7")
+
+// flip with string concat
+let prepend = |prefix: String, s: String| prefix + s
+let append = flip(prepend)
+assert(append("world", "hello ") == "hello world", "flip strings")
+
+println("PASS: flip (4 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 4. const_(v)  —  always returns v, ignores argument
+// ────────────────────────────────────────────────────────────
+
+// const_ needs explicit generic annotation @[B: Type] since the input
+// type can't be inferred from the value alone.
+
+let always42 = const_(42) @[B: Int]
+assert(always42(0) == 42,       "const_(42)(0) == 42")
+assert(always42(999) == 42,     "const_(42)(999) == 42")
+assert(always42(-1) == 42,      "const_(42)(-1) == 42")
+
+let alwaysHi = const_("hi") @[B: Int]
+assert(alwaysHi(0) == "hi",     "const_ string")
+
+// const_ with different input types
+let alwaysPi = const_(3.14) @[B: String]
+assert(alwaysPi("anything") == 3.14, "const_ float ignores string arg")
+
+println("PASS: const_ (5 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 5. identity(x)  —  returns x unchanged
+// ────────────────────────────────────────────────────────────
+
+assert(identity(42) == 42,       "identity Int")
+assert(identity("hello") == "hello", "identity String")
+assert(identity(true) == true,   "identity Bool")
+assert(identity(3.14) == 3.14,   "identity Float")
+
+println("PASS: identity (4 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 6. applyN(f, n, x)  —  apply f to x exactly n times
+// ────────────────────────────────────────────────────────────
+
+// double applied 0 times: x stays the same
+assert(applyN(double, 0, 5) == 5, "applyN 0 times")
+
+// double applied 1 time: 5 * 2 = 10
+assert(applyN(double, 1, 5) == 10, "applyN 1 time")
+
+// double applied 3 times: 1 → 2 → 4 → 8
+assert(applyN(double, 3, 1) == 8, "applyN 3 times")
+
+// inc applied 5 times: 0 → 1 → 2 → 3 → 4 → 5
+assert(applyN(inc, 5, 0) == 5, "applyN inc 5 times")
+
+// string append
+let bang = |s: String| s + "!"
+assert(applyN(bang, 3, "wow") == "wow!!!", "applyN string 3 bangs")
+
+println("PASS: applyN (5 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 7. applyWhile(f, pred, x)  —  apply f while pred holds
+// ────────────────────────────────────────────────────────────
+
+// double while < 100: 1 → 2 → 4 → 8 → 16 → 32 → 64 → 128 (stop, 128 >= 100)
+assert(applyWhile(double, |x: Int| x < 100, 1) == 128, "applyWhile double < 100")
+
+// inc while < 5: 0 → 1 → 2 → 3 → 4 → 5 (stop, 5 is not < 5)
+assert(applyWhile(inc, |x: Int| x < 5, 0) == 5, "applyWhile inc < 5")
+
+// pred immediately false: return x unchanged
+assert(applyWhile(double, |x: Int| x < 0, 42) == 42, "applyWhile pred false initially")
+
+// triple while < 1000: 1 → 3 → 9 → 27 → 81 → 243 → 729 → 2187
+assert(applyWhile(triple, |x: Int| x < 1000, 1) == 2187, "applyWhile triple < 1000")
+
+println("PASS: applyWhile (4 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 8. memoize(f)  —  cache results
+// ────────────────────────────────────────────────────────────
+
+// 8a. Basic memoization: repeated calls return cached result
+let callCount = [0]  // mutable counter via list trick
+
+let expensiveDouble = fn(x: Int) -> Int {
+    callCount[0] = callCount[0] + 1
+    return x * 2
+}
+
+let cachedDouble = memoize(expensiveDouble)
+
+// First call — computes and caches
+assert(cachedDouble(5) == 10, "memoize first call")
+assert(callCount[0] == 1, "memoize: underlying called once")
+
+// Second call with same arg — should return cached, not call underlying
+assert(cachedDouble(5) == 10, "memoize second call same arg")
+assert(callCount[0] == 1, "memoize: still only one call (cached)")
+
+// New argument — computes again
+assert(cachedDouble(7) == 14, "memoize new arg")
+assert(callCount[0] == 2, "memoize: now two calls")
+
+// Previous cached value still works
+assert(cachedDouble(5) == 10, "memoize old arg still cached")
+assert(callCount[0] == 2, "memoize: still two calls")
+
+println("PASS: memoize basic (8 assertions)")
+
+// 8b. Memoize with recursive-style usage (fibonacci)
+// We can't memoize a self-referencing recursive function directly,
+// but we can prove memoize caches across different inputs
+let squareCount = [0]
+let square = fn(x: Int) -> Int {
+    squareCount[0] = squareCount[0] + 1
+    return x * x
+}
+
+let cachedSquare = memoize(square)
+
+// Compute several values
+assert(cachedSquare(3) == 9,   "memo square(3)")
+assert(cachedSquare(4) == 16,  "memo square(4)")
+assert(cachedSquare(5) == 25,  "memo square(5)")
+assert(squareCount[0] == 3,    "memo: 3 underlying calls")
+
+// Re-query all — none should trigger underlying
+assert(cachedSquare(3) == 9,   "memo square(3) cached")
+assert(cachedSquare(4) == 16,  "memo square(4) cached")
+assert(cachedSquare(5) == 25,  "memo square(5) cached")
+assert(squareCount[0] == 3,    "memo: still 3 calls (all cached)")
+
+// 8c. Memoize with strings
+let strCallCount = [0]
+let shout = fn(s: String) -> String {
+    strCallCount[0] = strCallCount[0] + 1
+    return s.toUpper() + "!"
+}
+
+let cachedShout = memoize(shout)
+assert(cachedShout("hello") == "HELLO!", "memo shout hello")
+assert(cachedShout("world") == "WORLD!", "memo shout world")
+assert(strCallCount[0] == 2, "memo shout: 2 calls")
+assert(cachedShout("hello") == "HELLO!", "memo shout hello cached")
+assert(cachedShout("world") == "WORLD!", "memo shout world cached")
+assert(strCallCount[0] == 2, "memo shout: still 2 (cached)")
+
+println("PASS: memoize advanced (14 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 9. negate(pred)  —  logical NOT of a predicate
+// ────────────────────────────────────────────────────────────
+
+let isEven = |x: Int| x % 2 == 0
+let isOdd = negate(isEven)
+
+assert(isEven(4) == true,  "isEven(4)")
+assert(isOdd(4) == false,  "isOdd(4) via negate")
+assert(isEven(3) == false, "isEven(3)")
+assert(isOdd(3) == true,   "isOdd(3) via negate")
+assert(isOdd(0) == false,  "isOdd(0) via negate")
+assert(isOdd(1) == true,   "isOdd(1) via negate")
+
+println("PASS: negate (6 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 10. both(p, q)  —  true when both predicates hold
+// ────────────────────────────────────────────────────────────
+
+let isPositive = |x: Int| x > 0
+let isSmall = |x: Int| x < 10
+let isPositiveAndSmall = both(isPositive, isSmall)
+
+assert(isPositiveAndSmall(5) == true,   "both: 5 is positive and small")
+assert(isPositiveAndSmall(0) == false,  "both: 0 not positive")
+assert(isPositiveAndSmall(10) == false, "both: 10 not small")
+assert(isPositiveAndSmall(-1) == false, "both: -1 not positive")
+assert(isPositiveAndSmall(1) == true,   "both: 1 is positive and small")
+assert(isPositiveAndSmall(9) == true,   "both: 9 is positive and small")
+
+println("PASS: both (6 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 11. either(p, q)  —  true when at least one holds
+// ────────────────────────────────────────────────────────────
+
+let isNegative = |x: Int| x < 0
+let isLarge = |x: Int| x > 100
+let isNegativeOrLarge = either(isNegative, isLarge)
+
+assert(isNegativeOrLarge(-5) == true,   "either: -5 is negative")
+assert(isNegativeOrLarge(200) == true,  "either: 200 is large")
+assert(isNegativeOrLarge(50) == false,  "either: 50 is neither")
+assert(isNegativeOrLarge(0) == false,   "either: 0 is neither")
+assert(isNegativeOrLarge(-1) == true,   "either: -1 is negative")
+assert(isNegativeOrLarge(101) == true,  "either: 101 is large")
+
+println("PASS: either (6 assertions)")
+
+// ────────────────────────────────────────────────────────────
+// 12. Combo tests — composing functional utilities together
+// ────────────────────────────────────────────────────────────
+
+// compose + negate
+let isNotEven = compose(|b: Bool| !b, isEven)
+assert(isNotEven(3) == true, "compose + negate-like")
+
+// pipe + applyN: build a function then apply it
+let tripleInc = pipe(inc, triple)
+assert(applyN(tripleInc, 2, 1) == 21, "pipe + applyN: tripleInc applied twice to 1")
+// step 1: tripleInc(1) = triple(inc(1)) = triple(2) = 6
+// step 2: tripleInc(6) = triple(inc(6)) = triple(7) = 21
+
+// both + negate
+let isOddAndSmall = both(negate(isEven), isSmall)
+assert(isOddAndSmall(3) == true,  "both + negate: 3")
+assert(isOddAndSmall(4) == false, "both + negate: 4 even")
+assert(isOddAndSmall(11) == false, "both + negate: 11 not small")
+
+// either + both
+let complexPred = either(
+    both(isPositive, isSmall),
+    isNegative
+)
+assert(complexPred(5) == true,    "complex: 5 is positive and small")
+assert(complexPred(-3) == true,   "complex: -3 is negative")
+assert(complexPred(50) == false,  "complex: 50 neither")
+
+// const_ + applyN: applying const_ function N times still returns same
+let always7 = const_(7) @[B: Int]
+assert(applyN(always7, 100, 0) == 7, "const_ + applyN 100 times")
+
+// identity is neutral for compose
+let idInt = |x: Int| identity(x)
+let idComposed = compose(double, idInt)
+assert(idComposed(5) == 10, "compose with identity is neutral")
+
+let idPiped = pipe(idInt, double)
+assert(idPiped(5) == 10, "pipe with identity is neutral")
+
+// flip + flip = original
+let doubleFlip = flip(flip(sub))
+assert(doubleFlip(10, 3) == 7, "flip(flip(f)) == f")
+
+println("PASS: combo tests (12 assertions)")
+
+// ────────────────────────────────────────────────────────────
+println("All std/functional tests passed! (78 total assertions)")
