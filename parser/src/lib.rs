@@ -5473,9 +5473,25 @@ impl Parser {
                 .insert(enum_name.clone(), generic_field_names.clone());
         }
 
+        // Register `Self` as a type alias for this enum while parsing variants
+        let self_type = TType::Custom {
+            name: enum_name.clone(),
+            type_params: generic_field_names
+                .iter()
+                .map(|g| TType::Generic { name: g.clone() })
+                .collect(),
+        };
+        self.typechecker
+            .environment
+            .type_alias
+            .insert("Self".into(), self_type);
+
         self.consume_symbol(LeftBrace)?;
         let parameter_list = self.enum_list()?;
         self.consume_symbol(RightBrace)?;
+
+        // Remove the `Self` alias — it's only valid inside the enum body
+        self.typechecker.environment.type_alias.remove("Self");
         let mut fields = vec![];
         let mut type_parameters = vec![];
         let mut generics_table = Table::new();
@@ -5592,9 +5608,25 @@ impl Parser {
                 .insert(struct_name.clone(), generic_field_names.clone());
         }
 
+        // Register `Self` as a type alias for this struct while parsing fields
+        let self_type = TType::Custom {
+            name: struct_name.clone(),
+            type_params: generic_field_names
+                .iter()
+                .map(|g| TType::Generic { name: g.clone() })
+                .collect(),
+        };
+        self.typechecker
+            .environment
+            .type_alias
+            .insert("Self".into(), self_type);
+
         self.consume_symbol(LeftBrace)?;
         let parameter_list = self.parameter_list()?;
         self.consume_symbol(RightBrace)?;
+
+        // Remove the `Self` alias — it's only valid inside the struct body
+        self.typechecker.environment.type_alias.remove("Self");
 
         let mut fields = vec![];
         let mut type_parameters = vec![];

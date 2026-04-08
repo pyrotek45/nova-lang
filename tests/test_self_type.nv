@@ -1,0 +1,84 @@
+module test_self_type
+
+// ---- Self in a non-generic struct ----
+struct Animal {
+    name: String,
+    speak: fn(Self) -> String,
+}
+
+let a = Animal {
+    name: "Dog",
+    speak: fn(self: Animal) -> String { return self.name },
+}
+assert(a->speak() == "Dog", "Self in struct fn field")
+
+// ---- Self chaining (non-generic struct) ----
+struct Counter {
+    count: Int,
+    increment: fn(Self) -> Self,
+}
+
+let c = Counter {
+    count: 0,
+    increment: fn(self: Counter) -> Counter {
+        return Counter { count: self.count + 1, increment: self.increment }
+    },
+}
+let c2 = c->increment()
+let c3 = c2->increment()
+assert(c3.count == 2, "Self chaining returns correct type")
+
+// ---- Self in a generic struct ----
+struct Wrapper(T) {
+    value: $T,
+    clone_self: fn(Self) -> Self,
+}
+
+let w = Wrapper {
+    value: 10,
+    clone_self: fn(self: Wrapper(Int)) -> Wrapper(Int) {
+        return Wrapper { value: self.value, clone_self: self.clone_self }
+    },
+}
+let w2 = w->clone_self()
+assert(w2.value == 10, "Self in generic struct")
+
+// ---- Self in a non-generic enum variant ----
+enum Expr {
+    Num: Int,
+    Add: (Self, Self),
+}
+
+let e = Expr::Add((Expr::Num(1), Expr::Num(2)))
+assert(true, "Self in non-generic enum compiles")
+
+// ---- Self in a generic enum variant ----
+enum Container(T) {
+    Some: $T,
+    None,
+    Map: fn($T) -> Self,
+}
+
+let mapper = Container::Map(fn(x: Int) -> Container(Int) {
+    return Container::Some(x * 2)
+})
+assert(true, "Self in generic enum compiles")
+
+// ---- Self as return type in struct ----
+struct Builder {
+    parts: [String],
+    add: fn(Self, String) -> Self,
+}
+
+let b = Builder {
+    parts: []: String,
+    add: fn(self: Builder, s: String) -> Builder {
+        self.parts.push(s)
+        return Builder { parts: self.parts, add: self.add }
+    },
+}
+let b2 = b->add("hello")
+let b3 = b2->add("world")
+assert(b3.parts.len() == 2, "Self return type builder pattern")
+
+println("PASS: test_self_type")
