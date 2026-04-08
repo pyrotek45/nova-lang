@@ -312,6 +312,93 @@ Key rules:
 | `[T]` | `[1, 2, 3]` | List of T |
 | `(A, B)` | `(42, "hi")` | Tuple |
 
+### Number Literals
+
+Nova supports several number-literal formats. All integer forms produce an
+`Int`; the decimal-point form produces a `Float`.
+
+| Format | Prefix | Example | Value |
+|--------|--------|---------|-------|
+| Decimal | *(none)* | `42` | 42 |
+| Binary | `0b` | `0b1010` | 10 |
+| Octal | `0o` | `0o17` | 15 |
+| Hexadecimal | `0x` | `0xFF` | 255 |
+| Float | *(none)* | `3.14` | 3.14 |
+
+> **Underscores as separators:** You can place underscores anywhere inside a
+> number literal for readability. They are stripped before parsing and have
+> no effect on the value:
+>
+> ```rust
+> let million = 1_000_000          // 1000000
+> let mask    = 0b1111_0000        // 240
+> let color   = 0xFF_AA_33         // 16755251
+> let pi      = 3.14_159_26       // 3.1415926
+> ```
+>
+> Underscores work in binary, octal, hex, decimal, and float literals.
+
+Hex digits are case-insensitive: `0xff` and `0xFF` both work.
+
+### String Literals and Escape Sequences
+
+Regular strings are enclosed in double quotes. The following escape
+sequences are recognized:
+
+| Escape | Character |
+|--------|-----------|
+| `\n` | Newline |
+| `\r` | Carriage return |
+| `\t` | Tab |
+| `\0` | Null byte |
+| `\\` | Backslash |
+| `\"` | Double quote |
+
+```rust
+let msg = "line1\nline2"     // two lines
+let path = "C:\\Users\\Nova"  // backslashes
+let quoted = "she said \"hi\""
+```
+
+Char literals use single quotes and support the same escapes plus `\'`:
+
+```rust
+let newline = '\n'
+let tab     = '\t'
+let tick    = '\''
+```
+
+### Raw Strings
+
+Raw strings skip escape processing. They use `r#"..."#` syntax (with one
+or more `#` on each side):
+
+```rust
+let pattern = r#"\d+\.\d+"#     // literal backslashes, no escaping
+let json    = r#"{"key": "value"}"#
+```
+
+Add more `#` signs to include `"#` inside the string:
+
+```rust
+let nested = r##"she said "hi""##
+```
+
+> **Tip:** Raw strings are especially useful for regex patterns, where
+> double-escaping backslashes would be painful:
+> `r#"\b\w+\b"#` vs `"\\b\\w+\\b"`.
+
+### Comments
+
+```rust
+// Single-line comment — everything after // to end of line
+
+/* Block comment — can span
+   multiple lines */
+
+/* Block comments work inline too: */ let x = 42
+```
+
 ---
 
 ## 5. Operators
@@ -353,7 +440,8 @@ while running && !paused {
 
 ### Compound Assignment
 
-`+=`, `-=`, `/=` are available. There is **no `*=`** — write `x = x * 2`.
+`+=` and `-=` are available. There is **no `*=` or `/=`** — write `x = x * 2`
+or `x = x / 2`.
 
 ### Unary Minus
 
@@ -1137,31 +1225,104 @@ x.isNone()              // true
 
 ## 13. Closures and Lambdas
 
-### Full Syntax
+Nova has two closure syntaxes: **bar closures** (`|params| expr`) and **fn closures**
+(`fn(params) -> Type { body }`). Understanding which to use is one of the most
+important things in Nova.
+
+### Bar Closures (`||`)
+
+Bar closures are the short, expression-based form. The body is a **single
+expression** whose value is automatically returned. The return type is
+inferred from that expression.
 
 ```rust
-let add = fn(x: Int, y: Int) -> Int {
-    return x + y
+// One parameter — type annotated
+let double = |x: Int| x * 2
+
+// Multiple parameters
+let add = |a: Int, b: Int| a + b
+
+// Zero parameters
+let greet = || "hello"
+
+// The expression CAN be a block expression (if/else, { })
+let abs = |x: Int| if x >= 0 { x } else { 0 - x }
+```
+
+> **Key rule:** bar closures evaluate one expression. They cannot contain
+> `return`, `while`, `for`, or multi-statement logic. They also **cannot
+> have `-> Type` return-type annotations** — the return type is always
+> inferred from the expression. Writing `|x: Int| -> Int { ... }` is a
+> compile error; use `fn(x: Int) -> Int { ... }` instead.
+
+Bar closures are ideal as inline arguments to higher-order functions:
+
+```rust
+let doubled = [1, 2, 3].map(|x: Int| x * 2)        // [2, 4, 6]
+let evens = [1, 2, 3, 4].filter(|x: Int| x % 2 == 0)  // [2, 4]
+let sum = [1, 2, 3].reduce(|acc: Int, x: Int, i: Int| acc + x, 0)  // 6
+```
+
+### fn Closures
+
+The `fn(params) -> ReturnType { body }` form is a full closure. It
+supports multiple statements, control flow, explicit `return`, and
+return-type annotations.
+
+```rust
+// With return type
+let clamp = fn(x: Int) -> Int {
+    if x < 0 { return 0 }
+    elif x > 100 { return 100 }
+    return x
 }
+
+// Without return type (Void)
+let log = fn(msg: String) {
+    println("[LOG] " + msg)
+}
+
+// Zero parameters with return type
+let answer = fn() -> Int { return 42 }
+
+// Zero parameters, Void
+let say_hi = fn() { println("hi") }
 ```
 
-### Short Lambda
+> **Tip:** Every fn closure that declares `-> ReturnType` must have
+> an explicit `return` on every code path. Nova has no implicit returns.
 
-```rust
-let square = |x: Int| x * x
-```
+### When to Use Which
 
-### Empty Closures
+| Feature | Bar closure (`\|\|`) | fn closure |
+|---------|---------------------|------------|
+| Single expression body | ✅ | ✅ |
+| Multi-statement body | ❌ | ✅ |
+| Control flow (`if`, `while`, `for`) | Only as block expressions | ✅ |
+| `return` statement | ❌ | ✅ |
+| Return type annotation (`-> Type`) | ❌ (inferred) | ✅ |
+| Stored in `let` | ✅ | ✅ |
+| Passed to higher-order functions | ✅ | ✅ |
+| Ideal for | Short transforms, predicates | Complex logic, multi-statement |
 
-```rust
-let greet = || println("hello")
-```
+**Rules of thumb:**
+- If the body fits on one line with no `return`, use `|params| expr`
+- If you need control flow, multiple statements, or an explicit return type, use `fn(params) -> Type { ... }`
 
 ### Closures as Arguments
 
+Both forms work as function arguments:
+
 ```rust
-let doubled = [1, 2, 3].map(|x: Int| x * 2)     // [2, 4, 6]
-let evens = [1, 2, 3, 4].filter(|x: Int| x % 2 == 0)  // [2, 4]
+// Bar closure inline
+[1, 2, 3].map(|x: Int| x * 2)
+
+// fn closure inline
+[1, 2, 3].map(fn(x: Int) -> Int { return x * 2 })
+
+// Pre-defined and passed by variable
+let triple = |x: Int| x * 3
+[1, 2, 3].map(triple)
 ```
 
 ### Trailing Closures
@@ -1204,28 +1365,58 @@ let inc = fn() { counter.value += 1 }
 inc(); inc(); inc()   // counter.value == 3
 ```
 
-### Choosing Between `||` and `fn()`
-
-Short lambdas (`||`) are concise but limited — they evaluate a **single
-expression** and cannot contain `return`, `if`, `while`, or multi-line
-logic. They also cannot have return-type annotations.
-
-Use the full `fn()` form when you need:
-- Control flow (`if`, `while`, `for`)
-- Multiple statements
-- An explicit `-> ReturnType`
+Lists are also captured by reference, so closures share mutations:
 
 ```rust
-// Short lambda — one expression
-let double = |x: Int| x * 2
-
-// Full closure — needs control flow and return type
-let clamp = fn(x: Int) -> Int {
-    if x < 0 { return 0 }
-    elif x > 100 { return 100 }
-    return x
-}
+let log = []: String
+let add_log = fn(msg: String) { log.push(msg) }
+add_log("hello")
+add_log("world")
+println(log.len())   // 2
 ```
+
+### Passing Named Functions as Values — `@(Type)`
+
+Named `fn` declarations are not automatically first-class values. To pass
+a named function as an argument to a higher-order function, use the `@(Type)`
+syntax to create a function reference:
+
+```rust
+fn square(x: Int) -> Int { return x * x }
+
+let ref = square@(Int)     // fn(Int) -> Int — a first-class value
+println(ref(5))            // 25
+```
+
+When a function is **overloaded**, `@(Type)` disambiguates which overload
+you mean:
+
+```rust
+fn convert(x: Int) -> String { return Cast::string(x) }
+fn convert(x: String) -> String { return x }
+
+let intConvert = convert@(Int)      // picks fn(Int) -> String
+let strConvert = convert@(String)   // picks fn(String) -> String
+```
+
+Multiple parameter types are comma-separated:
+
+```rust
+fn add(a: Int, b: Int) -> Int { return a + b }
+let addRef = add@(Int, Int)
+```
+
+> **Note:** `let`-bound closures (both `||` and `fn()` forms) are already
+> first-class values — you can pass them directly without `@`:
+>
+> ```rust
+> let double = |x: Int| x * 2
+> let inc = fn(x: Int) -> Int { return x + 1 }
+>
+> // Passed directly — no @ needed
+> import super.std.functional
+> let doubleThenInc = compose(inc, double)
+> ```
 
 ---
 
@@ -2046,6 +2237,12 @@ Dyn types, and extends + UFCS.
 | Varargs | `f(1, 2, 3)` where `f(xs: [Int])` | Trailing args auto-wrapped into list |
 | Forward decl | `fn f(x: Int) -> Int` | Signature only, no body |
 | Single-elem tuple | `(42,)` | One-element tuple |
+| Number underscores | `1_000_000`, `0xFF_AA` | Visual separators in any numeric literal |
+| Binary literal | `0b1010` | Integer in base 2 |
+| Octal literal | `0o17` | Integer in base 8 |
+| Hex literal | `0xFF` | Integer in base 16 |
+| Raw string | `r#"..."#` | No escape processing |
+| Comments | `//` and `/* */` | Line and block comments |
 
 ---
 
@@ -2055,21 +2252,25 @@ Dyn types, and extends + UFCS.
 - Closures with control flow need full `fn` syntax (not short lambda)
 - Bar closures (`||`) cannot have `-> Type` annotations — use `fn()` instead
 - Every function returning a value needs explicit `return`
-- No `*=` operator — write `x = x * 2`
+- No `*=` or `/=` operators — write `x = x * 2` or `x = x / 2`
 - Empty lists need type annotation: `let xs = []: Int`
 - No-data enum variants need `()`: `Color::Red()`
 - String concatenation: only `String + String`; use `Cast::string` to convert
 - `format` / `printf` use `{}` placeholders
 - Strings are indexable: `"hello"[0]` returns `'h'` (Char). Negative indices work: `"hello"[-1]` → `'o'`
 - Use `typeof(x)` for runtime type inspection — returns the full type as a string (e.g. `"[Int]"`, `"(Int,String)"`)
+- Note: `typeof` for tuples has **no spaces**: `"(Int,String)"` not `"(Int, String)"`
 - Use `clone(x)` to break aliasing — especially for lists and structs
 - Use `todo() @[T: ReturnType]` as a placeholder in unfinished code
 - Use `nova check file.nv` to typecheck without executing
 - Pipe `|>` always requires `()`: write `5 |> println()` not `5 |> println`
 - Semicolons separate statements on one line: `let x = 1; let y = 2`
 - `&&` and `||` work in `while` and `elif` conditions
-- Numeric literals support binary `0b1010`, octal `0o17`, hex `0xFF`, and underscores `1_000_000`
-- Raw strings `r"..."` skip escape processing
+- Numeric literals support binary `0b1010`, octal `0o17`, hex `0xFF`, and underscores `1_000_000` (see [§4 Number Literals](#number-literals))
+- Raw strings use `r#"..."#` syntax (not `r"..."`): `r#"no \escapes here"#`
+- Escape sequences in strings: `\n` `\t` `\r` `\0` `\\` `\"` (see [§4 Escape Sequences](#string-literals-and-escape-sequences))
+- Char escape sequences: `'\n'` `'\t'` `'\r'` `'\0'` `'\\'` `'\''`
+- Comments: `// line` and `/* block */` (block comments can span multiple lines)
 - Use `Data::save`/`Data::load` to persist any value to JSON — great for save files, config, high scores
 - `Data::load` and `Data::fromJson` need `@[T: Type]` to know what type to reconstruct
 - `Data::toJson`/`Data::fromJson` work in-memory without touching the filesystem
@@ -2077,10 +2278,13 @@ Dyn types, and extends + UFCS.
 - `format` and `printf` support **varargs**: `format("{} + {}", a, b)` — no list wrapper needed
 - `Regex` functions take **(pattern, text)**: `Regex::matches("\\d+", myString)`
 - `Regex::captures` returns all full-pattern matches, not sub-groups: `Regex::captures("\\d+", "a 1 b 2")` → `["1", "2"]`
+- Use `r#"..."#` for regex patterns to avoid double-escaping: `r#"\d+\.\d+"#`
 - `String::indexOf` returns `Int` (`-1` if not found) — not `Option`
 - Tuple fields are accessed with bracket syntax: `tup[0]`, not `tup.0`
 - `let _` is a zero-cost discard pattern — use it any number of times in the same scope
 - The must-use check fires **between** statements — a trailing Option at end-of-block is exempt (it's a tail expression)
+- Named functions need `@(Type)` to be passed as first-class values: `square@(Int)` (see [§13 Closures](#passing-named-functions-as-values--type))
+- `let`-bound closures are already first-class values — no `@` needed
 
 ---
 
@@ -2089,7 +2293,7 @@ Dyn types, and extends + UFCS.
 | Mistake | Fix |
 |---|---|
 | `let x = []; x.push(1)` | `let x = []: Int; x.push(1)` |
-| `x *= 2` | No `*=` — use `x = x * 2` |
+| `x *= 2` | No `*=` or `/=` — use `x = x * 2` |
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
 | `5 \|> println` | Pipe needs `()` — write `5 \|> println()` |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends |
@@ -2098,6 +2302,9 @@ Dyn types, and extends + UFCS.
 | `Cast::int(x)` used as `Int` | Returns `Option(Int)` — must unwrap |
 | `else if x > 0 { }` | Use `elif` |
 | `\|x: Int\| -> Int { return x + 1 }` | Bar closures can't have `-> Type` — use `fn(x: Int) -> Int { ... }` |
+| `r"no escapes"` | Raw strings need `#`: use `r#"no escapes"#` |
+| `memoize(myNamedFn)` | Named fns need `@`: `memoize(myNamedFn@(Int))` |
+| `typeof((1,"a")) == "(Int, String)"` | No space in typeof output: `"(Int,String)"` |
 | Lambda with control flow | Use `fn(params) -> Type { }` |
 | `fn f(x: Int) -> Int { x * x }` | Must have explicit `return` |
 | `let b = a` (a is a list) | Creates alias! Use `clone(a)` for copy |
