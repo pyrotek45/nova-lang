@@ -1,0 +1,163 @@
+module test_match_runtime
+import super.std.core
+
+// ── Runtime pattern-match scenarios ────────────────────
+
+let cnt = 0
+
+// 1. Match on function return value
+fn get_val() -> Int { return 42 }
+let r1 = match get_val() {
+    42 => "got42",
+    _ => "other"
+}
+assert(r1 == "got42", "match on fn return")
+cnt = cnt + 1
+
+// 2. Match inside closure
+let matcher = fn(x: Int) -> String {
+    match x {
+        0 => "zero",
+        1 => "one",
+        _ => "many"
+    }
+}
+assert(matcher(0) == "zero", "match in closure 0")
+assert(matcher(1) == "one", "match in closure 1")
+assert(matcher(99) == "many", "match in closure _")
+cnt = cnt + 1
+
+// 3. Match in a loop body
+let results: [String] = []: String
+for i in [1, 2, 3] {
+    let s = match i {
+        1 => "a",
+        2 => "b",
+        _ => "c"
+    }
+    results.push(s)
+}
+assert(results == ["a", "b", "c"], "match in for loop")
+cnt = cnt + 1
+
+// 4. Match with computed guard
+fn is_even(n: Int) -> Bool { return n % 2 == 0 }
+let r4 = match 10 {
+    x if is_even(x) => "even",
+    _ => "odd"
+}
+assert(r4 == "even", "guard calls function")
+cnt = cnt + 1
+
+// 5. Match in while loop
+let idx = 0
+let acc: [String] = []: String
+while idx < 3 {
+    let tag = match idx {
+        0 => "first",
+        1 => "second",
+        _ => "rest"
+    }
+    acc.push(tag)
+    idx = idx + 1
+}
+assert(acc == ["first", "second", "rest"], "match in while loop")
+cnt = cnt + 1
+
+// 6. Option match with guard
+let opt: Option(Int) = Some(7)
+let r6 = match opt {
+    Some(v) if v > 5 => "big",
+    Some(v) => "small",
+    None() => "none"
+}
+assert(r6 == "big", "option match with guard")
+cnt = cnt + 1
+
+// 7. Option None match
+let opt2: Option(Int) = None(Int)
+let r7 = match opt2 {
+    Some(v) => v,
+    None() => -1
+}
+assert(r7 == -1, "option None match")
+cnt = cnt + 1
+
+// 8. Option Some match
+let opt3: Option(String) = Some("hello")
+let r8 = match opt3 {
+    Some(s) => s,
+    None() => "empty"
+}
+assert(r8 == "hello", "option Some match")
+cnt = cnt + 1
+
+// 9. Match on method return
+let lst = [10, 20, 30]
+let r9 = match lst.len() {
+    3 => "three",
+    _ => "other"
+}
+assert(r9 == "three", "match on method return")
+cnt = cnt + 1
+
+// 10. Match as argument to function
+fn greet(s: String) -> String { return "hi " + s }
+let r10 = greet(match 1 { 1 => "world", _ => "nobody" })
+assert(r10 == "hi world", "match expr as fn arg")
+cnt = cnt + 1
+
+// 11. Match in if condition comparison
+let val = match true {
+    true => 42,
+    false => 0
+}
+if val == 42 {
+    cnt = cnt + 1
+} else {
+    assert(false, "match result in if cond")
+}
+
+// 12. Chained match - result of one feeds into another
+let step1 = match 3 {
+    1 => "a",
+    2 => "b",
+    3 => "c",
+    _ => "z"
+}
+let step2 = match step1 {
+    "a" => 1,
+    "b" => 2,
+    "c" => 3,
+    _ => 0
+}
+assert(step2 == 3, "chained match results")
+cnt = cnt + 1
+
+// 13. Match on bool expr
+let r13 = match 5 > 3 {
+    true => "yes",
+    false => "no"
+}
+assert(r13 == "yes", "match on bool expression")
+cnt = cnt + 1
+
+// 14. Match on string concatenation
+let r14 = match "hello" + " " + "world" {
+    "hello world" => true,
+    _ => false
+}
+assert(r14 == true, "match on string concat")
+cnt = cnt + 1
+
+// 15. Match on list element
+let items = ["cat", "dog", "fish"]
+let r15 = match items[1] {
+    "dog" => "found dog",
+    _ => "not found"
+}
+assert(r15 == "found dog", "match on list index")
+cnt = cnt + 1
+
+assert(cnt == 15, "all runtime tests ran")
+println("PASS: test_match_runtime all clear")

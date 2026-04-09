@@ -1,0 +1,80 @@
+module test_match_nested_blocks
+import super.std.core
+
+// Match expr as last expression in match arm block body
+let x = 42
+let r = match x {
+    42 => {
+        match x {
+            42 => "inner",
+            _ => "other"
+        }
+    },
+    _ => "outer"
+}
+assert(r == "inner", "nested match expr in block body")
+
+// Enum match nested in value match
+enum Color { Red, Green, Blue }
+let c = Color::Red()
+let msg = match c {
+    Red() => {
+        match 1 {
+            1 => "red-one",
+            _ => "red-other"
+        }
+    },
+    Green() => "green",
+    Blue() => "blue"
+}
+assert(msg == "red-one", "enum match with nested value match")
+
+// Value match nested in enum match arm
+let n = 10
+let c2 = Color::Green()
+let msg2 = match c2 {
+    Red() => "r",
+    Green() => {
+        match n {
+            10 => "green-ten",
+            _ => "green-other"
+        }
+    },
+    Blue() => "b"
+}
+assert(msg2 == "green-ten", "enum match with nested value match in arm")
+
+// Triple nesting
+let a = true
+let b = 1
+let c3 = "hello"
+let r2 = match a {
+    true => {
+        match b {
+            1 => {
+                match c3 {
+                    "hello" => "deep",
+                    _ => "nope"
+                }
+            },
+            _ => "mid"
+        }
+    },
+    false => "top"
+}
+assert(r2 == "deep", "triple nested match expr")
+
+// Match statement as last in block (should work too)
+struct Point { x: Int, y: Int }
+let p = Point(3, 4)
+let dist = match p {
+    Point { x, y } => {
+        match x * x + y * y {
+            25 => "five",
+            _ => "other"
+        }
+    }
+}
+assert(dist == "five", "struct match with nested int match")
+
+println("PASS: test_match_nested_blocks all clear")

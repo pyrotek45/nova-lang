@@ -1,0 +1,159 @@
+module test_match_nesting
+import super.std.core
+
+// === Option inside struct ===
+struct User { name: String, age: Option(Int) }
+let u1 = User("Alice", Some(30))
+let u1r = match u1 {
+    User { name, age } => {
+        match age {
+            Some(a) => name + " is " + Cast::string(a),
+            None() => name + " unknown age"
+        }
+    }
+}
+assert(u1r == "Alice is 30", "option inside struct match")
+
+let u2 = User("Bob", None(Int))
+let u2r = match u2 {
+    User { name, age } => {
+        match age {
+            Some(a) => name + " is " + Cast::string(a),
+            None() => name + " unknown age"
+        }
+    }
+}
+assert(u2r == "Bob unknown age", "option none inside struct match")
+
+// === Struct inside Option ===
+struct Point { x: Int, y: Int }
+let op1: Option(Point) = Some(Point(3, 4))
+let op1r = match op1 {
+    Some(p) => {
+        match p {
+            Point { x, y } => x + y
+        }
+    },
+    None() => -1
+}
+assert(op1r == 7, "struct inside option match")
+
+// === Tuple of options ===
+let to1: (Option(Int), Option(String)) = (Some(1), Some("hi"))
+let to1r = match to1 {
+    (Some(n), Some(s)) => Cast::string(n) + s,
+    _ => "miss"
+}
+assert(to1r == "1hi", "tuple of options both some")
+
+let to2: (Option(Int), Option(String)) = (None(Int), Some("hi"))
+let to2r = match to2 {
+    (Some(n), Some(s)) => "both",
+    _ => "miss"
+}
+assert(to2r == "miss", "tuple of options one none falls to _")
+
+// === List of tuples in for-destructure ===
+let pairs: [(Int, String)] = [(1, "a"), (2, "b")]
+let acc = ""
+for (n, s) in pairs {
+    acc = acc + Cast::string(n) + s
+}
+assert(acc == "1a2b", "for destructure list of tuples")
+
+// === Let destructure tuple ===
+let (a, b, c) = (10, 20, 30)
+assert(a == 10, "let destr tuple a")
+assert(b == 20, "let destr tuple b")
+assert(c == 30, "let destr tuple c")
+
+// === Let destructure list ===
+let [x, y, z] = [1, 2, 3]
+assert(x == 1, "let destr list x")
+assert(y == 2, "let destr list y")
+assert(z == 3, "let destr list z")
+
+// === Let destructure list cons ===
+let [h, ..t] = [10, 20, 30]
+assert(h == 10, "let destr cons h")
+assert(t == [20, 30], "let destr cons t")
+
+// === Let destructure struct ===
+let pt = Point(100, 200)
+let Point { x: px, y: py } = pt
+assert(px == 100, "let destr struct x")
+assert(py == 200, "let destr struct y")
+
+// === Let destructure struct with wildcard ===
+let Point { x: qx, _ } = pt
+assert(qx == 100, "let destr struct wildcard x")
+
+// === Let destructure struct reorder ===
+let Point { y: ry, x: rx } = pt
+assert(rx == 100, "let destr struct reorder x")
+assert(ry == 200, "let destr struct reorder y")
+
+// === For destructure struct ===
+let points: [Point] = [Point(1, 2), Point(3, 4)]
+let sum = 0
+for Point { x, y } in points {
+    sum = sum + x + y
+}
+assert(sum == 10, "for destr struct sum")
+
+// === Nested struct in match ===
+struct Rect { origin: Point, size: Point }
+let r = Rect(Point(0, 0), Point(10, 20))
+let area = match r {
+    Rect { origin: Point { x: ox, y: oy }, size: Point { x: w, y: h } } => w * h
+}
+assert(area == 200, "nested struct match")
+
+// === Deeply nested tuple ===
+let deep = ((1, (2, 3)), (4, (5, 6)))
+let dr = match deep {
+    ((a, (b, c)), (d, (e, f))) => a + b + c + d + e + f
+}
+assert(dr == 21, "deeply nested tuple")
+
+// === Match with guard on nested struct ===
+let p2 = Point(0, 5)
+let axis = match p2 {
+    Point { x: 0, y } if y > 0 => "y-pos",
+    Point { x: 0, y } if y < 0 => "y-neg",
+    Point { x: 0, y: 0 } => "origin",
+    _ => "other"
+}
+assert(axis == "y-pos", "guard on nested struct literal")
+
+// === Option match with guard ===
+let og: Option(Int) = Some(5)
+let ogr = match og {
+    Some(v) if v > 10 => "big",
+    Some(v) => "small",
+    None() => "none"
+}
+assert(ogr == "small", "option guard fallthrough")
+
+// === Struct wildcard in match stmt ===
+let p3res = 0
+match pt {
+    Point { x, _ } => { p3res = x }
+}
+assert(p3res == 100, "struct wildcard match stmt")
+
+// === Struct reorder in match stmt ===
+let p4res = 0
+match pt {
+    Point { y, x } => { p4res = y - x }
+}
+assert(p4res == 100, "struct reorder match stmt")
+
+// === For struct wildcard ===
+let sum2 = 0
+for Point { x, _ } in points {
+    sum2 = sum2 + x
+}
+assert(sum2 == 4, "for destr struct wildcard")
+
+println("PASS: test_match_nesting all clear")

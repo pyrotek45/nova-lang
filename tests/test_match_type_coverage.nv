@@ -1,0 +1,127 @@
+module test_match_type_coverage
+import super.std.core
+
+// === 1. Int match expr ===
+let i1 = match 42 { 42 => "a", _ => "b" }
+assert(i1 == "a", "int match expr exact")
+
+// === 2. Int match stmt ===
+let i2 = ""
+match 42 { 42 => { i2 = "a" }, _ => { i2 = "b" } }
+assert(i2 == "a", "int match stmt exact")
+
+// === 3. Float match expr ===
+let f1 = match 3.14 { 3.14 => "pi", _ => "other" }
+assert(f1 == "pi", "float match expr")
+
+// === 4. Float match stmt ===
+let f2 = ""
+match 3.14 { 3.14 => { f2 = "pi" }, _ => { f2 = "other" } }
+assert(f2 == "pi", "float match stmt")
+
+// === 5. String match expr ===
+let s1 = match "hello" { "hello" => 1, _ => 0 }
+assert(s1 == 1, "string match expr")
+
+// === 6. String match stmt ===
+let s2 = 0
+match "hello" { "hello" => { s2 = 1 }, _ => { s2 = 0 } }
+assert(s2 == 1, "string match stmt")
+
+// === 7. Char match expr ===
+let c1 = match 'a' { 'a' => "alpha", _ => "other" }
+assert(c1 == "alpha", "char match expr")
+
+// === 8. Char match stmt ===
+let c2 = ""
+match 'a' { 'a' => { c2 = "alpha" }, _ => { c2 = "other" } }
+assert(c2 == "alpha", "char match stmt")
+
+// === 9. Bool match expr ===
+let b1 = match true { true => 1, false => 0 }
+assert(b1 == 1, "bool match expr")
+
+// === 10. Bool match stmt ===
+let b2 = 0
+match true { true => { b2 = 1 }, false => { b2 = 0 } }
+assert(b2 == 1, "bool match stmt")
+
+// === 11. Option(Int) match expr ===
+let o1: Option(Int) = Some(10)
+let o1r = match o1 { Some(v) => v, None() => 0 }
+assert(o1r == 10, "option int match expr some")
+
+let o2: Option(Int) = None(Int)
+let o2r = match o2 { Some(v) => v, None() => -1 }
+assert(o2r == -1, "option int match expr none")
+
+// === 12. Option(Int) match stmt ===
+let o3: Option(Int) = Some(10)
+let o3r = 0
+match o3 { Some(v) => { o3r = v }, None() => { o3r = -1 } }
+assert(o3r == 10, "option int match stmt some")
+
+// === 13. Option(String) match expr ===
+let os1: Option(String) = Some("hi")
+let os1r = match os1 { Some(s) => s, None() => "empty" }
+assert(os1r == "hi", "option string match expr")
+
+// === 14. Option(String) match stmt ===
+let os2: Option(String) = None(String)
+let os2r = ""
+match os2 { Some(s) => { os2r = s }, None() => { os2r = "empty" } }
+assert(os2r == "empty", "option string match stmt none")
+
+// === 15. Tuple match expr ===
+let t1 = match (1, "a") { (1, "a") => "yes", _ => "no" }
+assert(t1 == "yes", "tuple match expr")
+
+// === 16. Tuple match stmt ===
+let t2 = ""
+match (1, "a") { (1, "a") => { t2 = "yes" }, _ => { t2 = "no" } }
+assert(t2 == "yes", "tuple match stmt")
+
+// === 17. List match expr ===
+let xs: [Int] = [1, 2, 3]
+let l1 = match xs { [1, 2, 3] => "exact", _ => "other" }
+assert(l1 == "exact", "list match expr exact")
+
+// === 18. List match stmt ===
+let l2 = ""
+match xs { [1, 2, 3] => { l2 = "exact" }, _ => { l2 = "other" } }
+assert(l2 == "exact", "list match stmt exact")
+
+// === 19. Empty list match ===
+let empty: [Int] = []: Int
+let e1 = match empty { [] => "empty", _ => "notempty" }
+assert(e1 == "empty", "empty list match expr")
+
+// === 20. Cons pattern match expr ===
+let l3 = match xs { [h, ..rest] => h, [] => 0 }
+assert(l3 == 1, "cons match expr head")
+
+// === 21. Cons pattern match stmt ===
+let l4 = 0
+match xs { [h, ..rest] => { l4 = h }, [] => { l4 = 0 } }
+assert(l4 == 1, "cons match stmt head")
+
+// === 22. Struct match expr ===
+struct Point { x: Int, y: Int }
+let p = Point(10, 20)
+let p1 = match p { Point { x, y } => x + y }
+assert(p1 == 30, "struct match expr")
+
+// === 23. Struct match stmt ===
+let p2 = 0
+match p { Point { x, y } => { p2 = x + y } }
+assert(p2 == 30, "struct match stmt")
+
+// === 24. Struct wildcard _ match expr ===
+let p3 = match p { Point { x, _ } => x }
+assert(p3 == 10, "struct wildcard match expr")
+
+// === 25. Struct reorder match expr ===
+let p4 = match p { Point { y, x } => y - x }
+assert(p4 == 10, "struct reorder match expr")
+
+println("PASS: test_match_type_coverage all clear")
