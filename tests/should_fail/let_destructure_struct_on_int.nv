@@ -1,0 +1,5 @@
+// should_fail: let destructure struct pattern on non-struct
+module let_destructure_struct_on_int
+struct Point { x: Int, y: Int }
+let n = 42
+let Point { x, y } = n

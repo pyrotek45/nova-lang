@@ -1908,6 +1908,7 @@ Supported patterns:
 | Option None      | `None()`                 | Match absent Option                 |
 | Enum variant     | `Red()`, `Leaf(v)`       | Match enum variant (use `Red() \| Blue()` for OR) |
 | Struct           | `Point { x, y }`        | Destructure a struct by field name  |
+| If guard         | `n if n > 0`             | Pattern + condition (guard must be Bool) |
 
 ```rust
 // Option matching
@@ -1968,6 +1969,118 @@ fn area(r: Rect) -> Int {
     return match r {
         Rect { origin: Point { x, y }, size: Point { x: w, y: h } } => w * h,
     }
+}
+```
+
+### If Guards
+
+You can add an `if` condition after a pattern to further refine when an
+arm matches.  The guard expression must evaluate to `Bool`:
+
+```rust
+let x = 7
+let label = match x {
+    n if n > 10 => "big",
+    n if n > 5  => "medium",
+    n if n > 0  => "small",
+    _           => "non-positive"
+}
+// label == "medium"
+```
+
+Guards are checked **after** the pattern matches.  If the guard is
+`false`, the match falls through to the next arm.  This lets you use
+the same pattern multiple times with different conditions:
+
+```rust
+fn classify(n: Int) -> String {
+    return match n {
+        x if x > 100 => "huge",
+        x if x > 10  => "big",
+        x if x > 0   => "small",
+        0             => "zero",
+        _             => "negative"
+    }
+}
+```
+
+Guards work with all pattern types — struct patterns, tuples, lists,
+options, and literals:
+
+```rust
+// Struct pattern with guard
+struct Point { x: Int, y: Int }
+
+let p = Point(5, 10)
+let quadrant = match p {
+    Point { x, y } if x > 0 && y > 0 => "Q1",
+    Point { x, y } if x < 0 && y > 0 => "Q2",
+    Point { x, y } if x < 0 && y < 0 => "Q3",
+    Point { x, y } if x > 0 && y < 0 => "Q4",
+    _                                 => "on axis"
+}
+
+// Tuple pattern with guard
+let pair = (10, 20)
+match pair {
+    (a, b) if a > b => { println("first bigger") }
+    (a, b) if a < b => { println("second bigger") }
+    _               => { println("equal") }
+}
+
+// Option with guard
+let opt = Some(42)
+let msg = match opt {
+    Some(n) if n > 100 => "big",
+    Some(n) if n > 0   => "small",
+    Some(n)             => "non-positive",
+    None                => "empty"
+}
+```
+
+Guards also work in match statements (not just expressions):
+
+```rust
+let score = 85
+match score {
+    s if s >= 90 => { println("A") }
+    s if s >= 80 => { println("B") }
+    s if s >= 70 => { println("C") }
+    _            => { println("F") }
+}
+```
+
+> **Type rule:** the guard expression must be `Bool`.  A non-Bool guard
+> (like `n if n + 1 => ...`) is a compile-time error.
+
+### Duplicate Arm Detection
+
+Nova detects duplicate match arms at compile time.  If two arms have
+exactly the same pattern (and neither uses an if-guard), the compiler
+reports an error:
+
+```rust
+// Compile error: duplicate arm `1`
+match x {
+    1 => "one",
+    2 => "two",
+    1 => "one again",   // ← error!
+    _ => "other"
+}
+```
+
+This applies to all pattern types: int, float, string, bool, char,
+tuple, struct, enum variants, and list patterns.
+
+If the same pattern appears with different guards, it is **not**
+considered a duplicate — the guards make the arms distinct:
+
+```rust
+// OK — same pattern, different guards
+match x {
+    n if n > 10 => "big",
+    n if n > 0  => "small",
+    _           => "other"
 }
 ```
 
@@ -2701,6 +2814,7 @@ Dyn types, and extends + UFCS.
 | Let struct destr.| `let Point { x, y } = p` | Unpack struct by field name |
 | For destructure | `for (k, v) in pairs { }` | Unpack each tuple in loop |
 | For struct destr.| `for Point { x, y } in pts` | Unpack each struct in loop |
+| Match if-guard | `n if n > 0 => ...` | Refine arm with a Bool condition |
 | Varargs | `f(1, 2, 3)` where `f(xs: [Int])` | Trailing args auto-wrapped into list |
 | Forward decl | `fn f(x: Int) -> Int` | Signature only, no body |
 | Single-elem tuple | `(42,)` | One-element tuple |
@@ -2789,6 +2903,8 @@ Dyn types, and extends + UFCS.
 | `let Point { a, b } = p` | Field names must match struct definition — use `let Point { x, y } = p` |
 | `let Point { x } = p` with 2 fields | All fields must be listed — use `let Point { x, _ } = p` for discard |
 | `let Point { x, y } = 42` | Can only destructure a value whose type is that struct |
+| Duplicate match arms `1 => ..., 1 => ...` | Nova detects duplicate arms — remove the repeated arm or add an if-guard |
+| `n if n + 1 => ...` in match guard | Guard must be `Bool` — write `n if n > 0 => ...` |
 
 ---
 

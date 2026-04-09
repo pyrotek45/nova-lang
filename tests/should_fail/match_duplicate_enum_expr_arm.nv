@@ -1,0 +1,9 @@
+// should_fail: Duplicate enum variant arms in match expression
+module match_duplicate_enum_expr_arm
+enum Shape { Circle: Float, Rect: (Float, Float) }
+let s = Shape::Circle(3.14)
+let name = match s {
+    Circle(r) => "circle",
+    Circle(r) => "circle again",
+    Rect(dims) => "rect"
+}

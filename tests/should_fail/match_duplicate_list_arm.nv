@@ -1,0 +1,9 @@
+// should_fail: Duplicate empty list pattern arms
+module match_duplicate_list_arm
+let xs: [Int] = [1, 2, 3]
+match xs {
+    [] => println("empty"),
+    [h, ..t] => println("cons"),
+    [] => println("empty again"),
+    _ => println("other")
+}

@@ -1,0 +1,7 @@
+// should_fail: for destructure struct with wrong field name
+module for_destructure_struct_wrong_field
+struct Point { x: Int, y: Int }
+let points: [Point] = [Point(1, 2)]
+for Point { x, z } in points {
+    println(x)
+}

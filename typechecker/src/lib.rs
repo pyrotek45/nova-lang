@@ -914,7 +914,7 @@ impl TypeChecker {
                     )?;
                     let mut arms_return = vec![];
                     for arm in arms.iter() {
-                        for statement in arm.1.iter() {
+                        for statement in arm.2.iter() {
                             arms_return.push(self.will_return(
                                 std::slice::from_ref(statement),
                                 return_type.clone(),

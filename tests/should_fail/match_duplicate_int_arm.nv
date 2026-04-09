@@ -1,0 +1,9 @@
+// should_fail: Duplicate integer literal arms in value match
+module match_duplicate_int_arm
+let x = 5
+match x {
+    1 => println("one"),
+    2 => println("two"),
+    1 => println("one again"),
+    _ => println("other")
+}

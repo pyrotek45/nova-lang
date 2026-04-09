@@ -1,0 +1,9 @@
+// should_fail: Duplicate int arm in match expression
+module match_duplicate_int_expr_arm
+let x = 5
+let result = match x {
+    1 => "one",
+    2 => "two",
+    1 => "one again",
+    _ => "other"
+}

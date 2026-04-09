@@ -1,0 +1,9 @@
+// should_fail: Duplicate float literal arms in value match
+module match_duplicate_float_arm
+let f = 3.14
+match f {
+    1.0 => println("one"),
+    3.14 => println("pi"),
+    3.14 => println("pi again"),
+    _ => println("other")
+}

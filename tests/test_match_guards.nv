@@ -1,0 +1,223 @@
+module test_match_guards
+
+import super.std.core
+
+// ─── §1 Basic if-guard on integer match ──────────────────
+let x = 7
+let label = match x {
+    n if n > 10 => "big",
+    n if n > 5  => "medium",
+    n if n > 0  => "small",
+    _           => "non-positive"
+}
+assert(label == "medium", "guard: basic int guard picks medium")
+println("PASS: §1 basic int guard")
+
+// ─── §2 Guard with equality ─────────────────────────────
+let y = 42
+let msg = match y {
+    n if n == 42 => "the answer",
+    n if n == 0  => "zero",
+    _            => "other"
+}
+assert(msg == "the answer", "guard: equality check")
+println("PASS: §2 guard equality")
+
+// ─── §3 Guard with logical operators ────────────────────
+let z = 15
+let range = match z {
+    n if n >= 10 && n <= 20 => "teens",
+    n if n > 20             => "above",
+    _                       => "below"
+}
+assert(range == "teens", "guard: logical AND range check")
+println("PASS: §3 guard logical AND")
+
+// ─── §4 Same pattern with different guards ──────────────
+let val = 3
+let cat = match val {
+    n if n > 100 => "huge",
+    n if n > 50  => "large",
+    n if n > 10  => "medium",
+    n if n > 0   => "small",
+    _            => "non-positive"
+}
+assert(cat == "small", "guard: multiple same-pattern with guards")
+println("PASS: §4 same pattern different guards")
+
+// ─── §5 Guard on string match ───────────────────────────
+let name = "Alice"
+let greeting = match name {
+    s if s == "Alice" => "Hello, Alice!",
+    s if s == "Bob"   => "Hey, Bob!",
+    _                 => "Hi, stranger"
+}
+assert(greeting == "Hello, Alice!", "guard: string match with guard")
+println("PASS: §5 string guard")
+
+// ─── §6 Guard on float match ────────────────────────────
+let f = 3.14
+let desc = match f {
+    v if v > 3.0 && v < 4.0 => "pi-ish",
+    v if v > 2.0             => "above two",
+    _                        => "other"
+}
+assert(desc == "pi-ish", "guard: float range check")
+println("PASS: §6 float guard")
+
+// ─── §7 Guard falling through to later arm ──────────────
+let a = 2
+let res = match a {
+    n if n > 10 => "nope",
+    n if n > 5  => "nope",
+    n if n == 2 => "yes!",
+    _           => "fallback"
+}
+assert(res == "yes!", "guard: fall-through to third arm")
+println("PASS: §7 guard fall-through")
+
+// ─── §8 Guard with wildcard fallback ────────────────────
+let b = -5
+let sign = match b {
+    n if n > 0  => "positive",
+    n if n == 0 => "zero",
+    _           => "negative"
+}
+assert(sign == "negative", "guard: wildcard catches negative")
+println("PASS: §8 guard wildcard fallback")
+
+// ─── §9 Match statement with guards ─────────────────────
+let score = 85
+let grade = ""
+match score {
+    s if s >= 90 => { grade = "A" }
+    s if s >= 80 => { grade = "B" }
+    s if s >= 70 => { grade = "C" }
+    _            => { grade = "F" }
+}
+assert(grade == "B", "guard: statement form grade B")
+println("PASS: §9 match statement guards")
+
+// ─── §10 Guard with boolean variable ────────────────────
+let flag = true
+let check = match flag {
+    b if b => "truthy",
+    _      => "falsy"
+}
+assert(check == "truthy", "guard: bool guard")
+println("PASS: §10 bool guard")
+
+// ─── §11 Struct pattern with guard ──────────────────────
+struct Point { x: Int, y: Int }
+let p = Point(5, 10)
+let quadrant = match p {
+    Point { x, y } if x > 0 && y > 0 => "Q1",
+    Point { x, y } if x < 0 && y > 0 => "Q2",
+    Point { x, y } if x < 0 && y < 0 => "Q3",
+    Point { x, y } if x > 0 && y < 0 => "Q4",
+    _                                 => "axis"
+}
+assert(quadrant == "Q1", "guard: struct pattern quadrant Q1")
+println("PASS: §11 struct pattern guard")
+
+// ─── §12 Struct pattern guard with computed condition ───
+let p2 = Point(3, 4)
+let kind = match p2 {
+    Point { x, y } if x * x + y * y > 25 => "far",
+    Point { x, y } if x * x + y * y > 10 => "mid",
+    _                                      => "close"
+}
+assert(kind == "mid", "guard: struct computed distance")
+println("PASS: §12 struct computed guard")
+
+// ─── §13 Tuple pattern with guard ───────────────────────
+let pair = (10, 20)
+let orient = match pair {
+    (a, b) if a > b => "first bigger",
+    (a, b) if a < b => "second bigger",
+    _               => "equal"
+}
+assert(orient == "second bigger", "guard: tuple pattern guard")
+println("PASS: §13 tuple pattern guard")
+
+// ─── §14 Literal + guard on same type ───────────────────
+let num = 5
+let info = match num {
+    0           => "zero",
+    1           => "one",
+    n if n < 0  => "negative",
+    n if n > 0  => "positive",
+    _           => "?"
+}
+assert(info == "positive", "guard: literal then guard arms")
+println("PASS: §14 literal and guard mix")
+
+// ─── §15 Guard in match expression used in function ─────
+fn classify(n: Int) -> String {
+    return match n {
+        x if x > 100 => "huge",
+        x if x > 10  => "big",
+        x if x > 0   => "small",
+        0             => "zero",
+        _             => "negative"
+    }
+}
+assert(classify(200) == "huge", "guard: fn classify huge")
+assert(classify(50)  == "big",  "guard: fn classify big")
+assert(classify(5)   == "small","guard: fn classify small")
+assert(classify(0)   == "zero", "guard: fn classify zero")
+assert(classify(-3)  == "negative", "guard: fn classify negative")
+println("PASS: §15 guard in function")
+
+// ─── §16 Nested guard: struct inside tuple ──────────────
+let tp = (Point(1, 2), 100)
+let result = match tp {
+    (Point { x, y }, score) if score > 50 => x + y + score,
+    _ => 0
+}
+assert(result == 103, "guard: nested struct-in-tuple guard")
+println("PASS: §16 nested struct in tuple guard")
+
+// ─── §17 Guard with Option ──────────────────────────────
+let opt = Some(42)
+let optmsg = match opt {
+    Some(n) if n > 100 => "big some",
+    Some(n) if n > 0   => "small some",
+    Some(n)             => "non-positive some",
+    None                => "none"
+}
+assert(optmsg == "small some", "guard: option with guard")
+println("PASS: §17 option guard")
+
+// ─── §18 Guard with list patterns ───────────────────────
+let xs: [Int] = [5, 10, 15]
+let listmsg = match xs {
+    [h, ..rest] if h > 10 => "big head",
+    [h, ..rest] if h > 0  => "small head",
+    []                     => "empty",
+    _                      => "other"
+}
+assert(listmsg == "small head", "guard: list cons guard")
+println("PASS: §18 list pattern guard")
+
+// ─── §19 Guard statement with multiple arms all guarded ─
+let c = 'z'
+let letter = ""
+match c {
+    ch if ch == 'a' => { letter = "first" }
+    ch if ch == 'z' => { letter = "last" }
+    _               => { letter = "middle" }
+}
+assert(letter == "last", "guard: char match with guard stmt")
+println("PASS: §19 char guard statement")
+
+// ─── §20 Guard with negation ────────────────────────────
+let v = 0
+let nonneg = match v {
+    n if !(n < 0) => "non-negative",
+    _             => "negative"
+}
+assert(nonneg == "non-negative", "guard: negation in guard")
+println("PASS: §20 guard negation")
+
+println("All match guard tests passed!")

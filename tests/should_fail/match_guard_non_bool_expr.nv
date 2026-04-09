@@ -1,0 +1,7 @@
+// should_fail: If guard must be Bool in match expression
+module match_guard_non_bool_expr
+let x = 10
+let result = match x {
+    n if n * 2 => "doubled",
+    _ => "other"
+}

@@ -1,0 +1,8 @@
+// should_fail: Duplicate bool literal arms in value match
+module match_duplicate_bool_arm
+let b = true
+match b {
+    true => println("yes"),
+    true => println("yes again"),
+    false => println("no")
+}

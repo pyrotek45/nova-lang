@@ -1,0 +1,7 @@
+// should_fail: for destructure struct pattern on non-struct list
+module for_destructure_struct_on_int_list
+struct Point { x: Int, y: Int }
+let nums: [Int] = [1, 2, 3]
+for Point { x, y } in nums {
+    println(x)
+}

@@ -1,0 +1,7 @@
+// should_fail: If guard must be Bool, not Float
+module match_guard_non_bool_float
+let x = 5
+match x {
+    n if 3.14 => println("bad"),
+    _ => println("other")
+}

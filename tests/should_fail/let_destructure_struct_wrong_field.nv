@@ -1,0 +1,5 @@
+// should_fail: let destructure struct with wrong field name
+module let_destructure_struct_wrong_field
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+let Point { x, z } = p
