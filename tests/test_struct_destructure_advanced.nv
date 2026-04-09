@@ -1,0 +1,153 @@
+module test_struct_destructure_advanced
+
+// ═══════════════════════════════════════════════════════════════
+//  Advanced struct destructuring edge cases
+// ═══════════════════════════════════════════════════════════════
+
+struct Point  { x: Int, y: Int }
+struct Color  { r: Int, g: Int, b: Int }
+struct Single { value: Int }
+struct Nested { point: Point, label: String }
+struct Deep   { inner: Nested }
+
+// ─── §1 Struct inside tuple let destructure ─────────────────
+
+let (Point { x, y }, z) = (Point(3, 4), 5)
+assert(x == 3, "§1a")
+assert(y == 4, "§1b")
+assert(z == 5, "§1c")
+println("PASS: §1 struct inside tuple destructure")
+
+// ─── §2 Struct inside list destructure ──────────────────────
+
+let [Point { x: x1, y: y1 }, Point { x: x2, y: y2 }] = [Point(1, 2), Point(3, 4)]
+assert(x1 == 1, "§2a")
+assert(y1 == 2, "§2b")
+assert(x2 == 3, "§2c")
+assert(y2 == 4, "§2d")
+println("PASS: §2 struct inside list destructure")
+
+// ─── §3 Wildcard + struct in tuple ──────────────────────────
+
+let (_, Point { x: px, y: py }) = ("skip", Point(7, 8))
+assert(px == 7, "§3a")
+assert(py == 8, "§3b")
+println("PASS: §3 wildcard + struct in tuple")
+
+// ─── §4 Triple nested struct ────────────────────────────────
+
+let deep = Deep(Nested(Point(42, 58), "deep"))
+let Deep { inner: Nested { point: Point { x: dx, y: dy }, label } } = deep
+assert(dx == 42,        "§4a")
+assert(dy == 58,        "§4b")
+assert(label == "deep", "§4c")
+println("PASS: §4 triple nested struct destructure")
+
+// ─── §5 For struct-in-tuple ─────────────────────────────────
+
+let data: [(Point, String)] = [(Point(1, 2), "a"), (Point(3, 4), "b")]
+let result = ""
+for (Point { x: fx, y: fy }, lab) in data {
+    result = result + lab + Cast::string(fx + fy)
+}
+assert(result == "a3b7", "§5")
+println("PASS: §5 for struct-in-tuple destructure")
+
+// ─── §6 Struct with Option field destructure ────────────────
+
+struct Wrapper { inner: Option(Int), name: String }
+let w = Wrapper(Some(42), "test")
+let Wrapper { inner, name } = w
+assert(name == "test",    "§6a")
+assert(inner.unwrap() == 42, "§6b")
+println("PASS: §6 struct with Option field")
+
+// ─── §7 Struct with list field destructure ──────────────────
+
+struct ListHolder { items: [Int], tag: String }
+let lh = ListHolder([10, 20, 30], "nums")
+let ListHolder { items, tag } = lh
+assert(tag == "nums", "§7a")
+assert(items[0] == 10, "§7b")
+assert(items[2] == 30, "§7c")
+println("PASS: §7 struct with list field")
+
+// ─── §8 Struct with Bool field ──────────────────────────────
+
+struct Flag { active: Bool, count: Int }
+let f = Flag(true, 5)
+let Flag { active, count } = f
+assert(active == true, "§8a")
+assert(count == 5,     "§8b")
+println("PASS: §8 struct with Bool field")
+
+// ─── §9 Struct with Float and Char fields ───────────────────
+
+struct Mixed { f: Float, c: Char }
+let m = Mixed(3.14, 'z')
+let Mixed { f, c } = m
+assert(f == 3.14, "§9a")
+assert(c == 'z',  "§9b")
+println("PASS: §9 struct with Float and Char fields")
+
+// ─── §10 Struct with tuple field ────────────────────────────
+
+struct TupleHolder { pair: (Int, Int), name: String }
+let th = TupleHolder((10, 20), "pair")
+let TupleHolder { pair, name: tname } = th
+assert(tname == "pair", "§10a")
+let (ta, tb) = pair
+assert(ta == 10, "§10b")
+assert(tb == 20, "§10c")
+println("PASS: §10 struct with tuple field")
+
+// ─── §11 Struct destructure inside if-else block ────────────
+
+fn classify(p: Point) -> String {
+    if p.x == 0 && p.y == 0 {
+        return "origin"
+    } else {
+        let Point { x: cx, y: cy } = p
+        return Cast::string(cx) + "," + Cast::string(cy)
+    }
+}
+assert(classify(Point(0, 0)) == "origin", "§11a")
+assert(classify(Point(3, 4)) == "3,4",    "§11b")
+println("PASS: §11 struct destructure in if-else")
+
+// ─── §12 Struct destructure chained with match ──────────────
+
+fn process(p: Point) -> String {
+    let Point { x: mx, y: my } = p
+    return match mx + my {
+        0 => "zero",
+        _ => "nonzero",
+    }
+}
+assert(process(Point(0, 0)) == "zero",    "§12a")
+assert(process(Point(1, 2)) == "nonzero", "§12b")
+println("PASS: §12 struct destructure then match")
+
+// ─── §13 Multiple struct types in sequence ──────────────────
+
+let Point { x: ax, y: ay } = Point(1, 2)
+let Color { r: cr, g: cg, b: cb } = Color(10, 20, 30)
+assert(ax + ay + cr + cg + cb == 63, "§13")
+println("PASS: §13 multiple struct types in sequence")
+
+// ─── §14 For with all wildcards in struct ───────────────────
+
+let wc_count = 0
+for Point { x: _, y: _ } in [Point(1, 2), Point(3, 4)] {
+    wc_count = wc_count + 1
+}
+assert(wc_count == 2, "§14")
+println("PASS: §14 for with all-wildcard struct")
+
+// ─── §15 Cons pattern with struct elements ──────────────────
+
+let [Point { x: hx, y: hy }, ..rest] = [Point(1, 2), Point(3, 4), Point(5, 6)]
+assert(hx == 1, "§15a")
+assert(hy == 2, "§15b")
+println("PASS: §15 cons pattern with struct head")
+

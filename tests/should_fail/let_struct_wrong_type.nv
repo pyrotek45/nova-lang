@@ -1,0 +1,5 @@
+module fail
+// Let destructure: wrong struct type name
+struct Point { x: Int, y: Int }
+struct Color { r: Int, g: Int, b: Int }
+let Color { r, g, b } = Point(1, 2)

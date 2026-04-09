@@ -1,0 +1,7 @@
+module fail
+// For destructure: struct with too few fields
+struct Point { x: Int, y: Int }
+let points: [Point] = [Point(1, 2)]
+for Point { x } in points {
+    println(Cast::string(x))
+}

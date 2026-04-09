@@ -1,0 +1,8 @@
+module fail
+// For destructure: struct with wrong type vs list element type
+struct Point { x: Int, y: Int }
+struct Color { r: Int, g: Int, b: Int }
+let points: [Point] = [Point(1, 2)]
+for Color { r, g, b } in points {
+    println(Cast::string(r))
+}

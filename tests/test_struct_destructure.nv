@@ -1,0 +1,191 @@
+module test_struct_destructure
+
+// ═══════════════════════════════════════════════════════════════
+//  Struct Let/For Destructuring
+// ═══════════════════════════════════════════════════════════════
+
+struct Point  { x: Int, y: Int }
+struct Color  { r: Int, g: Int, b: Int }
+struct Pair   { first: Int, second: String }
+struct Nested { point: Point, label: String }
+struct Single { value: Int }
+
+// ─── §1 Basic struct let destructure ────────────────────────
+
+let p = Point(3, 4)
+let Point { x, y } = p
+assert(x == 3, "§1a")
+assert(y == 4, "§1b")
+println("PASS: §1 basic struct let destructure")
+
+// ─── §2 Struct with reversed field order ────────────────────
+
+let p2 = Point(10, 20)
+let Point { y, x } = p2
+assert(x == 10, "§2a")
+assert(y == 20, "§2b")
+println("PASS: §2 reversed field order")
+
+// ─── §3 3-field struct destructure ──────────────────────────
+
+let c = Color(255, 128, 0)
+let Color { r, g, b } = c
+assert(r == 255, "§3a")
+assert(g == 128, "§3b")
+assert(b == 0,   "§3c")
+println("PASS: §3 three-field struct destructure")
+
+// ─── §4 Struct with mixed types ─────────────────────────────
+
+let pair = Pair(42, "hello")
+let Pair { first, second } = pair
+assert(first == 42,       "§4a")
+assert(second == "hello", "§4b")
+println("PASS: §4 mixed-type struct destructure")
+
+// ─── §5 Wildcard in struct destructure ──────────────────────
+
+let p3 = Point(7, 8)
+let Point { x, y: _ } = p3
+assert(x == 7, "§5")
+println("PASS: §5 wildcard field in struct destructure")
+
+// ─── §6 All wildcards ──────────────────────────────────────
+
+let p4 = Point(1, 2)
+let Point { x: _, y: _ } = p4
+println("PASS: §6 all-wildcard struct destructure")
+
+// ─── §7 Single-field struct destructure ─────────────────────
+
+let s = Single(99)
+let Single { value } = s
+assert(value == 99, "§7")
+println("PASS: §7 single-field struct destructure")
+
+// ─── §8 Nested struct destructure ───────────────────────────
+
+let n = Nested(Point(5, 6), "test")
+let Nested { point: Point { x, y }, label } = n
+assert(x == 5,         "§8a")
+assert(y == 6,         "§8b")
+assert(label == "test", "§8c")
+println("PASS: §8 nested struct destructure")
+
+// ─── §9 Function returning struct ───────────────────────────
+
+fn make_point(a: Int, b: Int) -> Point {
+    return Point(a, b)
+}
+let Point { x, y } = make_point(100, 200)
+assert(x == 100, "§9a")
+assert(y == 200, "§9b")
+println("PASS: §9 destructure function return value")
+
+// ─── §10 For-loop struct destructure ────────────────────────
+
+let points: [Point] = [Point(1, 10), Point(2, 20), Point(3, 30)]
+let sum = 0
+for Point { x, y } in points {
+    sum = sum + x * y
+}
+assert(sum == 10 + 40 + 90, "§10")
+println("PASS: §10 for-loop struct destructure")
+
+// ─── §11 For-loop with reversed fields ─────────────────────
+
+let total = 0
+for Point { y, x } in [Point(1, 10), Point(2, 20)] {
+    total = total + x + y
+}
+assert(total == 1 + 10 + 2 + 20, "§11")
+println("PASS: §11 for-loop reversed field order")
+
+// ─── §12 For-loop nested struct ─────────────────────────────
+
+let items: [Nested] = [Nested(Point(1, 2), "a"), Nested(Point(3, 4), "b")]
+let labels = ""
+for Nested { point: Point { x, y }, label } in items {
+    labels = labels + label + Cast::string(x + y)
+}
+assert(labels == "a3b7", "§12")
+println("PASS: §12 for-loop nested struct destructure")
+
+// ─── §13 For-loop wildcard in struct ────────────────────────
+
+let xs = 0
+for Point { x, y: _ } in [Point(10, 99), Point(20, 99)] {
+    xs = xs + x
+}
+assert(xs == 30, "§13")
+println("PASS: §13 for-loop wildcard field")
+
+// ─── §14 Multiple let destructures in sequence ─────────────
+
+let Point { x: a1, y: b1 } = Point(1, 2)
+let Point { x: a2, y: b2 } = Point(3, 4)
+assert(a1 + b1 + a2 + b2 == 10, "§14")
+println("PASS: §14 sequential struct destructures")
+
+// ─── §15 Struct destructure in function body ────────────────
+
+fn sum_point(p: Point) -> Int {
+    let Point { x, y } = p
+    return x + y
+}
+assert(sum_point(Point(7, 8)) == 15, "§15")
+println("PASS: §15 struct destructure inside function")
+
+// ─── §16 Struct with positional construction + destructure ──
+
+let Point { x, y } = Point { x: 42, y: 58 }
+assert(x == 42, "§16a")
+assert(y == 58, "§16b")
+println("PASS: §16 named construction + destructure")
+
+// ─── §17 Color for-loop accumulate channels ────────────────
+
+let colors: [Color] = [Color(10, 20, 30), Color(40, 50, 60)]
+let rtotal = 0
+let gtotal = 0
+let btotal = 0
+for Color { r, g, b } in colors {
+    rtotal = rtotal + r
+    gtotal = gtotal + g
+    btotal = btotal + b
+}
+assert(rtotal == 50, "§17a")
+assert(gtotal == 70, "§17b")
+assert(btotal == 90, "§17c")
+println("PASS: §17 for-loop color channel accumulation")
+
+// ─── §18 Struct destructure + tuple destructure combo ───────
+
+let Point { x, y } = Point(5, 6)
+let (a, b) = (x * 2, y * 3)
+assert(a == 10, "§18a")
+assert(b == 18, "§18b")
+println("PASS: §18 struct then tuple destructure combo")
+
+// ─── §19 Deeply nested struct-in-struct ─────────────────────
+
+struct Rect { origin: Point, size: Point }
+
+let rect = Rect(Point(1, 2), Point(10, 20))
+let Rect { origin: Point { x: ox, y: oy }, size: Point { x: sx, y: sy } } = rect
+assert(ox == 1,  "§19a")
+assert(oy == 2,  "§19b")
+assert(sx == 10, "§19c")
+assert(sy == 20, "§19d")
+println("PASS: §19 deeply nested struct-in-struct destructure")
+
+// ─── §20 Struct destructure preserves original ──────────────
+
+let original = Point(100, 200)
+let Point { x, y } = original
+assert(original.x == 100, "§20a")
+assert(original.y == 200, "§20b")
+assert(x == 100, "§20c")
+assert(y == 200, "§20d")
+println("PASS: §20 original struct unchanged after destructure")
+

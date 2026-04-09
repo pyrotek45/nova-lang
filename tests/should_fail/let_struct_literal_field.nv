@@ -1,0 +1,4 @@
+module fail
+// Let destructure: struct with literal in field (refutable)
+struct Point { x: Int, y: Int }
+let Point { x: 0, y } = Point(1, 2)
