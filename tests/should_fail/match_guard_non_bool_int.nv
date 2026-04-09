@@ -1,0 +1,7 @@
+// should_fail: If guard must be Bool, not Int
+module match_guard_non_bool_int
+let x = 5
+match x {
+    n if n + 1 => println("bad guard"),
+    _ => println("other")
+}

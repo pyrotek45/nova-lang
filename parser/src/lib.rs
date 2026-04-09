@@ -4697,6 +4697,62 @@ impl Parser {
         }
     }
 
+    /// Produce a human-readable string for a pattern (used in error messages).
+    fn pattern_to_string(pat: &Pattern) -> String {
+        match pat {
+            Pattern::Wildcard => "_".to_string(),
+            Pattern::Variable(name) => name.to_string(),
+            Pattern::IntLiteral(n) => n.to_string(),
+            Pattern::FloatLiteral(f) => f.to_string(),
+            Pattern::StringLiteral(s) => format!("\"{}\"", s),
+            Pattern::BoolLiteral(b) => b.to_string(),
+            Pattern::CharLiteral(c) => format!("'{}'", c),
+            Pattern::Tuple(pats) => {
+                let inner: Vec<String> = pats.iter().map(Self::pattern_to_string).collect();
+                format!("({})", inner.join(", "))
+            }
+            Pattern::List(pats) => {
+                let inner: Vec<String> = pats.iter().map(Self::pattern_to_string).collect();
+                format!("[{}]", inner.join(", "))
+            }
+            Pattern::ListCons(heads, tail) => {
+                let mut parts: Vec<String> = heads.iter().map(Self::pattern_to_string).collect();
+                parts.push(format!("..{}", tail));
+                format!("[{}]", parts.join(", "))
+            }
+            Pattern::EmptyList => "[]".to_string(),
+            Pattern::Or(alts) => {
+                let inner: Vec<String> = alts.iter().map(Self::pattern_to_string).collect();
+                inner.join(" | ")
+            }
+            Pattern::Enum { variant, binding, .. } => {
+                if let Some(b) = binding {
+                    format!("{}({})", variant, Self::pattern_to_string(b))
+                } else {
+                    format!("{}()", variant)
+                }
+            }
+            Pattern::OptionSome(binding) => {
+                if let Some(b) = binding {
+                    format!("Some({})", Self::pattern_to_string(b))
+                } else {
+                    "Some()".to_string()
+                }
+            }
+            Pattern::OptionNone => "None()".to_string(),
+            Pattern::Struct { name, fields } => {
+                let inner: Vec<String> = fields.iter().map(|(fname, pat)| {
+                    if matches!(pat, Pattern::Variable(v) if v == fname) {
+                        fname.to_string()
+                    } else {
+                        format!("{}: {}", fname, Self::pattern_to_string(pat))
+                    }
+                }).collect();
+                format!("{} {{ {} }}", name, inner.join(", "))
+            }
+        }
+    }
+
     /// Validate that a pattern is compatible with the match type.
     /// Returns an error if, e.g., an IntLiteral pattern is used on a String match.
     fn validate_pattern_type(&self, pattern: &Pattern, match_type: &TType, pos: &FilePosition) -> NovaResult<()> {
@@ -5210,7 +5266,7 @@ impl Parser {
     fn value_match_expr(&mut self, expr: Expr) -> NovaResult<Expr> {
         let pos = self.get_current_token_position();
         let match_type = expr.get_type();
-        let mut arms: Vec<(Pattern, Vec<Statement>)> = vec![];
+        let mut arms: Vec<(Pattern, Option<Expr>, Vec<Statement>)> = vec![];
         self.consume_symbol(StructuralSymbol::LeftBrace)?;
         let mut default_branch: Option<Vec<Statement>> = None;
 
@@ -5246,6 +5302,26 @@ impl Parser {
                 continue;
             }
 
+            // ── Parse optional if-guard: `pattern if condition => body` ──
+            let guard = if self.current_token().is_some_and(|t| t.is_id("if")) {
+                self.advance(); // consume `if`
+                // Register bindings before parsing guard (guard can reference bound variables)
+                self.typechecker.environment.push_block();
+                self.register_pattern_bindings(&pat, &match_type)?;
+                let guard_expr = self.logical_or_expr()?;
+                if guard_expr.get_type() != TType::Bool && guard_expr.get_type() != TType::Void {
+                    return Err(self.generate_error_with_pos(
+                        format!("Match guard must be a Bool, found `{}`", guard_expr.get_type()),
+                        "The `if` guard in a match arm must evaluate to a Bool.\n  Example: `pattern if x > 0 => { ... }`",
+                        pos.clone(),
+                    ));
+                }
+                self.typechecker.environment.pop_block();
+                Some(guard_expr)
+            } else {
+                None
+            };
+
             self.consume_operator(Operator::FatArrow)?;
 
             // type-check: register bindings from the pattern
@@ -5263,7 +5339,7 @@ impl Parser {
             };
 
             self.typechecker.environment.pop_block();
-            arms.push((pat, body));
+            arms.push((pat, guard, body));
 
             while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
                 self.advance();
@@ -5271,20 +5347,34 @@ impl Parser {
         }
         self.consume_symbol(StructuralSymbol::RightBrace)?;
 
+        // ── Duplicate arm detection ──
+        // Two arms with the same pattern are only duplicates if neither has a guard
+        for i in 0..arms.len() {
+            for j in (i + 1)..arms.len() {
+                if arms[i].0 == arms[j].0 && arms[i].1.is_none() && arms[j].1.is_none() {
+                    return Err(self.generate_error_with_pos(
+                        format!("Duplicate match arm: `{}`", Self::pattern_to_string(&arms[j].0)),
+                        "This pattern already appears in an earlier arm, so this arm can never be reached.\n  Remove the duplicate or use a different pattern.\n  Tip: use an `if` guard to distinguish arms with the same pattern:\n    pattern if condition => { ... }",
+                        pos.clone(),
+                    ));
+                }
+            }
+        }
+
         // ── Exhaustiveness check ──
         let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, _)| Self::is_irrefutable(p));
+            || arms.iter().any(|(p, _, _)| Self::is_irrefutable(p));
         if !has_catchall {
             // Bool exhaustiveness: true + false
             let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                let has_true = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
                 has_true && has_false
             };
             // Option exhaustiveness: Some + None
             let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                let has_some = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
                 has_some && has_none
             };
             // User enum exhaustiveness: all variants present
@@ -5297,7 +5387,7 @@ impl Parser {
                                 .map(|(n, _)| n.as_ref())
                                 .collect();
                             variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                                arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
                             })
                         } else {
                             false
@@ -5322,7 +5412,7 @@ impl Parser {
 
         // type-check: all arms produce the same type
         let mut result_type: Option<TType> = None;
-        for (_, arm_body) in arms.iter() {
+        for (_, _, arm_body) in arms.iter() {
             if let Some(arm_ty) = Self::tail_type(arm_body) {
                 if let Some(ref prev) = result_type {
                     if *prev != arm_ty {
@@ -5374,7 +5464,7 @@ impl Parser {
     fn value_match_statement(&mut self, expr: Expr) -> NovaResult<Option<Statement>> {
         let pos = self.get_current_token_position();
         let match_type = expr.get_type();
-        let mut arms: Vec<(Pattern, Vec<Statement>)> = vec![];
+        let mut arms: Vec<(Pattern, Option<Expr>, Vec<Statement>)> = vec![];
         self.consume_symbol(StructuralSymbol::LeftBrace)?;
         let mut default_branch: Option<Vec<Statement>> = None;
 
@@ -5409,6 +5499,25 @@ impl Parser {
                 continue;
             }
 
+            // ── Parse optional if-guard: `pattern if condition => body` ──
+            let guard = if self.current_token().is_some_and(|t| t.is_id("if")) {
+                self.advance(); // consume `if`
+                self.typechecker.environment.push_block();
+                self.register_pattern_bindings(&pat, &match_type)?;
+                let guard_expr = self.logical_or_expr()?;
+                if guard_expr.get_type() != TType::Bool && guard_expr.get_type() != TType::Void {
+                    return Err(self.generate_error_with_pos(
+                        format!("Match guard must be a Bool, found `{}`", guard_expr.get_type()),
+                        "The `if` guard in a match arm must evaluate to a Bool.\n  Example: `pattern if x > 0 => { ... }`",
+                        pos.clone(),
+                    ));
+                }
+                self.typechecker.environment.pop_block();
+                Some(guard_expr)
+            } else {
+                None
+            };
+
             self.consume_operator(Operator::FatArrow)?;
 
             self.typechecker.environment.push_block();
@@ -5425,7 +5534,7 @@ impl Parser {
             };
 
             self.typechecker.environment.pop_block();
-            arms.push((pat, body));
+            arms.push((pat, guard, body));
 
             while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
                 self.advance();
@@ -5433,18 +5542,32 @@ impl Parser {
         }
         self.consume_symbol(StructuralSymbol::RightBrace)?;
 
+        // ── Duplicate arm detection ──
+        // Two arms with the same pattern are only duplicates if neither has a guard
+        for i in 0..arms.len() {
+            for j in (i + 1)..arms.len() {
+                if arms[i].0 == arms[j].0 && arms[i].1.is_none() && arms[j].1.is_none() {
+                    return Err(self.generate_error_with_pos(
+                        format!("Duplicate match arm: `{}`", Self::pattern_to_string(&arms[j].0)),
+                        "This pattern already appears in an earlier arm, so this arm can never be reached.\n  Remove the duplicate or use a different pattern.\n  Tip: use an `if` guard to distinguish arms with the same pattern:\n    pattern if condition => { ... }",
+                        pos.clone(),
+                    ));
+                }
+            }
+        }
+
         // ── Exhaustiveness check ──
         let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, _)| Self::is_irrefutable(p));
+            || arms.iter().any(|(p, _, _)| Self::is_irrefutable(p));
         if !has_catchall {
             let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                let has_true = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
                 has_true && has_false
             };
             let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                let has_some = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
                 has_some && has_none
             };
             let is_enum_exhaustive = match &match_type {
@@ -5456,7 +5579,7 @@ impl Parser {
                                 .map(|(n, _)| n.as_ref())
                                 .collect();
                             variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                                arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
                             })
                         } else {
                             false
@@ -5887,6 +6010,28 @@ impl Parser {
         }
         self.consume_symbol(RightBrace)?;
 
+        // ── Duplicate arm detection (enum match expression) ──
+        {
+            let mut seen_tags: Vec<usize> = vec![];
+            if let Some(fields) = self.typechecker.environment.custom_types.get(
+                expr.get_type().custom_to_string().unwrap()
+            ) {
+                for (tag, _, _) in &branches {
+                    if seen_tags.contains(tag) {
+                        let variant_name = fields.get(*tag)
+                            .map(|(n, _)| n.to_string())
+                            .unwrap_or_else(|| format!("tag {}", tag));
+                        return Err(self.generate_error_with_pos(
+                            format!("Duplicate match arm for variant `{}`", variant_name),
+                            "This variant already has an arm. Each enum variant can only appear once.\n  Remove the duplicate arm.",
+                            pos.clone(),
+                        ));
+                    }
+                    seen_tags.push(*tag);
+                }
+            }
+        }
+
         // ── Exhaustiveness check ──
         if default_branch.is_none() {
             let mut covered = vec![];
@@ -6262,6 +6407,28 @@ impl Parser {
             }
         }
         self.consume_symbol(RightBrace)?;
+
+        // ── Duplicate arm detection (enum match statement) ──
+        {
+            let mut seen_tags: Vec<usize> = vec![];
+            if let Some(fields) = self.typechecker.environment.custom_types.get(
+                expr.get_type().custom_to_string().unwrap()
+            ) {
+                for (tag, _, _) in &branches {
+                    if seen_tags.contains(tag) {
+                        let variant_name = fields.get(*tag)
+                            .map(|(n, _)| n.to_string())
+                            .unwrap_or_else(|| format!("tag {}", tag));
+                        return Err(self.generate_error_with_pos(
+                            format!("Duplicate match arm for variant `{}`", variant_name),
+                            "This variant already has an arm. Each enum variant can only appear once.\n  Remove the duplicate arm.",
+                            pos.clone(),
+                        ));
+                    }
+                    seen_tags.push(*tag);
+                }
+            }
+        }
 
         if default_branch.is_none() {
             // check to see if all variants are covered
@@ -6997,7 +7164,12 @@ impl Parser {
                     if name != type_name {
                         return Err(self.generate_error_with_pos(
                             format!("Struct pattern `{}` does not match list element type `{}`", name, type_name),
-                            "The struct name in the pattern must match the list element type.",
+                            format!(
+                                "The struct name in the pattern must match the list element type.\n  \
+                                 The list contains `{}`, but the pattern uses `{}`.\n  \
+                                 Example: `for {} {{ ... }} in list {{ ... }}`",
+                                type_name, name, type_name
+                            ),
                             arraypos.clone(),
                         ));
                     }
@@ -7006,12 +7178,19 @@ impl Parser {
                             .filter(|(n, _)| n.as_ref() != "type")
                             .collect();
                         if fields.len() != real_fields.len() {
+                            let field_names: Vec<String> = real_fields.iter()
+                                .map(|(n, _)| n.to_string())
+                                .collect();
                             return Err(self.generate_error_with_pos(
                                 format!(
                                     "Struct pattern `{}` has {} fields but the struct has {}",
                                     name, fields.len(), real_fields.len()
                                 ),
-                                "The number of fields in the pattern must match the struct definition.",
+                                format!(
+                                    "All fields must be listed. Use `_` to discard a field.\n  \
+                                     Expected: `for {} {{ {} }} in list {{ ... }}`",
+                                    name, field_names.join(", ")
+                                ),
                                 arraypos.clone(),
                             ));
                         }
@@ -7022,7 +7201,14 @@ impl Parser {
                                     .collect();
                                 return Err(self.generate_error_with_pos(
                                     format!("Field `{}` not found in struct `{}`", field_name, name),
-                                    format!("Available fields: {}", available.join(", ")),
+                                    format!(
+                                        "Available fields: {}.\n  \
+                                         Struct field names must match the definition exactly.\n  \
+                                         Example: `for {} {{ {} }} in list {{ ... }}`",
+                                        available.join(", "),
+                                        name,
+                                        real_fields.iter().map(|(n, _)| n.to_string()).collect::<Vec<_>>().join(", ")
+                                    ),
                                     arraypos.clone(),
                                 ));
                             }
@@ -7033,7 +7219,9 @@ impl Parser {
                 _ => {
                     return Err(self.generate_error_with_pos(
                         format!("Cannot destructure `{}` with a struct pattern", inner_type),
-                        "Struct patterns can only destructure struct types.",
+                        "Struct patterns can only destructure struct types.\n  \
+                         Struct destructuring works with lists of structs:\n  \
+                         `for Point {{ x, y }} in list_of_points {{ ... }}`",
                         arraypos.clone(),
                     ));
                 }
@@ -7472,7 +7660,12 @@ impl Parser {
                     if name != type_name {
                         return Err(self.generate_error_with_pos(
                             format!("Struct pattern `{}` does not match type `{}`", name, type_name),
-                            "The struct name in the pattern must match the expression type.",
+                            format!(
+                                "The struct name in the pattern must match the expression type.\n  \
+                                 The value has type `{}`, but the pattern uses `{}`.\n  \
+                                 Example: `let {} {{ ... }} = expr`",
+                                type_name, name, type_name
+                            ),
                             pos.clone(),
                         ));
                     }
@@ -7481,12 +7674,19 @@ impl Parser {
                             .filter(|(n, _)| n.as_ref() != "type")
                             .collect();
                         if fields.len() != real_fields.len() {
+                            let field_names: Vec<String> = real_fields.iter()
+                                .map(|(n, _)| n.to_string())
+                                .collect();
                             return Err(self.generate_error_with_pos(
                                 format!(
                                     "Struct pattern `{}` has {} fields but the struct has {}",
                                     name, fields.len(), real_fields.len()
                                 ),
-                                "The number of fields in the pattern must match the struct definition.",
+                                format!(
+                                    "All fields must be listed. Use `_` to discard a field.\n  \
+                                     Expected: `let {} {{ {} }} = expr`",
+                                    name, field_names.join(", ")
+                                ),
                                 pos.clone(),
                             ));
                         }
@@ -7498,7 +7698,14 @@ impl Parser {
                                     .collect();
                                 return Err(self.generate_error_with_pos(
                                     format!("Field `{}` not found in struct `{}`", field_name, name),
-                                    format!("Available fields: {}", available.join(", ")),
+                                    format!(
+                                        "Available fields: {}.\n  \
+                                         Struct field names must match the definition exactly.\n  \
+                                         Example: `let {} {{ {} }} = expr`",
+                                        available.join(", "),
+                                        name,
+                                        real_fields.iter().map(|(n, _)| n.to_string()).collect::<Vec<_>>().join(", ")
+                                    ),
                                     pos.clone(),
                                 ));
                             }

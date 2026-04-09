@@ -1,0 +1,10 @@
+// should_fail: Duplicate enum variant arms in match statement
+module match_duplicate_enum_arm
+enum Color { Red, Green, Blue }
+let c = Color::Red()
+match c {
+    Red() => println("red"),
+    Green() => println("green"),
+    Red() => println("red again"),
+    Blue() => println("blue")
+}

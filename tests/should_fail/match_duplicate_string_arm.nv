@@ -1,0 +1,9 @@
+// should_fail: Duplicate string literal arms in value match
+module match_duplicate_string_arm
+let s = "hello"
+match s {
+    "hello" => println("hi"),
+    "world" => println("world"),
+    "hello" => println("hi again"),
+    _ => println("other")
+}

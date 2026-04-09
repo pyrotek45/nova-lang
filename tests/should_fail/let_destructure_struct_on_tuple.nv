@@ -1,0 +1,5 @@
+// should_fail: let destructure struct pattern on a tuple value
+module let_destructure_struct_on_tuple
+struct Point { x: Int, y: Int }
+let t = (1, 2)
+let Point { x, y } = t

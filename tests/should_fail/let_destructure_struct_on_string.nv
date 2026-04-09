@@ -1,0 +1,5 @@
+// should_fail: let destructure struct pattern on a string
+module let_destructure_struct_on_string
+struct Point { x: Int, y: Int }
+let s = "hello"
+let Point { x, y } = s

@@ -2854,7 +2854,7 @@ impl Compiler {
     fn compile_value_match_statement(
         &mut self,
         expr: &Expr,
-        arms: &[(Pattern, Vec<Statement>)],
+        arms: &[(Pattern, Option<Expr>, Vec<Statement>)],
         default: &Option<Vec<Statement>>,
         position: &FilePosition,
     ) -> NovaResult<()> {
@@ -2874,12 +2874,18 @@ impl Compiler {
             self.compile_pattern_test(&arm.0, temp, position)?;
             self.asm.push(Asm::JUMPIFFALSE(next));
 
-            // emit pattern bindings
+            // emit pattern bindings (needed before guard can reference bound variables)
             self.compile_pattern_bindings(&arm.0, temp, position)?;
+
+            // emit optional if-guard
+            if let Some(guard) = &arm.1 {
+                self.compile_expr(guard)?;
+                self.asm.push(Asm::JUMPIFFALSE(next));
+            }
 
             // emit arm body
             let arm_ast = Ast {
-                program: arm.1.clone(),
+                program: arm.2.clone(),
             };
             self.compile_program(arm_ast, self.filepath.clone(), false, false, false, false)?;
             self.asm.pop();
@@ -2911,7 +2917,7 @@ impl Compiler {
     fn compile_value_match_expr(
         &mut self,
         expr: &Expr,
-        arms: &[(Pattern, Vec<Statement>)],
+        arms: &[(Pattern, Option<Expr>, Vec<Statement>)],
         default: &Option<Vec<Statement>>,
         position: &FilePosition,
     ) -> NovaResult<()> {
@@ -2931,12 +2937,18 @@ impl Compiler {
             self.compile_pattern_test(&arm.0, temp, position)?;
             self.asm.push(Asm::JUMPIFFALSE(next));
 
-            // emit pattern bindings
+            // emit pattern bindings (needed before guard can reference bound variables)
             self.compile_pattern_bindings(&arm.0, temp, position)?;
+
+            // emit optional if-guard
+            if let Some(guard) = &arm.1 {
+                self.compile_expr(guard)?;
+                self.asm.push(Asm::JUMPIFFALSE(next));
+            }
 
             // emit arm body (keep=true so result stays on stack)
             let arm_ast = Ast {
-                program: arm.1.clone(),
+                program: arm.2.clone(),
             };
             self.compile_program(arm_ast, self.filepath.clone(), false, false, false, true)?;
             self.asm.pop();

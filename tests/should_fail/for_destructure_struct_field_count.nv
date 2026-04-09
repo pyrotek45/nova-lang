@@ -1,0 +1,7 @@
+// should_fail: for destructure struct with wrong field count
+module for_destructure_struct_field_count
+struct Point { x: Int, y: Int }
+let points: [Point] = [Point(1, 2)]
+for Point { x } in points {
+    println(x)
+}

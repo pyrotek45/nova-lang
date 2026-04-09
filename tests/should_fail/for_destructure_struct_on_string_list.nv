@@ -1,0 +1,7 @@
+// should_fail: for destructure struct pattern on a string list
+module for_destructure_struct_on_string_list
+struct Point { x: Int, y: Int }
+let names: [String] = ["a", "b"]
+for Point { x, y } in names {
+    println(x)
+}

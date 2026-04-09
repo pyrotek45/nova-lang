@@ -1,0 +1,9 @@
+// should_fail: Duplicate struct pattern arms in value match
+module match_duplicate_struct_arm
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+match p {
+    Point { x: 0, y: 0 } => println("origin"),
+    Point { x: 0, y: 0 } => println("origin again"),
+    _ => println("other")
+}

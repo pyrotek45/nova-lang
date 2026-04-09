@@ -1,0 +1,8 @@
+// should_fail: for destructure struct with wrong struct type
+module for_destructure_wrong_struct_type
+struct Point { x: Int, y: Int }
+struct Rect { w: Int, h: Int }
+let points: [Point] = [Point(1, 2)]
+for Rect { w, h } in points {
+    println(w)
+}

@@ -1,0 +1,9 @@
+// should_fail: Duplicate tuple pattern arms in value match
+module match_duplicate_tuple_arm
+let t = (1, 2)
+match t {
+    (1, 2) => println("one two"),
+    (3, 4) => println("three four"),
+    (1, 2) => println("one two again"),
+    _ => println("other")
+}

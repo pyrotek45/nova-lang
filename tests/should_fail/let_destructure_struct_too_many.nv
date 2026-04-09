@@ -1,0 +1,5 @@
+// should_fail: let destructure struct with too many fields
+module let_destructure_struct_too_many
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+let Point { x, y, z } = p

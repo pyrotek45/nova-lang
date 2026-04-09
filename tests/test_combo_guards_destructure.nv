@@ -1,0 +1,253 @@
+module test_combo_guards_destructure
+
+import super.std.core
+
+// ─── §1 Struct destructure + match guards in function ───────────
+struct Point { x: Int, y: Int }
+
+fn classify_point(p: Point) -> String {
+    return match p {
+        Point { x, y } if x == 0 && y == 0 => "origin",
+        Point { x, y } if x > 0 && y > 0   => "Q1",
+        Point { x, y } if x < 0 && y > 0   => "Q2",
+        Point { x, y } if x < 0 && y < 0   => "Q3",
+        Point { x, y } if x > 0 && y < 0   => "Q4",
+        Point { x, y } if x == 0            => "y-axis",
+        Point { x, y } if y == 0            => "x-axis",
+        _                                    => "impossible"
+    }
+}
+
+assert(classify_point(Point(0, 0))   == "origin", "combo1: origin")
+assert(classify_point(Point(5, 10))  == "Q1",     "combo1: Q1")
+assert(classify_point(Point(-3, 7))  == "Q2",     "combo1: Q2")
+assert(classify_point(Point(-1, -1)) == "Q3",     "combo1: Q3")
+assert(classify_point(Point(4, -2))  == "Q4",     "combo1: Q4")
+assert(classify_point(Point(0, 5))   == "y-axis", "combo1: y-axis")
+assert(classify_point(Point(5, 0))   == "x-axis", "combo1: x-axis")
+println("PASS: §1 struct match guards classify")
+
+// ─── §2 for destructure + match inside loop body ────────────────
+struct Score { name: String, value: Int }
+
+let scores: [Score] = [
+    Score("Alice", 95),
+    Score("Bob", 42),
+    Score("Carol", 78),
+    Score("Dave", 100)
+]
+
+let honors = 0
+let passing = 0
+let low = 0
+
+for Score { name, value } in scores {
+    match value {
+        v if v >= 90 => { honors = honors + 1 }
+        v if v >= 60 => { passing = passing + 1 }
+        _            => { low = low + 1 }
+    }
+}
+
+assert(honors == 2,  "combo2: honors count")
+assert(passing == 1, "combo2: passing count")
+assert(low == 1,     "combo2: low count")
+println("PASS: §2 for destructure + match guards")
+
+// ─── §3 Nested struct let destructure + match guards ────────────
+struct Rect { width: Int, height: Int }
+
+let r = Rect(10, 20)
+let Rect { width, height } = r
+
+let shape = match (width, height) {
+    (w, h) if w == h      => "square",
+    (w, h) if w > h       => "landscape",
+    (w, h) if w < h       => "portrait",
+    _                      => "unknown"
+}
+assert(shape == "portrait", "combo3: rect is portrait")
+println("PASS: §3 let destructure + tuple match guards")
+
+// ─── §4 Option + struct destructure + guard ─────────────────────
+fn best_score(scores: [Score]) -> Option(Int) {
+    let best = None(Int)
+    for Score { name, value } in scores {
+        match best {
+            None    => { best = Some(value) }
+            Some(b) => {
+                if value > b {
+                    best = Some(value)
+                }
+            }
+        }
+    }
+    return best
+}
+
+let result = best_score(scores)
+match result {
+    Some(v) => assert(v == 100, "combo4: best is 100"),
+    None    => assert(false, "combo4: should not be None")
+}
+println("PASS: §4 option + struct destructure + guard")
+
+// ─── §5 Tuple destructure in let + match guard on result ────────
+let pair = (7, 3)
+let (a, b) = pair
+let relation = match (a - b) {
+    d if d > 0 => "first bigger by " + Cast::string(d),
+    d if d < 0 => "second bigger",
+    _          => "equal"
+}
+assert(relation == "first bigger by 4", "combo5: tuple destr + guard")
+println("PASS: §5 tuple let destructure + match guard")
+
+// ─── §6 Multiple structs + match expression with guards ─────────
+struct Velocity { dx: Int, dy: Int }
+
+fn move_point(p: Point, v: Velocity) -> String {
+    let Point { x, y } = p
+    let Velocity { dx, dy } = v
+    let nx = x + dx
+    let ny = y + dy
+    return match Point(nx, ny) {
+        Point { x, y } if x > 100 || y > 100 => "out of bounds",
+        Point { x, y } if x < 0 || y < 0     => "negative zone",
+        _                                      => "ok"
+    }
+}
+
+assert(move_point(Point(50, 50), Velocity(60, 10)) == "out of bounds", "combo6: oob")
+assert(move_point(Point(5, 5), Velocity(-10, 0))   == "negative zone", "combo6: neg")
+assert(move_point(Point(10, 10), Velocity(5, 5))   == "ok",            "combo6: ok")
+println("PASS: §6 two struct destructure + match guards")
+
+// ─── §7 For loop + tuple destructure + guard in body ────────────
+let pairs: [(Int, Int)] = [(1, 10), (5, 5), (10, 1), (3, 3)]
+let bigger_first = 0
+let equal_count = 0
+let bigger_second = 0
+
+for (x, y) in pairs {
+    match (x, y) {
+        (a, b) if a > b  => { bigger_first = bigger_first + 1 }
+        (a, b) if a == b => { equal_count = equal_count + 1 }
+        _                => { bigger_second = bigger_second + 1 }
+    }
+}
+
+assert(bigger_first == 1,  "combo7: bigger_first")
+assert(equal_count == 2,   "combo7: equal")
+assert(bigger_second == 1, "combo7: bigger_second")
+println("PASS: §7 for tuple destructure + match guards")
+
+// ─── §8 Guard with struct literal patterns ──────────────────────
+let origin = Point(0, 0)
+let axis_check = match origin {
+    Point { x: 0, y: 0 }          => "origin",
+    Point { x: 0, y } if y > 0    => "y-pos",
+    Point { x, y: 0 } if x > 0    => "x-pos",
+    _                               => "other"
+}
+assert(axis_check == "origin", "combo8: literal struct + guard")
+println("PASS: §8 struct literal + guard mix")
+
+// ─── §9 Deeply nested: for struct, let tuple, match guard ──────
+struct Player { name: String, stats: (Int, Int) }
+let players: [Player] = [
+    Player("Alice", (100, 50)),
+    Player("Bob",   (30, 80)),
+    Player("Carol", (60, 60))
+]
+
+let offensive = 0
+let defensive = 0
+let balanced = 0
+
+for Player { name, stats } in players {
+    let (atk, def) = stats
+    match (atk, def) {
+        (a, d) if a > d => { offensive = offensive + 1 }
+        (a, d) if a < d => { defensive = defensive + 1 }
+        _               => { balanced = balanced + 1 }
+    }
+}
+
+assert(offensive == 1, "combo9: offensive")
+assert(defensive == 1, "combo9: defensive")
+assert(balanced == 1,  "combo9: balanced")
+println("PASS: §9 deep combo: for struct + let tuple + match guard")
+
+// ─── §10 Chain of match guards transforming data ────────────────
+fn transform(n: Int) -> String {
+    let step1 = match n {
+        x if x < 0   => x * -1,
+        x if x == 0  => 1,
+        x             => x
+    }
+    let step2 = match step1 {
+        x if x > 100 => 100,
+        x if x > 50  => 50,
+        x             => x
+    }
+    return match step2 {
+        x if x == 100 => "max",
+        x if x == 50  => "half",
+        x if x == 1   => "unit",
+        _              => "other"
+    }
+}
+
+assert(transform(-200) == "max",   "combo10: -200 => max")
+assert(transform(75)   == "half",  "combo10: 75 => half")
+assert(transform(0)    == "unit",  "combo10: 0 => unit")
+assert(transform(30)   == "other", "combo10: 30 => other")
+println("PASS: §10 chain of match guards")
+
+// ─── §11 Enum match + struct fields ─────────────────────────────
+enum Action {
+    Move: Point,
+    Attack: Int,
+    Heal: Int
+}
+
+fn describe_action(a: Action) -> String {
+    match a {
+        Move(p) => {
+            let Point { x, y } = p
+            return match (x, y) {
+                (dx, dy) if dx == 0 && dy == 0 => "stay",
+                (dx, dy) if dx > 0             => "move right",
+                (dx, dy) if dy > 0             => "move up",
+                _                               => "move other"
+            }
+        }
+        Attack(dmg) => { return "attack:" + Cast::string(dmg) }
+        Heal(hp)    => { return "heal:" + Cast::string(hp) }
+    }
+    return "unknown"
+}
+
+assert(describe_action(Action::Move(Point(0, 0))) == "stay",       "combo11: stay")
+assert(describe_action(Action::Move(Point(5, 0))) == "move right", "combo11: right")
+assert(describe_action(Action::Move(Point(0, 3))) == "move up",    "combo11: up")
+assert(describe_action(Action::Attack(10))        == "attack:10",  "combo11: attack")
+assert(describe_action(Action::Heal(25))          == "heal:25",    "combo11: heal")
+println("PASS: §11 enum match + struct destructure + guard")
+
+// ─── §12 Guard accumulator in loop ──────────────────────────────
+let numbers: [Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let sum_even = 0
+let sum_odd = 0
+for n in numbers {
+    match n {
+        x if x % 2 == 0 => { sum_even = sum_even + x }
+        x                => { sum_odd = sum_odd + x }
+    }
+}
+assert(sum_even == 30, "combo12: sum even 2+4+6+8+10=30")
+assert(sum_odd == 25,  "combo12: sum odd 1+3+5+7+9=25")
+println("PASS: §12 guard accumulator loop")
+
+println("All combo tests passed!")

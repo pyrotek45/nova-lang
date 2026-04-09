@@ -1,0 +1,6 @@
+// should_fail: let destructure struct with wrong struct type name
+module let_destructure_wrong_struct_type
+struct Point { x: Int, y: Int }
+struct Rect { w: Int, h: Int }
+let p = Point(1, 2)
+let Rect { w, h } = p

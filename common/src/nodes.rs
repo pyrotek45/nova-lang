@@ -187,7 +187,8 @@ pub enum Statement {
     ValueMatch {
         ttype: TType,
         expr: Expr,
-        arms: Vec<(Pattern, Vec<Statement>)>,
+        /// Each arm: (pattern, optional if-guard, body)
+        arms: Vec<(Pattern, Option<Expr>, Vec<Statement>)>,
         default: Option<Vec<Statement>>,
         position: FilePosition,
     },
@@ -344,7 +345,8 @@ pub enum Expr {
     ValueMatchExpr {
         ttype: TType,
         expr: Box<Expr>,
-        arms: Vec<(Pattern, Vec<Statement>)>,
+        /// Each arm: (pattern, optional if-guard, body)
+        arms: Vec<(Pattern, Option<Expr>, Vec<Statement>)>,
         default: Option<Vec<Statement>>,
         position: FilePosition,
     },
