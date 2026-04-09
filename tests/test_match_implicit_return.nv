@@ -1,0 +1,74 @@
+module test_match_implicit_return
+import super.std.core
+
+// Regular function with match as last statement (implicit return)
+fn classify(n: Int) -> String {
+    match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many"
+    }
+}
+assert(classify(0) == "zero", "fn match return 0")
+assert(classify(1) == "one", "fn match return 1")
+assert(classify(99) == "many", "fn match return _")
+
+// Function with enum match as implicit return
+enum Animal { Cat, Dog, Fish }
+fn describe(a: Animal) -> String {
+    match a {
+        Cat() => "meow",
+        Dog() => "woof",
+        Fish() => "blub"
+    }
+}
+assert(describe(Animal::Cat()) == "meow", "fn enum match")
+
+// Function with nested match as implicit return
+fn nested(x: Int, y: Bool) -> String {
+    match x {
+        1 => {
+            match y {
+                true => "one-true",
+                false => "one-false"
+            }
+        },
+        _ => "other"
+    }
+}
+assert(nested(1, true) == "one-true", "fn nested match")
+assert(nested(1, false) == "one-false", "fn nested match 2")
+assert(nested(2, true) == "other", "fn nested match 3")
+
+// Function with match + guards as implicit return
+struct Point { x: Int, y: Int }
+fn quadrant(p: Point) -> String {
+    match p {
+        Point { x, y } if x > 0 && y > 0 => "Q1",
+        Point { x, y } if x < 0 && y > 0 => "Q2",
+        Point { x, y } if x < 0 && y < 0 => "Q3",
+        Point { x, y } if x > 0 && y < 0 => "Q4",
+        _ => "origin"
+    }
+}
+assert(quadrant(Point(3, 4)) == "Q1", "fn match guard Q1")
+assert(quadrant(Point(-1, 2)) == "Q2", "fn match guard Q2")
+assert(quadrant(Point(0, 0)) == "origin", "fn match guard origin")
+
+// Function with if in match arm as implicit return
+fn classify2(n: Int) -> String {
+    match n {
+        x if x > 100 => "huge",
+        x if x > 10 => "big",
+        x if x > 0 => "small",
+        0 => "zero",
+        _ => "negative"
+    }
+}
+assert(classify2(200) == "huge", "fn match classify huge")
+assert(classify2(50) == "big", "fn match classify big")
+assert(classify2(5) == "small", "fn match classify small")
+assert(classify2(0) == "zero", "fn match classify zero")
+assert(classify2(-3) == "negative", "fn match classify negative")
+
+println("PASS: test_match_implicit_return all clear")

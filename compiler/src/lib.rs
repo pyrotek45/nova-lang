@@ -810,7 +810,7 @@ impl Compiler {
                             false,
                             false,
                             false,
-                            false,
+                            keep,
                         )?;
                         self.asm.pop();
 
@@ -827,7 +827,7 @@ impl Compiler {
                             false,
                             false,
                             false,
-                            false,
+                            keep,
                         )?;
                         self.asm.pop();
                     }
@@ -1058,7 +1058,7 @@ impl Compiler {
                     position,
                     ..
                 } => {
-                    self.compile_value_match_statement(expr, arms, default, position)?;
+                    self.compile_value_match_statement(expr, arms, default, position, keep)?;
                 }
             }
         }
@@ -2857,6 +2857,7 @@ impl Compiler {
         arms: &[(Pattern, Option<Expr>, Vec<Statement>)],
         default: &Option<Vec<Statement>>,
         position: &FilePosition,
+        keep: bool,
     ) -> NovaResult<()> {
         let end = self.gen.generate();
 
@@ -2887,7 +2888,7 @@ impl Compiler {
             let arm_ast = Ast {
                 program: arm.2.clone(),
             };
-            self.compile_program(arm_ast, self.filepath.clone(), false, false, false, false)?;
+            self.compile_program(arm_ast, self.filepath.clone(), false, false, false, keep)?;
             self.asm.pop();
 
             self.asm.push(Asm::JMP(end));
@@ -2904,7 +2905,7 @@ impl Compiler {
                 false,
                 false,
                 false,
-                false,
+                keep,
             )?;
             self.asm.pop();
         }

@@ -1917,6 +1917,10 @@ impl Parser {
                     ));
                 }
 
+                // If the last statement is an implicit-return match, inject
+                // explicit returns so the compiler emits RET for every arm.
+                Self::inject_returns_into_tail_match(&mut statements, &output);
+
                 left = Expr::Closure {
                     ttype: TType::Function {
                         parameters: typeinput,
@@ -8242,6 +8246,10 @@ impl Parser {
             }
         }
 
+        // If the last statement is an implicit-return match, inject
+        // explicit returns so the compiler emits RET for every arm.
+        Self::inject_returns_into_tail_match(&mut statements, &output);
+
         // dbg!(identifier.clone());
         Ok(Some(Statement::Function {
             ttype: output,
@@ -8250,6 +8258,65 @@ impl Parser {
             body: statements,
             captures: captured,
         }))
+    }
+
+    /// When a function/closure body's last statement is an implicit-return match
+    /// (ValueMatch or Match), rewrite the arm bodies so that each arm's last
+    /// expression is wrapped in `Statement::Return`.  This ensures the compiler
+    /// emits a proper RET instruction for every arm.
+    fn inject_returns_into_tail_match(body: &mut Vec<Statement>, return_type: &TType) {
+        if *return_type == TType::Void {
+            return;
+        }
+        if let Some(last) = body.last_mut() {
+            match last {
+                Statement::ValueMatch { arms, default, .. } => {
+                    for arm in arms.iter_mut() {
+                        Self::inject_return_in_arm_body(&mut arm.2, return_type);
+                    }
+                    if let Some(def) = default {
+                        Self::inject_return_in_arm_body(def, return_type);
+                    }
+                }
+                Statement::Match { arms, default, .. } => {
+                    for arm in arms.iter_mut() {
+                        Self::inject_return_in_arm_body(&mut arm.2, return_type);
+                    }
+                    if let Some(def) = default {
+                        Self::inject_return_in_arm_body(def, return_type);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Helper: if the last statement of an arm body is a bare expression (not a
+    /// Return), replace it with a Return wrapping that expression.  Recurse for
+    /// nested match-as-last-statement.
+    fn inject_return_in_arm_body(stmts: &mut Vec<Statement>, return_type: &TType) {
+        if let Some(last) = stmts.last_mut() {
+            match last {
+                Statement::Expression { ttype, expr } if *ttype != TType::Void => {
+                    let ret = Statement::Return {
+                        ttype: ttype.clone(),
+                        expr: expr.clone(),
+                    };
+                    *last = ret;
+                }
+                Statement::ValueMatch { .. } | Statement::Match { .. } => {
+                    // Nested match as implicit return — recurse
+                    Self::inject_returns_into_tail_match(stmts, return_type);
+                }
+                Statement::If { body, alternative, .. } => {
+                    Self::inject_return_in_arm_body(body, return_type);
+                    if let Some(alt) = alternative {
+                        Self::inject_return_in_arm_body(alt, return_type);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn expression_statement(&mut self) -> NovaResult<Option<Statement>> {
@@ -8304,6 +8371,34 @@ impl Parser {
                 }
             }
             Some(Statement::Match {
+                arms,
+                default,
+                ..
+            }) => {
+                let mut iter_type: Option<TType> = None;
+                for (_, _, arm_body) in arms {
+                    let arm_ty = Self::tail_type(arm_body)?;
+                    if let Some(ref prev) = iter_type {
+                        if *prev != arm_ty {
+                            return None;
+                        }
+                    } else {
+                        iter_type = Some(arm_ty);
+                    }
+                }
+                if let Some(def) = default {
+                    let def_ty = Self::tail_type(def)?;
+                    if let Some(ref prev) = iter_type {
+                        if *prev != def_ty {
+                            return None;
+                        }
+                    } else {
+                        iter_type = Some(def_ty);
+                    }
+                }
+                iter_type
+            }
+            Some(Statement::ValueMatch {
                 arms,
                 default,
                 ..

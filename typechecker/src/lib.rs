@@ -678,6 +678,43 @@ impl TypeChecker {
     // Return validation (will_return)
     // ---------------------------------------------------------------
 
+    /// Check whether the last statement in a body is an expression whose type
+    /// matches the expected return type (implicit return from match arm / block).
+    fn last_stmt_matches_type(
+        &self,
+        body: &[Statement],
+        return_type: &TType,
+        pos: &FilePosition,
+    ) -> bool {
+        if let Some(last) = body.last() {
+            match last {
+                Statement::Expression { ttype, .. } if *ttype != TType::Void => {
+                    self.check_and_map_types(
+                        std::slice::from_ref(ttype),
+                        std::slice::from_ref(return_type),
+                        &mut HashMap::default(),
+                        pos.clone(),
+                    )
+                    .is_ok()
+                }
+                Statement::ValueMatch { ttype, .. } | Statement::Match { ttype, .. }
+                    if *ttype != TType::Void =>
+                {
+                    self.check_and_map_types(
+                        std::slice::from_ref(ttype),
+                        std::slice::from_ref(return_type),
+                        &mut HashMap::default(),
+                        pos.clone(),
+                    )
+                    .is_ok()
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn will_return(
         &self,
         statements: &[Statement],
@@ -868,22 +905,24 @@ impl TypeChecker {
                     )?;
                     let mut arms_return = vec![];
                     for arm in arms.iter() {
-                        for statement in arm.2.iter() {
-                            arms_return.push(self.will_return(
-                                std::slice::from_ref(statement),
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
+                        // Check explicit returns inside the arm
+                        let explicit = self.will_return(&arm.2, return_type.clone(), pos.clone())?;
+                        if explicit {
+                            arms_return.push(true);
+                        } else {
+                            // Check if the last statement is an implicit return (expression whose type matches)
+                            let implicit = self.last_stmt_matches_type(&arm.2, &return_type, &pos);
+                            arms_return.push(implicit);
                         }
                     }
 
                     if let Some(default) = default {
-                        for statement in default.iter() {
-                            arms_return.push(self.will_return(
-                                std::slice::from_ref(statement),
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
+                        let explicit = self.will_return(default, return_type.clone(), pos.clone())?;
+                        if explicit {
+                            arms_return.push(true);
+                        } else {
+                            let implicit = self.last_stmt_matches_type(default, &return_type, &pos);
+                            arms_return.push(implicit);
                         }
                     }
 
@@ -914,21 +953,21 @@ impl TypeChecker {
                     )?;
                     let mut arms_return = vec![];
                     for arm in arms.iter() {
-                        for statement in arm.2.iter() {
-                            arms_return.push(self.will_return(
-                                std::slice::from_ref(statement),
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
+                        let explicit = self.will_return(&arm.2, return_type.clone(), pos.clone())?;
+                        if explicit {
+                            arms_return.push(true);
+                        } else {
+                            let implicit = self.last_stmt_matches_type(&arm.2, &return_type, &pos);
+                            arms_return.push(implicit);
                         }
                     }
                     if let Some(default) = default {
-                        for statement in default.iter() {
-                            arms_return.push(self.will_return(
-                                std::slice::from_ref(statement),
-                                return_type.clone(),
-                                pos.clone(),
-                            )?);
+                        let explicit = self.will_return(default, return_type.clone(), pos.clone())?;
+                        if explicit {
+                            arms_return.push(true);
+                        } else {
+                            let implicit = self.last_stmt_matches_type(default, &return_type, &pos);
+                            arms_return.push(implicit);
                         }
                     }
                     if arms_return.iter().all(|x| *x) {
