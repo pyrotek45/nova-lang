@@ -1,0 +1,8 @@
+// should_fail: Char literal pattern on a Float match
+module match_pattern_char_on_float
+fn bad(f: Float) -> String {
+    return match f {
+        'x' => "nope",
+        _ => "ok"
+    }
+}

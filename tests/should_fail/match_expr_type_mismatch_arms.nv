@@ -1,0 +1,8 @@
+// should_fail: Match expression arms return different types
+module match_expr_type_mismatch_arms
+fn bad(n: Int) -> Int {
+    return match n {
+        1 => "one",
+        _ => 42
+    }
+}

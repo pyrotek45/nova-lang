@@ -1,0 +1,8 @@
+// should_fail: Non-exhaustive match on Int without default
+module match_non_exhaustive_int
+fn bad(n: Int) -> String {
+    return match n {
+        1 => "one",
+        2 => "two"
+    }
+}

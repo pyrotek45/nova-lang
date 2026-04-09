@@ -898,6 +898,43 @@ impl TypeChecker {
                 Statement::Continue => {}
                 Statement::Break => {}
                 Statement::Unwrap { .. } => {}
+                Statement::ValueMatch {
+                    expr,
+                    arms,
+                    default,
+                    ..
+                } => {
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    let mut arms_return = vec![];
+                    for arm in arms.iter() {
+                        for statement in arm.1.iter() {
+                            arms_return.push(self.will_return(
+                                std::slice::from_ref(statement),
+                                return_type.clone(),
+                                pos.clone(),
+                            )?);
+                        }
+                    }
+                    if let Some(default) = default {
+                        for statement in default.iter() {
+                            arms_return.push(self.will_return(
+                                std::slice::from_ref(statement),
+                                return_type.clone(),
+                                pos.clone(),
+                            )?);
+                        }
+                    }
+                    if arms_return.iter().all(|x| *x) {
+                        return Ok(true);
+                    }
+                }
                 Statement::WhileLet { expr, body, .. } => {
                     self.will_return(
                         &[Statement::Expression {

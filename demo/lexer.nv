@@ -1,0 +1,200 @@
+module lexer
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Simple Lexer — Tokenising a Mini Expression Language
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: enums, pattern matching, Char intrinsics (isDigit, isAlpha,
+//         isWhitespace), string/char manipulation, while loops, closures
+//
+//  Tokenises a small language of integer literals, identifiers, and
+//  single-character operators:  +  -  *  /  (  )  =
+//
+//  Importable:  import lexer   (from the demo/ directory)
+//
+//  Run standalone:  nova run demo/lexer.nv
+//     (runs the built-in demo at the bottom)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+
+// ── Token type ──────────────────────────────────────────────────────────────
+
+enum Token {
+    TNumber:  Int,
+    TIdent:   String,
+    TPlus,
+    TMinus,
+    TStar,
+    TSlash,
+    TLParen,
+    TRParen,
+    TEquals,
+    TUnknown: Char
+}
+
+fn extends toString(t: Token) -> String {
+    match t {
+        TNumber(n)  => { return format("Number({})", Cast::string(n)) }
+        TIdent(s)   => { return format("Ident({})", s) }
+        TPlus()     => { return "Plus" }
+        TMinus()    => { return "Minus" }
+        TStar()     => { return "Star" }
+        TSlash()    => { return "Slash" }
+        TLParen()   => { return "LParen" }
+        TRParen()   => { return "RParen" }
+        TEquals()   => { return "Equals" }
+        TUnknown(c) => { return format("Unknown({})", Cast::string(c)) }
+    }
+    return "?"
+}
+
+// ── Lexer state ─────────────────────────────────────────────────────────────
+
+struct Lexer {
+    source: [Char],
+    pos:    Int
+}
+
+fn extends(Lexer) new(input: String) -> Lexer {
+    return Lexer { source: input.chars(), pos: 0 }
+}
+
+fn extends peek(lex: Lexer) -> Option(Char) {
+    if lex.pos < lex.source.len() {
+        return Some(lex.source[lex.pos])
+    }
+    return None(Char)
+}
+
+fn extends advance(lex: Lexer) -> Char {
+    let ch = lex.source[lex.pos]
+    lex.pos += 1
+    return ch
+}
+
+fn extends atEnd(lex: Lexer) -> Bool {
+    return lex.pos >= lex.source.len()
+}
+
+// ── Skip whitespace ─────────────────────────────────────────────────────────
+
+fn extends skipWhitespace(lex: Lexer) {
+    while !lex.atEnd() {
+        if let ch = lex.peek() {
+            if ch.isWhitespace() {
+                let _ = lex.advance()
+            } else {
+                return
+            }
+        }
+    }
+}
+
+// ── Read a multi-digit integer ──────────────────────────────────────────────
+
+fn extends readNumber(lex: Lexer) -> Token {
+    let digits = []: Char
+    while !lex.atEnd() {
+        if let ch = lex.peek() {
+            if ch.isDigit() {
+                digits.push(lex.advance())
+            } else {
+                break
+            }
+        }
+    }
+    let numStr = digits.string()
+    return Token::TNumber(Cast::int(numStr).orDefault(0))
+}
+
+// ── Read an identifier (letters, digits, underscores) ───────────────────────
+
+fn extends readIdent(lex: Lexer) -> Token {
+    let chars = []: Char
+    while !lex.atEnd() {
+        if let ch = lex.peek() {
+            if ch.isAlphanumeric() || ch == '_' {
+                chars.push(lex.advance())
+            } else {
+                break
+            }
+        }
+    }
+    return Token::TIdent(chars.string())
+}
+
+// ── Tokenise one token ─────────────────────────────────────────────────────
+
+fn extends nextToken(lex: Lexer) -> Option(Token) {
+    lex.skipWhitespace()
+    if lex.atEnd() { return None(Token) }
+
+    let ch = lex.peek().unwrap()
+
+    if ch.isDigit() {
+        return Some(lex.readNumber())
+    }
+
+    if ch.isAlpha() || ch == '_' {
+        return Some(lex.readIdent())
+    }
+
+    let _ = lex.advance()
+    if ch == '+' { return Some(Token::TPlus()) }
+    if ch == '-' { return Some(Token::TMinus()) }
+    if ch == '*' { return Some(Token::TStar()) }
+    if ch == '/' { return Some(Token::TSlash()) }
+    if ch == '(' { return Some(Token::TLParen()) }
+    if ch == ')' { return Some(Token::TRParen()) }
+    if ch == '=' { return Some(Token::TEquals()) }
+
+    return Some(Token::TUnknown(ch))
+}
+
+// ── Tokenise entire input ───────────────────────────────────────────────────
+
+fn tokenize(input: String) -> [Token] {
+    let lex = Lexer::new(input)
+    let tokens = []: Token
+    while let tok = lex.nextToken() {
+        tokens.push(tok)
+    }
+    return tokens
+}
+
+// ── Demo ────────────────────────────────────────────────────────────────────
+//  Call runLexerDemo() to see the tokenizer in action.
+//  The parser demo (parser.nv) imports this file for its Token and Lexer types.
+
+fn runLexerDemo() {
+    println("═══ Mini Lexer Demo ═══")
+    println("")
+
+    let examples = [
+        "42 + x * (y - 3)",
+        "let result = a + b / 2",
+        "foo123 + _ + bar_baz",
+        "(((1 + 2) * 3))",
+        "x = 10 + 20 * 30",
+        "hello   world   999",
+        "5 @ 3"
+    ]
+
+    for src in examples {
+        println(format("  input: \"{}\"", src))
+        let tokens = tokenize(src)
+        let names = tokens.map(|t: Token| t.toString())
+        print("  tokens: [")
+        for i in 0..names.len() {
+            print(names[i])
+            if i < names.len() - 1 { print(", ") }
+        }
+        println("]")
+        println("")
+    }
+
+    println("Done!")
+}

@@ -1,0 +1,8 @@
+// should_fail: List pattern on a non-list type (Int)
+module match_list_pattern_on_int
+fn bad(n: Int) -> String {
+    return match n {
+        [] => "empty",
+        _ => "ok"
+    }
+}

@@ -1,0 +1,8 @@
+// should_fail: String literal pattern on an Int match
+module match_pattern_string_on_int
+fn bad(n: Int) -> String {
+    return match n {
+        "hello" => "nope",
+        _ => "ok"
+    }
+}

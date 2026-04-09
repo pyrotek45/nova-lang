@@ -191,6 +191,26 @@ impl Environment {
         }
     }
 
+    /// Check whether `name` exists as a declared function (any overload)
+    /// by scanning the current scope for keys that match either the bare
+    /// name or the `name_<Type>` pattern used by overloaded functions.
+    pub fn is_known_function(&self, name: &str) -> bool {
+        let prefix = format!("{name}_");
+        if let Some(scope) = self.values.last() {
+            for (key, sym) in scope.iter() {
+                match sym.kind {
+                    SymbolKind::Function | SymbolKind::GenericFunction => {
+                        if key.as_ref() == name || key.starts_with(&prefix) {
+                            return true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
     pub fn push_scope(&mut self) {
         let mut scope = HashMap::default();
         if let Some(cap) = self.captured.last() {

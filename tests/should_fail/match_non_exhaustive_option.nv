@@ -1,0 +1,7 @@
+// should_fail: Non-exhaustive Option match (only Some, missing None)
+module match_non_exhaustive_option
+fn bad(o: Option(Int)) -> Int {
+    return match o {
+        Some(v) => v
+    }
+}

@@ -1,0 +1,9 @@
+// should_fail: Duplicate default _ branch in match
+module match_duplicate_wildcard
+fn bad(n: Int) -> String {
+    return match n {
+        1 => "one",
+        _ => "first",
+        _ => "second"
+    }
+}

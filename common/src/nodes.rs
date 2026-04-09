@@ -6,6 +6,49 @@ use crate::{
     ttype::TType,
 };
 
+/// A pattern for generalized pattern matching (non-enum types).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    /// Match any value, discard: `_`
+    Wildcard,
+    /// Bind the value to a variable: `x`
+    Variable(Rc<str>),
+    /// Match a literal Int: `42`, `-1`
+    IntLiteral(i64),
+    /// Match a literal Float: `3.14`
+    FloatLiteral(f64),
+    /// Match a literal String: `"hello"`
+    StringLiteral(Rc<str>),
+    /// Match a literal Bool: `true`, `false`
+    BoolLiteral(bool),
+    /// Match a literal Char: `'a'`
+    CharLiteral(char),
+    /// Match a tuple with sub-patterns: `(p1, p2, ...)`
+    Tuple(Vec<Pattern>),
+    /// Match a list with exact elements: `[p1, p2, ...]`
+    List(Vec<Pattern>),
+    /// Match a list with head elements and a rest tail: `[p1, p2, ..rest]`
+    ListCons(Vec<Pattern>, Rc<str>),
+    /// Match an empty list: `[]`
+    EmptyList,
+    /// Match any of several alternatives: `1 | 2 | 3`
+    Or(Vec<Pattern>),
+    /// Match an enum variant: `Red()`, `Leaf(val)` (for user-defined enums)
+    Enum {
+        variant: Rc<str>,
+        binding: Option<Box<Pattern>>,
+    },
+    /// Match Option::Some with an inner pattern: `Some(x)`
+    OptionSome(Option<Box<Pattern>>),
+    /// Match Option::None: `None()`
+    OptionNone,
+    /// Match a struct by field patterns: `Point { x: 0, y }`
+    Struct {
+        name: Rc<str>,
+        fields: Vec<(Rc<str>, Pattern)>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Arg {
     pub identifier: Rc<str>,
@@ -135,6 +178,14 @@ pub enum Statement {
         ttype: TType,
         expr: Expr,
         arms: Vec<(usize, Option<Rc<str>>, Vec<Statement>)>,
+        default: Option<Vec<Statement>>,
+        position: FilePosition,
+    },
+    /// Generalized pattern match on non-enum types (Int, String, List, Tuple, etc.)
+    ValueMatch {
+        ttype: TType,
+        expr: Expr,
+        arms: Vec<(Pattern, Vec<Statement>)>,
         default: Option<Vec<Statement>>,
         position: FilePosition,
     },
@@ -273,6 +324,14 @@ pub enum Expr {
         default: Option<Vec<Statement>>,
         position: FilePosition,
     },
+    /// Generalized pattern match expression on non-enum types
+    ValueMatchExpr {
+        ttype: TType,
+        expr: Box<Expr>,
+        arms: Vec<(Pattern, Vec<Statement>)>,
+        default: Option<Vec<Statement>>,
+        position: FilePosition,
+    },
     None,
     Void,
 }
@@ -298,6 +357,7 @@ impl Expr {
             Expr::Let { ttype, .. } => ttype.clone(),
             Expr::DynField { ttype, .. } => ttype.clone(),
             Expr::MatchExpr { ttype, .. } => ttype.clone(),
+            Expr::ValueMatchExpr { ttype, .. } => ttype.clone(),
             Expr::Void => TType::Void,
         }
     }

@@ -1,0 +1,326 @@
+module main
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Functional Programming in Nova — Haskell-Inspired Patterns
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: function composition, currying, partial application, higher-order
+//         functions, lazy iterators, Maybe/Option monadic chaining, pipes,
+//         point-free style, algebraic data types, pattern matching
+//
+//  Run:  nova run demo/functional.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.iter
+import super.std.functional
+import super.std.math
+
+// ── 1. Function Composition ─────────────────────────────────────────────────
+//
+//  Haskell:  (f . g) x  =  f (g x)
+//  Nova:     compose(f, g)  or  pipe(g, f)
+
+println("── 1. Composition ──")
+
+let double = |x: Int| x * 2
+let inc    = |x: Int| x + 1
+let square = |x: Int| x * x
+
+// compose: right-to-left (like Haskell's `.`)
+let doubleThenSquare = compose(square, double)
+println(format("  compose(square, double)(3) = {}", Cast::string(doubleThenSquare(3))))
+
+// pipe: left-to-right (more readable for chains)
+let pipeline = pipe(inc, pipe(double, square))
+println(format("  pipe(inc, double, square)(3) = {}", Cast::string(pipeline(3))))
+
+// point-free: build a transform without naming arguments
+let normalize = compose(
+    |x: Int| if x > 100 { 100 } else { x },
+    |x: Int| if x < 0 { 0 } else { x }
+)
+println(format("  clamp(-5)  = {}", Cast::string(normalize(-5))))
+println(format("  clamp(50)  = {}", Cast::string(normalize(50))))
+println(format("  clamp(999) = {}", Cast::string(normalize(999))))
+println("")
+
+// ── 2. Currying & Partial Application ───────────────────────────────────────
+//
+//  Haskell:  add x y = x + y ;  add3 = add 3
+//  Nova:     closures capture the first argument
+
+println("── 2. Currying ──")
+
+// Manual currying: a function that returns a function
+fn add(a: Int) -> fn(Int) -> Int {
+    return |b: Int| a + b
+}
+
+let add5 = add(5)
+let add10 = add(10)
+println(format("  add5(3)  = {}", Cast::string(add5(3))))
+println(format("  add10(7) = {}", Cast::string(add10(7))))
+
+// Curried multiply
+fn mul(a: Int) -> fn(Int) -> Int {
+    return |b: Int| a * b
+}
+
+let triple = mul(3)
+let tenTimes = mul(10)
+println(format("  triple(7) = {}", Cast::string(triple(7))))
+
+// Using curry from std/functional
+let sub = curry(|a: Int, b: Int| a - b)
+let subFrom100 = sub(100)
+println(format("  subFrom100(42) = {}", Cast::string(subFrom100(42))))
+println("")
+
+// ── 3. Higher-Order List Operations ─────────────────────────────────────────
+//
+//  Haskell:  map (*2) . filter even $ [1..10]
+//  Nova:     [1..10].filter(pred).map(f)
+
+println("── 3. Map / Filter / Fold ──")
+
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+let evens = data.filter(): |x: Int| x % 2 == 0
+let doubled = evens.map(): |x: Int| x * 2
+println(format("  evens doubled: {}", Cast::string(doubled)))
+
+// fold (reduce) — like Haskell's foldl
+let sum = data.reduce(|acc: Int, x: Int, i: Int| acc + x, 0)
+let product = data.reduce(|acc: Int, x: Int, i: Int| acc * x, 1)
+println(format("  sum [1..10]     = {}", Cast::string(sum)))
+println(format("  product [1..10] = {}", Cast::string(product)))
+
+// build a string with fold
+let words = ["the", "quick", "brown", "fox"]
+let sentence = words.reduce(
+    |acc: String, w: String, i: Int| if acc == "" { w } else { acc + " " + w },
+    ""
+)
+println(format("  joined: \"{}\"", sentence))
+println("")
+
+// ── 4. Lazy Iterators ───────────────────────────────────────────────────────
+//
+//  Haskell:  take 5 . map (*2) . filter even $ [1..]
+//  Nova:     Iter::fromRange(1,n).filter(p).map(f).take(5)
+
+println("── 4. Lazy Iterators ──")
+
+// Take first 5 even squares from an infinite-ish range
+let result = Iter::fromRange(1, 100)
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * x)
+    .take(5)
+    .collect()
+println(format("  first 5 even squares: {}", Cast::string(result)))
+
+// sum of first 100 natural numbers, lazily
+let n100 = Iter::fromRange(1, 101).sum()
+println(format("  sum [1..100] = {}", Cast::string(n100)))
+
+// zipWith — pair two iterators then combine
+let xs = Iter::fromRange(1, 6)    // [1,2,3,4,5]
+let ys = Iter::fromRange(10, 15)  // [10,11,12,13,14]
+let zipped = xs.zip(ys).map(|pair: (Int, Int)| pair[0] + pair[1]).collect()
+println(format("  zipWith (+) [1..5] [10..14] = {}", Cast::string(zipped)))
+
+// Fibonacci via iterator
+fn fibs(n: Int) -> [Int] {
+    let a = Box(0)
+    let b = Box(1)
+    return Iter::generate(fn() -> Int {
+        let val = a.value
+        let next = a.value + b.value
+        a.value = b.value
+        b.value = next
+        return val
+    }).take(n).collect()
+}
+println(format("  first 10 fibs: {}", Cast::string(fibs(10))))
+println("")
+
+// ── 5. Maybe Monad ──────────────────────────────────────────────────────────
+//
+//  Haskell:  Just 5 >>= (\x -> Just (x*2)) >>= (\x -> if x > 8 then Just x else Nothing)
+//  Nova:     Maybe::Just(5).map(f).map(g)  (flatMap for chaining)
+
+println("── 5. Maybe Monad ──")
+
+let val = Maybe::Just(5)
+    .map(|x: Int| x * 2)
+    .map(|x: Int| x + 1)
+println(format("  Just(5) |> *2 |> +1 = {}", val.toString()))
+
+let nothing = Maybe::Nothing() @[A: Int]
+let safe = nothing
+    .map(|x: Int| x * 2)
+    .map(|x: Int| x + 1)
+println(format("  Nothing |> *2 |> +1 = {}", safe.toString()))
+
+// safe division
+fn safeDiv(a: Int, b: Int) -> Maybe(Int) {
+    if b == 0 { return Maybe::Nothing() @[A: Int] }
+    return Maybe::Just(a / b)
+}
+
+let r1 = safeDiv(10, 2)
+let r2 = safeDiv(10, 0)
+println(format("  safeDiv(10, 2) = {}", r1.toString()))
+println(format("  safeDiv(10, 0) = {}", r2.toString()))
+
+// chain safe operations
+let chain = Maybe::Just(100)
+    .map(|x: Int| x + 20)
+    .map(|x: Int| x / 4)
+    .map(|x: Int| x - 5)
+println(format("  Just(100) |> +20 |> /4 |> -5 = {}", chain.toString()))
+println("")
+
+// ── 6. Option Chaining ──────────────────────────────────────────────────────
+//
+//  Built-in Option(T) with .map(), .orDefault(), .orError()
+
+println("── 6. Option Chaining ──")
+
+let parsed = Cast::int("42").map(|n: Int| n * 10).orDefault(0)
+println(format("  parse(\"42\") * 10 = {}", Cast::string(parsed)))
+
+let bad = Cast::int("hello").map(|n: Int| n * 10).orDefault(-1)
+println(format("  parse(\"hello\") * 10 = {}", Cast::string(bad)))
+
+// maybe to option bridge
+let m = Maybe::Just(42).toOption()
+println(format("  Maybe::Just(42).toOption() = {}", Cast::string(m)))
+println("")
+
+// ── 7. Pipe Operator & Bind ─────────────────────────────────────────────────
+//
+//  Haskell:  x & f & g     (with Data.Function.(&))
+//  Nova:     x |> f() |> g()   and   x ~> name { expr }
+
+println("── 7. Pipe & Bind ──")
+
+fn negate(x: Int) -> Int { return 0 - x }
+fn dbl(x: Int) -> Int { return x * 2 }
+
+let piped = 5 |> dbl() |> inc() |> triple()
+println(format("  5 |> dbl |> inc |> triple = {}", Cast::string(piped)))
+
+// bind: name an intermediate result
+let bound = [1, 2, 3, 4, 5].len() ~> n {
+    n * n
+} ~> sq {
+    sq + 10
+}
+println(format("  len([1..5]) ~> n² ~> +10 = {}", Cast::string(bound)))
+println("")
+
+// ── 8. Predicate Combinators ────────────────────────────────────────────────
+//
+//  Haskell:  liftA2 (&&) (> 3) (< 10)
+//  Nova:     both(pred1, pred2)
+
+println("── 8. Predicate Combinators ──")
+
+let between3and8 = both(|x: Int| x > 3, |x: Int| x < 8)
+let small_or_big = either(|x: Int| x < 3, |x: Int| x > 100)
+let notEven = negate(|x: Int| x % 2 == 0)
+
+let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+println(format("  between 3..8: {}", Cast::string(nums.filter(): |x: Int| between3and8(x))))
+println(format("  small or big: {}", Cast::string(nums.filter(): |x: Int| small_or_big(x))))
+println(format("  odd numbers:  {}", Cast::string(nums.filter(): |x: Int| notEven(x))))
+println("")
+
+// ── 9. Apply / Iterate ──────────────────────────────────────────────────────
+//
+//  Haskell:  iterate (*2) 1 & take 10
+//  Nova:     applyN(f, n, x)  and  applyWhile(f, pred, x)
+
+println("── 9. Apply & Iterate ──")
+
+// apply f n times
+let doubled8 = applyN(|x: Int| x * 2, 8, 1)
+println(format("  applyN(double, 8, 1) = {}", Cast::string(doubled8)))
+
+// apply while predicate holds
+let grown = applyWhile(|x: Int| x * 2, |x: Int| x < 1000, 1)
+println(format("  applyWhile(double, <1000, 1) = {}", Cast::string(grown)))
+println("")
+
+// ── 10. Algebraic Data Types & Pattern Matching ─────────────────────────────
+//
+//  Haskell:  data Shape = Circle Double | Rect Double Double
+//  Nova:     enum Shape { Circle: Float, Rect: (Float, Float) }
+
+println("── 10. Algebraic Data Types ──")
+
+enum Shape {
+    Circle: Float,
+    Rect:   (Float, Float)
+}
+
+fn extends area(s: Shape) -> Float {
+    match s {
+        Circle(r)  => { return 3.14159 * r * r }
+        Rect(dims) => { return dims[0] * dims[1] }
+    }
+    return 0.0
+}
+
+fn extends toString(s: Shape) -> String {
+    match s {
+        Circle(r)  => { return format("Circle({})", Cast::string(r)) }
+        Rect(dims) => { return format("Rect({}, {})", Cast::string(dims[0]), Cast::string(dims[1])) }
+    }
+    return "?"
+}
+
+let shapes = [
+    Shape::Circle(5.0),
+    Shape::Rect((3.0, 4.0)),
+    Shape::Circle(1.0),
+    Shape::Rect((10.0, 2.5))
+]
+
+for s in shapes {
+    println(format("  {} → area = {}", s.toString(), Cast::string(s.area())))
+}
+
+// total area via fold
+let totalArea = shapes.reduce(
+    |acc: Float, s: Shape, i: Int| acc + s.area(),
+    0.0
+)
+println(format("  total area = {}", Cast::string(totalArea)))
+println("")
+
+// ── 11. Const, Identity, Flip ───────────────────────────────────────────────
+//
+//  Haskell staples: const, id, flip
+
+println("── 11. Const / Identity / Flip ──")
+
+// const_ : always returns the same value
+let always42 = const_(42) @[B: String]
+println(format("  const_(42)(\"ignored\") = {}", Cast::string(always42("ignored"))))
+
+// identity : returns input unchanged
+println(format("  identity(99) = {}", Cast::string(identity(99))))
+
+// flip : swap arguments
+let div = |a: Int, b: Int| a / b
+let flipped_div = flip(div)
+println(format("  div(10, 2)         = {}", Cast::string(div(10, 2))))
+println(format("  flip(div)(10, 2)   = {}", Cast::string(flipped_div(10, 2))))
+println("")
+
+println("Done!")

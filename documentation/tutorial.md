@@ -821,6 +821,13 @@ format("Hello, {}!", name)
 format("{} + {} = {}", "1", "2", "3")
 ```
 
+Use `{{` and `}}` to produce literal braces in the output:
+
+```rust
+format("{{ {} }}", "x")     // "{ x }"
+format("{{{}}}", "hi")       // "{hi}"
+```
+
 Both the explicit-list form and varargs form are valid — use whichever
 reads better.
 
