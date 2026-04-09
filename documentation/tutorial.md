@@ -1807,6 +1807,133 @@ fn depth(t: Tree(Int)) -> Int {
 }
 ```
 
+### Value Match (Non-Enum Types)
+
+`match` also works on non-enum types like Int, String, Bool, Float, Char,
+tuples, and lists using pattern matching:
+
+```rust
+let x = 42
+let result = match x {
+    0       => "zero"
+    1 | 2   => "one or two"
+    _       => "other"
+}
+```
+
+Supported patterns:
+
+| Pattern          | Example                  | Description                         |
+|------------------|--------------------------|-------------------------------------|
+| Literal          | `42`, `"hi"`, `true`     | Match exact value                   |
+| Wildcard         | `_`                      | Match anything                      |
+| Variable         | `x`                      | Bind value to variable              |
+| Tuple            | `(a, b)`                 | Destructure a tuple                 |
+| List             | `[a, b, c]`              | Exact list length match             |
+| List cons        | `[h, ..t]`               | Head element(s) + rest              |
+| Empty list       | `[]`                     | Match empty list                    |
+| Or               | `1 \| 2 \| 3`           | Match any alternative               |
+| Option Some      | `Some(v)`                | Match Option with value             |
+| Option None      | `None()`                 | Match absent Option                 |
+| Enum variant     | `Red()`, `Leaf(v)`       | Match enum variant                  |
+
+```rust
+// Option matching
+fn unwrap_or(opt: Option(Int), default: Int) -> Int {
+    return match opt {
+        Some(v) => v
+        None()  => default
+    }
+}
+
+// Tuple matching
+let point = (3, 4)
+match point {
+    (0, 0)  => { println("origin") }
+    (x, 0)  => { println("on x-axis") }
+    (0, y)  => { println("on y-axis") }
+    (x, y)  => { println("general point") }
+}
+```
+
+### Let Destructuring
+
+You can use patterns on the left side of `let` to unpack tuples and lists:
+
+```rust
+// Tuple destructuring
+let (x, y) = (10, 20)
+// x == 10, y == 20
+
+// Nested tuple
+let (a, (b, c)) = (1, (2, 3))
+// a == 1, b == 2, c == 3
+
+// Wildcard to discard
+let (name, _) = ("Alice", 30)
+// name == "Alice", age discarded
+
+// List destructuring
+let [first, second] = [100, 200]
+// first == 100, second == 200
+
+// List cons (head + tail)
+let [head, ..tail] = [1, 2, 3, 4]
+// head == 1, tail == [2, 3, 4]
+```
+
+Let destructuring requires **irrefutable** patterns — patterns that always
+match.  This means you can use tuples, lists, cons, variables, and wildcards,
+but not literal values or Or patterns.
+
+```rust
+// Function returning a tuple
+fn min_max(xs: [Int]) -> (Int, Int) {
+    let lo = xs[0]
+    let hi = xs[0]
+    for x in xs {
+        if x < lo { lo = x }
+        if x > hi { hi = x }
+    }
+    return (lo, hi)
+}
+
+let (lo, hi) = min_max([3, 1, 4, 1, 5])
+// lo == 1, hi == 5
+```
+
+### For-Loop Destructuring
+
+When iterating over a list of tuples (or nested lists), you can destructure
+each element directly in the `for` header:
+
+```rust
+let pairs: [(String, Int)] = [("Alice", 90), ("Bob", 85), ("Carol", 92)]
+
+for (name, score) in pairs {
+    println(name + ": " + Cast::string(score))
+}
+// prints:
+//   Alice: 90
+//   Bob: 85
+//   Carol: 92
+```
+
+Nested destructuring works too:
+
+```rust
+let data: [(Int, (Int, Int))] = [(1, (2, 3)), (4, (5, 6))]
+for (a, (b, c)) in data {
+    println(Cast::string(a + b + c))
+}
+// prints:
+//   6
+//   15
+```
+
+> **Tip:** For-loop destructuring is especially useful with hashmaps, key-value
+> pairs, coordinate lists, and any collection where each element is a tuple.
+
 ---
 
 ## 17. Pipe Operator

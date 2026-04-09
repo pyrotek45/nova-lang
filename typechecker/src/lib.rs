@@ -946,6 +946,17 @@ impl TypeChecker {
                     )?;
                     self.will_return(body, return_type.clone(), pos.clone())?;
                 }
+                Statement::ForeachDestructure { expr, body, .. } => {
+                    self.will_return(
+                        &[Statement::Expression {
+                            ttype: expr.get_type(),
+                            expr: expr.clone(),
+                        }],
+                        return_type.clone(),
+                        pos.clone(),
+                    )?;
+                    self.will_return(body, return_type.clone(), pos.clone())?;
+                }
             }
         }
 

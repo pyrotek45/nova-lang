@@ -257,6 +257,104 @@ impl Compiler {
                     self.breaks.pop();
                     self.continues.pop();
                 }
+                common::nodes::Statement::ForeachDestructure {
+                    pattern,
+                    expr,
+                    body,
+                    position,
+                } => {
+                    let top = self.gen.generate();
+                    let end = self.gen.generate();
+                    let mid = self.gen.generate();
+                    let step = self.gen.generate();
+                    let next = self.gen.generate();
+
+                    self.breaks.push(end);
+                    self.continues.push(next);
+
+                    // temp counter
+                    self.variables
+                        .insert(format!("__tempcounter__{}", self.gen.generate()).into());
+                    let tempcounter_index = self.variables.len() - 1;
+
+                    // temp array
+                    self.variables
+                        .insert(format!("__arrayexpr__{}", self.gen.generate()).into());
+                    let array_index = self.variables.len() - 1;
+
+                    // temp for the current element (used for pattern binding)
+                    self.variables
+                        .insert(format!("__foreachelem__{}", self.gen.generate()).into());
+                    let elem_temp = self.variables.len() - 1;
+
+                    self.compile_expr(expr)?;
+                    self.asm.push(Asm::STORE(array_index as u32));
+
+                    // counter = 0
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::STORE(tempcounter_index as u32));
+
+                    // loop top
+                    self.asm.push(Asm::LABEL(top));
+
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    self.asm.push(Asm::LEN);
+
+                    self.asm.push(Asm::IGTR);
+                    self.asm.push(Asm::DUP);
+                    self.asm.push(Asm::NOT);
+
+                    self.asm.push(Asm::JUMPIFFALSE(step));
+                    self.asm.push(Asm::POP);
+
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    self.asm.push(Asm::LEN);
+                    self.asm.push(Asm::EQUALS);
+
+                    self.asm.push(Asm::LABEL(step));
+                    self.asm.push(Asm::JUMPIFFALSE(mid));
+                    self.asm.push(Asm::JMP(end));
+                    self.asm.push(Asm::LABEL(mid));
+
+                    // Get current element: array[counter]
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::GET(array_index as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+
+                    // Store element in temp, then destructure using pattern bindings
+                    self.asm.push(Asm::STORE(elem_temp as u32));
+                    self.compile_pattern_bindings(pattern, elem_temp, position)?;
+
+                    // -- body
+                    let foreach_body = Ast {
+                        program: body.clone(),
+                    };
+                    self.compile_program(
+                        foreach_body,
+                        self.filepath.clone(),
+                        false,
+                        false,
+                        false,
+                        false,
+                    )?;
+                    self.asm.pop();
+                    // -- body
+
+                    self.asm.push(Asm::LABEL(next));
+                    // increment counter
+                    self.asm.push(Asm::INTEGER(1));
+                    self.asm.push(Asm::GET(tempcounter_index as u32));
+                    self.asm.push(Asm::IADD);
+                    self.asm.push(Asm::INTEGER(tempcounter_index as i64));
+                    self.asm.push(Asm::ASSIGN);
+                    self.asm.push(Asm::BJMP(top));
+                    self.asm.push(Asm::LABEL(end));
+
+                    self.breaks.pop();
+                    self.continues.pop();
+                }
                 common::nodes::Statement::Pass => {}
                 Function {
                     identifier,
@@ -1026,6 +1124,7 @@ impl Compiler {
             Expr::ValueMatchExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
+            Expr::LetDestructure { .. } => todo!(),
             Expr::DynField {
                 name,
                 expr,
@@ -1956,6 +2055,22 @@ impl Compiler {
                 }
                 Ok(())
             }
+            Expr::LetDestructure {
+                pattern,
+                expr,
+                position,
+                ..
+            } => {
+                self.compile_expr(expr)?;
+                // Store the expression result in a temp variable
+                self.variables
+                    .insert(format!("___letdestr___{}", self.gen.generate()).into());
+                let temp = self.variables.len() - 1;
+                self.asm.push(Asm::STORE(temp as u32));
+                // Emit bindings using the same machinery as value-match
+                self.compile_pattern_bindings(pattern, temp, position)?;
+                Ok(())
+            }
             Expr::Void => Ok(()),
             Expr::ValueMatchExpr {
                 expr,
@@ -2583,8 +2698,8 @@ impl Compiler {
                 self.asm.push(Asm::GET(temp as u32));
                 // We need a way to slice. Let's use the native function if available.
                 // Actually, let's look at how slicing works in the VM.
-                // For now emit a native call to List::slice
-                if let Some(index) = self.native_functions.get_index("List::slice") {
+                // For now emit a native call to List::__tail_slice
+                if let Some(index) = self.native_functions.get_index("List::__tail_slice") {
                     self.asm.push(Asm::NATIVE(index as u64, None));
                 }
                 if let Some(index) = self.variables.get_index(tail_name) {

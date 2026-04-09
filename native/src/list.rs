@@ -271,3 +271,28 @@ pub fn get(state: &mut state::State) -> NovaResult<()> {
     state.memory.dec(list_index);
     Ok(())
 }
+
+/// List::slice(start_index, list) -> new_list
+/// Returns a new list containing elements from start_index to the end.
+pub fn slice(state: &mut state::State) -> NovaResult<()> {
+    let list_index = pop_list(state)?;
+    let start = pop_int(state)? as usize;
+    let elements = {
+        let obj = state
+            .memory
+            .ref_from_heap(list_index)
+            .ok_or(runtime_err("List::slice: invalid list reference"))?;
+        if start < obj.data.len() {
+            obj.data[start..].to_vec()
+        } else {
+            vec![]
+        }
+    };
+    // Inc ref counts for copied elements
+    for v in &elements {
+        state.memory.inc_value(*v);
+    }
+    state.memory.push_list(elements);
+    state.memory.dec(list_index);
+    Ok(())
+}

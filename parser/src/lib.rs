@@ -6547,6 +6547,13 @@ impl Parser {
     fn for_statement(&mut self) -> NovaResult<Option<Statement>> {
         self.consume_identifier(Some("for"))?;
 
+        // ── Destructuring foreach: `for (a, b) in list { … }` ──
+        if self.current_token().is_some_and(|t| {
+            t.is_symbol(LeftParen) || t.is_symbol(LeftSquareBracket)
+        }) {
+            return self.for_destructure();
+        }
+
         if let Some(Keyword(KeyWord::In)) = self.peek_offset_value(1) {
             // Handle foreach statement
 
@@ -6660,6 +6667,68 @@ impl Parser {
                 body,
             }))
         }
+    }
+
+    /// Parse `for (a, b) in list { … }` or `for [h, ..t] in list { … }`.
+    fn for_destructure(&mut self) -> NovaResult<Option<Statement>> {
+        let pattern = self.parse_single_pattern()?;
+
+        // Only allow irrefutable patterns
+        match &pattern {
+            Pattern::Tuple(_) | Pattern::List(_) | Pattern::ListCons(_, _)
+            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList => {}
+            _ => {
+                return Err(self.generate_error_with_pos(
+                    "Invalid pattern in for destructuring".to_string(),
+                    "Only tuple `(a, b)`, list `[a, b]`, and cons `[h, ..t]` patterns are allowed in for loops.",
+                    self.get_current_token_position(),
+                ));
+            }
+        }
+
+        self.consume_keyword(KeyWord::In)?;
+        let arraypos = self.get_current_token_position();
+        let array = self.expr()?;
+
+        // Must be a list
+        let inner_type = if let TType::List { inner } = array.get_type() {
+            *inner
+        } else {
+            return Err(self.generate_error_with_pos(
+                format!("`for..in` can only iterate over lists, found `{}`", array.get_type()),
+                "The expression must be a list type `[T]`.",
+                arraypos.clone(),
+            ));
+        };
+
+        // Validate tuple arity if tuple pattern
+        if let Pattern::Tuple(pats) = &pattern {
+            if let TType::Tuple { elements } = &inner_type {
+                if pats.len() != elements.len() {
+                    return Err(self.generate_error_with_pos(
+                        format!(
+                            "Tuple pattern has {} elements but list elements have {}",
+                            pats.len(),
+                            elements.len()
+                        ),
+                        "The number of pattern elements must match the tuple size.",
+                        arraypos.clone(),
+                    ));
+                }
+            }
+        }
+
+        self.typechecker.environment.push_block();
+        self.register_pattern_bindings(&pattern, &inner_type)?;
+        let body = self.block()?;
+        self.typechecker.environment.pop_block();
+
+        Ok(Some(Statement::ForeachDestructure {
+            pattern,
+            expr: array,
+            body,
+            position: arraypos,
+        }))
     }
 
     fn while_statement(&mut self) -> NovaResult<Option<Statement>> {
@@ -6843,6 +6912,15 @@ impl Parser {
 
     fn let_expr(&mut self) -> NovaResult<Expr> {
         self.consume_identifier(Some("let"))?;
+        let pos = self.get_current_token_position();
+
+        // ── Destructuring let: `let (a, b) = expr`, `let [h, ..t] = expr` ──
+        if self.current_token().is_some_and(|t| {
+            t.is_symbol(LeftParen) || t.is_symbol(LeftSquareBracket)
+        }) {
+            return self.let_destructure(pos);
+        }
+
         let mut global = false;
         // refactor out into two parsing ways for ident. one with module and one without
         let (mut identifier, mut pos) = self.get_identifier()?;
@@ -6976,6 +7054,82 @@ impl Parser {
                 global,
             })
         }
+    }
+
+    /// Parse `let (a, b) = expr` or `let [h, ..t] = expr` destructuring.
+    /// Called from `let_expr` when the token after `let` is `(` or `[`.
+    fn let_destructure(&mut self, pos: FilePosition) -> NovaResult<Expr> {
+        let pattern = self.parse_single_pattern()?;
+
+        // Only allow irrefutable patterns (tuple, list, variable, wildcard, listcons)
+        match &pattern {
+            Pattern::Tuple(_) | Pattern::List(_) | Pattern::ListCons(_, _)
+            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList => {}
+            _ => {
+                return Err(self.generate_error_with_pos(
+                    "Invalid pattern in let destructuring".to_string(),
+                    "Only tuple `(a, b)`, list `[a, b]`, and cons `[h, ..t]` patterns are allowed in let destructuring.",
+                    pos.clone(),
+                ));
+            }
+        }
+
+        self.consume_operator(Operator::Assignment)?;
+        let expr = self.expr()?;
+        let expr_type = expr.get_type();
+
+        // Void check
+        if expr_type == TType::Void {
+            return Err(self.generate_error_with_pos(
+                "Cannot destructure a Void expression".to_string(),
+                "The right-hand side does not return a value.",
+                pos.clone(),
+            ));
+        }
+
+        // Validate tuple arity
+        if let Pattern::Tuple(pats) = &pattern {
+            if let TType::Tuple { elements } = &expr_type {
+                if pats.len() != elements.len() {
+                    return Err(self.generate_error_with_pos(
+                        format!(
+                            "Tuple pattern has {} elements but expression has {}",
+                            pats.len(),
+                            elements.len()
+                        ),
+                        "The number of pattern elements must match the tuple size.",
+                        pos.clone(),
+                    ));
+                }
+            } else if !matches!(expr_type, TType::Any) {
+                return Err(self.generate_error_with_pos(
+                    format!("Cannot destructure `{}` with a tuple pattern", expr_type),
+                    "Tuple patterns can only destructure tuple types.",
+                    pos.clone(),
+                ));
+            }
+        }
+
+        // Validate list pattern against list type
+        if matches!(&pattern, Pattern::List(_) | Pattern::ListCons(_, _) | Pattern::EmptyList) {
+            if !matches!(expr_type, TType::List { .. } | TType::Any) {
+                return Err(self.generate_error_with_pos(
+                    format!("Cannot destructure `{}` with a list pattern", expr_type),
+                    "List patterns can only destructure list types.",
+                    pos.clone(),
+                ));
+            }
+        }
+
+        // Register pattern bindings in scope
+        self.register_pattern_bindings(&pattern, &expr_type)?;
+
+        Ok(Expr::LetDestructure {
+            ttype: TType::Void,
+            pattern,
+            expr: Box::new(expr),
+            position: pos,
+        })
     }
 
     fn return_statement(&mut self) -> NovaResult<Option<Statement>> {

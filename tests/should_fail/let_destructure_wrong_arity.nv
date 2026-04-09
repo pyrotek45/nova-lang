@@ -1,0 +1,3 @@
+module test
+// let tuple destructure with wrong arity (2 elements, 3 in pattern)
+let (a, b, c) = (10, 20)

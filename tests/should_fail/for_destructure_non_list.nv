@@ -1,0 +1,5 @@
+module test
+// for destructure on non-list type
+for (a, b) in 42 {
+    println(Cast::string(a))
+}
