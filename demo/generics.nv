@@ -1,0 +1,120 @@
+module genericsDemo
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Generics — Type Parameters in Nova
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: generic functions ($T), generic structs (Struct(T)),
+//         generic extends, @[T: Type] annotations, type inference
+//
+//  Run:  nova run demo/generics.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+
+// ── Generic functions ───────────────────────────────────────────────────────
+// $T is a type parameter — Nova infers the concrete type at call site.
+
+println("── Generic Functions ──")
+
+fn first_of(xs: [$T]) -> $T { return xs[0] }
+println(format("first([10,20,30]) = {}", Cast::string(first_of([10, 20, 30]))))
+println(format("first([\"a\",\"b\"]) = {}", first_of(["a", "b"])))
+
+fn swap_pair(a: $T, b: $T) -> ($T, $T) { return (b, a) }
+let swapped = swap_pair(1, 2)
+println(format("swap(1,2) = ({}, {})", Cast::string(swapped[0]), Cast::string(swapped[1])))
+
+fn repeat_val(val: $T, n: Int) -> [$T] {
+    let out = [val]
+    for i in 1..n { out.push(val) }
+    return out
+}
+println(format("repeat(\"hi\",3) = {}", Cast::string(repeat_val("hi", 3))))
+
+// ── Generic structs ─────────────────────────────────────────────────────────
+
+println("")
+println("── Generic Structs ──")
+
+struct Wrapper(T) { inner: $T }
+
+fn extends(Wrapper) toString(self: Wrapper($T)) -> String {
+    return format("Wrapper({})", Cast::string(self.inner))
+}
+
+fn extends(Wrapper) get(self: Wrapper($T)) -> $T {
+    return self.inner
+}
+
+let wi = Wrapper { inner: 42 }
+let ws = Wrapper { inner: "hello" }
+println(format("{} → {}", Cast::string(wi), Cast::string(wi.get())))
+println(format("{} → {}", Cast::string(ws), ws.get()))
+
+// ── Multi-parameter generic struct ──────────────────────────────────────────
+
+println("")
+println("── Multi-Parameter Generics ──")
+
+struct KeyVal(K, V) { key: $K, val: $V }
+
+fn extends(KeyVal) toString(self: KeyVal($K, $V)) -> String {
+    return format("{}: {}", Cast::string(self.key), Cast::string(self.val))
+}
+
+let entries = [
+    KeyVal { key: "name", val: "Nova" },
+    KeyVal { key: "version", val: "0.5" },
+    KeyVal { key: "type", val: "language" },
+]
+for entry in entries {
+    println(format("  {}", Cast::string(entry)))
+}
+
+// ── Generic with @[T: Type] annotation ──────────────────────────────────────
+
+println("")
+println("── @[T: Type] Annotations ──")
+
+struct Stack(T) { items: [$T] }
+
+fn extends(Stack) new() -> Stack($T) {
+    return Stack { items: []: $T }
+}
+
+fn extends(Stack) push(self: Stack($T), val: $T) {
+    self.items.push(val)
+}
+
+fn extends(Stack) peek(self: Stack($T)) -> $T {
+    return self.items[-1]
+}
+
+fn extends(Stack) size(self: Stack($T)) -> Int {
+    return self.items.len()
+}
+
+fn extends(Stack) toString(self: Stack($T)) -> String {
+    return format("Stack{}", Cast::string(self.items))
+}
+
+let stk = Stack::new() @[T: Int]
+stk.push(10)
+stk.push(20)
+stk.push(30)
+println(format("{}", Cast::string(stk)))
+println(format("peek = {} size = {}", Cast::string(stk.peek()), Cast::string(stk.size())))
+
+// ── Generic higher-order function ───────────────────────────────────────────
+
+println("")
+println("── Generic Higher-Order ──")
+
+fn apply_to_each(xs: [$T], f: fn($T) -> $T) -> [$T] {
+    return xs.map(f)
+}
+
+println(format("ints *3: {}", Cast::string(apply_to_each([1, 2, 3], |x: Int| x * 3))))
+println(format("strs !:  {}", Cast::string(apply_to_each(["a", "b"], |x: String| x + "!"))))

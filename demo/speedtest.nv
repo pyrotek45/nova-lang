@@ -1,20 +1,33 @@
 module speedtest
 
-println("speedtest")
-let sum = 0
-let num = 20000
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Speed Test — Perfect Number Finder
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Finds all perfect numbers up to N by brute-force divisor summation.
+//  A perfect number equals the sum of its proper divisors (e.g. 6 = 1+2+3).
+//  This is an intentionally compute-heavy benchmark for the VM.
+//
+//  Run:  nova run demo/speedtest.nv
+// ═══════════════════════════════════════════════════════════════════════════════
 
-println("started...")
-for i in 1..=20000 {
-    for j in 1..num  {
+println("Perfect number search (1..20000)")
+println("A perfect number equals the sum of its proper divisors.")
+println("")
+
+let found = 0
+for num in 1..=20000 {
+    let sum = 0
+    for j in 1..num {
         if num % j == 0 {
             sum += j
         }
     }
     if num == sum {
-        println(sum)
+        found += 1
+        println(format("  Found: {} (#{} perfect number)", Cast::string(num), Cast::string(found)))
     }
-    sum = 0
-    num -= 1
 }
 
+println("")
+println(format("Done — found {} perfect numbers in range 1..20000", Cast::string(found)))

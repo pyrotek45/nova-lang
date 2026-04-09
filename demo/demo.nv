@@ -1,231 +1,550 @@
 module main
 
-// Type declaration
-struct Person {
-    name: String,
-    age: Int,
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Nova Language — Feature Showcase
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Run:  nova run demo/demo.nv
+//
+//  Walks through every major language feature with explanations and
+//  runnable examples.  Read top-to-bottom as a quick tour of Nova.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Hello world
-println("hello world!")
-
-
-// Creating instance of type
-let person : Person = Person {name: "bob", age: 42}
-
-// Optional type annotation
-let person2 = Person("joe", 50)
-
-// Function for type
-fn extends display(self: Person) {
-    println(self.name)
-    println(self.age)
-}
-
-// import function
-person.display()
-Person::display(person2)
-
-// For loop
-for let i = 0; i < 10; i += 1 {
-    println(i)
-}
-
+import super.std.core
 import super.std.list
-
-// Array
-let arr = [1,2,3]
-println(arr)
-
-let arr2 = []: Int.fill(10,5)
-println(arr2)
-
-arr[1] = 4
-println(arr)
-
-// Changing struct value
-person.name = "bingo"
-person.display()
-
-struct Zed {
-    test: fn()
-}
-
-// Creating an instance from a type
-let zed = Zed {
-    test: || {
-        print("wow\n")
-    }
-}
-
-// Now we can access its namespace and call functions directly
-zed::test()
-
-// import iterators
 import super.std.iter
+import super.std.string
+import super.std.math
+import super.std.functional
+import super.std.hashmap
+import super.std.option
 
-let myIter = Iter::fromVec([1,2,3,4,5])
-    .map(fn(x:Int)->Int{return x * x})
-    .collect()
+// ── 1. HELLO WORLD ──────────────────────────────────────────────────────────
 
-println(myIter)
+println("═══ 1. Hello World ═══")
+print("Hello, ")
+println("world!")
+let greeting = format("Welcome to {} {}!", "Nova", "0.5")
+println(greeting)
+println("")
 
-// Function pointers
-struct SomeFunction {
-    function: fn(Int,Int) -> Int
+// ── 2. VARIABLES & TYPES ────────────────────────────────────────────────────
+
+println("═══ 2. Variables & Types ═══")
+let x = 42
+let pi = 3.14159
+let lang_name = "Nova"
+let flag = true
+let ch = 'A'
+println(format("Int={}, Float={}, String={}, Bool={}, Char={}",
+    Cast::string(x), Cast::string(pi), lang_name,
+    Cast::string(flag), Cast::string(ch)))
+
+let counter = 0
+counter += 15
+println(format("counter = {}", Cast::string(counter)))
+
+let _ = Some(42)
+let _ = Some("discarded")
+println("")
+
+// ── 3. NUMBER LITERALS ──────────────────────────────────────────────────────
+
+println("═══ 3. Number Literals ═══")
+let decimal   = 1_000_000
+let binary    = 0b1010_1010
+let octal     = 0o777
+let hex       = 0xFF_AA
+let float_val = 3.14
+println(format("dec={} bin={} oct={} hex={} float={}",
+    Cast::string(decimal), Cast::string(binary), Cast::string(octal),
+    Cast::string(hex), Cast::string(float_val)))
+println("")
+
+// ── 4. STRINGS ──────────────────────────────────────────────────────────────
+
+println("═══ 4. Strings ═══")
+let two_lines = "line1\nline2"
+println(two_lines)
+let raw = r#"Raw: \n is literal, "quotes" are fine"#
+println(raw)
+let word = "hello"
+println(format("first={} last={}", Cast::string(word[0]), Cast::string(word[-1])))
+println(format("len={} upper={}", Cast::string("Nova".len()), "Nova".toUpper()))
+let mut_s = "hello"
+mut_s[0] = 'H'
+println(mut_s)
+println("")
+
+// ── 5. COMMENTS ─────────────────────────────────────────────────────────────
+
+println("═══ 5. Comments ═══")
+// Single-line comment
+/* Block comment — can span
+   multiple lines */
+/* Inline block: */ let after_block = "works!"
+println(after_block)
+println("")
+
+// ── 6. CONTROL FLOW ─────────────────────────────────────────────────────────
+
+println("═══ 6. Control Flow ═══")
+let score = 85
+if score >= 90 {
+    println("A")
+} elif score >= 80 {
+    println("B")
+} else {
+    println("F")
+}
+let lbl = if score >= 80 { "pass" } else { "fail" }
+println(format("Result: {}", lbl))
+let block_val = { let a = 10; let b = 20; a + b }
+println(format("Block expr: {}", Cast::string(block_val)))
+println("")
+
+// ── 7. LOOPS ────────────────────────────────────────────────────────────────
+
+println("═══ 7. Loops ═══")
+print("C-style:   ")
+for let i = 0; i < 5; i += 1 { print(Cast::string(i) + " ") }
+println("")
+
+print("Range:     ")
+for i in 0..5 { print(Cast::string(i) + " ") }
+println("")
+
+print("Inclusive:  ")
+for i in 0..=5 { print(Cast::string(i) + " ") }
+println("")
+
+print("for-in:    ")
+for item in ["a", "b", "c"] { print(item + " ") }
+println("")
+
+print("while:     ")
+let j = 0
+while true {
+    j += 1
+    if j % 2 == 0 { continue }
+    if j > 9 { break }
+    print(Cast::string(j) + " ")
+}
+println("")
+println("")
+
+// ── 8. FUNCTIONS ────────────────────────────────────────────────────────────
+
+println("═══ 8. Functions ═══")
+
+fn add(a: Int, b: Int) -> Int { return a + b }
+println(format("add(3,4) = {}", Cast::string(add(3, 4))))
+
+// Overloading
+fn describe(v: Int) -> String { return "int:" + Cast::string(v) }
+fn describe(v: String) -> String { return "str:" + v }
+fn describe(v: Bool) -> String { return "bool:" + Cast::string(v) }
+println(describe(42))
+println(describe("hi"))
+println(describe(true))
+
+// Recursion
+fn factorial(n: Int) -> Int {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+println(format("10! = {}", Cast::string(factorial(10))))
+
+// Forward declaration
+fn isEven(n: Int) -> Bool
+fn isOdd(n: Int) -> Bool {
+    if n == 0 { return false }
+    return isEven(n - 1)
+}
+fn isEven(n: Int) -> Bool {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+}
+println(format("isEven(42) = {}", Cast::string(isEven(42))))
+
+// Varargs
+fn sum_all(xs: [Int]) -> Int {
+    let total = 0
+    for v in xs { total += v }
+    return total
+}
+println(format("sum(1..5) = {}", Cast::string(sum_all(1, 2, 3, 4, 5))))
+println("")
+
+// ── 9. EXTENDS & UFCS ──────────────────────────────────────────────────────
+
+println("═══ 9. Extends & UFCS ═══")
+fn extends double(n: Int) -> Int { return n * 2 }
+fn extends square(n: Int) -> Int { return n * n }
+println(format("5.double() = {}", Cast::string(5.double())))
+println(format("3.double().square() = {}", Cast::string(3.double().square())))
+println("")
+
+// ── 10. STRUCTS ─────────────────────────────────────────────────────────────
+
+println("═══ 10. Structs ═══")
+struct Point { px: Float, py: Float }
+let p1 = Point { px: 3.0, py: 4.0 }
+let p2 = Point(1.0, 2.0)
+println(format("p1 = ({}, {})", Cast::string(p1.px), Cast::string(p1.py)))
+p1.px = 10.0
+
+fn extends dist(a: Point, b: Point) -> Float {
+    let dx = a.px - b.px
+    let dy = a.py - b.py
+    return (dx * dx + dy * dy).sqrt()
+}
+println(format("distance = {}", Cast::string(p1.dist(p2))))
+println(format("type = {}", p1.type))
+
+fn extends toString(p: Point) -> String {
+    return format("Point({}, {})", Cast::string(p.px), Cast::string(p.py))
+}
+println(p1)
+println("")
+
+// ── 11. OPERATOR OVERLOADING ────────────────────────────────────────────────
+
+println("═══ 11. Operator Overloading ═══")
+struct Vec2i { vx: Int, vy: Int }
+
+fn extends toString(v: Vec2i) -> String {
+    return format("({},{})", Cast::string(v.vx), Cast::string(v.vy))
+}
+fn extends __add__(a: Vec2i, b: Vec2i) -> Vec2i {
+    return Vec2i(a.vx + b.vx, a.vy + b.vy)
+}
+fn extends __eq__(a: Vec2i, b: Vec2i) -> Bool {
+    return a.vx == b.vx && a.vy == b.vy
 }
 
-let myMul = SomeFunction(fn(x:Int,y:Int)->Int {
-    return x * y
-})
+let v1 = Vec2i(1, 2)
+let v2 = Vec2i(3, 4)
+println(format("{} + {} = {}", Cast::string(v1), Cast::string(v2), Cast::string(v1 + v2)))
+println(format("equal? {}", Cast::string(v1 == v1)))
+println("")
 
-let myOtherFunc = myMul.function
-let simpleSquare = fn(x: Int) -> Int {return x * x};
+// ── 12. ENUMS & PATTERN MATCHING ────────────────────────────────────────────
 
-// Calling function pointer from a struct
-println((myMul.function)(4,99))
-println(myMul::function(4,99))
-
-// Support for most escape chars
-print("hello again!\n")
-
-println(myOtherFunc(4,7))
-
-let myIterTwo = Iter::fromVec([1,2,3,4,5])
-    .map(simpleSquare)
-    .map(simpleSquare)
-    .collect()
-
-println(myIterTwo)
-
-// function overloading
-fn add(x:Int,y:Int) -> Int {
-    println("im adding ints")
-    return x + y
+println("═══ 12. Enums & Pattern Matching ═══")
+enum DemoShape {
+    DemoCircle: Float,
+    DemoRect: (Float, Float),
 }
 
-fn add(x:Float,y:Float) -> Float {
-    println("im adding floats")
-    return x + y
+fn extends area(s: DemoShape) -> Float {
+    match s {
+        DemoCircle(r) => { return 3.14159 * r * r }
+        DemoRect(dims) => { return dims[0] * dims[1] }
+    }
+    return 0.0
 }
 
-println(add(1,3))
-println(add(1.0,3.0))
-
-// Passing an overloaded function
-let myIntAdder = add@(Int,Int)
-println(myIntAdder(1,4))
-
-// Generic functions
-fn generic(x: $A) {
-    println(x)
+fn extends toString(s: DemoShape) -> String {
+    match s {
+        DemoCircle(r) => { return format("Circle(r={})", Cast::string(r)) }
+        DemoRect(dims) => { return format("Rect({}x{})", Cast::string(dims[0]), Cast::string(dims[1])) }
+    }
+    return ""
 }
 
-generic("hello!")
-generic(10)
-generic(5.5)
-
-// More advance structs
-struct Counter {
-    value: Int,
-    count: fn(Counter) -> Int,
-    reset: fn(Counter)
+let shapes = [DemoShape::DemoCircle(5.0), DemoShape::DemoRect((4.0, 6.0))]
+for s in shapes {
+    println(format("  {} -> area={}", Cast::string(s), Cast::string(s.area())))
 }
 
-// Creating a init funciton for Counter
-fn CounterInit() -> Counter {
-    return Counter {
-        value: 0,
-        count: fn(self: Counter) -> Int {
-            let result = self.value
-            self.value += 1
-            return result
-        },
-        reset: fn(self: Counter) {
-            self.value = 0
-        }
+let sname = match DemoShape::DemoCircle(1.0) {
+    DemoCircle(r) => "circle"
+    DemoRect(d) => "rectangle"
+}
+println(format("match expr: {}", sname))
+println("")
+
+// ── 13. GENERICS ────────────────────────────────────────────────────────────
+
+println("═══ 13. Generics ═══")
+fn ident(val: $T) -> $T { return val }
+println(format("ident(42) = {}", Cast::string(ident(42))))
+println(format("ident(\"hi\") = {}", ident("hi")))
+
+struct DemoPair(A, B) { first: $A, second: $B }
+fn extends(DemoPair) toString(self: DemoPair($A, $B)) -> String {
+    return format("({}, {})", Cast::string(self.first), Cast::string(self.second))
+}
+let pair = DemoPair { first: "hello", second: 42 }
+println(format("pair = {}", Cast::string(pair)))
+println("")
+
+// ── 14. OPTION TYPE ─────────────────────────────────────────────────────────
+
+println("═══ 14. Option Type ═══")
+let some_val: Option(Int) = Some(42)
+let no_val: Option(Int) = None(Int)
+println(format("isSome={}", Cast::string(some_val.isSome())))
+
+if let val = some_val {
+    println(format("Unwrapped: {}", Cast::string(val)))
+}
+if let val = no_val {
+    println("nope")
+} else {
+    println("None -> else branch")
+}
+
+let quick = Some(99)?
+println(format("Quick unwrap: {}", Cast::string(quick)))
+
+let stk = [10, 20, 30]
+print("Drain: ")
+while let drn = stk.pop() { print(Cast::string(drn) + " ") }
+println("")
+
+println(format("orDefault: {}", Cast::string(None(Int).orDefault(0))))
+println("")
+
+// ── 15. CLOSURES ────────────────────────────────────────────────────────────
+
+println("═══ 15. Closures ═══")
+let triple = |val: Int| val * 3
+println(format("triple(7) = {}", Cast::string(triple(7))))
+
+let clamp_fn = fn(val: Int, lo: Int, hi: Int) -> Int {
+    if val < lo { return lo }
+    if val > hi { return hi }
+    return val
+}
+println(format("clamp(150,0,100) = {}", Cast::string(clamp_fn(150, 0, 100))))
+
+let shared = Box(0)
+let inc_box = fn() { shared.value += 1 }
+inc_box(); inc_box(); inc_box()
+println(format("shared counter = {}", Cast::string(shared.value)))
+
+let fac_ref = factorial@(Int)
+println(format("fac ref(6) = {}", Cast::string(fac_ref(6))))
+println("")
+
+// ── 16. CURRYING ────────────────────────────────────────────────────────────
+
+println("═══ 16. Currying ═══")
+fn curry_demo(f: fn($A, $A) -> $A) -> fn($A) -> fn($A) -> $A {
+    return fn(cx: $A) -> fn($A) -> $A {
+        return fn(cy: $A) -> $A { return f(cx, cy) }
     }
 }
+fn mul_ints(a: Int, b: Int) -> Int { return a * b }
+let curried = curry_demo(mul_ints@(Int, Int))
+let times5 = curried(5)
+println(format("times5(8) = {}", Cast::string(times5(8))))
+println("")
 
-// Creating a function for counter outside of the struct
-fn extends count(self: Counter) -> Int {
-    println("im in a normal function")
-    let result = self.value
-    self.value += 1
-    return result
+// ── 17. PIPE OPERATOR ───────────────────────────────────────────────────────
+
+println("═══ 17. Pipe Operator ═══")
+fn inc_val(val: Int) -> Int { return val + 1 }
+fn square_val(val: Int) -> Int { return val * val }
+let pipe_r = 4 |> inc_val() |> square_val()
+println(format("4 |> inc |> square = {}", Cast::string(pipe_r)))
+42 |> Cast::string() |> println()
+println("")
+
+// ── 18. LISTS ───────────────────────────────────────────────────────────────
+
+println("═══ 18. Lists ═══")
+let nums = [10, 20, 30, 40, 50]
+println(format("nums = {}", Cast::string(nums)))
+println(format("first={} last={}", Cast::string(nums[0]), Cast::string(nums[-1])))
+println(format("slice [1:3] = {}", Cast::string(nums[1:3])))
+nums.push(60)
+println(format("after push: len={}", Cast::string(nums.len())))
+let cat_list = [1, 2] + [3, 4]
+println(format("[1,2]+[3,4] = {}", Cast::string(cat_list)))
+println("")
+
+// ── 19. LIST COMPREHENSIONS ─────────────────────────────────────────────────
+
+println("═══ 19. List Comprehensions ═══")
+let sq = [val in [1, 2, 3, 4, 5] | val * val]
+println(format("squares = {}", Cast::string(sq)))
+let ev = [val in [1, 2, 3, 4, 5, 6] | val | val % 2 == 0]
+println(format("evens = {}", Cast::string(ev)))
+let cross = [a in [1, 2], b in [10, 20] | a * b]
+println(format("cross = {}", Cast::string(cross)))
+println("")
+
+// ── 20. HIGHER-ORDER FUNCTIONS ──────────────────────────────────────────────
+
+println("═══ 20. Higher-Order Functions ═══")
+let data = [1, 2, 3, 4, 5]
+println(format("map (*2): {}", Cast::string(data.map(|val: Int| val * 2))))
+println(format("filter (>2): {}", Cast::string(data.filter(|val: Int| val > 2))))
+println(format("reduce (sum): {}", Cast::string(data.reduce(|acc: Int, val: Int, idx: Int| acc + val, 0))))
+
+let chain_r = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .filter(|val: Int| val % 2 == 0)
+    .map(|val: Int| val * val)
+println(format("even squares: {}", Cast::string(chain_r)))
+
+let iter_r = Iter::fromVec([1, 2, 3, 4, 5])
+    .map(|val: Int| val * val)
+    .filter(|val: Int| val > 5)
+    .collect()
+println(format("lazy iter: {}", Cast::string(iter_r)))
+println("")
+
+// ── 21. TUPLES ──────────────────────────────────────────────────────────────
+
+println("═══ 21. Tuples ═══")
+let tup = (42, "hello", true)
+println(format("tuple = ({}, {}, {})", Cast::string(tup[0]), tup[1], Cast::string(tup[2])))
+fn div_mod(a: Int, b: Int) -> (Int, Int) { return (a / b, a % b) }
+let dm = div_mod(17, 5)
+println(format("17 divmod 5 = ({}, {})", Cast::string(dm[0]), Cast::string(dm[1])))
+println("")
+
+// ── 22. HASHMAP ─────────────────────────────────────────────────────────────
+
+println("═══ 22. HashMap ═══")
+let hm = HashMap::new() @[K: String, V: Int]
+hm.insert("apples", 5)
+hm.insert("bananas", 3)
+println(format("apples = {}", Cast::string(hm.get("apples").unwrap())))
+println(format("has grapes? {}", Cast::string(hm.get("grapes").isSome())))
+println("")
+
+// ── 23. FUNCTION FIELDS (:: vs ->) ──────────────────────────────────────────
+
+println("═══ 23. Function Fields ═══")
+struct Transformer { transform: fn(Int) -> Int }
+let xfm = Transformer { transform: |val: Int| val * 2 }
+println(format("::transform(21) = {}", Cast::string(xfm::transform(21))))
+
+struct GameEntity { hp: Int, show: fn(Self) -> String }
+let hero = GameEntity {
+    hp: 100,
+    show: fn(self: GameEntity) -> String {
+        return format("HP={}", Cast::string(self.hp))
+    },
 }
+println(format("->show() = {}", hero->show()))
+println("")
 
-let mycounter = CounterInit()
+// ── 24. DYN TYPES ───────────────────────────────────────────────────────────
 
-// The -> takes the function from the struct, and applys it to itself
-println(mycounter->count())
+println("═══ 24. Dyn Types ═══")
+struct DemoDog { name: String, breed: String }
+struct DemoBot { name: String, model: Int }
 
-// the normal function 'count' will be called here, not from the struct itself
-println(mycounter.count())
+fn get_name(thing: Dyn(T = name: String)) -> String { return thing.name }
+let dog = DemoDog { name: "Rex", breed: "Lab" }
+let bot = DemoBot { name: "R2D2", model: 2 }
+println(format("Dog: {} ({})", get_name(dog), dog.type))
+println(format("Bot: {} ({})", get_name(bot), bot.type))
+println("")
 
-// Option type lets you represent none
-let x: Option(Int) = Some(20)
+// ── 25. STRING OPS ──────────────────────────────────────────────────────────
 
-// import the isSome() function here
-if x.isSome() {
-    println(x.unwrap())
-}
-
-x = None(Int)
-if x.isSome() {
-    println("i never print")
-    println(x.unwrap())
-}
-
-fn extends do(x: Option($A), f: fn($A)) {
-    if x.isSome() {
-        f(x.unwrap())
-    }
-}
-
-x.do(fn(x:Int) {println(x)})
-
-// String manipulation
-let str = "hello world!"
-    .chars()
-    .filter(fn(x:Char) -> Bool {return (x != 'l') && (x != 'o') })
+println("═══ 25. String Ops ═══")
+println(format("trim: '{}'", "  hi  ".trim()))
+println(format("split: {}", Cast::string("a,b,c".split(","))))
+println(format("replace: {}", "banana".replace("a", "o")))
+println(format("reverse: {}", "desserts".reverse()))
+let no_vowels = "hello world".chars()
+    .filter(|c: Char| c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u')
     .string()
+println(format("no vowels: '{}'", no_vowels))
+println("")
 
-println(str)
+// ── 26. MATH ────────────────────────────────────────────────────────────────
 
-// Currying
-fn add(x:Int) -> fn(Int) -> fn(Int) -> fn(Int) -> Int {   
-    return fn(y:Int) -> fn(Int) -> fn(Int) -> Int {  
-        return fn(z:Int) -> fn(Int) -> Int {            
-            return fn(t:Int) -> Int {            
-                return x + y + z + t
-            }            
-        }  
+println("═══ 26. Math ═══")
+println(format("sqrt(144)={}", Cast::string(144.0.sqrt())))
+println(format("abs(-42)={}", Cast::string((-42).abs())))
+println(format("clamp(10,0,5)={}", Cast::string(10.clamp(0, 5))))
+println(format("10!={}", Cast::string(10.factorial())))
+println(format("gcd(48,18)={}", Cast::string(48.gcd(18))))
+println("")
+
+// ── 27. TYPE INSPECTION ─────────────────────────────────────────────────────
+
+println("═══ 27. Type Inspection ═══")
+println(format("typeof(42)={}", typeof(42)))
+println(format("typeof(3.14)={}", typeof(3.14)))
+println(format("typeof(\"hi\")={}", typeof("hi")))
+println(format("typeof([1,2])={}", typeof([1, 2])))
+println(format("typeof(true)={}", typeof(true)))
+println("")
+
+// ── 28. FUNCTIONAL ──────────────────────────────────────────────────────────
+
+println("═══ 28. Functional ═══")
+let inc_c = fn(val: Int) -> Int { return val + 1 }
+let dbl_c = fn(val: Int) -> Int { return val * 2 }
+let inc_then_dbl = compose(dbl_c, inc_c)
+println(format("compose(dbl,inc)(4) = {}", Cast::string(inc_then_dbl(4))))
+
+let bind_r = [1, 2, 3, 4, 5].len() ~> n { n * n }
+println(format("bind: {}", Cast::string(bind_r)))
+println("")
+
+// ── 29. SERIALIZATION ───────────────────────────────────────────────────────
+
+println("═══ 29. Serialization ═══")
+struct SerPlayer { uname: String, hp: Int }
+let sp = SerPlayer { uname: "Nova", hp: 100 }
+let json_str = Data::toJson(sp)
+println(format("JSON: {}", json_str))
+let restored = Data::fromJson(json_str) @[T: SerPlayer]
+if let p = restored {
+    println(format("Restored: {} HP={}", p.uname, Cast::string(p.hp)))
+}
+println("")
+
+// ── 30. DESIGN PATTERNS ─────────────────────────────────────────────────────
+
+println("═══ 30. Design Patterns ═══")
+
+enum GameMode { ModeMenu, ModePlaying: Int, ModeOver: Int }
+fn extends toString(gs: GameMode) -> String {
+    match gs {
+        ModeMenu() => { return "Menu" }
+        ModePlaying(lvl) => { return format("Playing lvl {}", Cast::string(lvl)) }
+        ModeOver(sc) => { return format("Game Over! Score={}", Cast::string(sc)) }
     }
+    return ""
 }
+println(format("State: {}", Cast::string(GameMode::ModePlaying(3))))
 
-let inc = add(1)(2)(3)(4)
-println(inc)
+fn apply_strat(xs: [Int], f: fn(Int) -> Int) -> [Int] { return xs.map(f) }
+println(format("x10: {}", Cast::string(apply_strat([1, 2, 3], |val: Int| val * 10))))
 
-
-fn curry(f: fn($A,$A) -> $A) -> fn($A) -> fn($A) -> $A {
-    return fn(x: $A) -> fn($A) -> $A {
-        return fn(y: $A) -> $A {
-            return f(x,y)
-        }
-    }
+struct AppCfg { w: Int, h: Int, title: String }
+fn extends(AppCfg) make() -> AppCfg { return AppCfg { w: 800, h: 600, title: "App" } }
+fn extends withSize(cfg: AppCfg, nw: Int, nh: Int) -> AppCfg { cfg.w = nw; cfg.h = nh; return cfg }
+fn extends withTitle(cfg: AppCfg, t: String) -> AppCfg { cfg.title = t; return cfg }
+fn extends toString(cfg: AppCfg) -> String {
+    return format("{}x{} '{}'", Cast::string(cfg.w), Cast::string(cfg.h), cfg.title)
 }
+println(format("Config: {}", Cast::string(AppCfg::make().withSize(1920, 1080).withTitle("My Game"))))
+println("")
 
-fn mul(x:Int,y:Int) -> Int {
-    return x * y
-}
+// ── 31. fn mod ──────────────────────────────────────────────────────────────
 
-let curriedmul = curry(mul@(Int,Int))
+println("═══ 31. fn mod ═══")
+fn mod(main) version() -> String { return "0.5.0-alpha" }
+fn mod(main) maxHP() -> Int { return 100 }
+println(format("version={} maxHP={}", main::version(), Cast::string(main::maxHP())))
+println("")
 
-println(curriedmul(5)(5))
+// ── DONE ────────────────────────────────────────────────────────────────────
 
-// using IO struct
-import super.std.io
-
-// let input = io::prompt("wow")
-// println(input)
+println("═══════════════════════════════════════════════════════════════")
+println("  Nova Feature Showcase — Complete!")
+println("  See the other demo/ files for focused examples.")
+println("═══════════════════════════════════════════════════════════════")

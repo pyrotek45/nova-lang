@@ -1,23 +1,81 @@
 module functionDemo
 
-// Function creation
-fn hello() {
-    println("hello world")
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Functions — Declaration, Overloading, UFCS & Chaining
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: basic functions, return types, overloading by parameter type,
+//         fn extends (UFCS), method chaining, forward declaration, varargs
+//
+//  Run:  nova run demo/function.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+
+// ── Basic function ──────────────────────────────────────────────────────────
+
+fn greet(name: String) -> String {
+    return "Hello, " + name + "!"
 }
+println(greet("Nova"))
 
-// Calling a function
-hello()
+// ── Function overloading ────────────────────────────────────────────────────
+// Same name, different parameter types — Nova picks the right one.
 
-// Nova uses universal function call syntax. Any function can be called this way.
-fn extends show(input: String) {
-    println(input)
+fn show(v: Int)    { println(format("Int: {}", Cast::string(v))) }
+fn show(v: Float)  { println(format("Float: {}", Cast::string(v))) }
+fn show(v: String) { println(format("String: {}", v)) }
+fn show(v: Bool)   { println(format("Bool: {}", Cast::string(v))) }
+
+show(42)
+show(3.14)
+show("hello")
+show(true)
+
+// ── UFCS — fn extends ──────────────────────────────────────────────────────
+// Any function can be called as a method on its first parameter.
+
+fn extends abs_val(n: Int) -> Int {
+    if n < 0 { return 0 - n }
+    return n
 }
+println(format("(-7).abs_val() = {}", Cast::string((-7).abs_val())))
 
-"wow".show()
+fn extends shout(s: String) -> String { return s.toUpper() + "!" }
+println("nova".shout())
 
-// This makes it easy to chain
-fn extends square(x:Int) -> Int {
-    return x * x
+// Chaining — UFCS makes pipelines natural
+fn extends dbl(n: Int) -> Int { return n * 2 }
+fn extends sqr(n: Int) -> Int { return n * n }
+println(format("3.dbl().sqr() = {}", Cast::string(3.dbl().sqr())))
+
+// ── Forward declaration ─────────────────────────────────────────────────────
+// Declare before define — useful for mutual recursion.
+
+fn ping(n: Int) -> String
+fn pong(n: Int) -> String {
+    if n == 0 { return "pong!" }
+    return "pong->" + ping(n - 1)
 }
+fn ping(n: Int) -> String {
+    if n == 0 { return "ping!" }
+    return "ping->" + pong(n - 1)
+}
+println(ping(5))
 
-5.square().square() |> println()
+// ── Varargs ─────────────────────────────────────────────────────────────────
+// A function taking [T] can be called with individual values.
+
+fn total(xs: [Int]) -> Int {
+    let s = 0
+    for v in xs { s += v }
+    return s
+}
+println(format("total(1,2,3,4,5) = {}", Cast::string(total(1, 2, 3, 4, 5))))
+
+// ── Pipe operator ───────────────────────────────────────────────────────────
+
+fn inc(n: Int) -> Int { return n + 1 }
+fn triple(n: Int) -> Int { return n * 3 }
+let result = 10 |> inc() |> triple()
+println(format("10 |> inc |> triple = {}", Cast::string(result)))

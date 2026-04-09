@@ -1,0 +1,126 @@
+module closuresDemo
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Closures, Lambdas & Higher-Order Functions
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: bar closures (|x| expr), fn closures, capturing variables,
+//         Box for mutable shared state, function references (@), map/filter/reduce,
+//         closures as arguments, returning closures
+//
+//  Run:  nova run demo/closures.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.functional
+
+// ── Bar closures — short lambdas ────────────────────────────────────────────
+
+println("── Bar Closures ──")
+let dbl = |x: Int| x * 2
+let neg = |x: Int| 0 - x
+println(format("dbl(5) = {}", Cast::string(dbl(5))))
+println(format("neg(3) = {}", Cast::string(neg(3))))
+
+// ── fn closures — multi-statement ───────────────────────────────────────────
+
+println("")
+println("── fn Closures ──")
+let clamp_val = fn(x: Int, lo: Int, hi: Int) -> Int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+println(format("clamp(-5,0,100) = {}", Cast::string(clamp_val(-5, 0, 100))))
+println(format("clamp(150,0,100) = {}", Cast::string(clamp_val(150, 0, 100))))
+println(format("clamp(42,0,100) = {}", Cast::string(clamp_val(42, 0, 100))))
+
+// ── Closures capture their environment ──────────────────────────────────────
+
+println("")
+println("── Capturing ──")
+let offset = 100
+let shift = |x: Int| x + offset
+println(format("shift(5) = {}", Cast::string(shift(5))))
+
+// ── Box — mutable shared state ──────────────────────────────────────────────
+
+println("")
+println("── Box (Shared Mutable State) ──")
+let counter = Box(0)
+let inc = fn() { counter.value += 1 }
+let dec = fn() { counter.value -= 1 }
+let get = fn() -> Int { return counter.value }
+
+inc(); inc(); inc(); inc(); inc()
+dec(); dec()
+println(format("counter = {} (5 incs, 2 decs)", Cast::string(get())))
+
+// ── Function references ─────────────────────────────────────────────────────
+
+println("")
+println("── Function References ──")
+fn square(n: Int) -> Int { return n * n }
+fn cube(n: Int) -> Int { return n * n * n }
+
+let sq_ref = square@(Int)
+let cu_ref = cube@(Int)
+println(format("square(7) via ref = {}", Cast::string(sq_ref(7))))
+println(format("cube(3) via ref   = {}", Cast::string(cu_ref(3))))
+
+// ── Higher-order functions ──────────────────────────────────────────────────
+
+println("")
+println("── Map / Filter / Reduce ──")
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+let doubled = data.map(|x: Int| x * 2)
+println(format("map(*2):    {}", Cast::string(doubled)))
+
+let evens = data.filter(|x: Int| x % 2 == 0)
+println(format("filter(%%2): {}", Cast::string(evens)))
+
+let total = data.reduce(|acc: Int, x: Int, idx: Int| acc + x, 0)
+println(format("reduce(+):  {}", Cast::string(total)))
+
+// ── Chaining ────────────────────────────────────────────────────────────────
+
+println("")
+println("── Chaining ──")
+let result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * x)
+    .reduce(|acc: Int, x: Int, idx: Int| acc + x, 0)
+println(format("sum of even squares = {}", Cast::string(result)))
+
+// ── Closures as parameters ──────────────────────────────────────────────────
+
+println("")
+println("── Closures as Parameters ──")
+fn apply_twice(val: Int, f: fn(Int) -> Int) -> Int {
+    return f(f(val))
+}
+println(format("apply_twice(3, *2) = {}", Cast::string(apply_twice(3, |x: Int| x * 2))))
+println(format("apply_twice(2, ^2) = {}", Cast::string(apply_twice(2, |x: Int| x * x))))
+
+// ── Returning closures ──────────────────────────────────────────────────────
+
+println("")
+println("── Returning Closures ──")
+fn make_adder(n: Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int { return x + n }
+}
+let add10 = make_adder(10)
+let add50 = make_adder(50)
+println(format("add10(5) = {}", Cast::string(add10(5))))
+println(format("add50(5) = {}", Cast::string(add50(5))))
+
+// ── Compose from std/functional ─────────────────────────────────────────────
+
+println("")
+println("── Compose ──")
+let inc_fn = fn(x: Int) -> Int { return x + 1 }
+let dbl_fn = fn(x: Int) -> Int { return x * 2 }
+let inc_then_dbl = compose(dbl_fn, inc_fn)
+println(format("compose(dbl, inc)(4) = {}", Cast::string(inc_then_dbl(4))))

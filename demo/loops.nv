@@ -1,19 +1,92 @@
 module loopsDemo
 
-// For loop (expression;condition;iteration)
-for let i = 0; i < 10; i += 1 {
-    println(i)
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Loops — for, while, range, break & continue
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: C-style for, range (.. and ..=), for-in, while, break, continue
+//
+//  Run:  nova run demo/loops.nv
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// While loops (condition)
+import super.std.core
+
+// ── C-style for loop ────────────────────────────────────────────────────────
+// for init; condition; update { body }
+
+print("C-style for:   ")
+for let i = 0; i < 10; i += 1 {
+    print(Cast::string(i) + " ")
+}
+println("")
+
+// ── Range-based for (exclusive) ─────────────────────────────────────────────
+// 0..5 produces 0, 1, 2, 3, 4
+
+print("Range (0..5):  ")
+for i in 0..5 {
+    print(Cast::string(i) + " ")
+}
+println("")
+
+// ── Range-based for (inclusive) ─────────────────────────────────────────────
+// 0..=5 produces 0, 1, 2, 3, 4, 5
+
+print("Range (0..=5): ")
+for i in 0..=5 {
+    print(Cast::string(i) + " ")
+}
+println("")
+
+// ── For-in over a list ──────────────────────────────────────────────────────
+
+print("For-in list:   ")
+for fruit in ["apple", "banana", "cherry"] {
+    print(fruit + " ")
+}
+println("")
+
+// ── While loop ──────────────────────────────────────────────────────────────
+
+print("While:         ")
+let n = 1
+while n <= 16 {
+    print(Cast::string(n) + " ")
+    n *= 2
+}
+println("")
+
+// ── break & continue ────────────────────────────────────────────────────────
+// continue: skip to next iteration
+// break:    exit loop entirely
+
+print("Odd < 20:      ")
 let j = 0
 while true {
     j += 1
-    if j == 5 {
-        continue  // this will jump to the top of the loop
-    }
-    if j == 10 {
-        break  // this will break the loop
-    }
-    println(j)
+    if j >= 20 { break }
+    if j % 2 == 0 { continue }
+    print(Cast::string(j) + " ")
 }
+println("")
+
+// ── Nested loops ────────────────────────────────────────────────────────────
+
+println("")
+println("Multiplication table (1-5):")
+for r in 1..=5 {
+    let row = ""
+    for c in 1..=5 {
+        let prod = r * c
+        row = row + Cast::string(prod) + "\t"
+    }
+    println(row)
+}
+
+// ── Countdown ───────────────────────────────────────────────────────────────
+
+print("\nCountdown: ")
+for i in 0..=10 {
+    print(Cast::string(10 - i) + " ")
+}
+println("🚀")

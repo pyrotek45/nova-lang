@@ -1,0 +1,167 @@
+module patternsDemo
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Design Patterns — Idiomatic Nova Patterns
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: builder pattern, state machine, strategy, observer (Box),
+//         fn mod namespaces, type aliases with Dyn, data serialization
+//
+//  Run:  nova run demo/patterns.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.hashmap
+import super.std.option
+
+// ── Builder Pattern ─────────────────────────────────────────────────────────
+// Chain methods that return Self to build complex objects fluently.
+
+println("── Builder Pattern ──")
+
+struct Config { w: Int, h: Int, title: String, fullscreen: Bool }
+
+fn extends(Config) make() -> Config {
+    return Config { w: 800, h: 600, title: "App", fullscreen: false }
+}
+fn extends withSize(c: Config, nw: Int, nh: Int) -> Config { c.w = nw; c.h = nh; return c }
+fn extends withTitle(c: Config, t: String) -> Config { c.title = t; return c }
+fn extends withFullscreen(c: Config, f: Bool) -> Config { c.fullscreen = f; return c }
+fn extends toString(c: Config) -> String {
+    return format("{}x{} '{}' fullscreen={}", Cast::string(c.w), Cast::string(c.h), c.title, Cast::string(c.fullscreen))
+}
+
+let cfg = Config::make()
+    .withSize(1920, 1080)
+    .withTitle("My Game")
+    .withFullscreen(true)
+println(format("  {}", Cast::string(cfg)))
+
+// ── State Machine ───────────────────────────────────────────────────────────
+// Use enums to represent states, match to handle transitions.
+
+println("")
+println("── State Machine ──")
+
+enum PlayerState {
+    PSIdle,
+    PSRunning: Float,
+    PSJumping: Float,
+    PSDead,
+}
+
+fn extends toString(ps: PlayerState) -> String {
+    match ps {
+        PSIdle() => { return "Idle" }
+        PSRunning(spd) => { return format("Running({})", Cast::string(spd)) }
+        PSJumping(h) => { return format("Jumping({})", Cast::string(h)) }
+        PSDead() => { return "Dead" }
+    }
+    return ""
+}
+
+fn extends update(ps: PlayerState) -> PlayerState {
+    match ps {
+        PSIdle() => { return PlayerState::PSRunning(5.0) }
+        PSRunning(spd) => { return PlayerState::PSJumping(spd * 2.0) }
+        PSJumping(h) => {
+            if h > 0.5 { return PlayerState::PSJumping(h * 0.5) }
+            return PlayerState::PSIdle()
+        }
+        PSDead() => { return PlayerState::PSDead() }
+    }
+    return ps
+}
+
+let state = PlayerState::PSIdle()
+for tick in 0..6 {
+    println(format("  tick {} → {}", Cast::string(tick), Cast::string(state)))
+    state = state.update()
+}
+
+// ── Strategy Pattern ────────────────────────────────────────────────────────
+// Pass different functions to change behavior.
+
+println("")
+println("── Strategy Pattern ──")
+
+fn apply_strategy(values: [Int], strat: fn(Int) -> Int) -> [Int] {
+    return values.map(strat)
+}
+
+let nums = [1, 2, 3, 4, 5]
+println(format("  double: {}", Cast::string(apply_strategy(nums, |x: Int| x * 2))))
+println(format("  square: {}", Cast::string(apply_strategy(nums, |x: Int| x * x))))
+println(format("  negate: {}", Cast::string(apply_strategy(nums, |x: Int| 0 - x))))
+
+// ── Observer Pattern (via Box) ──────────────────────────────────────────────
+// Use Box to share mutable state between closures.
+
+println("")
+println("── Observer Pattern ──")
+
+let log = Box([]: String)
+
+let on_score = fn(pts: Int) {
+    log.value.push(format("Score: +{}", Cast::string(pts)))
+}
+let on_death = fn() {
+    log.value.push("Player died!")
+}
+
+on_score(100)
+on_score(50)
+on_death()
+on_score(200)
+
+for msg in log.value {
+    println(format("  {}", msg))
+}
+
+// ── fn mod — Namespaces ─────────────────────────────────────────────────────
+
+println("")
+println("── fn mod Namespaces ──")
+
+fn mod(patternsDemo) version() -> String { return "1.0.0" }
+fn mod(patternsDemo) author() -> String { return "Nova Team" }
+
+println(format("  version: {}", patternsDemo::version()))
+println(format("  author:  {}", patternsDemo::author()))
+
+// ── Dyn Type Aliases ────────────────────────────────────────────────────────
+// Structural typing lets unrelated structs share an interface.
+
+println("")
+println("── Structural Typing (Dyn) ──")
+
+struct Enemy { name: String, hp: Int }
+struct NPC { name: String, dialog: String }
+
+fn greet_named(thing: Dyn(T = name: String)) -> String {
+    return "Hello, " + thing.name + "!"
+}
+
+let enemy = Enemy { name: "Goblin", hp: 30 }
+let npc = NPC { name: "Merchant", dialog: "Buy something?" }
+println(format("  {}", greet_named(enemy)))
+println(format("  {}", greet_named(npc)))
+
+// ── Data Serialization ──────────────────────────────────────────────────────
+
+println("")
+println("── Data Serialization ──")
+
+struct SaveData { level: Int, pname: String }
+let save = SaveData { level: 42, pname: "Hero" }
+let json = Data::toJson(save)
+println(format("  Saved JSON (length={})", Cast::string(json.len())))
+
+let loaded = Data::fromJson(json) @[T: SaveData]
+if let data = loaded {
+    println(format("  Loaded: {} level {}", data.pname, Cast::string(data.level)))
+}
+
+println("")
+println("All patterns demonstrated ✓")

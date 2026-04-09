@@ -1,115 +1,115 @@
 module dunder
 
-struct SimpleType {
-    value: Int,
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Operator Overloading (Dunder Methods)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: __add__, __sub__, __mul__, __div__, __mod__, __eq__, __ne__,
+//         __lt__, __le__, __gt__, __ge__, __and__, __or__, toString
+//
+//  Nova lets you overload operators for custom types by defining
+//  "dunder" (double-underscore) methods via fn extends.
+//
+//  Run:  nova run demo/dunder.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+
+struct Num { value: Int }
+
+// ── toString — used by println ──────────────────────────────────────────────
+
+fn extends toString(self: Num) -> String {
+    return format("Num({})", Cast::string(self.value))
 }
 
-// when Overloading toString, the function must be named toString and be extended to the type
-fn extends toString(self: SimpleType) -> String {
-    return format("{}", Cast::string(self.value))
+// ── Arithmetic ──────────────────────────────────────────────────────────────
+
+fn extends __add__(self: Num, other: Num) -> Num {
+    return Num { value: self.value + other.value }
 }
 
-fn extends __add__(self: SimpleType, other: SimpleType) -> SimpleType {
-    return SimpleType {
-        value: self.value + other.value,
-    }
+fn extends __sub__(self: Num, other: Num) -> Num {
+    return Num { value: self.value - other.value }
 }
 
-println(SimpleType { value: 1 } + SimpleType { value: 2 })
-
-fn extends __sub__(self: SimpleType, other: SimpleType) -> SimpleType {
-    return SimpleType {
-        value: self.value - other.value,
-    }
+fn extends __mul__(self: Num, other: Num) -> Num {
+    return Num { value: self.value * other.value }
 }
 
-println(SimpleType { value: 1 } - SimpleType { value: 2 })
-
-fn extends __mul__(self: SimpleType, other: SimpleType) -> SimpleType {
-    return SimpleType {
-        value: self.value * other.value,
-    }
+fn extends __div__(self: Num, other: Num) -> Num {
+    return Num { value: self.value / other.value }
 }
 
-println(SimpleType { value: 2 } * SimpleType { value: 3 })
-
-fn extends __div__(self: SimpleType, other: SimpleType) -> SimpleType {
-    return SimpleType {
-        value: self.value / other.value,
-    }
+fn extends __mod__(self: Num, other: Num) -> Num {
+    return Num { value: self.value % other.value }
 }
 
-println(SimpleType { value: 6 } / SimpleType { value: 3 })
+println("── Arithmetic ──")
+let a = Num(10)
+let b = Num(3)
+println(format("{} + {} = {}", Cast::string(a), Cast::string(b), Cast::string(a + b)))
+println(format("{} - {} = {}", Cast::string(a), Cast::string(b), Cast::string(a - b)))
+println(format("{} * {} = {}", Cast::string(a), Cast::string(b), Cast::string(a * b)))
+println(format("{} / {} = {}", Cast::string(a), Cast::string(b), Cast::string(a / b)))
+println(format("{} %% {} = {}", Cast::string(a), Cast::string(b), Cast::string(a % b)))
 
-fn extends __eq__(self: SimpleType, other: SimpleType) -> Bool {
+// ── Comparison ──────────────────────────────────────────────────────────────
+
+fn extends __eq__(self: Num, other: Num) -> Bool {
     return self.value == other.value
 }
 
-println(SimpleType { value: 1 } == SimpleType { value: 1 })
-println(SimpleType { value: 1 } == SimpleType { value: 2 })
-
-fn extends __ne__(self: SimpleType, other: SimpleType) -> Bool {
+fn extends __ne__(self: Num, other: Num) -> Bool {
     return self.value != other.value
 }
 
-println(SimpleType { value: 1 } != SimpleType { value: 1 })
-println(SimpleType { value: 1 } != SimpleType { value: 2 })
-
-fn extends __lt__(self: SimpleType, other: SimpleType) -> Bool {
+fn extends __lt__(self: Num, other: Num) -> Bool {
     return self.value < other.value
 }
 
-println(SimpleType { value: 1 } < SimpleType { value: 2 })
-println(SimpleType { value: 2 } < SimpleType { value: 1 })
-
-fn extends __le__(self: SimpleType, other: SimpleType) -> Bool {
+fn extends __le__(self: Num, other: Num) -> Bool {
     return self.value <= other.value
 }
 
-println(SimpleType { value: 1 } <= SimpleType { value: 2 })
-println(SimpleType { value: 2 } <= SimpleType { value: 1 })
-println(SimpleType { value: 1 } <= SimpleType { value: 1 })
-
-fn extends __gt__(self: SimpleType, other: SimpleType) -> Bool {
+fn extends __gt__(self: Num, other: Num) -> Bool {
     return self.value > other.value
 }
 
-println(SimpleType { value: 2 } > SimpleType { value: 1 })
-println(SimpleType { value: 1 } > SimpleType { value: 2 })
-
-fn extends __ge__(self: SimpleType, other: SimpleType) -> Bool {
+fn extends __ge__(self: Num, other: Num) -> Bool {
     return self.value >= other.value
 }
 
-println(SimpleType { value: 2 } >= SimpleType { value: 1 })
-println(SimpleType { value: 1 } >= SimpleType { value: 2 })
-println(SimpleType { value: 1 } >= SimpleType { value: 1 })
+println("")
+println("── Comparison ──")
+let x = Num(5)
+let y = Num(5)
+let z = Num(10)
+println(format("{} == {} → {}", Cast::string(x), Cast::string(y), Cast::string(x == y)))
+println(format("{} != {} → {}", Cast::string(x), Cast::string(z), Cast::string(x != z)))
+println(format("{} <  {} → {}", Cast::string(x), Cast::string(z), Cast::string(x < z)))
+println(format("{} <= {} → {}", Cast::string(x), Cast::string(y), Cast::string(x <= y)))
+println(format("{} >  {} → {}", Cast::string(z), Cast::string(x), Cast::string(z > x)))
+println(format("{} >= {} → {}", Cast::string(z), Cast::string(x), Cast::string(z >= x)))
 
+// ── Logical ─────────────────────────────────────────────────────────────────
 
-fn extends __mod__(self: SimpleType, other: SimpleType) -> SimpleType {
-    return SimpleType {
-        value: self.value % other.value,
-    }
+fn extends __and__(self: Num, other: Num) -> Bool {
+    return (self.value != 0) && (other.value != 0)
 }
 
-println(SimpleType { value: 5 } % SimpleType { value: 3 })
-
-fn extends __and__(self: SimpleType, other: SimpleType) -> Bool {
-    return if( self.value != 0) && (other.value != 0) {
-        true
-    } else {
-        false
-    }
+fn extends __or__(self: Num, other: Num) -> Bool {
+    return (self.value != 0) || (other.value != 0)
 }
 
-println(SimpleType { value: 5 } && SimpleType { value: 3 })
+println("")
+println("── Logical ──")
+let t = Num(1)
+let f = Num(0)
+println(format("{} && {} → {}", Cast::string(t), Cast::string(t), Cast::string(t && t)))
+println(format("{} && {} → {}", Cast::string(t), Cast::string(f), Cast::string(t && f)))
+println(format("{} || {} → {}", Cast::string(f), Cast::string(t), Cast::string(f || t)))
+println(format("{} || {} → {}", Cast::string(f), Cast::string(f), Cast::string(f || f)))
 
-fn extends __or__(self: SimpleType, other: SimpleType) -> Bool {
-    return if( self.value != 0) || (other.value != 0) {
-        true
-    } else {
-        false
-    }
-}
-
-println(SimpleType { value: 5 } || SimpleType { value: 3 })
+println("")
+println("All dunder operators demonstrated ✓")

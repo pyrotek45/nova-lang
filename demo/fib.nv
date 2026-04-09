@@ -1,10 +1,56 @@
 module fib
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Fibonacci — Classic Recursion Demo
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: recursion, functions, if-expressions, UFCS, format strings
+//
+//  Run:  nova run demo/fib.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+
+// ── Recursive Fibonacci ─────────────────────────────────────────────────────
+
 fn fib(n: Int) -> Int {
-    if n <= 1 {
-        return n
-    }
+    if n <= 1 { return n }
     return fib(n - 1) + fib(n - 2)
 }
 
-println(fib(20))
+// ── Iterative Fibonacci (much faster for large n) ───────────────────────────
+
+fn fib_iter(n: Int) -> Int {
+    let a = 0
+    let b = 1
+    for i in 0..n {
+        let tmp = a + b
+        a = b
+        b = tmp
+    }
+    return a
+}
+
+// ── Print a table ───────────────────────────────────────────────────────────
+
+println("  n │ fib(n)")
+println("────┼──────────")
+for i in 0..=20 {
+    let result = fib_iter(i)
+    println(format("{} │ {}", Cast::string(i), Cast::string(result)))
+}
+
+// ── Verify recursive == iterative ───────────────────────────────────────────
+
+println("")
+print("Verifying recursive matches iterative for n=0..20... ")
+let ok = true
+for i in 0..=20 {
+    if fib(i) != fib_iter(i) { ok = false }
+}
+println(if ok { "✓ PASS" } else { "✗ FAIL" })
+
+// ── Benchmark: recursive fib(30) ────────────────────────────────────────────
+
+println("")
+println(format("fib(30) = {}", Cast::string(fib(30))))

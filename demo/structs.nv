@@ -1,16 +1,103 @@
 module structsDemo
 
-// Structs Creation
-struct One {
-    item1: String,
-    item2: Int
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Structs — Definition, Construction, Methods & Self
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: struct definition, positional/named construction, fields, fn extends,
+//         toString, Self type, static constructors, builder pattern
+//
+//  Run:  nova run demo/structs.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+
+// ── Basic struct ────────────────────────────────────────────────────────────
+
+struct Color { r: Int, g: Int, b: Int }
+
+// Named construction
+let red = Color { r: 255, g: 0, b: 0 }
+
+// Positional construction
+let green = Color(0, 255, 0)
+
+println(format("red = ({}, {}, {})", Cast::string(red.r), Cast::string(red.g), Cast::string(red.b)))
+println(format("green = ({}, {}, {})", Cast::string(green.r), Cast::string(green.g), Cast::string(green.b)))
+
+// Fields are mutable
+red.g = 128
+println(format("modified red = ({}, {}, {})", Cast::string(red.r), Cast::string(red.g), Cast::string(red.b)))
+
+// ── toString override ───────────────────────────────────────────────────────
+// When you define fn extends toString, println uses it automatically.
+
+fn extends toString(c: Color) -> String {
+    return format("rgb({},{},{})", Cast::string(c.r), Cast::string(c.g), Cast::string(c.b))
+}
+println(red)
+println(green)
+
+// ── Methods via fn extends ──────────────────────────────────────────────────
+
+fn extends brightness(c: Color) -> Int {
+    return (c.r + c.g + c.b) / 3
+}
+println(format("red brightness = {}", Cast::string(red.brightness())))
+
+fn extends mix(a: Color, b: Color) -> Color {
+    return Color((a.r + b.r) / 2, (a.g + b.g) / 2, (a.b + b.b) / 2)
+}
+println(format("mix = {}", Cast::string(red.mix(green))))
+
+// ── .type introspection ─────────────────────────────────────────────────────
+
+println(format("type = {}", red.type))
+
+// ── Static constructors with fn extends(Type) ───────────────────────────────
+
+struct Rect { x: Float, y: Float, w: Float, h: Float }
+
+fn extends(Rect) unit() -> Rect {
+    return Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 }
 }
 
-struct Two {
-    function: fn(Int) -> Int
+fn extends toString(r: Rect) -> String {
+    return format("Rect({},{} {}x{})",
+        Cast::string(r.x), Cast::string(r.y),
+        Cast::string(r.w), Cast::string(r.h))
 }
 
-// You can use () or {} to construct a struct
-let thingone : One = One("wow",3)
-let thingtwo = One { item1: "hello", item2: 30 }
-let thingthree = Two(|x:Int| x * x)
+fn extends area(r: Rect) -> Float { return r.w * r.h }
+
+let unit = Rect::unit()
+println(format("{} area={}", Cast::string(unit), Cast::string(unit.area())))
+
+// ── Builder pattern via chaining ────────────────────────────────────────────
+
+fn extends at(r: Rect, nx: Float, ny: Float) -> Rect { r.x = nx; r.y = ny; return r }
+fn extends size(r: Rect, nw: Float, nh: Float) -> Rect { r.w = nw; r.h = nh; return r }
+
+let big = Rect::unit().at(10.0, 20.0).size(100.0, 50.0)
+println(format("built: {}", Cast::string(big)))
+
+// ── Struct with function fields ─────────────────────────────────────────────
+
+struct Callback { label: String, run: fn() -> String }
+let cb = Callback { label: "hello", run: fn() -> String { return "callback fired!" } }
+println(format("{}: {}", cb.label, cb::run()))
+
+// ── Struct with Self ────────────────────────────────────────────────────────
+
+struct Counter { count: Int, tick: fn(Self) -> Self }
+let ctr = Counter {
+    count: 0,
+    tick: fn(self: Counter) -> Counter {
+        self.count += 1
+        return self
+    },
+}
+ctr->tick()
+ctr->tick()
+ctr->tick()
+println(format("counter after 3 ticks = {}", Cast::string(ctr.count)))
