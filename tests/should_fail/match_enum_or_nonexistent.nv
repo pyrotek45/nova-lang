@@ -1,0 +1,11 @@
+// should_fail: enum OR pattern references a nonexistent variant
+module match_enum_or_nonexistent
+
+enum Color { Red, Green, Blue }
+
+fn classify(c: Color) -> String {
+    return match c {
+        Red() | Yellow() => "warm",
+        Green() | Blue() => "cool"
+    }
+}

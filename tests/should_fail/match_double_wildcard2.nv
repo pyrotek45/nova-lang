@@ -1,0 +1,10 @@
+// should_fail: duplicate wildcard/default in match
+module match_double_wildcard
+
+fn check(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        _ => "a",
+        _ => "b"
+    }
+}

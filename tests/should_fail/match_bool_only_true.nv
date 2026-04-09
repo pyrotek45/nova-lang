@@ -1,0 +1,8 @@
+// should_fail: bool match with only true (not exhaustive, no wildcard)
+module match_bool_only_true
+
+fn check(b: Bool) -> String {
+    return match b {
+        true => "yes"
+    }
+}

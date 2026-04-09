@@ -1,0 +1,9 @@
+// should_fail: string match with no wildcard (not exhaustive)
+module match_string_no_wildcard
+
+fn check(s: String) -> Int {
+    return match s {
+        "hello" => 1,
+        "world" => 2
+    }
+}

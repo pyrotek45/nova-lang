@@ -1,0 +1,8 @@
+module test
+// match: Int literal pattern on String type
+fn bad(s: String) -> Int {
+    return match s {
+        42 => 1,
+        _  => 0
+    }
+}

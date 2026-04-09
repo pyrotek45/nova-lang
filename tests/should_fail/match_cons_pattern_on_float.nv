@@ -1,0 +1,8 @@
+module test
+// match: cons pattern on Float type (not a list)
+fn bad(f: Float) -> Float {
+    return match f {
+        [h, ..t] => h,
+        _        => 0.0
+    }
+}

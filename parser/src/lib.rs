@@ -5553,18 +5553,62 @@ impl Parser {
                 continue;
             }
 
-            // collect identifiers
-            let mut enum_id = None;
-            if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
-                self.consume_symbol(LeftParen)?;
-                if !self
-                    .current_token()
-                    .is_some_and(|t| t.is_symbol(RightParen))
-                {
-                    enum_id = Some(self.get_identifier()?.0);
+            // ── Collect first variant (and optional binding) ──
+            let mut or_variants: Vec<(Rc<str>, Option<Rc<str>>)> = vec![];
+            {
+                let mut enum_id = None;
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                    self.consume_symbol(LeftParen)?;
+                    if !self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(RightParen))
+                    {
+                        enum_id = Some(self.get_identifier()?.0);
+                    }
+                    self.consume_symbol(RightParen)?;
                 }
-                self.consume_symbol(RightParen)?;
+                or_variants.push((variant, enum_id));
             }
+
+            // ── Collect additional OR variants: `| Variant2() | Variant3()` ──
+            while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Pipe)) {
+                self.advance(); // consume |
+                let (or_variant, or_vpos) = self.get_identifier()?;
+                // Detect qualified names
+                if self.current_token().is_some_and(|t| t.is_op(Operator::DoubleColon)) {
+                    let next_variant = self
+                        .input
+                        .get(self.index + 1)
+                        .and_then(|t| {
+                            if let TokenValue::Identifier(id) = &t.value {
+                                Some(id.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| "...".into());
+                    return Err(self.generate_error_with_pos(
+                        format!("Use just `{}` instead of qualifying with the enum type", next_variant),
+                        format!(
+                            "Match arms use the variant name alone, not the fully-qualified path.\n  \
+                             Write `{nv}` instead of `{v}::{nv}`",
+                            nv = next_variant,
+                            v = or_variant
+                        ),
+                        or_vpos,
+                    ));
+                }
+                let mut or_enum_id = None;
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                    self.consume_symbol(LeftParen)?;
+                    if !self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
+                        or_enum_id = Some(self.get_identifier()?.0);
+                    }
+                    self.consume_symbol(RightParen)?;
+                }
+                or_variants.push((or_variant, or_enum_id));
+            }
+
             self.consume_operator(Operator::FatArrow)?;
 
             if let Some(fields) = self
@@ -5600,76 +5644,92 @@ impl Parser {
                 } else {
                     fields.clone()
                 };
-                let mut tag = 0;
-                let mut found = false;
-                let mut vtype = TType::None;
 
-                for (i, field) in new_fields.iter().enumerate() {
-                    if variant == field.0 {
-                        tag = i;
-                        vtype = field.1.clone();
-                        found = true;
+                // ── Validate all OR variants and collect their tags ──
+                let mut or_tags: Vec<usize> = vec![];
+                let mut shared_enum_id: Option<Rc<str>> = None;
+                let mut shared_vtype = TType::None;
+
+                for (or_var, or_eid) in or_variants.iter() {
+                    let mut tag = 0;
+                    let mut found = false;
+                    let mut vtype = TType::None;
+
+                    for (i, field) in new_fields.iter().enumerate() {
+                        if *or_var == field.0 {
+                            tag = i;
+                            vtype = field.1.clone();
+                            found = true;
+                        }
+                    }
+
+                    if vtype != TType::None && or_eid.is_none() {
+                        return Err(self.generate_error_with_pos(
+                            format!(
+                                "Variant `{}` carries data but is missing a binding variable",
+                                or_var
+                            ),
+                            format!(
+                                "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
+                                vtype, or_var
+                            ),
+                            vpos.clone(),
+                        ));
+                    }
+
+                    if !found {
+                        let available: Vec<String> = new_fields
+                            .iter()
+                            .filter(|(name, _)| name.as_ref() != "type")
+                            .map(|(name, ttype)| {
+                                if *ttype == TType::None {
+                                    format!("`{}`", name)
+                                } else {
+                                    format!("`{}` (holds `{}`)", name, ttype)
+                                }
+                            })
+                            .collect();
+                        return Err(self.generate_error_with_pos(
+                            format!("Variant `{}` not found in this enum type", or_var),
+                            format!(
+                                "Available variants: {}. Check for typos — variant names are case-sensitive.",
+                                available.join(", ")
+                            ),
+                            vpos.clone(),
+                        ));
+                    }
+
+                    or_tags.push(tag);
+                    if or_eid.is_some() {
+                        shared_enum_id = or_eid.clone();
+                        shared_vtype = vtype;
                     }
                 }
 
-                if vtype != TType::None && enum_id.is_none() {
-                    return Err(self.generate_error_with_pos(
-                        format!(
-                            "Variant `{}` carries data but is missing a binding variable",
-                            variant
-                        ),
-                        format!(
-                            "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
-                            vtype, variant
-                        ),
-                        vpos,
-                    ));
-                }
-
-                if !found {
-                    let available: Vec<String> = new_fields
-                        .iter()
-                        .filter(|(name, _)| name.as_ref() != "type")
-                        .map(|(name, ttype)| {
-                            if *ttype == TType::None {
-                                format!("`{}`", name)
-                            } else {
-                                format!("`{}` (holds `{}`)", name, ttype)
-                            }
-                        })
-                        .collect();
-                    return Err(self.generate_error_with_pos(
-                        format!("Variant `{}` not found in this enum type", variant),
-                        format!(
-                            "Available variants: {}. Check for typos — variant names are case-sensitive.",
-                            available.join(", ")
-                        ),
-                        vpos,
-                    ));
-                }
+                let enum_id = shared_enum_id.or_else(|| or_variants[0].1.clone());
 
                 self.typechecker.environment.push_block();
                 self.typechecker.environment.insert_symbol(
                     enum_id.as_deref().unwrap_or_default(),
-                    vtype,
+                    shared_vtype,
                     None,
                     SymbolKind::Variable,
                 );
 
-                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
-                    let body = self.block()?;
-                    branches.push((tag, enum_id.clone(), body));
+                let body = if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                    self.block()?
                 } else {
                     let body = self.expr()?;
-                    branches.push((
-                        tag,
-                        enum_id.clone(),
-                        vec![Statement::Expression {
-                            ttype: body.clone().get_type(),
-                            expr: body,
-                        }],
-                    ));
+                    vec![Statement::Expression {
+                        ttype: body.clone().get_type(),
+                        expr: body,
+                    }]
                 };
+
+                // Push one arm per tag, all sharing the same body
+                for tag in or_tags {
+                    branches.push((tag, enum_id.clone(), body.clone()));
+                }
 
                 self.typechecker.environment.pop_block();
             }
@@ -5871,18 +5931,62 @@ impl Parser {
                 }
                 continue;
             }
-            // collect identifiers
-            let mut enum_id = None;
-            if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
-                self.consume_symbol(LeftParen)?;
-                if !self
-                    .current_token()
-                    .is_some_and(|t| t.is_symbol(RightParen))
-                {
-                    enum_id = Some(self.get_identifier()?.0);
+            // ── Collect first variant (and optional binding) ──
+            let mut or_variants: Vec<(Rc<str>, Option<Rc<str>>)> = vec![];
+            {
+                let mut enum_id = None;
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                    self.consume_symbol(LeftParen)?;
+                    if !self
+                        .current_token()
+                        .is_some_and(|t| t.is_symbol(RightParen))
+                    {
+                        enum_id = Some(self.get_identifier()?.0);
+                    }
+                    self.consume_symbol(RightParen)?;
                 }
-                self.consume_symbol(RightParen)?;
+                or_variants.push((variant, enum_id));
             }
+
+            // ── Collect additional OR variants: `| Variant2() | Variant3()` ──
+            while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Pipe)) {
+                self.advance(); // consume |
+                let (or_variant, or_vpos) = self.get_identifier()?;
+                // Detect qualified names
+                if self.current_token().is_some_and(|t| t.is_op(Operator::DoubleColon)) {
+                    let next_variant = self
+                        .input
+                        .get(self.index + 1)
+                        .and_then(|t| {
+                            if let TokenValue::Identifier(id) = &t.value {
+                                Some(id.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| "...".into());
+                    return Err(self.generate_error_with_pos(
+                        format!("Use just `{}` instead of qualifying with the enum type", next_variant),
+                        format!(
+                            "Match arms use the variant name alone, not the fully-qualified path.\n  \
+                             Write `{nv}` instead of `{v}::{nv}`",
+                            nv = next_variant,
+                            v = or_variant
+                        ),
+                        or_vpos,
+                    ));
+                }
+                let mut or_enum_id = None;
+                if self.current_token().is_some_and(|t| t.is_symbol(LeftParen)) {
+                    self.consume_symbol(LeftParen)?;
+                    if !self.current_token().is_some_and(|t| t.is_symbol(RightParen)) {
+                        or_enum_id = Some(self.get_identifier()?.0);
+                    }
+                    self.consume_symbol(RightParen)?;
+                }
+                or_variants.push((or_variant, or_enum_id));
+            }
+
             self.consume_operator(Operator::FatArrow)?;
 
             if let Some(fields) = self
@@ -5915,83 +6019,92 @@ impl Parser {
                 } else {
                     fields.clone()
                 };
-                let mut tag = 0;
 
-                // mark if the variant is found
-                let mut found = false;
-                let mut vtype = TType::None;
+                // ── Validate all OR variants and collect their tags ──
+                let mut or_tags: Vec<usize> = vec![];
+                let mut shared_enum_id: Option<Rc<str>> = None;
+                let mut shared_vtype = TType::None;
 
-                for (i, field) in new_fields.iter().enumerate() {
-                    if variant == field.0 {
-                        tag = i;
-                        vtype = field.1.clone();
-                        found = true;
+                for (or_var, or_eid) in or_variants.iter() {
+                    let mut tag = 0;
+                    let mut found = false;
+                    let mut vtype = TType::None;
+
+                    for (i, field) in new_fields.iter().enumerate() {
+                        if *or_var == field.0 {
+                            tag = i;
+                            vtype = field.1.clone();
+                            found = true;
+                        }
+                    }
+
+                    if vtype != TType::None && or_eid.is_none() {
+                        return Err(self.generate_error_with_pos(
+                            format!(
+                                "Variant `{}` carries data but is missing a binding variable",
+                                or_var
+                            ),
+                            format!(
+                                "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
+                                vtype, or_var
+                            ),
+                            pos.clone(),
+                        ));
+                    }
+
+                    if !found {
+                        let available: Vec<String> = new_fields
+                            .iter()
+                            .filter(|(name, _)| name.as_ref() != "type")
+                            .map(|(name, ttype)| {
+                                if *ttype == TType::None {
+                                    format!("`{}`", name)
+                                } else {
+                                    format!("`{}` (holds `{}`)", name, ttype)
+                                }
+                            })
+                            .collect();
+                        return Err(self.generate_error_with_pos(
+                            format!("Variant `{}` not found in this enum type", or_var),
+                            format!(
+                                "Available variants: {}. Check for typos — variant names are case-sensitive.",
+                                available.join(", ")
+                            ),
+                            pos.clone(),
+                        ));
+                    }
+
+                    or_tags.push(tag);
+                    if or_eid.is_some() {
+                        shared_enum_id = or_eid.clone();
+                        shared_vtype = vtype;
                     }
                 }
 
-                if vtype != TType::None && enum_id.is_none() {
-                    return Err(self.generate_error_with_pos(
-                        format!("Variant `{}` carries data but is missing a binding variable", variant),
-                        format!(
-                            "This variant holds a value of type `{}`. You must bind it to a variable.\n  Example: `{}(my_var) => {{ ... }}`",
-                            vtype, variant
-                        ),
-                        pos,
-                    ));
-                }
-
-                if !found {
-                    // Build list of available variants for the hint
-                    let available: Vec<String> = new_fields
-                        .iter()
-                        .filter(|(name, _)| name.as_ref() != "type")
-                        .map(|(name, ttype)| {
-                            if *ttype == TType::None {
-                                format!("`{}`", name)
-                            } else {
-                                format!("`{}` (holds `{}`)", name, ttype)
-                            }
-                        })
-                        .collect();
-                    return Err(self.generate_error_with_pos(
-                        format!("Variant `{}` not found in this enum type", variant),
-                        format!(
-                            "Available variants: {}. Check for typos — variant names are case-sensitive.",
-                            available.join(", ")
-                        ),
-                        pos,
-                    ));
-                }
+                let enum_id = shared_enum_id.or_else(|| or_variants[0].1.clone());
 
                 self.typechecker.environment.push_block();
                 self.typechecker.environment.insert_symbol(
                     enum_id.as_deref().unwrap_or_default(),
-                    vtype,
+                    shared_vtype,
                     None,
                     SymbolKind::Variable,
                 );
-                // get expression if no { }
 
-                //let enum_id = enum_id.unwrap_or_default();
-                if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
-                    let body = self.block()?;
-                    branches.push((tag, enum_id.clone(), body.clone()));
-                    body.clone()
+                let body = if self.current_token().is_some_and(|t| t.is_symbol(LeftBrace)) {
+                    self.block()?
                 } else {
                     let body = self.expr()?;
-                    branches.push((
-                        tag,
-                        enum_id.clone(),
-                        vec![Statement::Expression {
-                            ttype: body.clone().get_type(),
-                            expr: body.clone(),
-                        }],
-                    ));
                     vec![Statement::Expression {
                         ttype: body.clone().get_type(),
                         expr: body,
                     }]
                 };
+
+                // Push one arm per tag, all sharing the same body
+                for tag in or_tags {
+                    branches.push((tag, enum_id.clone(), body.clone()));
+                }
 
                 self.typechecker.environment.pop_block();
             }

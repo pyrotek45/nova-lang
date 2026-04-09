@@ -1,0 +1,6 @@
+module test
+// for destructure: tuple pattern on list of Ints (not list of tuples)
+let xs: [Int] = [1, 2, 3]
+for (a, b) in xs {
+    println(Cast::string(a))
+}

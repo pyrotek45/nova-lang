@@ -1,0 +1,3 @@
+module test
+// let destructure: 4-element pattern on 2-element tuple
+let (a, b, c, d) = (1, 2)

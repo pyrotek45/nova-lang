@@ -1,0 +1,8 @@
+module test
+// match: tuple pattern on Int type
+fn bad(n: Int) -> Int {
+    return match n {
+        (a, b) => a + b,
+        _      => 0
+    }
+}

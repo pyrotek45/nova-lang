@@ -1,0 +1,11 @@
+// should_fail: enum OR with data variant missing binding
+module match_enum_or_data_missing_binding
+
+enum Expr { Lit: Int, Neg: Int, Add: (Int, Int) }
+
+fn eval(e: Expr) -> Int {
+    return match e {
+        Lit() | Neg() => 0,
+        Add(pair) => pair[0] + pair[1]
+    }
+}

@@ -1,0 +1,3 @@
+module test
+// let destructure with OR pattern (not allowed in let destructuring)
+let (a | b) = 42

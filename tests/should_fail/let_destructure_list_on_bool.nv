@@ -1,0 +1,3 @@
+module test
+// let destructure: list pattern on Bool (not a list)
+let [a, b] = true

@@ -1,0 +1,8 @@
+module test
+// match: empty list pattern on Int type (not a list)
+fn bad(n: Int) -> String {
+    return match n {
+        [] => "empty",
+        _  => "other"
+    }
+}

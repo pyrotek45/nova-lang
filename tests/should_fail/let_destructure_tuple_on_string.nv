@@ -1,0 +1,3 @@
+module test
+// let destructure: tuple pattern on String (not a tuple)
+let (a, b) = "hello"

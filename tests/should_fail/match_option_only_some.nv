@@ -1,0 +1,8 @@
+// should_fail: option match with only Some (not exhaustive, no wildcard)
+module match_option_only_some
+
+fn check(o: Option(Int)) -> String {
+    return match o {
+        Some(x) => "has"
+    }
+}

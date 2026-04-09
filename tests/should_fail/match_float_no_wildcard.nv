@@ -1,0 +1,9 @@
+// should_fail: float match with no wildcard (not exhaustive)
+module match_float_no_wildcard
+
+fn check(f: Float) -> String {
+    return match f {
+        0.0 => "zero",
+        1.0 => "one"
+    }
+}

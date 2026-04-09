@@ -1,0 +1,9 @@
+// should_fail: char match with no wildcard (not exhaustive)
+module match_char_no_wildcard
+
+fn check(c: Char) -> String {
+    return match c {
+        'a' => "a",
+        'b' => "b"
+    }
+}

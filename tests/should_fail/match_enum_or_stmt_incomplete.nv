@@ -1,0 +1,10 @@
+// should_fail: enum OR stmt missing variant (not exhaustive)
+module match_enum_or_stmt_incomplete
+
+enum Direction { North, South, East, West }
+
+let d = Direction::North()
+match d {
+    North() | South() => { println("NS") }
+    East() => { println("E") }
+}

@@ -1,0 +1,6 @@
+module test
+// for destructure: tuple pattern on list of Strings
+let xs: [String] = ["a", "b", "c"]
+for (a, b) in xs {
+    println(a)
+}

@@ -1,0 +1,3 @@
+module test
+// let destructure: list cons on Int (not a list)
+let [h, ..t] = 42

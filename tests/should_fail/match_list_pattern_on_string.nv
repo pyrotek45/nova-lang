@@ -1,0 +1,8 @@
+module test
+// match: list pattern on String type
+fn bad(s: String) -> String {
+    return match s {
+        [a, b] => "two",
+        _      => "other"
+    }
+}
