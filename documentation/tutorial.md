@@ -1107,6 +1107,17 @@ match shape {
 }
 ```
 
+You can combine multiple variants in a single arm with `|` (OR patterns):
+
+```rust
+enum Direction { North, South, East, West }
+
+match d {
+    North() | South() => { println("vertical") }
+    East()  | West()  => { println("horizontal") }
+}
+```
+
 > Match arms use variant names without the enum prefix. Each variant name must be
 > unique across all enums in scope.
 
@@ -1810,7 +1821,36 @@ fn depth(t: Tree(Int)) -> Int {
 ### Value Match (Non-Enum Types)
 
 `match` also works on non-enum types like Int, String, Bool, Float, Char,
-tuples, and lists using pattern matching:
+tuples, and lists using pattern matching.
+
+**OR Patterns** work with all types, including enums.  Use `|` to combine
+several patterns in one arm:
+
+```rust
+// Enum OR patterns
+enum Direction { North, South, East, West }
+
+fn axis(d: Direction) -> String {
+    return match d {
+        North() | South() => "vertical",
+        East()  | West()  => "horizontal"
+    }
+}
+
+// You can combine all variants in a single arm
+match d {
+    North() | South() | East() | West() => { println("any direction") }
+}
+
+// OR also works in match statements
+let label = ""
+match d {
+    North() | South() => { label = "NS" }
+    East()  | West()  => { label = "EW" }
+}
+```
+
+OR patterns on non-enum types work the same way:
 
 ```rust
 let x = 42
@@ -1832,10 +1872,10 @@ Supported patterns:
 | List             | `[a, b, c]`              | Exact list length match             |
 | List cons        | `[h, ..t]`               | Head element(s) + rest              |
 | Empty list       | `[]`                     | Match empty list                    |
-| Or               | `1 \| 2 \| 3`           | Match any alternative               |
+| Or               | `1 \| 2 \| 3`           | Match any alternative (works with all types including enums) |
 | Option Some      | `Some(v)`                | Match Option with value             |
 | Option None      | `None()`                 | Match absent Option                 |
-| Enum variant     | `Red()`, `Leaf(v)`       | Match enum variant                  |
+| Enum variant     | `Red()`, `Leaf(v)`       | Match enum variant (use `Red() \| Blue()` for OR) |
 
 ```rust
 // Option matching
@@ -2528,6 +2568,9 @@ Dyn types, and extends + UFCS.
 | `fn mod` | `fn mod(M) f(x: Int) -> Int { }` | Add function to module M |
 | Match commas | `A() => { ... }, B() => ...` | Optional commas between arms |
 | Match expr arm | `A() => expr` | Single-expression arm, no braces |
+| Let destructure | `let (a, b) = expr` | Unpack tuple into variables |
+| Let list destr. | `let [h, ..t] = xs` | Unpack list head + tail |
+| For destructure | `for (k, v) in pairs { }` | Unpack each tuple in loop |
 | Varargs | `f(1, 2, 3)` where `f(xs: [Int])` | Trailing args auto-wrapped into list |
 | Forward decl | `fn f(x: Int) -> Int` | Signature only, no body |
 | Single-elem tuple | `(42,)` | One-element tuple |

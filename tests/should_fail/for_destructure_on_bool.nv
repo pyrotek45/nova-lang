@@ -1,0 +1,5 @@
+module test
+// for destructure on a non-list (Bool)
+for (a, b) in true {
+    println(Cast::string(a))
+}

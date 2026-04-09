@@ -1,0 +1,5 @@
+module test
+// for destructure on a non-list (String)
+for (a, b) in "hello" {
+    println(a)
+}

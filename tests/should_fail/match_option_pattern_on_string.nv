@@ -1,0 +1,8 @@
+module test
+// match: Option pattern on String type (not an Option)
+fn bad(s: String) -> String {
+    return match s {
+        Some(x) => x,
+        None()  => "default"
+    }
+}

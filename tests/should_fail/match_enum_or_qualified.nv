@@ -1,0 +1,11 @@
+// should_fail: enum OR pattern with qualified name (Color::Red)
+module match_enum_or_qualified
+
+enum Color { Red, Green, Blue }
+
+fn classify(c: Color) -> String {
+    return match c {
+        Color::Red() | Color::Green() => "warm",
+        Blue() => "cool"
+    }
+}

@@ -1,0 +1,232 @@
+// ============================================================
+//  test_pattern_enum_or.nv – Enum OR‑patterns in match arms
+// ============================================================
+module test_pattern_enum_or
+
+// ─── §1 Basic enum definitions ──────────────────────────────
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+enum Suit {
+    Hearts,
+    Diamonds,
+    Clubs,
+    Spades
+}
+
+// ─── §2 Two‑variant OR in match expression ──────────────────
+
+fn color_warm(c: Color) -> Bool {
+    return match c {
+        Red() | Green() => true,
+        Blue() => false
+    }
+}
+assert(color_warm(Color::Red())   == true,  "enum OR: Red warm")
+assert(color_warm(Color::Green()) == true,  "enum OR: Green warm")
+assert(color_warm(Color::Blue())  == false, "enum OR: Blue not warm")
+
+// ─── §3 Three‑variant OR covers all → exhaustive ───────────
+
+fn any_color(c: Color) -> String {
+    return match c {
+        Red() | Green() | Blue() => "color"
+    }
+}
+assert(any_color(Color::Red())   == "color", "enum OR all: Red")
+assert(any_color(Color::Green()) == "color", "enum OR all: Green")
+assert(any_color(Color::Blue())  == "color", "enum OR all: Blue")
+
+// ─── §4 Four‑way enum: 2+2 OR split ────────────────────────
+
+fn dir_axis(d: Direction) -> String {
+    return match d {
+        North() | South() => "vertical",
+        East() | West()   => "horizontal"
+    }
+}
+assert(dir_axis(Direction::North()) == "vertical",   "dir 2+2: North")
+assert(dir_axis(Direction::South()) == "vertical",   "dir 2+2: South")
+assert(dir_axis(Direction::East())  == "horizontal", "dir 2+2: East")
+assert(dir_axis(Direction::West())  == "horizontal", "dir 2+2: West")
+
+// ─── §5 Four‑way enum: 3+1 OR split ────────────────────────
+
+fn is_east(d: Direction) -> Bool {
+    return match d {
+        North() | South() | West() => false,
+        East() => true
+    }
+}
+assert(is_east(Direction::North()) == false, "3+1: North")
+assert(is_east(Direction::South()) == false, "3+1: South")
+assert(is_east(Direction::West())  == false, "3+1: West")
+assert(is_east(Direction::East())  == true,  "3+1: East")
+
+// ─── §6 Four‑way enum: all in one OR ───────────────────────
+
+fn always(d: Direction) -> Int {
+    return match d {
+        North() | South() | East() | West() => 42
+    }
+}
+assert(always(Direction::North()) == 42, "all-in-one: North")
+assert(always(Direction::East())  == 42, "all-in-one: East")
+
+// ─── §7 OR with wildcard ───────────────────────────────────
+
+fn color_or_wild(c: Color) -> String {
+    return match c {
+        Red() => "red",
+        _ => "other"
+    }
+}
+assert(color_or_wild(Color::Red())   == "red",   "OR wild: Red")
+assert(color_or_wild(Color::Green()) == "other", "OR wild: Green")
+assert(color_or_wild(Color::Blue())  == "other", "OR wild: Blue")
+
+// ─── §8 OR with block bodies ───────────────────────────────
+
+fn dir_block(d: Direction) -> String {
+    return match d {
+        North() | South() => {
+            let s = "vert"
+            s + "ical"
+        }
+        East() | West() => {
+            let s = "horiz"
+            s + "ontal"
+        }
+    }
+}
+assert(dir_block(Direction::North()) == "vertical",   "OR block: North")
+assert(dir_block(Direction::South()) == "vertical",   "OR block: South")
+assert(dir_block(Direction::East())  == "horizontal", "OR block: East")
+assert(dir_block(Direction::West())  == "horizontal", "OR block: West")
+
+// ─── §9 Match statement with enum OR ───────────────────────
+
+let result1 = ""
+let c1 = Color::Green()
+match c1 {
+    Red() | Blue() => { result1 = "rb" }
+    Green() => { result1 = "g" }
+}
+assert(result1 == "g", "stmt OR: Green")
+
+let result2 = ""
+let c2 = Color::Blue()
+match c2 {
+    Red() | Blue() => { result2 = "rb" }
+    Green() => { result2 = "g" }
+}
+assert(result2 == "rb", "stmt OR: Blue")
+
+// ─── §10 Statement enum OR with all in one arm ─────────────
+
+let result3 = ""
+match Direction::West() {
+    North() | South() | East() | West() => { result3 = "any" }
+}
+assert(result3 == "any", "stmt all-in-one OR")
+
+// ─── §11 Suit (4‑way) various OR splits ────────────────────
+
+fn suit_color(s: Suit) -> String {
+    return match s {
+        Hearts() | Diamonds() => "red",
+        Clubs() | Spades()    => "black"
+    }
+}
+assert(suit_color(Suit::Hearts())   == "red",   "suit: Hearts")
+assert(suit_color(Suit::Diamonds()) == "red",   "suit: Diamonds")
+assert(suit_color(Suit::Clubs())    == "black", "suit: Clubs")
+assert(suit_color(Suit::Spades())   == "black", "suit: Spades")
+
+fn suit_minor(s: Suit) -> Bool {
+    return match s {
+        Clubs() | Diamonds() => true,
+        Hearts() | Spades()  => false
+    }
+}
+assert(suit_minor(Suit::Clubs())    == true,  "minor: Clubs")
+assert(suit_minor(Suit::Diamonds()) == true,  "minor: Diamonds")
+assert(suit_minor(Suit::Hearts())   == false, "minor: Hearts")
+assert(suit_minor(Suit::Spades())   == false, "minor: Spades")
+
+// ─── §12 Enum with data – separate arms (no OR with data) ──
+
+enum Shape {
+    Circle: Float,
+    Rect: (Float, Float),
+    Point
+}
+
+fn shape_name(s: Shape) -> String {
+    return match s {
+        Circle(r) => "circle",
+        Rect(dims) => "rect",
+        Point() => "point"
+    }
+}
+assert(shape_name(Shape::Circle(3.14)) == "circle", "shape: circle")
+assert(shape_name(Shape::Rect((2.0, 3.0))) == "rect", "shape: rect")
+assert(shape_name(Shape::Point()) == "point", "shape: point")
+
+// ─── §13 Mix OR and non-OR arms in same match ──────────────
+
+fn dir_primary(d: Direction) -> Bool {
+    return match d {
+        North() => true,
+        South() | East() | West() => false
+    }
+}
+assert(dir_primary(Direction::North()) == true,  "primary: North")
+assert(dir_primary(Direction::South()) == false, "primary: South")
+assert(dir_primary(Direction::East())  == false, "primary: East")
+assert(dir_primary(Direction::West())  == false, "primary: West")
+
+// ─── §14 Nested match with enum OR ─────────────────────────
+
+fn classify_dir(d: Direction) -> String {
+    let axis = match d {
+        North() | South() => "v",
+        East() | West()   => "h"
+    }
+    let detail = match d {
+        North() | East() => "pos",
+        South() | West() => "neg"
+    }
+    return axis + "_" + detail
+}
+assert(classify_dir(Direction::North()) == "v_pos", "nested: North")
+assert(classify_dir(Direction::South()) == "v_neg", "nested: South")
+assert(classify_dir(Direction::East())  == "h_pos", "nested: East")
+assert(classify_dir(Direction::West())  == "h_neg", "nested: West")
+
+// ─── §15 Enum OR in loop ───────────────────────────────────
+
+let dirs = [Direction::North(), Direction::East(), Direction::South(), Direction::West()]
+let vert_count = 0
+let horiz_count = 0
+for d in dirs {
+    match d {
+        North() | South() => { vert_count = vert_count + 1 }
+        East() | West()   => { horiz_count = horiz_count + 1 }
+    }
+}
+assert(vert_count == 2,  "loop OR: vert count")
+assert(horiz_count == 2, "loop OR: horiz count")
+
+println("PASS: all enum OR pattern tests passed")

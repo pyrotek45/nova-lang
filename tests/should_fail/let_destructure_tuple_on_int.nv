@@ -1,0 +1,4 @@
+module test
+// let destructure: tuple pattern on Int (not a tuple)
+let x = 42
+let (a, b) = x

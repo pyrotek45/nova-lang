@@ -1,0 +1,10 @@
+// should_fail: enum OR in match statement with nonexistent variant
+module match_enum_or_stmt_nonexistent
+
+enum Color { Red, Green, Blue }
+
+let c = Color::Red()
+match c {
+    Red() | Purple() => { println("warm") }
+    Green() | Blue() => { println("cool") }
+}

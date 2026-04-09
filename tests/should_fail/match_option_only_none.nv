@@ -1,0 +1,8 @@
+// should_fail: option match with only None (not exhaustive, no wildcard)
+module match_option_only_none
+
+fn check(o: Option(Int)) -> String {
+    return match o {
+        None() => "empty"
+    }
+}

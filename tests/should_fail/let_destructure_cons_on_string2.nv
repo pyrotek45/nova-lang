@@ -1,0 +1,4 @@
+module test
+// let destructure: cons pattern on String (not a list)
+let s = "hello"
+let [h, ..t] = s

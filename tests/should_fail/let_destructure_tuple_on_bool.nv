@@ -1,0 +1,3 @@
+module test
+// let destructure: tuple on Bool (not a tuple)
+let (a, b) = true

@@ -1,0 +1,293 @@
+// ============================================================
+//  test_exhaustiveness_edge.nv – Edge cases for exhaustiveness
+// ============================================================
+module test_exhaustiveness_edge
+
+// ─── §1 Bool: true + false in separate arms ─────────────────
+
+fn bool_sep(b: Bool) -> String {
+    return match b {
+        true => "yes",
+        false => "no"
+    }
+}
+assert(bool_sep(true)  == "yes", "bool sep true")
+assert(bool_sep(false) == "no",  "bool sep false")
+
+// ─── §2 Bool: true | false in single OR arm ────────────────
+
+fn bool_or(b: Bool) -> String {
+    return match b {
+        true | false => "any"
+    }
+}
+assert(bool_or(true)  == "any", "bool OR true")
+assert(bool_or(false) == "any", "bool OR false")
+
+// ─── §3 Bool: one literal + wildcard ────────────────────────
+
+fn bool_wild(b: Bool) -> String {
+    return match b {
+        true => "yes",
+        _ => "no"
+    }
+}
+assert(bool_wild(true)  == "yes", "bool wild true")
+assert(bool_wild(false) == "no",  "bool wild false")
+
+// ─── §4 Option: Some + None exhaustive ──────────────────────
+
+fn opt_exh(o: Option(Int)) -> String {
+    return match o {
+        Some(x) => "some",
+        None() => "none"
+    }
+}
+assert(opt_exh(Some(1))   == "some", "opt exh some")
+assert(opt_exh(None(Int)) == "none", "opt exh none")
+
+// ─── §5 Option: Some | None in single OR arm ───────────────
+
+fn opt_or(o: Option(Int)) -> Int {
+    return match o {
+        Some(x) | None() => 42
+    }
+}
+assert(opt_or(Some(1))   == 42, "opt OR some")
+assert(opt_or(None(Int)) == 42, "opt OR none")
+
+// ─── §6 Option: wildcard as catch-all ───────────────────────
+
+fn opt_wild(o: Option(Int)) -> String {
+    return match o {
+        Some(x) => "some",
+        _ => "other"
+    }
+}
+assert(opt_wild(Some(1))   == "some",  "opt wild some")
+assert(opt_wild(None(Int)) == "other", "opt wild none")
+
+// ─── §7 Variable pattern is irrefutable (exhaustive) ────────
+
+fn var_catch(n: Int) -> Int {
+    return match n {
+        x => x * 2
+    }
+}
+assert(var_catch(5) == 10, "var catch int")
+
+fn var_catch_str(s: String) -> String {
+    return match s {
+        x => x + "!"
+    }
+}
+assert(var_catch_str("hi") == "hi!", "var catch str")
+
+// ─── §8 Tuple pattern is irrefutable ────────────────────────
+
+fn tuple_catch(t: (Int, String)) -> String {
+    return match t {
+        (n, s) => Cast::string(n) + s
+    }
+}
+assert(tuple_catch((5, "x")) == "5x", "tuple catch")
+
+// ─── §9 Int with wildcard ───────────────────────────────────
+
+fn int_wild(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many"
+    }
+}
+assert(int_wild(0) == "zero", "int wild 0")
+assert(int_wild(1) == "one",  "int wild 1")
+assert(int_wild(99) == "many", "int wild 99")
+
+// ─── §10 Int OR patterns with wildcard ──────────────────────
+
+fn int_or(n: Int) -> String {
+    return match n {
+        1 | 2 | 3 => "low",
+        4 | 5 | 6 => "mid",
+        _ => "high"
+    }
+}
+assert(int_or(1) == "low",  "int OR 1")
+assert(int_or(3) == "low",  "int OR 3")
+assert(int_or(5) == "mid",  "int OR 5")
+assert(int_or(9) == "high", "int OR 9")
+
+// ─── §11 String OR patterns with wildcard ───────────────────
+
+fn str_or(s: String) -> Int {
+    return match s {
+        "yes" | "y" | "true" => 1,
+        "no"  | "n" | "false" => 0,
+        _ => -1
+    }
+}
+assert(str_or("yes")   == 1,  "str OR yes")
+assert(str_or("y")     == 1,  "str OR y")
+assert(str_or("true")  == 1,  "str OR true")
+assert(str_or("no")    == 0,  "str OR no")
+assert(str_or("n")     == 0,  "str OR n")
+assert(str_or("other") == -1, "str OR other")
+
+// ─── §12 Char OR patterns with wildcard ─────────────────────
+
+fn vowel(c: Char) -> Bool {
+    return match c {
+        'a' | 'e' | 'i' | 'o' | 'u' => true,
+        _ => false
+    }
+}
+assert(vowel('a') == true,  "vowel a")
+assert(vowel('e') == true,  "vowel e")
+assert(vowel('z') == false, "vowel z")
+
+// ─── §13 Float patterns with wildcard ───────────────────────
+
+fn float_class(f: Float) -> String {
+    return match f {
+        0.0 => "zero",
+        1.0 | -1.0 => "unit",
+        _ => "other"
+    }
+}
+assert(float_class(0.0)  == "zero",  "float 0.0")
+assert(float_class(1.0)  == "unit",  "float 1.0")
+assert(float_class(-1.0) == "unit",  "float -1.0")
+assert(float_class(3.14) == "other", "float pi")
+
+// ─── §14 Negative int patterns ──────────────────────────────
+
+fn neg_int(n: Int) -> String {
+    return match n {
+        -1 => "neg one",
+        0  => "zero",
+        1  => "pos one",
+        _  => "other"
+    }
+}
+assert(neg_int(-1) == "neg one", "neg int -1")
+assert(neg_int(0)  == "zero",    "neg int 0")
+assert(neg_int(1)  == "pos one", "neg int 1")
+assert(neg_int(99) == "other",   "neg int 99")
+
+// ─── §15 Match in let binding ───────────────────────────────
+
+let x = 42
+let label = match x {
+    0 => "zero",
+    _ => "nonzero"
+}
+assert(label == "nonzero", "match in let")
+
+// ─── §16 Match in return ────────────────────────────────────
+
+fn ret_match(n: Int) -> String {
+    return match n {
+        0 => "z",
+        _ => "nz"
+    }
+}
+assert(ret_match(0) == "z",  "ret match 0")
+assert(ret_match(5) == "nz", "ret match 5")
+
+// ─── §17 Match statement with side effects ──────────────────
+
+let counter = 0
+match 3 {
+    1 | 2 => { counter = 10 }
+    3     => { counter = 30 }
+    _     => { counter = -1 }
+}
+assert(counter == 30, "stmt side effect")
+
+// ─── §18 Match statement Bool exhaustive ────────────────────
+
+let res = ""
+let flag = false
+match flag {
+    true => { res = "t" }
+    false => { res = "f" }
+}
+assert(res == "f", "stmt bool exhaustive")
+
+// ─── §19 List patterns with wildcard ────────────────────────
+
+fn list_msg(xs: [Int]) -> String {
+    return match xs {
+        []       => "empty",
+        [x]      => "one",
+        [x, y]   => "two",
+        _        => "many"
+    }
+}
+assert(list_msg([]: Int)    == "empty", "list empty")
+assert(list_msg([1])       == "one",   "list one")
+assert(list_msg([1, 2])    == "two",   "list two")
+assert(list_msg([1, 2, 3]) == "many",  "list many")
+
+// ─── §20 Cons pattern with wildcard ─────────────────────────
+
+fn list_head_or(xs: [Int], default: Int) -> Int {
+    return match xs {
+        [h, ..t] => h,
+        _        => default
+    }
+}
+assert(list_head_or([10, 20], 0) == 10, "cons head")
+assert(list_head_or([]: Int, 99)      == 99, "cons default")
+
+// ─── §21 Nested match ───────────────────────────────────────
+
+fn double_match(n: Int) -> String {
+    let a = match n {
+        0 => "zero",
+        _ => "nonzero"
+    }
+    let b = match n {
+        0 | 1 => "small",
+        _     => "large"
+    }
+    return a + "_" + b
+}
+assert(double_match(0)  == "zero_small",     "nested 0")
+assert(double_match(1)  == "nonzero_small",  "nested 1")
+assert(double_match(99) == "nonzero_large",  "nested 99")
+
+// ─── §22 Match in for loop ──────────────────────────────────
+
+let sum = 0
+for i in [1, 2, 3, 4, 5] {
+    let delta = match i {
+        1 | 2 => 10,
+        3     => 20,
+        _     => 1
+    }
+    sum = sum + delta
+}
+assert(sum == 42, "match in loop: 10+10+20+1+1")
+
+// ─── §23 Block bodies in match arms ─────────────────────────
+
+fn block_body(n: Int) -> String {
+    return match n {
+        0 => {
+            let a = "hello"
+            let b = " world"
+            a + b
+        }
+        _ => {
+            let x = Cast::string(n)
+            "val=" + x
+        }
+    }
+}
+assert(block_body(0)  == "hello world", "block 0")
+assert(block_body(42) == "val=42",      "block 42")
+
+println("PASS: all exhaustiveness edge case tests passed")

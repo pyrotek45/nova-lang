@@ -1,0 +1,688 @@
+// ============================================================
+//  test_pattern_matching_exhaustive.nv
+//  Exhaustive tests for all pattern types in match expressions
+// ============================================================
+module test_pattern_matching_exhaustive
+
+import super.std.core
+import super.std.list
+
+// ═══════════════════════════════════════════════════════════
+// §1  Integer literal patterns with many values
+// ═══════════════════════════════════════════════════════════
+
+fn int_classify(n: Int) -> String {
+    return match n {
+        -100 => "neg hundred",
+        -10  => "neg ten",
+        -1   => "neg one",
+        0    => "zero",
+        1    => "pos one",
+        10   => "pos ten",
+        100  => "pos hundred",
+        _    => "other"
+    }
+}
+assert(int_classify(-100) == "neg hundred")
+assert(int_classify(-10)  == "neg ten")
+assert(int_classify(-1)   == "neg one")
+assert(int_classify(0)    == "zero")
+assert(int_classify(1)    == "pos one")
+assert(int_classify(10)   == "pos ten")
+assert(int_classify(100)  == "pos hundred")
+assert(int_classify(42)   == "other")
+assert(int_classify(-999) == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §2  Float literal patterns including negatives
+// ═══════════════════════════════════════════════════════════
+
+fn float_classify(f: Float) -> String {
+    return match f {
+        -1.5 => "neg 1.5",
+        0.0  => "zero",
+        0.5  => "half",
+        1.0  => "one",
+        3.14 => "pi-ish",
+        _    => "other"
+    }
+}
+assert(float_classify(-1.5) == "neg 1.5")
+assert(float_classify(0.0)  == "zero")
+assert(float_classify(0.5)  == "half")
+assert(float_classify(1.0)  == "one")
+assert(float_classify(3.14) == "pi-ish")
+assert(float_classify(99.9) == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §3  String literal patterns
+// ═══════════════════════════════════════════════════════════
+
+fn cmd_parse(cmd: String) -> Int {
+    return match cmd {
+        "quit"   => 0,
+        "help"   => 1,
+        "save"   => 2,
+        "load"   => 3,
+        "status" => 4,
+        ""       => -1,
+        _        => 99
+    }
+}
+assert(cmd_parse("quit")   == 0)
+assert(cmd_parse("help")   == 1)
+assert(cmd_parse("save")   == 2)
+assert(cmd_parse("load")   == 3)
+assert(cmd_parse("status") == 4)
+assert(cmd_parse("")       == -1)
+assert(cmd_parse("foo")    == 99)
+
+// ═══════════════════════════════════════════════════════════
+// §4  Char literal patterns
+// ═══════════════════════════════════════════════════════════
+
+fn char_classify(c: Char) -> String {
+    return match c {
+        ' '  => "space",
+        '\n' => "newline",
+        '\t' => "tab",
+        '0'  => "digit zero",
+        'a'  => "letter a",
+        'Z'  => "letter Z",
+        _    => "other"
+    }
+}
+assert(char_classify(' ')  == "space")
+assert(char_classify('\n') == "newline")
+assert(char_classify('\t') == "tab")
+assert(char_classify('0')  == "digit zero")
+assert(char_classify('a')  == "letter a")
+assert(char_classify('Z')  == "letter Z")
+assert(char_classify('x')  == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §5  Bool exhaustiveness (no wildcard needed)
+// ═══════════════════════════════════════════════════════════
+
+fn bool_describe(b: Bool) -> String {
+    return match b {
+        true  => "truthy",
+        false => "falsy"
+    }
+}
+assert(bool_describe(true)  == "truthy")
+assert(bool_describe(false) == "falsy")
+
+// Bool with wildcard also works
+fn bool_with_wildcard(b: Bool) -> Int {
+    return match b {
+        true => 1,
+        _    => 0
+    }
+}
+assert(bool_with_wildcard(true)  == 1)
+assert(bool_with_wildcard(false) == 0)
+
+// ═══════════════════════════════════════════════════════════
+// §6  Wildcard-only match
+// ═══════════════════════════════════════════════════════════
+
+fn always_same(n: Int) -> String {
+    return match n {
+        _ => "constant"
+    }
+}
+assert(always_same(0)    == "constant")
+assert(always_same(1000) == "constant")
+assert(always_same(-42)  == "constant")
+
+// ═══════════════════════════════════════════════════════════
+// §7  Variable binding (captures value)
+// ═══════════════════════════════════════════════════════════
+
+fn var_capture(n: Int) -> Int {
+    return match n {
+        0 => 0,
+        1 => 100,
+        x => x * x
+    }
+}
+assert(var_capture(0) == 0)
+assert(var_capture(1) == 100)
+assert(var_capture(5) == 25)
+assert(var_capture(10) == 100)
+
+fn string_var_capture(s: String) -> String {
+    return match s {
+        "hello" => "greeting",
+        other   => other + "!"
+    }
+}
+assert(string_var_capture("hello") == "greeting")
+assert(string_var_capture("world") == "world!")
+assert(string_var_capture("")      == "!")
+
+// ═══════════════════════════════════════════════════════════
+// §8  OR patterns (|) with all literal types
+// ═══════════════════════════════════════════════════════════
+
+fn or_ints(n: Int) -> String {
+    return match n {
+        1 | 2 | 3 | 4 | 5 => "small",
+        10 | 20 | 30       => "round",
+        -1 | -2 | -3       => "neg small",
+        _                   => "other"
+    }
+}
+assert(or_ints(1)   == "small")
+assert(or_ints(5)   == "small")
+assert(or_ints(10)  == "round")
+assert(or_ints(30)  == "round")
+assert(or_ints(-1)  == "neg small")
+assert(or_ints(-3)  == "neg small")
+assert(or_ints(99)  == "other")
+
+fn or_floats(f: Float) -> String {
+    return match f {
+        0.0 | 1.0 | -1.0 => "unit",
+        _                  => "other"
+    }
+}
+assert(or_floats(0.0)  == "unit")
+assert(or_floats(1.0)  == "unit")
+assert(or_floats(-1.0) == "unit")
+assert(or_floats(2.0)  == "other")
+
+fn or_strings(s: String) -> Bool {
+    return match s {
+        "yes" | "y" | "1" | "true" | "on" => true,
+        _ => false
+    }
+}
+assert(or_strings("yes")  == true)
+assert(or_strings("y")    == true)
+assert(or_strings("1")    == true)
+assert(or_strings("true") == true)
+assert(or_strings("on")   == true)
+assert(or_strings("no")   == false)
+
+fn or_chars(c: Char) -> String {
+    return match c {
+        'a' | 'e' | 'i' | 'o' | 'u' => "vowel",
+        'y' | 'w' => "semivowel",
+        _ => "consonant"
+    }
+}
+assert(or_chars('a') == "vowel")
+assert(or_chars('u') == "vowel")
+assert(or_chars('y') == "semivowel")
+assert(or_chars('z') == "consonant")
+
+fn or_bools(b: Bool) -> String {
+    return match b {
+        true | false => "bool!"
+    }
+}
+assert(or_bools(true)  == "bool!")
+assert(or_bools(false) == "bool!")
+
+// ═══════════════════════════════════════════════════════════
+// §9  Tuple patterns in match
+// ═══════════════════════════════════════════════════════════
+
+fn tuple_classify(t: (Int, Int)) -> String {
+    return match t {
+        (0, 0) => "origin",
+        (0, _) => "y-axis",
+        (_, 0) => "x-axis",
+        (x, y) => "point"
+    }
+}
+assert(tuple_classify((0, 0)) == "origin")
+assert(tuple_classify((0, 5)) == "y-axis")
+assert(tuple_classify((3, 0)) == "x-axis")
+assert(tuple_classify((1, 1)) == "point")
+
+fn tuple_3(t: (Int, Int, Int)) -> Int {
+    return match t {
+        (a, b, c) => a + b + c
+    }
+}
+assert(tuple_3((1, 2, 3)) == 6)
+assert(tuple_3((10, 20, 30)) == 60)
+
+fn mixed_tuple(t: (String, Int)) -> String {
+    return match t {
+        ("hello", 0) => "hello zero",
+        ("hello", n) => "hello some",
+        (s, 0)       => "other zero",
+        (s, n)       => "other some"
+    }
+}
+assert(mixed_tuple(("hello", 0))   == "hello zero")
+assert(mixed_tuple(("hello", 42))  == "hello some")
+assert(mixed_tuple(("world", 0))   == "other zero")
+assert(mixed_tuple(("world", 99))  == "other some")
+
+// ═══════════════════════════════════════════════════════════
+// §10  List patterns in match
+// ═══════════════════════════════════════════════════════════
+
+fn list_shape(xs: [Int]) -> String {
+    return match xs {
+        []            => "empty",
+        [_]           => "singleton",
+        [_, _]        => "pair",
+        [_, _, _]     => "triple",
+        _             => "big"
+    }
+}
+assert(list_shape([]: Int)      == "empty")
+assert(list_shape([1])          == "singleton")
+assert(list_shape([1, 2])       == "pair")
+assert(list_shape([1, 2, 3])    == "triple")
+assert(list_shape([1, 2, 3, 4]) == "big")
+
+// List with specific literal values
+fn list_specific(xs: [Int]) -> String {
+    return match xs {
+        [0]    => "just zero",
+        [1, 2] => "one two",
+        _      => "other"
+    }
+}
+assert(list_specific([0])    == "just zero")
+assert(list_specific([1, 2]) == "one two")
+assert(list_specific([1])    == "other")
+assert(list_specific([]: Int)  == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §11  List cons patterns [head, ..tail]
+// ═══════════════════════════════════════════════════════════
+
+fn list_head_or(xs: [Int], default: Int) -> Int {
+    return match xs {
+        [h, ..rest] => h,
+        []          => default,
+        _           => default
+    }
+}
+assert(list_head_or([10, 20, 30], -1) == 10)
+assert(list_head_or([42], -1) == 42)
+assert(list_head_or([]: Int, -1) == -1)
+
+// cons pattern captures rest
+fn list_tail_len(xs: [Int]) -> Int {
+    return match xs {
+        [_, ..rest] => rest.len(),
+        _           => -1
+    }
+}
+assert(list_tail_len([1, 2, 3, 4]) == 3)
+assert(list_tail_len([1])          == 0)
+assert(list_tail_len([]: Int)        == -1)
+
+// ═══════════════════════════════════════════════════════════
+// §12  Option matching
+// ═══════════════════════════════════════════════════════════
+
+fn opt_describe(o: Option(Int)) -> String {
+    return match o {
+        Some(0) => "zero",
+        Some(1) => "one",
+        Some(v) => "some " + Cast::string(v),
+        None()  => "nothing"
+    }
+}
+assert(opt_describe(Some(0))    == "zero")
+assert(opt_describe(Some(1))    == "one")
+assert(opt_describe(Some(42))   == "some 42")
+assert(opt_describe(None(Int))  == "nothing")
+
+fn opt_string(o: Option(String)) -> String {
+    return match o {
+        Some(s) => s,
+        None()  => "default"
+    }
+}
+assert(opt_string(Some("hi"))    == "hi")
+assert(opt_string(None(String))  == "default")
+
+// Some with wildcard inner
+fn opt_has_value(o: Option(Int)) -> Bool {
+    return match o {
+        Some(_) => true,
+        None()  => false
+    }
+}
+assert(opt_has_value(Some(0))    == true)
+assert(opt_has_value(Some(999))  == true)
+assert(opt_has_value(None(Int))  == false)
+
+// ═══════════════════════════════════════════════════════════
+// §13  Enum matching (basic)
+// ═══════════════════════════════════════════════════════════
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+fn dir_name(d: Direction) -> String {
+    match d {
+        North() => { return "north" }
+        South() => { return "south" }
+        East()  => { return "east" }
+        West()  => { return "west" }
+    }
+    return ""
+}
+assert(dir_name(Direction::North()) == "north")
+assert(dir_name(Direction::South()) == "south")
+assert(dir_name(Direction::East())  == "east")
+assert(dir_name(Direction::West())  == "west")
+
+// ═══════════════════════════════════════════════════════════
+// §14  Enum matching with data
+// ═══════════════════════════════════════════════════════════
+
+enum Expr {
+    Lit: Int,
+    Neg: Int,
+    Add: (Int, Int)
+}
+
+fn eval_expr(e: Expr) -> Int {
+    match e {
+        Lit(n)    => { return n }
+        Neg(n)    => { return 0 - n }
+        Add(pair) => { return pair[0] + pair[1] }
+    }
+    return 0
+}
+assert(eval_expr(Expr::Lit(42))        == 42)
+assert(eval_expr(Expr::Neg(10))        == -10)
+assert(eval_expr(Expr::Add((3, 4)))    == 7)
+
+// ═══════════════════════════════════════════════════════════
+// §15  Match as expression vs match as statement
+// ═══════════════════════════════════════════════════════════
+
+// Match as expression in let binding
+let val = 10
+let label = match val {
+    0 => "zero",
+    _ => "nonzero"
+}
+assert(label == "nonzero")
+
+// Match as expression in return
+fn classify_ret(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        _ => "nonzero"
+    }
+}
+assert(classify_ret(0) == "zero")
+assert(classify_ret(1) == "nonzero")
+
+// Match as statement with side effects
+let counter = 0
+match 5 {
+    5 => { counter = counter + 1 }
+    _ => {}
+}
+assert(counter == 1)
+
+// ═══════════════════════════════════════════════════════════
+// §16  Block bodies with multiple statements
+// ═══════════════════════════════════════════════════════════
+
+fn complex_block(n: Int) -> String {
+    return match n {
+        0 => {
+            let a = "zero"
+            let b = " value"
+            a + b
+        }
+        1 => {
+            let x = 1
+            let y = x + 1
+            "one(" + Cast::string(y) + ")"
+        }
+        _ => {
+            let s = "other"
+            s
+        }
+    }
+}
+assert(complex_block(0) == "zero value")
+assert(complex_block(1) == "one(2)")
+assert(complex_block(9) == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §17  Nested match expressions
+// ═══════════════════════════════════════════════════════════
+
+fn double_nested(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        _ => {
+            let sign = match n {
+                -1 | -2 | -3 => "neg",
+                _             => "pos"
+            }
+            let size = match n {
+                1 | -1 => "small",
+                _      => "big"
+            }
+            sign + " " + size
+        }
+    }
+}
+assert(double_nested(0)  == "zero")
+assert(double_nested(1)  == "pos small")
+assert(double_nested(5)  == "pos big")
+assert(double_nested(-1) == "neg small")
+assert(double_nested(-2) == "neg big")
+
+// ═══════════════════════════════════════════════════════════
+// §18  Match with trailing commas
+// ═══════════════════════════════════════════════════════════
+
+fn trailing_comma(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        1 => "one",
+        _ => "other",
+    }
+}
+assert(trailing_comma(0) == "zero")
+assert(trailing_comma(1) == "one")
+assert(trailing_comma(2) == "other")
+
+// ═══════════════════════════════════════════════════════════
+// §19  Option as statement match
+// ═══════════════════════════════════════════════════════════
+
+let opt_result = 0
+let opt_val: Option(Int) = Some(77)
+match opt_val {
+    Some(v) => { opt_result = v * 2 }
+    None()  => { opt_result = -1 }
+}
+assert(opt_result == 154)
+
+let opt_none: Option(Int) = None(Int)
+match opt_none {
+    Some(v) => { opt_result = v }
+    None()  => { opt_result = -999 }
+}
+assert(opt_result == -999)
+
+// ═══════════════════════════════════════════════════════════
+// §20  Match on function return values
+// ═══════════════════════════════════════════════════════════
+
+fn get_int() -> Int { return 42 }
+
+let fn_match = match get_int() {
+    42 => "the answer",
+    _  => "nope"
+}
+assert(fn_match == "the answer")
+
+fn get_string() -> String { return "hello" }
+
+let fn_match2 = match get_string() {
+    "hello" => 1,
+    _       => 0
+}
+assert(fn_match2 == 1)
+
+// ═══════════════════════════════════════════════════════════
+// §21  Multiple arms with same result
+// ═══════════════════════════════════════════════════════════
+
+fn http_ok(code: Int) -> Bool {
+    return match code {
+        200 | 201 | 202 | 204 => true,
+        301 | 302             => false,
+        404                   => false,
+        500                   => false,
+        _                     => false
+    }
+}
+assert(http_ok(200) == true)
+assert(http_ok(201) == true)
+assert(http_ok(204) == true)
+assert(http_ok(301) == false)
+assert(http_ok(404) == false)
+assert(http_ok(500) == false)
+assert(http_ok(999) == false)
+
+// ═══════════════════════════════════════════════════════════
+// §22  Variable binding in different arm positions
+// ═══════════════════════════════════════════════════════════
+
+fn first_or_default(xs: [Int], default: Int) -> Int {
+    return match xs {
+        []          => default,
+        [h, ..rest] => h,
+        _           => default
+    }
+}
+assert(first_or_default([5, 6, 7], -1) == 5)
+assert(first_or_default([99], -1)      == 99)
+assert(first_or_default([]: Int, -1)     == -1)
+
+// ═══════════════════════════════════════════════════════════
+// §23  Tuple of different types in match
+// ═══════════════════════════════════════════════════════════
+
+fn bool_int_pair(t: (Bool, Int)) -> String {
+    return match t {
+        (true, 0)  => "true zero",
+        (true, _)  => "true other",
+        (false, 0) => "false zero",
+        _          => "false other"
+    }
+}
+assert(bool_int_pair((true, 0))   == "true zero")
+assert(bool_int_pair((true, 5))   == "true other")
+assert(bool_int_pair((false, 0))  == "false zero")
+assert(bool_int_pair((false, 7))  == "false other")
+
+// ═══════════════════════════════════════════════════════════
+// §24  Nested tuple patterns
+// ═══════════════════════════════════════════════════════════
+
+fn nested_tuple(t: (Int, (Int, Int))) -> Int {
+    return match t {
+        (0, (0, 0)) => 0,
+        (a, (b, c)) => a + b + c
+    }
+}
+assert(nested_tuple((0, (0, 0))) == 0)
+assert(nested_tuple((1, (2, 3))) == 6)
+
+// ═══════════════════════════════════════════════════════════
+// §25  List of strings
+// ═══════════════════════════════════════════════════════════
+
+fn first_word(ws: [String]) -> String {
+    return match ws {
+        []          => "",
+        [w, ..rest] => w,
+        _           => ""
+    }
+}
+assert(first_word(["hello", "world"]) == "hello")
+assert(first_word(["only"])           == "only")
+assert(first_word([]: String)           == "")
+
+// ═══════════════════════════════════════════════════════════
+// §26  Match in a loop
+// ═══════════════════════════════════════════════════════════
+
+let total = 0
+for i in 0..5 {
+    let delta = match i {
+        0 => 10,
+        1 => 20,
+        _ => 1
+    }
+    total = total + delta
+}
+assert(total == 33)  // 10 + 20 + 1 + 1 + 1
+
+// ═══════════════════════════════════════════════════════════
+// §27  Enum with wildcard
+// ═══════════════════════════════════════════════════════════
+
+fn is_north(d: Direction) -> Bool {
+    match d {
+        North() => { return true }
+        _       => { return false }
+    }
+    return false
+}
+assert(is_north(Direction::North()) == true)
+assert(is_north(Direction::South()) == false)
+assert(is_north(Direction::East())  == false)
+
+// ═══════════════════════════════════════════════════════════
+// §28  Enum data extraction via variable binding
+// ═══════════════════════════════════════════════════════════
+
+fn get_lit_val(e: Expr) -> Int {
+    match e {
+        Lit(n) => { return n }
+        _      => { return -1 }
+    }
+    return -1
+}
+assert(get_lit_val(Expr::Lit(100)) == 100)
+assert(get_lit_val(Expr::Neg(5))   == -1)
+
+// ═══════════════════════════════════════════════════════════
+// §29  Variable in statement match captures correctly
+// ═══════════════════════════════════════════════════════════
+
+let cap = ""
+match "test" {
+    "foo" => { cap = "matched foo" }
+    s     => { cap = "got: " + s }
+}
+assert(cap == "got: test")
+
+let cap2 = 0
+match 42 {
+    0 => { cap2 = -1 }
+    n => { cap2 = n + 8 }
+}
+assert(cap2 == 50)
+
+println("PASS: all exhaustive pattern matching tests passed")

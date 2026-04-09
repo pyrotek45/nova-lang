@@ -1,0 +1,10 @@
+// should_fail: enum OR pattern missing a variant (not exhaustive)
+module match_enum_or_incomplete
+
+enum Color { Red, Green, Blue }
+
+fn classify(c: Color) -> String {
+    return match c {
+        Red() | Green() => "warm"
+    }
+}

@@ -1,0 +1,456 @@
+// ============================================================
+//  test_destructuring_advanced.nv
+//  Extensive let/for destructuring edge cases
+// ============================================================
+module test_destructuring_advanced
+
+import super.std.core
+import super.std.list
+
+// ═══════════════════════════════════════════════════════════
+// §1  Let tuple destructuring – various arities
+// ═══════════════════════════════════════════════════════════
+
+// 2-tuple
+let (a2, b2) = (1, 2)
+assert(a2 == 1)
+assert(b2 == 2)
+
+// 3-tuple
+let (a3, b3, c3) = (10, 20, 30)
+assert(a3 == 10)
+assert(b3 == 20)
+assert(c3 == 30)
+
+// 4-tuple
+let (w4, x4, y4, z4) = (100, 200, 300, 400)
+assert(w4 == 100)
+assert(x4 == 200)
+assert(y4 == 300)
+assert(z4 == 400)
+
+// ═══════════════════════════════════════════════════════════
+// §2  Let tuple – all primitive types
+// ═══════════════════════════════════════════════════════════
+
+// Int
+let (ia, ib) = (42, -7)
+assert(ia == 42)
+assert(ib == -7)
+
+// Float
+let (fa, fb) = (3.14, -2.71)
+assert(fa == 3.14)
+assert(fb == -2.71)
+
+// String
+let (sa, sb) = ("hello", "world")
+assert(sa == "hello")
+assert(sb == "world")
+
+// Bool
+let (ba, bb) = (true, false)
+assert(ba == true)
+assert(bb == false)
+
+// Char
+let (ca, cb) = ('x', 'y')
+assert(ca == 'x')
+assert(cb == 'y')
+
+// Mixed types
+let (m_str, m_int, m_bool, m_float, m_char) = ("hi", 10, true, 1.5, 'z')
+assert(m_str == "hi")
+assert(m_int == 10)
+assert(m_bool == true)
+assert(m_float == 1.5)
+assert(m_char == 'z')
+
+// ═══════════════════════════════════════════════════════════
+// §3  Nested tuple destructuring
+// ═══════════════════════════════════════════════════════════
+
+// 2-deep nesting
+let (n1, (n2, n3)) = (1, (2, 3))
+assert(n1 == 1)
+assert(n2 == 2)
+assert(n3 == 3)
+
+let ((d1, d2), d3) = ((10, 20), 30)
+assert(d1 == 10)
+assert(d2 == 20)
+assert(d3 == 30)
+
+// Both sides nested
+let ((e1, e2), (e3, e4)) = ((1, 2), (3, 4))
+assert(e1 == 1)
+assert(e2 == 2)
+assert(e3 == 3)
+assert(e4 == 4)
+
+// 3-deep nesting
+let (g1, (g2, (g3, g4))) = (10, (20, (30, 40)))
+assert(g1 == 10)
+assert(g2 == 20)
+assert(g3 == 30)
+assert(g4 == 40)
+
+// ═══════════════════════════════════════════════════════════
+// §4  Wildcards in tuple destructuring
+// ═══════════════════════════════════════════════════════════
+
+let (keep1, _) = (42, 99)
+assert(keep1 == 42)
+
+let (_, keep2) = (0, 77)
+assert(keep2 == 77)
+
+let (_, _, keep3) = (0, 0, 55)
+assert(keep3 == 55)
+
+let (w1, _, w2) = (1, 2, 3)
+assert(w1 == 1)
+assert(w2 == 3)
+
+// All wildcards
+let (_, _) = (100, 200)
+let (_, _, _) = (1, 2, 3)
+
+// Wildcard in nested
+let (k1, (_, k2)) = (1, (2, 3))
+assert(k1 == 1)
+assert(k2 == 3)
+
+// ═══════════════════════════════════════════════════════════
+// §5  Let list destructuring – exact match
+// ═══════════════════════════════════════════════════════════
+
+let [l1, l2] = [10, 20]
+assert(l1 == 10)
+assert(l2 == 20)
+
+let [l3, l4, l5] = [100, 200, 300]
+assert(l3 == 100)
+assert(l4 == 200)
+assert(l5 == 300)
+
+let [single] = [42]
+assert(single == 42)
+
+// String list
+let [s1, s2] = ["foo", "bar"]
+assert(s1 == "foo")
+assert(s2 == "bar")
+
+// ═══════════════════════════════════════════════════════════
+// §6  Let list cons patterns [head, ..tail]
+// ═══════════════════════════════════════════════════════════
+
+let [h1, ..t1] = [1, 2, 3, 4, 5]
+assert(h1 == 1)
+assert(t1.len() == 4)
+assert(t1[0] == 2)
+assert(t1[3] == 5)
+
+// cons on two-element list
+let [h2, ..t2] = [10, 20]
+assert(h2 == 10)
+assert(t2.len() == 1)
+assert(t2[0] == 20)
+
+// cons on single-element list → empty tail
+let [h3, ..t3] = [99]
+assert(h3 == 99)
+assert(t3.len() == 0)
+
+// String cons
+let [sh, ..st] = ["alpha", "beta", "gamma"]
+assert(sh == "alpha")
+assert(st.len() == 2)
+assert(st[0] == "beta")
+assert(st[1] == "gamma")
+
+// ═══════════════════════════════════════════════════════════
+// §7  Let destructure with function call results
+// ═══════════════════════════════════════════════════════════
+
+fn make_pair() -> (Int, String) {
+    return (42, "answer")
+}
+let (fp_num, fp_str) = make_pair()
+assert(fp_num == 42)
+assert(fp_str == "answer")
+
+fn make_triple() -> (Int, Int, Int) {
+    return (10, 20, 30)
+}
+let (ft1, ft2, ft3) = make_triple()
+assert(ft1 == 10)
+assert(ft2 == 20)
+assert(ft3 == 30)
+
+fn make_nested() -> (Int, (String, Bool)) {
+    return (1, ("hi", true))
+}
+let (fn1, (fn2, fn3)) = make_nested()
+assert(fn1 == 1)
+assert(fn2 == "hi")
+assert(fn3 == true)
+
+fn make_list() -> [Int] {
+    return [5, 10, 15, 20]
+}
+let [fl1, ..fl_rest] = make_list()
+assert(fl1 == 5)
+assert(fl_rest.len() == 3)
+
+// ═══════════════════════════════════════════════════════════
+// §8  Let destructure inside blocks/scopes
+// ═══════════════════════════════════════════════════════════
+
+{
+    let (inner_a, inner_b) = (100, 200)
+    assert(inner_a == 100)
+    assert(inner_b == 200)
+}
+
+{
+    let [bh, ..bt] = [1, 2, 3]
+    assert(bh == 1)
+    assert(bt.len() == 2)
+}
+
+// Inside if
+let cond = true
+if cond {
+    let (ia2, ib2) = (7, 8)
+    assert(ia2 == 7)
+    assert(ib2 == 8)
+}
+
+// ═══════════════════════════════════════════════════════════
+// §9  For-loop tuple destructuring – basics
+// ═══════════════════════════════════════════════════════════
+
+let pairs: [(Int, Int)] = [(1, 10), (2, 20), (3, 30)]
+let pk = 0
+let pv = 0
+for (k, v) in pairs {
+    pk = pk + k
+    pv = pv + v
+}
+assert(pk == 6)
+assert(pv == 60)
+
+// 3-tuples
+let triples: [(Int, Int, Int)] = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
+let ts1 = 0
+let ts2 = 0
+let ts3 = 0
+for (a, b, c) in triples {
+    ts1 = ts1 + a
+    ts2 = ts2 + b
+    ts3 = ts3 + c
+}
+assert(ts1 == 12)
+assert(ts2 == 15)
+assert(ts3 == 18)
+
+// ═══════════════════════════════════════════════════════════
+// §10  For-loop with mixed types
+// ═══════════════════════════════════════════════════════════
+
+let entries: [(String, Int)] = [("a", 1), ("b", 2), ("c", 3)]
+let keys = []: String
+let vals = 0
+for (k, v) in entries {
+    keys.push(k)
+    vals = vals + v
+}
+assert(keys.len() == 3)
+assert(keys[0] == "a")
+assert(keys[2] == "c")
+assert(vals == 6)
+
+// (Bool, String) pairs
+let flags: [(Bool, String)] = [(true, "on"), (false, "off"), (true, "active")]
+let true_count = 0
+for (flag, _) in flags {
+    if flag {
+        true_count = true_count + 1
+    }
+}
+assert(true_count == 2)
+
+// ═══════════════════════════════════════════════════════════
+// §11  For-loop with wildcards
+// ═══════════════════════════════════════════════════════════
+
+let items: [(Int, String)] = [(1, "a"), (2, "b"), (3, "c")]
+let sum_ids = 0
+for (id, _) in items {
+    sum_ids = sum_ids + id
+}
+assert(sum_ids == 6)
+
+// All wildcards (just iterate, ignoring values)
+let count = 0
+let dummy_pairs: [(Int, Int)] = [(0, 0), (0, 0), (0, 0)]
+for (_, _) in dummy_pairs {
+    count = count + 1
+}
+assert(count == 3)
+
+// ═══════════════════════════════════════════════════════════
+// §12  For-loop with nested tuple destructuring
+// ═══════════════════════════════════════════════════════════
+
+let nested: [(Int, (Int, Int))] = [(1, (2, 3)), (4, (5, 6)), (7, (8, 9))]
+let ns1 = 0
+let ns2 = 0
+let ns3 = 0
+for (a, (b, c)) in nested {
+    ns1 = ns1 + a
+    ns2 = ns2 + b
+    ns3 = ns3 + c
+}
+assert(ns1 == 12)
+assert(ns2 == 15)
+assert(ns3 == 18)
+
+// Deeper nesting
+let deep: [((Int, Int), (Int, Int))] = [((1, 2), (3, 4)), ((5, 6), (7, 8))]
+let ds1 = 0
+let ds2 = 0
+let ds3 = 0
+let ds4 = 0
+for ((a, b), (c, d)) in deep {
+    ds1 = ds1 + a
+    ds2 = ds2 + b
+    ds3 = ds3 + c
+    ds4 = ds4 + d
+}
+assert(ds1 == 6)
+assert(ds2 == 8)
+assert(ds3 == 10)
+assert(ds4 == 12)
+
+// ═══════════════════════════════════════════════════════════
+// §13  For-loop with empty list (body should not execute)
+// ═══════════════════════════════════════════════════════════
+
+let empty: [(Int, Int)] = []: (Int, Int)
+let ran = false
+for (_, _) in empty {
+    ran = true
+}
+assert(ran == false)
+
+// ═══════════════════════════════════════════════════════════
+// §14  For-loop with single element
+// ═══════════════════════════════════════════════════════════
+
+let single_list: [(String, Int)] = [("only", 42)]
+let single_k = ""
+let single_v = 0
+for (k, v) in single_list {
+    single_k = k
+    single_v = v
+}
+assert(single_k == "only")
+assert(single_v == 42)
+
+// ═══════════════════════════════════════════════════════════
+// §15  For destructure used to build new collections
+// ═══════════════════════════════════════════════════════════
+
+let coords: [(Int, Int)] = [(1, 2), (3, 4), (5, 6)]
+let x_list = []: Int
+let y_list = []: Int
+for (x, y) in coords {
+    x_list.push(x)
+    y_list.push(y)
+}
+assert(x_list.len() == 3)
+assert(x_list[0] == 1)
+assert(x_list[2] == 5)
+assert(y_list[0] == 2)
+assert(y_list[2] == 6)
+
+// ═══════════════════════════════════════════════════════════
+// §16  For destructure with accumulated computation
+// ═══════════════════════════════════════════════════════════
+
+let weighted: [(Float, Float)] = [(10.0, 1.0), (20.0, 0.5), (30.0, 0.25)]
+let weighted_sum = 0.0
+for (val, weight) in weighted {
+    weighted_sum = weighted_sum + val * weight
+}
+// 10*1.0 + 20*0.5 + 30*0.25 = 10 + 10 + 7.5 = 27.5
+assert(weighted_sum == 27.5)
+
+// ═══════════════════════════════════════════════════════════
+// §17  Let destructure after computation
+// ═══════════════════════════════════════════════════════════
+
+fn compute() -> (Int, Int) {
+    let a = 10
+    let b = 20
+    return (a + b, a * b)
+}
+let (csum, cprod) = compute()
+assert(csum == 30)
+assert(cprod == 200)
+
+// ═══════════════════════════════════════════════════════════
+// §18  Multiple let destructures in sequence
+// ═══════════════════════════════════════════════════════════
+
+let (seq_a, seq_b) = (1, 2)
+let (seq_c, seq_d) = (3, 4)
+let (seq_e, seq_f) = (seq_a + seq_c, seq_b + seq_d)
+assert(seq_e == 4)
+assert(seq_f == 6)
+
+// ═══════════════════════════════════════════════════════════
+// §19  Cons pattern with list operations
+// ═══════════════════════════════════════════════════════════
+
+let nums = [10, 20, 30, 40, 50]
+let [first, ..rest] = nums
+assert(first == 10)
+
+// Use rest in further operations
+let rest_sum = 0
+for item in rest {
+    rest_sum = rest_sum + item
+}
+assert(rest_sum == 140)  // 20+30+40+50
+
+// ═══════════════════════════════════════════════════════════
+// §20  List destructure exact match with wildcards
+// ═══════════════════════════════════════════════════════════
+
+let [_, mid, _] = [1, 2, 3]
+assert(mid == 2)
+
+let [_, _, last_elem] = [10, 20, 30]
+assert(last_elem == 30)
+
+let [first_only, _, _] = [100, 200, 300]
+assert(first_only == 100)
+
+// ═══════════════════════════════════════════════════════════
+// §21  Destructure in for loop body
+// ═══════════════════════════════════════════════════════════
+
+let results = []: Int
+let pair_list: [(Int, Int)] = [(10, 1), (20, 2), (30, 3)]
+for (val, idx) in pair_list {
+    results.push(val * idx)
+}
+assert(results[0] == 10)
+assert(results[1] == 40)
+assert(results[2] == 90)
+
+println("PASS: all advanced destructuring tests passed")

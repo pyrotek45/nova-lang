@@ -1,0 +1,8 @@
+module test
+// match: Bool literal pattern on String type
+fn bad(s: String) -> String {
+    return match s {
+        true => "yes",
+        _    => "no"
+    }
+}

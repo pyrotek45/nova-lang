@@ -1,0 +1,11 @@
+// should_fail: enum OR pattern with type mismatch across arms
+module match_enum_or_type_mismatch
+
+enum Color { Red, Green, Blue }
+
+fn classify(c: Color) -> String {
+    return match c {
+        Red() | Green() => "warm",
+        Blue() => 42
+    }
+}

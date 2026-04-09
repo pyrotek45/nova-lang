@@ -1,0 +1,6 @@
+module test
+// for destructure: 1-tuple pattern on list of 2-tuples (arity mismatch)
+let pairs: [(Int, Int)] = [(1, 2), (3, 4)]
+for (a) in pairs {
+    println(Cast::string(a))
+}

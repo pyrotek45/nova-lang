@@ -1,0 +1,8 @@
+module test
+// match: Char literal pattern on Int type
+fn bad(n: Int) -> String {
+    return match n {
+        'a' => "yes",
+        _   => "no"
+    }
+}
