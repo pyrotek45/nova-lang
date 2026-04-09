@@ -1,0 +1,258 @@
+// ============================================================
+//  test_pattern_matching_advanced.nv – OR patterns, Option match,
+//  exhaustiveness, type validation, tuple/list patterns, etc.
+// ============================================================
+module test_pattern_matching_advanced
+
+// ── OR patterns (|) ──
+
+fn classify_digit(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        1 | 2 | 3 => "low",
+        4 | 5 | 6 => "mid",
+        7 | 8 | 9 => "high",
+        _ => "not a digit"
+    }
+}
+assert(classify_digit(0) == "zero",        "or: zero")
+assert(classify_digit(1) == "low",         "or: low 1")
+assert(classify_digit(2) == "low",         "or: low 2")
+assert(classify_digit(3) == "low",         "or: low 3")
+assert(classify_digit(5) == "mid",         "or: mid 5")
+assert(classify_digit(9) == "high",        "or: high 9")
+assert(classify_digit(42) == "not a digit","or: default")
+
+fn or_strings(s: String) -> Int {
+    return match s {
+        "yes" | "y" | "true" => 1,
+        "no" | "n" | "false" => 0,
+        _ => -1
+    }
+}
+assert(or_strings("yes")   == 1,  "or str: yes")
+assert(or_strings("y")     == 1,  "or str: y")
+assert(or_strings("true")  == 1,  "or str: true")
+assert(or_strings("no")    == 0,  "or str: no")
+assert(or_strings("n")     == 0,  "or str: n")
+assert(or_strings("false") == 0,  "or str: false")
+assert(or_strings("maybe") == -1, "or str: default")
+
+fn or_chars(c: Char) -> String {
+    return match c {
+        'a' | 'e' | 'i' | 'o' | 'u' => "vowel",
+        _ => "other"
+    }
+}
+assert(or_chars('a') == "vowel", "or char: a")
+assert(or_chars('e') == "vowel", "or char: e")
+assert(or_chars('z') == "other", "or char: z")
+
+// ── Option matching (Some/None) ──
+
+fn unwrap_or(opt: Option(Int), default: Int) -> Int {
+    return match opt {
+        Some(v) => v,
+        None()  => default
+    }
+}
+assert(unwrap_or(Some(42), 0) == 42, "opt: Some 42")
+assert(unwrap_or(None(Int), 0) == 0, "opt: None default")
+
+fn option_to_str(opt: Option(String)) -> String {
+    return match opt {
+        Some(s) => s,
+        None()  => "<none>"
+    }
+}
+assert(option_to_str(Some("hello")) == "hello",  "opt str: Some")
+assert(option_to_str(None(String))  == "<none>", "opt str: None")
+
+// Option as statement
+let opt_val : Option(Int) = Some(99)
+let captured = 0
+match opt_val {
+    Some(v) => { captured = v }
+    None()  => { captured = -1 }
+}
+assert(captured == 99, "opt stmt: Some")
+
+let opt_none : Option(Int) = None(Int)
+match opt_none {
+    Some(v) => { captured = v }
+    None()  => { captured = -1 }
+}
+assert(captured == -1, "opt stmt: None")
+
+// Option exhaustiveness – no _ needed when both Some and None present
+fn opt_is_some(o: Option(Int)) -> Bool {
+    return match o {
+        Some(_) => true,
+        None()  => false
+    }
+}
+assert(opt_is_some(Some(1))  == true,  "opt exhaust: Some")
+assert(opt_is_some(None(Int)) == false, "opt exhaust: None")
+
+// Option with wildcard default
+fn opt_with_default(o: Option(Int)) -> Int {
+    return match o {
+        Some(v) => v,
+        _ => -1
+    }
+}
+assert(opt_with_default(Some(5))   == 5,  "opt wildcard: Some")
+assert(opt_with_default(None(Int)) == -1, "opt wildcard: None")
+
+// ── Bool exhaustiveness ──
+
+fn bool_name(b: Bool) -> String {
+    return match b {
+        true  => "true",
+        false => "false"
+    }
+}
+assert(bool_name(true)  == "true",  "bool exhaust: true")
+assert(bool_name(false) == "false", "bool exhaust: false")
+
+// ── Tuple patterns ──
+
+fn first_of_pair(t: (Int, Int)) -> Int {
+    return match t {
+        (x, _) => x
+    }
+}
+assert(first_of_pair((10, 20)) == 10, "tuple: first")
+
+fn swap_pair(t: (Int, Int)) -> (Int, Int) {
+    return match t {
+        (a, b) => (b, a)
+    }
+}
+let swapped = swap_pair((1, 2))
+assert(swapped[0] == 2, "tuple swap: first")
+assert(swapped[1] == 1, "tuple swap: second")
+
+// ── List patterns ──
+
+fn list_len_msg(lst: [Int]) -> String {
+    return match lst {
+        [] => "empty",
+        [_] => "one",
+        [_, _] => "two",
+        _ => "many"
+    }
+}
+assert(list_len_msg([]: Int) == "empty",   "list: empty")
+assert(list_len_msg([1]) == "one",       "list: one")
+assert(list_len_msg([1, 2]) == "two",    "list: two")
+assert(list_len_msg([1, 2, 3]) == "many","list: many")
+
+// List cons pattern [head, ..rest]
+fn list_head(lst: [Int]) -> Int {
+    return match lst {
+        [h, ..rest] => h,
+        _ => -1
+    }
+}
+assert(list_head([10, 20, 30]) == 10, "list cons: head")
+assert(list_head([]: Int) == -1,        "list cons: empty")
+
+// ── Negative literals ──
+
+fn sign(n: Int) -> String {
+    return match n {
+        -1 => "neg one",
+        0  => "zero",
+        1  => "pos one",
+        _  => "other"
+    }
+}
+assert(sign(-1) == "neg one",  "neg: -1")
+assert(sign(0)  == "zero",     "neg: 0")
+assert(sign(1)  == "pos one",  "neg: 1")
+
+fn float_sign(f: Float) -> String {
+    return match f {
+        -1.0 => "neg",
+        0.0  => "zero",
+        1.0  => "pos",
+        _    => "other"
+    }
+}
+assert(float_sign(-1.0) == "neg",  "float neg: -1.0")
+assert(float_sign(0.0)  == "zero", "float neg: 0.0")
+assert(float_sign(1.0)  == "pos",  "float neg: 1.0")
+assert(float_sign(2.5)  == "other","float neg: 2.5")
+
+// ── Variable binding captures ──
+
+fn double_or_zero(n: Int) -> Int {
+    return match n {
+        0 => 0,
+        x => x * 2
+    }
+}
+assert(double_or_zero(0) == 0,  "var bind: zero")
+assert(double_or_zero(5) == 10, "var bind: double")
+
+// ── Mixed: OR with Bool ──
+
+fn bool_or(b: Bool) -> String {
+    return match b {
+        true | false => "any bool"
+    }
+}
+assert(bool_or(true)  == "any bool", "or bool: true")
+assert(bool_or(false) == "any bool", "or bool: false")
+
+// ── Match as expression in let ──
+
+let val = 7
+let result = match val {
+    1 | 2 | 3 => "low",
+    4 | 5 | 6 => "mid",
+    _ => "high"
+}
+assert(result == "high", "let match expr: high")
+
+// ── Multiple block arms ──
+
+fn verbose(n: Int) -> String {
+    return match n {
+        0 => {
+            let s = "nothing"
+            s
+        }
+        1 => {
+            "single"
+        }
+        _ => {
+            let x = n
+            "multiple"
+        }
+    }
+}
+assert(verbose(0) == "nothing",  "block: nothing")
+assert(verbose(1) == "single",   "block: single")
+assert(verbose(5) == "multiple", "block: multiple")
+
+// ── Nested match ──
+
+fn nested(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        _ => {
+            let inner = match n {
+                1 => "one",
+                _ => "big"
+            }
+            inner
+        }
+    }
+}
+assert(nested(0) == "zero", "nested: zero")
+assert(nested(1) == "one",  "nested: one")
+assert(nested(9) == "big",  "nested: big")
+
+println("PASS: all advanced pattern matching tests passed")

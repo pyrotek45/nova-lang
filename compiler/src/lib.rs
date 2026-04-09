@@ -8,7 +8,7 @@ use common::error::{NovaError, NovaResult};
 use common::fileposition::FilePosition;
 use common::gen::Gen;
 use common::nodes::Statement::{Block, Expression, For, Function, If, Return, Struct, While};
-use common::nodes::{Ast, Atom, Expr};
+use common::nodes::{Ast, Atom, Expr, Pattern, Statement};
 use common::table::Table;
 use common::ttype::TType;
 
@@ -953,6 +953,15 @@ impl Compiler {
                     self.breaks.pop();
                     self.continues.pop();
                 }
+                common::nodes::Statement::ValueMatch {
+                    expr,
+                    arms,
+                    default,
+                    position,
+                    ..
+                } => {
+                    self.compile_value_match_statement(expr, arms, default, position)?;
+                }
             }
         }
 
@@ -1014,6 +1023,7 @@ impl Compiler {
             Expr::Return { .. } => todo!(),
             Expr::IfExpr { .. } => todo!(),
             Expr::MatchExpr { .. } => todo!(),
+            Expr::ValueMatchExpr { .. } => todo!(),
             Expr::Block { .. } => todo!(),
             Expr::Let { .. } => todo!(),
             Expr::DynField {
@@ -1947,6 +1957,15 @@ impl Compiler {
                 Ok(())
             }
             Expr::Void => Ok(()),
+            Expr::ValueMatchExpr {
+                expr,
+                arms,
+                default,
+                position,
+                ..
+            } => {
+                self.compile_value_match_expr(expr, arms, default, position)
+            }
         }
     }
 
@@ -2165,4 +2184,665 @@ impl Compiler {
         }
         Ok(())
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Generalized pattern matching compilation
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Emit code that tests whether the value on top of the stack (already
+    /// stored in `temp`) matches `pattern`.  Pushes `Bool` on the stack.
+    /// For patterns that bind variables, the bindings are emitted as stores.
+    fn compile_pattern_test(
+        &mut self,
+        pattern: &Pattern,
+        temp: usize,
+        position: &FilePosition,
+    ) -> NovaResult<()> {
+        use common::nodes::Pattern::*;
+        match pattern {
+            Wildcard => {
+                // always matches
+                self.asm.push(Asm::BOOL(true));
+            }
+            Variable(_name) => {
+                // always matches (binding happens separately after the test succeeds)
+                self.asm.push(Asm::BOOL(true));
+            }
+            IntLiteral(v) => {
+                self.asm.push(Asm::INTEGER(*v));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::EQUALS);
+            }
+            FloatLiteral(v) => {
+                self.asm.push(Asm::FLOAT(*v));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::EQUALS);
+            }
+            StringLiteral(v) => {
+                let idx = self.insert_string_global(v.clone());
+                self.asm.push(Asm::GETGLOBAL(idx as u32));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::EQUALS);
+            }
+            BoolLiteral(v) => {
+                self.asm.push(Asm::BOOL(*v));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::EQUALS);
+            }
+            CharLiteral(v) => {
+                self.asm.push(Asm::Char(*v));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::EQUALS);
+            }
+            EmptyList => {
+                // Check that length == 0
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::LEN);
+                self.asm.push(Asm::INTEGER(0));
+                self.asm.push(Asm::EQUALS);
+            }
+            List(pats) => {
+                // Check length == pats.len(), then check each element
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                // length check
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::LEN);
+                self.asm.push(Asm::INTEGER(pats.len() as i64));
+                self.asm.push(Asm::EQUALS);
+                self.asm.push(Asm::JUMPIFFALSE(fail));
+
+                // check each element
+                for (i, pat) in pats.iter().enumerate() {
+                    match pat {
+                        Wildcard | Variable(_) => {
+                            // no test needed for wildcards/variables
+                        }
+                        _ => {
+                            // store element in a sub-temp
+                            self.asm.push(Asm::INTEGER(i as i64));
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.asm.push(Asm::LIN(position.clone()));
+                            self.variables.insert(
+                                format!("___matchelem___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_test(pat, sub_temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            ListCons(head_pats, _tail_name) => {
+                // Check length >= head_pats.len(), then check head elements
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                // length check: len >= head_pats.len()
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::LEN);
+                self.asm.push(Asm::INTEGER(head_pats.len() as i64));
+                // len >= n  is  !(len < n)
+                self.asm.push(Asm::ILSS);
+                self.asm.push(Asm::NOT);
+                self.asm.push(Asm::JUMPIFFALSE(fail));
+
+                // check each head element
+                for (i, pat) in head_pats.iter().enumerate() {
+                    match pat {
+                        Wildcard | Variable(_) => {}
+                        _ => {
+                            self.asm.push(Asm::INTEGER(i as i64));
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.asm.push(Asm::LIN(position.clone()));
+                            self.variables.insert(
+                                format!("___matchelem___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_test(pat, sub_temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            Tuple(pats) => {
+                // same as list: check length == pats.len(), then each element
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::LEN);
+                self.asm.push(Asm::INTEGER(pats.len() as i64));
+                self.asm.push(Asm::EQUALS);
+                self.asm.push(Asm::JUMPIFFALSE(fail));
+
+                for (i, pat) in pats.iter().enumerate() {
+                    match pat {
+                        Wildcard | Variable(_) => {}
+                        _ => {
+                            self.asm.push(Asm::INTEGER(i as i64));
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.asm.push(Asm::LIN(position.clone()));
+                            self.variables.insert(
+                                format!("___matchelem___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_test(pat, sub_temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            Or(alternatives) => {
+                // Try each alternative; if any matches, the whole Or matches.
+                let ok = self.gen.generate();
+                let fail = self.gen.generate();
+
+                for alt in alternatives.iter() {
+                    self.compile_pattern_test(alt, temp, position)?;
+                    // If true, jump to ok
+                    let next = self.gen.generate();
+                    self.asm.push(Asm::JUMPIFFALSE(next));
+                    self.asm.push(Asm::JMP(ok));
+                    self.asm.push(Asm::LABEL(next));
+                }
+
+                // none matched
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::JMP(fail));
+                self.asm.push(Asm::LABEL(ok));
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::LABEL(fail));
+            }
+            Enum { variant, binding } => {
+                // Enums are stored as [value, tag, type_name] with LIST(3).
+                // Tag is a string matching the variant name.
+                // Test: tag == variant_name
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                // Get the tag (index 1)
+                self.asm.push(Asm::INTEGER(1));
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::LIN(position.clone()));
+
+                // Compare with the variant name
+                let idx = self.insert_string_global(variant.clone());
+                self.asm.push(Asm::GETGLOBAL(idx as u32));
+                self.asm.push(Asm::EQUALS);
+                self.asm.push(Asm::JUMPIFFALSE(fail));
+
+                // If binding has a sub-pattern (not just a variable/wildcard), test it too
+                if let Some(sub_pat) = binding {
+                    match sub_pat.as_ref() {
+                        Wildcard | Variable(_) => {
+                            // no extra test needed
+                        }
+                        _ => {
+                            // Get the value (index 0) and test sub-pattern
+                            self.asm.push(Asm::INTEGER(0));
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.asm.push(Asm::LIN(position.clone()));
+                            self.variables.insert(
+                                format!("___matchenumval___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_test(sub_pat, sub_temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            Struct { name: _, fields } => {
+                // Structs are stored as objects. Fields are indexed by position.
+                // We need to check each field pattern.
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                for (i, (_field_name, pat)) in fields.iter().enumerate() {
+                    match pat {
+                        Wildcard | Variable(_) => {}
+                        _ => {
+                            self.asm.push(Asm::INTEGER(i as i64));
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.asm.push(Asm::LIN(position.clone()));
+                            self.variables.insert(
+                                format!("___matchfield___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_test(pat, sub_temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            OptionSome(binding) => {
+                // Option values: Some(x) is just the value on stack, None is VmData::None.
+                // ISSOME returns true for anything that isn't VmData::None.
+                let fail = self.gen.generate();
+                let ok = self.gen.generate();
+
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::ISSOME);
+                self.asm.push(Asm::JUMPIFFALSE(fail));
+
+                // If binding has a sub-pattern beyond variable/wildcard, test it
+                if let Some(sub_pat) = binding {
+                    match sub_pat.as_ref() {
+                        Wildcard | Variable(_) => {}
+                        _ => {
+                            // The value itself is the payload (no indexing needed)
+                            self.compile_pattern_test(sub_pat, temp, position)?;
+                            self.asm.push(Asm::JUMPIFFALSE(fail));
+                        }
+                    }
+                }
+
+                self.asm.push(Asm::BOOL(true));
+                self.asm.push(Asm::JMP(ok));
+                self.asm.push(Asm::LABEL(fail));
+                self.asm.push(Asm::BOOL(false));
+                self.asm.push(Asm::LABEL(ok));
+            }
+            OptionNone => {
+                // None is VmData::None. ISSOME returns false for None.
+                self.asm.push(Asm::GET(temp as u32));
+                self.asm.push(Asm::ISSOME);
+                self.asm.push(Asm::NOT);
+            }
+        }
+        Ok(())
+    }
+
+    /// Emit variable bindings for a pattern after it has matched.
+    fn compile_pattern_bindings(
+        &mut self,
+        pattern: &Pattern,
+        temp: usize,
+        position: &FilePosition,
+    ) -> NovaResult<()> {
+        use common::nodes::Pattern::*;
+        match pattern {
+            Wildcard => {}
+            Variable(name) => {
+                // bind the whole value
+                self.asm.push(Asm::GET(temp as u32));
+                if let Some(index) = self.variables.get_index(name) {
+                    self.asm.push(Asm::STORE(index as u32));
+                } else {
+                    self.variables.insert(name.clone());
+                    let index = self.variables.len() - 1;
+                    self.asm.push(Asm::STORE(index as u32));
+                }
+            }
+            IntLiteral(_) | FloatLiteral(_) | StringLiteral(_) | BoolLiteral(_)
+            | CharLiteral(_) | EmptyList => {
+                // no bindings for literals
+            }
+            List(pats) => {
+                for (i, pat) in pats.iter().enumerate() {
+                    if matches!(pat, Wildcard) {
+                        continue;
+                    }
+                    self.asm.push(Asm::INTEGER(i as i64));
+                    self.asm.push(Asm::GET(temp as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    match pat {
+                        Variable(name) => {
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        _ => {
+                            // nested pattern: store in a sub-temp and recurse
+                            self.variables.insert(
+                                format!("___matchbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(pat, sub_temp, position)?;
+                        }
+                    }
+                }
+            }
+            ListCons(head_pats, tail_name) => {
+                // bind head elements
+                for (i, pat) in head_pats.iter().enumerate() {
+                    if matches!(pat, Wildcard) {
+                        continue;
+                    }
+                    self.asm.push(Asm::INTEGER(i as i64));
+                    self.asm.push(Asm::GET(temp as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    match pat {
+                        Variable(name) => {
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        _ => {
+                            self.variables.insert(
+                                format!("___matchbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(pat, sub_temp, position)?;
+                        }
+                    }
+                }
+                // bind tail: slice from head_pats.len()..
+                // We need to use native slice for this
+                // Push start index, then None for end, then the list
+                // Use the SLICEFROM approach or emit a call
+                // Actually we can use: list[head_len..] which is a slice
+                self.asm.push(Asm::INTEGER(head_pats.len() as i64));
+                self.asm.push(Asm::GET(temp as u32));
+                // We need a way to slice. Let's use the native function if available.
+                // Actually, let's look at how slicing works in the VM.
+                // For now emit a native call to List::slice
+                if let Some(index) = self.native_functions.get_index("List::slice") {
+                    self.asm.push(Asm::NATIVE(index as u64, None));
+                }
+                if let Some(index) = self.variables.get_index(tail_name) {
+                    self.asm.push(Asm::STORE(index as u32));
+                } else {
+                    self.variables.insert(tail_name.clone());
+                    let index = self.variables.len() - 1;
+                    self.asm.push(Asm::STORE(index as u32));
+                }
+            }
+            Tuple(pats) => {
+                for (i, pat) in pats.iter().enumerate() {
+                    if matches!(pat, Wildcard) {
+                        continue;
+                    }
+                    self.asm.push(Asm::INTEGER(i as i64));
+                    self.asm.push(Asm::GET(temp as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    match pat {
+                        Variable(name) => {
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        _ => {
+                            self.variables.insert(
+                                format!("___matchbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(pat, sub_temp, position)?;
+                        }
+                    }
+                }
+            }
+            Or(alternatives) => {
+                // Or patterns cannot bind variables (enforced at parse time).
+                // But if the first alternative has bindings, use it.
+                // For safety, we just try the first alternative.
+                if let Some(first) = alternatives.first() {
+                    self.compile_pattern_bindings(first, temp, position)?;
+                }
+            }
+            Enum { variant: _, binding } => {
+                // Bind the payload (index 0 of the enum list [value, tag, type_name])
+                if let Some(sub_pat) = binding {
+                    self.asm.push(Asm::INTEGER(0));
+                    self.asm.push(Asm::GET(temp as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    match sub_pat.as_ref() {
+                        Variable(name) => {
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        Wildcard => {
+                            // discard
+                            self.asm.pop(); // pop the LIN
+                            self.asm.pop(); // pop the GET
+                            self.asm.pop(); // pop the INTEGER
+                        }
+                        _ => {
+                            self.variables.insert(
+                                format!("___matchenumbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(sub_pat.as_ref(), sub_temp, position)?;
+                        }
+                    }
+                }
+            }
+            Struct { name: _, fields } => {
+                // Bind field patterns by their index in the struct
+                for (i, (_field_name, pat)) in fields.iter().enumerate() {
+                    if matches!(pat, Wildcard) {
+                        continue;
+                    }
+                    self.asm.push(Asm::INTEGER(i as i64));
+                    self.asm.push(Asm::GET(temp as u32));
+                    self.asm.push(Asm::LIN(position.clone()));
+                    match pat {
+                        Variable(name) => {
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        _ => {
+                            self.variables.insert(
+                                format!("___matchfieldbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(pat, sub_temp, position)?;
+                        }
+                    }
+                }
+            }
+            OptionSome(binding) => {
+                // Option Some: the value IS the payload (no indexing into a list)
+                if let Some(sub_pat) = binding {
+                    // Bind the value directly from temp (it's the payload itself)
+                    match sub_pat.as_ref() {
+                        Variable(name) => {
+                            self.asm.push(Asm::GET(temp as u32));
+                            if let Some(index) = self.variables.get_index(name) {
+                                self.asm.push(Asm::STORE(index as u32));
+                            } else {
+                                self.variables.insert(name.clone());
+                                let index = self.variables.len() - 1;
+                                self.asm.push(Asm::STORE(index as u32));
+                            }
+                        }
+                        Wildcard => {
+                            // discard
+                        }
+                        _ => {
+                            // nested pattern: store temp value and recurse
+                            self.asm.push(Asm::GET(temp as u32));
+                            self.variables.insert(
+                                format!("___matchoptbind___{}", self.gen.generate()).into(),
+                            );
+                            let sub_temp = self.variables.len() - 1;
+                            self.asm.push(Asm::STORE(sub_temp as u32));
+                            self.compile_pattern_bindings(sub_pat.as_ref(), sub_temp, position)?;
+                        }
+                    }
+                }
+            }
+            OptionNone => {
+                // No bindings for None
+            }
+        }
+        Ok(())
+    }
+    fn compile_value_match_statement(
+        &mut self,
+        expr: &Expr,
+        arms: &[(Pattern, Vec<Statement>)],
+        default: &Option<Vec<Statement>>,
+        position: &FilePosition,
+    ) -> NovaResult<()> {
+        let end = self.gen.generate();
+
+        // evaluate the match subject and store in temp
+        self.compile_expr(expr)?;
+        self.variables
+            .insert(format!("___matchexpr___{}", self.gen.generate()).into());
+        let temp = self.variables.len() - 1;
+        self.asm.push(Asm::STORE(temp as u32));
+
+        for arm in arms.iter() {
+            let next = self.gen.generate();
+
+            // emit pattern test
+            self.compile_pattern_test(&arm.0, temp, position)?;
+            self.asm.push(Asm::JUMPIFFALSE(next));
+
+            // emit pattern bindings
+            self.compile_pattern_bindings(&arm.0, temp, position)?;
+
+            // emit arm body
+            let arm_ast = Ast {
+                program: arm.1.clone(),
+            };
+            self.compile_program(arm_ast, self.filepath.clone(), false, false, false, false)?;
+            self.asm.pop();
+
+            self.asm.push(Asm::JMP(end));
+            self.asm.push(Asm::LABEL(next));
+        }
+
+        if let Some(default) = default {
+            let default_ast = Ast {
+                program: default.clone(),
+            };
+            self.compile_program(
+                default_ast,
+                self.filepath.clone(),
+                false,
+                false,
+                false,
+                false,
+            )?;
+            self.asm.pop();
+        }
+
+        self.asm.push(Asm::LABEL(end));
+        Ok(())
+    }
+
+    /// Compile a value-match expression (non-enum pattern matching, result on stack).
+    fn compile_value_match_expr(
+        &mut self,
+        expr: &Expr,
+        arms: &[(Pattern, Vec<Statement>)],
+        default: &Option<Vec<Statement>>,
+        position: &FilePosition,
+    ) -> NovaResult<()> {
+        let end = self.gen.generate();
+
+        // evaluate the match subject and store in temp
+        self.compile_expr(expr)?;
+        self.variables
+            .insert(format!("___matchexpr___{}", self.gen.generate()).into());
+        let temp = self.variables.len() - 1;
+        self.asm.push(Asm::STORE(temp as u32));
+
+        for arm in arms.iter() {
+            let next = self.gen.generate();
+
+            // emit pattern test
+            self.compile_pattern_test(&arm.0, temp, position)?;
+            self.asm.push(Asm::JUMPIFFALSE(next));
+
+            // emit pattern bindings
+            self.compile_pattern_bindings(&arm.0, temp, position)?;
+
+            // emit arm body (keep=true so result stays on stack)
+            let arm_ast = Ast {
+                program: arm.1.clone(),
+            };
+            self.compile_program(arm_ast, self.filepath.clone(), false, false, false, true)?;
+            self.asm.pop();
+
+            self.asm.push(Asm::JMP(end));
+            self.asm.push(Asm::LABEL(next));
+        }
+
+        if let Some(default) = default {
+            let default_ast = Ast {
+                program: default.clone(),
+            };
+            self.compile_program(
+                default_ast,
+                self.filepath.clone(),
+                false,
+                false,
+                false,
+                true,
+            )?;
+            self.asm.pop();
+        }
+
+        self.asm.push(Asm::LABEL(end));
+        Ok(())
+    }
 }
+

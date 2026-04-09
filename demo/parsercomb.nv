@@ -1,0 +1,344 @@
+module main
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Parser Combinator Library — Build Parsers from Small Pieces
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: closures as first-class parsers, higher-order functions,
+//         combinator composition (then, or, many, map), Dyn types,
+//         structural typing, functional programming in Nova
+//
+//  Instead of hand-writing a recursive-descent parser (see parser.nv),
+//  this demo builds parsers by *composing* tiny building-block parsers.
+//
+//  Grammar parsed:
+//    expr   = term (('+' | '-') term)*
+//    term   = factor (('*' | '/') factor)*
+//    factor = INT | '(' expr ')'
+//
+//  Run:  nova run demo/parsercomb.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  1. Parse state — an immutable snapshot of where we are in the input
+// ═════════════════════════════════════════════════════════════════════════════
+
+struct PState {
+    input: [Char],
+    pos:   Int
+}
+
+fn extends(PState) new(s: String) -> PState {
+    return PState { input: s.chars(), pos: 0 }
+}
+
+fn extends atEnd(s: PState) -> Bool {
+    return s.pos >= s.input.len()
+}
+
+fn extends current(s: PState) -> Char {
+    return s.input[s.pos]
+}
+
+fn extends rest(s: PState) -> String {
+    let out = []: Char
+    for i in s.pos..s.input.len() {
+        out.push(s.input[i])
+    }
+    return out.string()
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  2. Parse result — either success (value + new position) or failure
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  We use Int as the universal value type for simplicity.
+//  A "parser" is a function:  fn(PState) -> Option((Int, PState))
+//    Some((value, newState))  — parse succeeded
+//    None                     — parse failed
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3. Primitive parsers
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Match a single specific character, return its code
+fn pChar(expected: Char) -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        if s.atEnd() { return None((Int, PState)) }
+        if s.current() == expected {
+            return Some((Cast::int(expected).orDefault(0), PState { input: s.input, pos: s.pos + 1 }))
+        }
+        return None((Int, PState))
+    }
+}
+
+// Match a digit, return its numeric value (0-9)
+fn pDigit() -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        if s.atEnd() { return None((Int, PState)) }
+        let ch = s.current()
+        if ch.isDigit() {
+            let val = Cast::int(Cast::string(ch)).orDefault(0)
+            return Some((val, PState { input: s.input, pos: s.pos + 1 }))
+        }
+        return None((Int, PState))
+    }
+}
+
+// Skip whitespace, return 0
+fn pSpaces() -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        let p = s.pos
+        while p < s.input.len() && s.input[p].isWhitespace() {
+            p += 1
+        }
+        return Some((0, PState { input: s.input, pos: p }))
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  4. Combinators — build complex parsers from simple ones
+// ═════════════════════════════════════════════════════════════════════════════
+
+// pInteger: one or more digits → assembled integer
+fn pInteger() -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        if s.atEnd() { return None((Int, PState)) }
+        if !s.current().isDigit() { return None((Int, PState)) }
+
+        let num = 0
+        let p = s.pos
+        while p < s.input.len() && s.input[p].isDigit() {
+            let d = Cast::int(Cast::string(s.input[p])).orDefault(0)
+            num = num * 10 + d
+            p += 1
+        }
+        return Some((num, PState { input: s.input, pos: p }))
+    }
+}
+
+// pOr: try first parser, if it fails try second
+fn pOr(
+    a: fn(PState) -> Option((Int, PState)),
+    b: fn(PState) -> Option((Int, PState))
+) -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        let ra = a(s)
+        if ra.isSome() { return ra }
+        return b(s)
+    }
+}
+
+// pThen: run first parser, then second, return pair via combiner function
+fn pThen(
+    a: fn(PState) -> Option((Int, PState)),
+    b: fn(PState) -> Option((Int, PState)),
+    combine: fn(Int, Int) -> Int
+) -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        let ra = a(s)
+        if !ra.isSome() { return None((Int, PState)) }
+        let va = ra.unwrap()[0]
+        let sa = ra.unwrap()[1]
+        let rb = b(sa)
+        if !rb.isSome() { return None((Int, PState)) }
+        let vb = rb.unwrap()[0]
+        let sb = rb.unwrap()[1]
+        return Some((combine(va, vb), sb))
+    }
+}
+
+// pSkipLeft: run left parser, discard its result, return right's result
+fn pSkipLeft(
+    skip: fn(PState) -> Option((Int, PState)),
+    keep: fn(PState) -> Option((Int, PState))
+) -> fn(PState) -> Option((Int, PState)) {
+    return pThen(skip, keep, fn(a: Int, b: Int) -> Int { return b })
+}
+
+// pBetween: skip left, parse middle, skip right
+fn pBetween(
+    open:  fn(PState) -> Option((Int, PState)),
+    inner: fn(PState) -> Option((Int, PState)),
+    close: fn(PState) -> Option((Int, PState))
+) -> fn(PState) -> Option((Int, PState)) {
+    return fn(s: PState) -> Option((Int, PState)) {
+        let r1 = open(s)
+        if !r1.isSome() { return None((Int, PState)) }
+        let s1 = r1.unwrap()[1]
+
+        let r2 = inner(s1)
+        if !r2.isSome() { return None((Int, PState)) }
+        let val = r2.unwrap()[0]
+        let s2 = r2.unwrap()[1]
+
+        let r3 = close(s2)
+        if !r3.isSome() { return None((Int, PState)) }
+        let s3 = r3.unwrap()[1]
+
+        return Some((val, s3))
+    }
+}
+
+// token: parser that skips leading whitespace then runs inner parser
+fn token(
+    inner: fn(PState) -> Option((Int, PState))
+) -> fn(PState) -> Option((Int, PState)) {
+    return pSkipLeft(pSpaces(), inner)
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  5. Expression parser — built entirely from combinators
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  We use a loop-based approach for left-associative binary operators,
+//  combined with combinator primitives for atoms and grouping.
+
+// Forward declarations for mutual recursion
+fn parseExpr(s: PState) -> Option((Int, PState))
+fn parseFactor(s: PState) -> Option((Int, PState))
+
+// factor = INT | '(' expr ')'
+fn parseFactor(s: PState) -> Option((Int, PState)) {
+    // Try integer first
+    let intP = token(pInteger())
+    let ri = intP(s)
+    if ri.isSome() { return ri }
+
+    // Try parenthesised expression — use @(Type) to get a function reference
+    let parenP = pBetween(token(pChar('(')), parseExpr@(PState), token(pChar(')')))
+    return parenP(s)
+}
+
+// term = factor (('*' | '/') factor)*
+fn parseTerm(s: PState) -> Option((Int, PState)) {
+    let rf = parseFactor(s)
+    if !rf.isSome() { return None((Int, PState)) }
+
+    let acc = rf.unwrap()[0]
+    let cur = rf.unwrap()[1]
+
+    let running = true
+    while running {
+        // Try '*'
+        let rmul = token(pChar('*'))(cur)
+        if rmul.isSome() {
+            let s2 = rmul.unwrap()[1]
+            let rr = parseFactor(s2)
+            if rr.isSome() {
+                acc = acc * rr.unwrap()[0]
+                cur = rr.unwrap()[1]
+                continue
+            }
+        }
+        // Try '/'
+        let rdiv = token(pChar('/'))(cur)
+        if rdiv.isSome() {
+            let s2 = rdiv.unwrap()[1]
+            let rr = parseFactor(s2)
+            if rr.isSome() {
+                acc = acc / rr.unwrap()[0]
+                cur = rr.unwrap()[1]
+                continue
+            }
+        }
+        running = false
+    }
+    return Some((acc, cur))
+}
+
+// expr = term (('+' | '-') term)*
+fn parseExpr(s: PState) -> Option((Int, PState)) {
+    let rt = parseTerm(s)
+    if !rt.isSome() { return None((Int, PState)) }
+
+    let acc = rt.unwrap()[0]
+    let cur = rt.unwrap()[1]
+
+    let running = true
+    while running {
+        // Try '+'
+        let radd = token(pChar('+'))(cur)
+        if radd.isSome() {
+            let s2 = radd.unwrap()[1]
+            let rr = parseTerm(s2)
+            if rr.isSome() {
+                acc = acc + rr.unwrap()[0]
+                cur = rr.unwrap()[1]
+                continue
+            }
+        }
+        // Try '-'
+        let rsub = token(pChar('-'))(cur)
+        if rsub.isSome() {
+            let s2 = rsub.unwrap()[1]
+            let rr = parseTerm(s2)
+            if rr.isSome() {
+                acc = acc - rr.unwrap()[0]
+                cur = rr.unwrap()[1]
+                continue
+            }
+        }
+        running = false
+    }
+    return Some((acc, cur))
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  6. Top-level run helper
+// ═════════════════════════════════════════════════════════════════════════════
+
+fn run(input: String) -> String {
+    let state = PState::new(input)
+    let result = parseExpr(state)
+    if result.isSome() {
+        let pair = result.unwrap()
+        let val = pair[0]
+        let endState = pair[1]
+        let remaining = endState.rest().trim()
+        if remaining.len() == 0 {
+            return Cast::string(val)
+        } else {
+            return format("{} (remaining: \"{}\")", Cast::string(val), remaining)
+        }
+    }
+    return "parse error"
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  7. Main
+// ═════════════════════════════════════════════════════════════════════════════
+
+println("═══ Parser Combinator Demo ═══")
+println("")
+println("Parsers are composed from small building blocks:")
+println("  pChar('x')       — match a single character")
+println("  pInteger()       — match one or more digits")
+println("  pOr(a, b)        — try a, then b")
+println("  pThen(a, b, f)   — sequence a then b, combine with f")
+println("  pBetween(l, m, r)— match l, then m, then r, keep m")
+println("  token(p)         — skip whitespace, then run p")
+println("")
+
+let examples = [
+    "42",
+    "1 + 2",
+    "3 * 4 + 5",
+    "2 * (3 + 4)",
+    "(1 + 2) * (3 + 4)",
+    "100 / 5 / 4",
+    "10 - 3 - 2",
+    "  42  +  8  ",
+    "((((1 + 2))))"
+]
+
+for src in examples {
+    println(format("  \"{}\"  →  {}", src, run(src)))
+}
+
+println("")
+println("Done!")

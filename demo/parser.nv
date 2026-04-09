@@ -1,0 +1,306 @@
+module main
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Recursive-Descent Parser — Arithmetic Expressions → AST → Eval
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: importing a module (lexer.nv), arena-allocated AST, enums,
+//         pattern matching, recursive descent, tree walking, HashMap
+//
+//  Grammar:
+//    expr   = term (('+' | '-') term)*
+//    term   = factor (('*' | '/') factor)*
+//    factor = NUMBER | IDENT | '(' expr ')' | '-' factor
+//
+//  Run:  nova run demo/parser.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import lexer                     // ← reuses Token, Lexer, tokenize()
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.hashmap
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  1. AST — arena-allocated expression tree
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  Each node lives in a flat list (the "arena").  Children are stored
+//  as integer indices, which avoids recursive enum limitations.
+
+enum Op { OpAdd, OpSub, OpMul, OpDiv, OpNeg }
+
+fn extends toString(o: Op) -> String {
+    match o {
+        OpAdd() => { return "+" }
+        OpSub() => { return "-" }
+        OpMul() => { return "*" }
+        OpDiv() => { return "/" }
+        OpNeg() => { return "neg" }
+    }
+    return "?"
+}
+
+enum NodeKind { NNum, NVar, NBinop, NUnary }
+
+struct Node {
+    kind:  NodeKind,
+    num:   Int,
+    name:  String,
+    op:    Op,
+    left:  Int,
+    right: Int
+}
+
+// The global arena — all nodes are pushed here
+let arena = []: Node
+
+fn mkNum(n: Int) -> Int {
+    arena.push(Node {
+        kind: NodeKind::NNum(), num: n, name: "",
+        op: Op::OpAdd(), left: 0, right: 0
+    })
+    return arena.len() - 1
+}
+
+fn mkVar(s: String) -> Int {
+    arena.push(Node {
+        kind: NodeKind::NVar(), num: 0, name: s,
+        op: Op::OpAdd(), left: 0, right: 0
+    })
+    return arena.len() - 1
+}
+
+fn mkBinop(op: Op, l: Int, r: Int) -> Int {
+    arena.push(Node {
+        kind: NodeKind::NBinop(), num: 0, name: "",
+        op: op, left: l, right: r
+    })
+    return arena.len() - 1
+}
+
+fn mkUnary(inner: Int) -> Int {
+    arena.push(Node {
+        kind: NodeKind::NUnary(), num: 0, name: "",
+        op: Op::OpNeg(), left: inner, right: 0
+    })
+    return arena.len() - 1
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  2. Pretty-print AST as S-expression
+// ═════════════════════════════════════════════════════════════════════════════
+
+fn showNode(idx: Int) -> String {
+    let n = arena[idx]
+    match n.kind {
+        NNum()   => { return Cast::string(n.num) }
+        NVar()   => { return n.name }
+        NBinop() => {
+            return format("({} {} {})", n.op.toString(), showNode(n.left), showNode(n.right))
+        }
+        NUnary() => {
+            return format("(neg {})", showNode(n.left))
+        }
+    }
+    return "?"
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3. Parser state
+// ═════════════════════════════════════════════════════════════════════════════
+
+struct Parser {
+    tokens: [Token],
+    pos:    Int
+}
+
+fn extends(Parser) new(tokens: [Token]) -> Parser {
+    return Parser { tokens: tokens, pos: 0 }
+}
+
+fn extends peek(p: Parser) -> Option(Token) {
+    if p.pos < p.tokens.len() {
+        return Some(p.tokens[p.pos])
+    }
+    return None(Token)
+}
+
+fn extends advance(p: Parser) -> Token {
+    let tok = p.tokens[p.pos]
+    p.pos += 1
+    return tok
+}
+
+// ── Token classification helpers ────────────────────────────────────────────
+
+fn isPlus(tok: Token) -> Bool {
+    match tok { TPlus() => { return true } _ => { return false } }
+    return false
+}
+fn isMinus(tok: Token) -> Bool {
+    match tok { TMinus() => { return true } _ => { return false } }
+    return false
+}
+fn isStar(tok: Token) -> Bool {
+    match tok { TStar() => { return true } _ => { return false } }
+    return false
+}
+fn isSlash(tok: Token) -> Bool {
+    match tok { TSlash() => { return true } _ => { return false } }
+    return false
+}
+fn isLParen(tok: Token) -> Bool {
+    match tok { TLParen() => { return true } _ => { return false } }
+    return false
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  4. Recursive descent
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Forward-declare parseExpr so parseFactor can call it (mutual recursion)
+fn extends parseExpr(p: Parser) -> Int
+
+// factor = NUMBER | IDENT | '(' expr ')' | '-' factor
+fn extends parseFactor(p: Parser) -> Int {
+    if let tok = p.peek() {
+        if isMinus(tok) {
+            let _ = p.advance()
+            return mkUnary(p.parseFactor())
+        }
+        if isLParen(tok) {
+            let _ = p.advance()
+            let inner = p.parseExpr()
+            let _ = p.advance()   // consume ')'
+            return inner
+        }
+        let _ = p.advance()
+        match tok {
+            TNumber(n) => { return mkNum(n) }
+            TIdent(s)  => { return mkVar(s) }
+            _          => { return mkNum(0) }
+        }
+    }
+    return mkNum(0)
+}
+
+// term = factor (('*' | '/') factor)*
+fn extends parseTerm(p: Parser) -> Int {
+    let left = p.parseFactor()
+    while let tok = p.peek() {
+        if isStar(tok) {
+            let _ = p.advance()
+            left = mkBinop(Op::OpMul(), left, p.parseFactor())
+        } elif isSlash(tok) {
+            let _ = p.advance()
+            left = mkBinop(Op::OpDiv(), left, p.parseFactor())
+        } else {
+            break
+        }
+    }
+    return left
+}
+
+// expr = term (('+' | '-') term)*
+fn extends parseExpr(p: Parser) -> Int {
+    let left = p.parseTerm()
+    while let tok = p.peek() {
+        if isPlus(tok) {
+            let _ = p.advance()
+            left = mkBinop(Op::OpAdd(), left, p.parseTerm())
+        } elif isMinus(tok) {
+            let _ = p.advance()
+            left = mkBinop(Op::OpSub(), left, p.parseTerm())
+        } else {
+            break
+        }
+    }
+    return left
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  5. Evaluator — walk the AST with a variable environment
+// ═════════════════════════════════════════════════════════════════════════════
+
+fn eval(idx: Int, env: HashMap(String, Int)) -> Int {
+    let n = arena[idx]
+    match n.kind {
+        NNum()   => { return n.num }
+        NVar()   => { return env.get(n.name).orDefault(0) }
+        NBinop() => {
+            let l = eval(n.left, env)
+            let r = eval(n.right, env)
+            match n.op {
+                OpAdd() => { return l + r }
+                OpSub() => { return l - r }
+                OpMul() => { return l * r }
+                OpDiv() => { return l / r }
+                _       => { return 0 }
+            }
+        }
+        NUnary() => {
+            return 0 - eval(n.left, env)
+        }
+    }
+    return 0
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  6. Top-level parse helper
+// ═════════════════════════════════════════════════════════════════════════════
+
+fn parse(input: String) -> Int {
+    let tokens = tokenize(input)    // from lexer.nv
+    let p = Parser::new(tokens)
+    return p.parseExpr()
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  7. Main
+// ═════════════════════════════════════════════════════════════════════════════
+
+println("═══ Recursive-Descent Parser Demo ═══")
+println("")
+
+// Variable environment
+let env = HashMap::new() @[K: String, V: Int]
+env.insert("x", 10)
+env.insert("y", 5)
+env.insert("z", 3)
+
+let examples = [
+    "1 + 2",
+    "3 * 4 + 5",
+    "2 * (3 + 4)",
+    "(1 + 2) * (3 + 4)",
+    "x + y * z",
+    "x * y - z",
+    "-42",
+    "-(x + y)",
+    "10 / 2 + 3 * 4",
+    "((1 + 2) * 3) / (4 - 1)"
+]
+
+for src in examples {
+    let root = parse(src)
+    let val  = eval(root, env)
+    println(format("  \"{}\"", src))
+    println(format("    AST:   {}", showNode(root)))
+    println(format("    Value: {}", Cast::string(val)))
+    println("")
+}
+
+// ── Show the token stream for one example ───────────────────────────────────
+
+println("── Token stream for \"x * (y + 3)\" ──")
+let toks = tokenize("x * (y + 3)")
+print("  [")
+for i in 0..toks.len() {
+    print(toks[i].toString())
+    if i < toks.len() - 1 { print(", ") }
+}
+println("]")
+println("")
+
+println("Done!")

@@ -1,0 +1,8 @@
+// should_fail: Some/None pattern on a non-Option type (Int)
+module match_option_pattern_on_int
+fn bad(n: Int) -> Int {
+    return match n {
+        Some(v) => v,
+        None() => 0
+    }
+}

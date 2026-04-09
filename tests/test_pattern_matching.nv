@@ -1,0 +1,143 @@
+// ============================================================
+//  test_pattern_matching.nv – Haskell-style pattern matching
+// ============================================================
+module test_pattern_matching
+
+// ── Integer literal matching ──
+fn describe_int(n: Int) -> String {
+    return match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        _ => "other"
+    }
+}
+assert(describe_int(0) == "zero",   "int match 0")
+assert(describe_int(1) == "one",    "int match 1")
+assert(describe_int(2) == "two",    "int match 2")
+assert(describe_int(99) == "other", "int match default")
+
+// ── Negative integer patterns ──
+fn sign_name(n: Int) -> String {
+    return match n {
+        -1 => "neg one",
+        0  => "zero",
+        1  => "pos one",
+        _  => "other"
+    }
+}
+assert(sign_name(-1) == "neg one",  "neg int -1")
+assert(sign_name(0)  == "zero",     "neg int 0")
+assert(sign_name(1)  == "pos one",  "neg int 1")
+assert(sign_name(42) == "other",    "neg int default")
+
+// ── String literal matching ──
+fn greet(name: String) -> String {
+    return match name {
+        "Alice" => "Hi Alice!",
+        "Bob"   => "Hey Bob!",
+        _       => "Hello stranger"
+    }
+}
+assert(greet("Alice") == "Hi Alice!",       "str match Alice")
+assert(greet("Bob")   == "Hey Bob!",        "str match Bob")
+assert(greet("Eve")   == "Hello stranger",  "str match default")
+
+// ── Bool matching (exhaustive, no _ needed) ──
+fn bool_to_str(b: Bool) -> String {
+    return match b {
+        true  => "yes",
+        false => "no"
+    }
+}
+assert(bool_to_str(true)  == "yes", "bool match true")
+assert(bool_to_str(false) == "no",  "bool match false")
+
+// ── Char matching ──
+fn char_kind(c: Char) -> String {
+    return match c {
+        'a' => "letter a",
+        'z' => "letter z",
+        '0' => "digit zero",
+        _   => "something else"
+    }
+}
+assert(char_kind('a') == "letter a",       "char match a")
+assert(char_kind('z') == "letter z",       "char match z")
+assert(char_kind('0') == "digit zero",     "char match 0")
+assert(char_kind('x') == "something else", "char match default")
+
+// ── Float matching ──
+fn float_check(f: Float) -> String {
+    return match f {
+        0.0  => "zero",
+        1.0  => "one",
+        -1.0 => "neg one",
+        _    => "other"
+    }
+}
+assert(float_check(0.0)  == "zero",    "float match 0.0")
+assert(float_check(1.0)  == "one",     "float match 1.0")
+assert(float_check(-1.0) == "neg one", "float match -1.0")
+assert(float_check(3.14) == "other",   "float match default")
+
+// ── Variable binding (captures the value) ──
+fn echo_int(n: Int) -> Int {
+    return match n {
+        0 => 100,
+        x => x + 1
+    }
+}
+assert(echo_int(0)  == 100, "var bind 0 → 100")
+assert(echo_int(5)  == 6,   "var bind 5 → 6")
+assert(echo_int(99) == 100, "var bind 99 → 100")
+
+// ── Match as statement ──
+let result = 0
+match 42 {
+    42 => { result = 1 }
+    _  => { result = 2 }
+}
+assert(result == 1, "match statement 42")
+
+match 99 {
+    42 => { result = 10 }
+    _  => { result = 20 }
+}
+assert(result == 20, "match statement default")
+
+// ── Wildcard-only match (always matches) ──
+fn always(n: Int) -> String {
+    return match n {
+        _ => "always"
+    }
+}
+assert(always(0)   == "always", "wildcard-only 0")
+assert(always(999) == "always", "wildcard-only 999")
+
+// ── Block bodies (no comma needed) ──
+fn block_match(n: Int) -> String {
+    return match n {
+        0 => {
+            let s = "zero"
+            s
+        }
+        1 => {
+            "one"
+        }
+        _ => { "other" }
+    }
+}
+assert(block_match(0) == "zero",  "block match 0")
+assert(block_match(1) == "one",   "block match 1")
+assert(block_match(9) == "other", "block match default")
+
+// ── Match with variable binding in statement ──
+let captured = 0
+match 77 {
+    0 => { captured = -1 }
+    n => { captured = n }
+}
+assert(captured == 77, "var bind in statement")
+
+println("PASS: all pattern matching tests passed")

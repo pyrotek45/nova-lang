@@ -1,0 +1,8 @@
+// should_fail: Float literal pattern on a String match
+module match_pattern_float_on_string
+fn bad(s: String) -> String {
+    return match s {
+        3.14 => "pi",
+        _ => "ok"
+    }
+}

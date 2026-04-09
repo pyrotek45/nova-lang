@@ -210,8 +210,8 @@ All list functions use UFCS — call them as methods with dot notation.
 | `writeFile(String, String) -> Bool` | Write to file (creates or overwrites). Returns `false` on error. |
 | `appendFile(String, String) -> Bool` | Append to file. Returns `false` on error. |
 | `fileExists(String) -> Bool` | Check if file exists. |
-| `printf(String, [String]) -> Void` | Print formatted string (`{}` placeholders). Supports varargs: `printf("{} {}", a, b)`. |
-| `format(String, [String]) -> String` | Format string without printing. Supports varargs: `format("{} {}", a, b)`. |
+| `printf(String, [String]) -> Void` | Print formatted string (`{}` placeholders). Use `{{` / `}}` for literal braces. Supports varargs: `printf("{} {}", a, b)`. |
+| `format(String, [String]) -> String` | Format string without printing. Use `{{` / `}}` for literal braces. Supports varargs: `format("{} {}", a, b)`. |
 
 ### Random
 

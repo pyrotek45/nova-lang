@@ -1,0 +1,828 @@
+module main
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Mini Compiler — Lexer → Parser → C Code Generator
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  A complete compiler pipeline that translates a tiny imperative language
+//  into compilable C code.  Demonstrates: arena AST, recursive descent
+//  parsing, tree-walking code generation, and string building.
+//
+//  Source Language:
+//    let x = <expr>;                -- variable declaration
+//    x = <expr>;                    -- assignment
+//    print <expr>;                  -- print integer
+//    if <cond> { … } else { … }    -- conditional
+//    while <cond> { … }            -- loop
+//    fn name(a, b) { … return e; } -- function definition
+//    name(a, b);                    -- function call (statement)
+//
+//  Expressions:
+//    +  -  *  /  %                  -- arithmetic
+//    ==  !=  <  >  <=  >=           -- comparison  (produce 0 / 1)
+//    &&  ||  !                      -- logical
+//    number / identifier / (expr)   -- atoms
+//    name(args)                     -- function call (in expression)
+//
+//  Run:  nova run demo/compiler.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1. Lexer
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Tok {
+    TNum:    Int,
+    TId:     String,
+    TPlus,   TMinus,  TStar,  TSlash,  TMod,
+    TLParen, TRParen, TLBrace, TRBrace,
+    TComma,  TSemi,
+    TEq,     TEqEq,   TBang,  TBangEq,
+    TLt,     TGt,     TLtEq,  TGtEq,
+    TAnd,    TOr,
+    TLet,    TIf,     TElse,  TWhile, TFn, TReturn, TPrint,
+    TEof
+}
+
+struct Lex { src: [Char], pos: Int }
+
+fn extends(Lex) new(s: String) -> Lex {
+    return Lex { src: s.chars(), pos: 0 }
+}
+
+fn extends ch(l: Lex) -> Char {
+    if l.pos < l.src.len() { return l.src[l.pos] }
+    return ' '
+}
+
+fn extends adv(l: Lex) { l.pos += 1 }
+
+fn extends skipWs(l: Lex) {
+    while l.pos < l.src.len() {
+        let c = l.src[l.pos]
+        if c == ' ' || c == '\n' || c == '\t' || c == '\r' {
+            l.pos += 1
+        } else {
+            break
+        }
+    }
+}
+
+fn extends readNum(l: Lex) -> Int {
+    let digits = []: Char
+    while l.pos < l.src.len() && l.src[l.pos].isDigit() {
+        digits.push(l.src[l.pos])
+        l.pos += 1
+    }
+    return Cast::int(digits.string()).orDefault(0)
+}
+
+fn extends readWord(l: Lex) -> String {
+    let chars = []: Char
+    while l.pos < l.src.len() {
+        let c = l.src[l.pos]
+        if c.isAlphanumeric() || c == '_' {
+            chars.push(c)
+            l.pos += 1
+        } else {
+            break
+        }
+    }
+    return chars.string()
+}
+
+fn kwLookup(w: String) -> Option(Tok) {
+    if w == "let"    { return Some(Tok::TLet()) }
+    if w == "if"     { return Some(Tok::TIf()) }
+    if w == "else"   { return Some(Tok::TElse()) }
+    if w == "while"  { return Some(Tok::TWhile()) }
+    if w == "fn"     { return Some(Tok::TFn()) }
+    if w == "return" { return Some(Tok::TReturn()) }
+    if w == "print"  { return Some(Tok::TPrint()) }
+    return None(Tok)
+}
+
+fn extends nextTok(l: Lex) -> Tok {
+    l.skipWs()
+    if l.pos >= l.src.len() { return Tok::TEof() }
+    let c = l.ch()
+
+    if c.isDigit() { return Tok::TNum(l.readNum()) }
+    if c.isAlpha() || c == '_' {
+        let w = l.readWord()
+        let kw = kwLookup(w)
+        if kw.isSome() { return kw.unwrap() }
+        return Tok::TId(w)
+    }
+
+    l.adv()
+    if c == '+' { return Tok::TPlus() }
+    if c == '-' { return Tok::TMinus() }
+    if c == '*' { return Tok::TStar() }
+    if c == '/' { return Tok::TSlash() }
+    if c == '%' { return Tok::TMod() }
+    if c == '(' { return Tok::TLParen() }
+    if c == ')' { return Tok::TRParen() }
+    if c == '{' { return Tok::TLBrace() }
+    if c == '}' { return Tok::TRBrace() }
+    if c == ',' { return Tok::TComma() }
+    if c == ';' { return Tok::TSemi() }
+
+    if c == '=' {
+        if l.ch() == '=' { l.adv(); return Tok::TEqEq() }
+        return Tok::TEq()
+    }
+    if c == '!' {
+        if l.ch() == '=' { l.adv(); return Tok::TBangEq() }
+        return Tok::TBang()
+    }
+    if c == '<' {
+        if l.ch() == '=' { l.adv(); return Tok::TLtEq() }
+        return Tok::TLt()
+    }
+    if c == '>' {
+        if l.ch() == '=' { l.adv(); return Tok::TGtEq() }
+        return Tok::TGt()
+    }
+    if c == '&' {
+        if l.ch() == '&' { l.adv(); return Tok::TAnd() }
+    }
+    if c == '|' {
+        if l.ch() == '|' { l.adv(); return Tok::TOr() }
+    }
+    return Tok::TEof()
+}
+
+fn tokenize(src: String) -> [Tok] {
+    let l = Lex::new(src)
+    let out = []: Tok
+    while true {
+        let t = l.nextTok()
+        out.push(t)
+        match t { TEof() => { break } _ => {} }
+    }
+    return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  2. AST  (arena-allocated flat list of nodes, referenced by integer index)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum NK {
+    NNum, NVar, NBinop, NUnary, NCall,
+    NLet, NAssign, NPrint, NReturn,
+    NIf, NWhile, NBlock, NFnDef
+}
+
+enum Op {
+    OAdd, OSub, OMul, ODiv, OMod,
+    OEq, ONe, OLt, OGt, OLe, OGe,
+    OAnd, OOr, ONot
+}
+
+fn extends toC(o: Op) -> String {
+    match o {
+        OAdd() => { return "+" }   OSub() => { return "-" }
+        OMul() => { return "*" }   ODiv() => { return "/" }
+        OMod() => { return "%" }   OEq()  => { return "==" }
+        ONe()  => { return "!=" }  OLt()  => { return "<" }
+        OGt()  => { return ">" }   OLe()  => { return "<=" }
+        OGe()  => { return ">=" }  OAnd() => { return "&&" }
+        OOr()  => { return "||" }  ONot() => { return "!" }
+    }
+}
+
+struct ASTNode {
+    kind:     NK,
+    num:      Int,
+    name:     String,
+    op:       Op,
+    left:     Int,
+    right:    Int,
+    condIdx:  Int,
+    bodyIdx:  Int,
+    elseIdx:  Int,
+    kids:     [Int],
+    params:   [String]
+}
+
+fn emptyNode(k: NK) -> ASTNode {
+    return ASTNode {
+        kind: k, num: 0, name: "", op: Op::OAdd(),
+        left: -1, right: -1, condIdx: -1, bodyIdx: -1, elseIdx: -1,
+        kids: []: Int, params: []: String
+    }
+}
+
+let arena = []: ASTNode
+
+fn nd(n: ASTNode) -> Int { arena.push(n); return arena.len() - 1 }
+
+fn mkNum(v: Int) -> Int    { let n = emptyNode(NK::NNum()); n.num = v; return nd(n) }
+fn mkVar(s: String) -> Int { let n = emptyNode(NK::NVar()); n.name = s; return nd(n) }
+
+fn mkBinop(op: Op, l: Int, r: Int) -> Int {
+    let n = emptyNode(NK::NBinop()); n.op = op; n.left = l; n.right = r; return nd(n)
+}
+fn mkUnary(op: Op, inner: Int) -> Int {
+    let n = emptyNode(NK::NUnary()); n.op = op; n.left = inner; return nd(n)
+}
+fn mkCall(name: String, args: [Int]) -> Int {
+    let n = emptyNode(NK::NCall()); n.name = name; n.kids = args; return nd(n)
+}
+fn mkLet(name: String, val: Int) -> Int {
+    let n = emptyNode(NK::NLet()); n.name = name; n.left = val; return nd(n)
+}
+fn mkAssign(name: String, val: Int) -> Int {
+    let n = emptyNode(NK::NAssign()); n.name = name; n.left = val; return nd(n)
+}
+fn mkPrint(expr: Int) -> Int {
+    let n = emptyNode(NK::NPrint()); n.left = expr; return nd(n)
+}
+fn mkReturn(expr: Int) -> Int {
+    let n = emptyNode(NK::NReturn()); n.left = expr; return nd(n)
+}
+fn mkIf(cond: Int, then: Int, els: Int) -> Int {
+    let n = emptyNode(NK::NIf()); n.condIdx = cond; n.bodyIdx = then; n.elseIdx = els; return nd(n)
+}
+fn mkWhile(cond: Int, body: Int) -> Int {
+    let n = emptyNode(NK::NWhile()); n.condIdx = cond; n.bodyIdx = body; return nd(n)
+}
+fn mkBlock(stmts: [Int]) -> Int {
+    let n = emptyNode(NK::NBlock()); n.kids = stmts; return nd(n)
+}
+fn mkFnDef(name: String, params: [String], body: Int) -> Int {
+    let n = emptyNode(NK::NFnDef()); n.name = name; n.params = params; n.bodyIdx = body; return nd(n)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  3. Parser  — recursive descent with precedence climbing
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct Par { toks: [Tok], pos: Int }
+
+fn extends(Par) new(toks: [Tok]) -> Par { return Par { toks: toks, pos: 0 } }
+fn extends pk(p: Par) -> Tok {
+    if p.pos < p.toks.len() { return p.toks[p.pos] }
+    return Tok::TEof()
+}
+fn extends eat(p: Par) -> Tok { let t = p.toks[p.pos]; p.pos += 1; return t }
+
+// Helper: check if the current token matches a kind string
+fn isTok(t: Tok, k: String) -> Bool {
+    match t {
+        TPlus()   => { return k == "+" }    TMinus()  => { return k == "-" }
+        TStar()   => { return k == "*" }    TSlash()  => { return k == "/" }
+        TMod()    => { return k == "%" }    TEqEq()   => { return k == "==" }
+        TBangEq() => { return k == "!=" }   TLt()     => { return k == "<" }
+        TGt()     => { return k == ">" }    TLtEq()   => { return k == "<=" }
+        TGtEq()   => { return k == ">=" }   TAnd()    => { return k == "&&" }
+        TOr()     => { return k == "||" }   TBang()   => { return k == "!" }
+        TEq()     => { return k == "=" }    TLParen() => { return k == "(" }
+        TRParen() => { return k == ")" }    TLBrace() => { return k == "{" }
+        TRBrace() => { return k == "}" }    TComma()  => { return k == "," }
+        TSemi()   => { return k == ";" }    TLet()    => { return k == "let" }
+        TIf()     => { return k == "if" }   TElse()   => { return k == "else" }
+        TWhile()  => { return k == "while" } TFn()    => { return k == "fn" }
+        TReturn() => { return k == "return" } TPrint() => { return k == "print" }
+        TEof()    => { return k == "eof" }
+        _         => { return false }
+    }
+}
+
+fn extends skip(p: Par, k: String) { let _ = p.eat() }
+
+// ── Expression grammar (lowest-to-highest precedence) ──
+
+fn extends parseExpr(p: Par) -> Int   // forward
+
+fn extends parseAtom(p: Par) -> Int {
+    let t = p.pk()
+    // parenthesized
+    if isTok(t, "(") { p.skip("("); let e = p.parseExpr(); p.skip(")"); return e }
+    // unary minus
+    if isTok(t, "-") { p.skip("-"); return mkUnary(Op::OSub(), p.parseAtom()) }
+    // logical not
+    if isTok(t, "!") { p.skip("!"); return mkUnary(Op::ONot(), p.parseAtom()) }
+    // number
+    match t { TNum(v) => { let _ = p.eat(); return mkNum(v) } _ => {} }
+    // identifier or call
+    match t {
+        TId(name) => {
+            let _ = p.eat()
+            if isTok(p.pk(), "(") {
+                p.skip("(")
+                let args = []: Int
+                if !isTok(p.pk(), ")") {
+                    args.push(p.parseExpr())
+                    while isTok(p.pk(), ",") { p.skip(","); args.push(p.parseExpr()) }
+                }
+                p.skip(")")
+                return mkCall(name, args)
+            }
+            return mkVar(name)
+        }
+        _ => {}
+    }
+    return mkNum(0)
+}
+
+fn extends parseMul(p: Par) -> Int {
+    let l = p.parseAtom()
+    while true {
+        let t = p.pk()
+        if isTok(t, "*")      { p.skip("*"); l = mkBinop(Op::OMul(), l, p.parseAtom()) }
+        elif isTok(t, "/")    { p.skip("/"); l = mkBinop(Op::ODiv(), l, p.parseAtom()) }
+        elif isTok(t, "%")    { p.skip("%"); l = mkBinop(Op::OMod(), l, p.parseAtom()) }
+        else { break }
+    }
+    return l
+}
+
+fn extends parseAdd(p: Par) -> Int {
+    let l = p.parseMul()
+    while true {
+        let t = p.pk()
+        if isTok(t, "+")      { p.skip("+"); l = mkBinop(Op::OAdd(), l, p.parseMul()) }
+        elif isTok(t, "-")    { p.skip("-"); l = mkBinop(Op::OSub(), l, p.parseMul()) }
+        else { break }
+    }
+    return l
+}
+
+fn extends parseCmp(p: Par) -> Int {
+    let l = p.parseAdd()
+    while true {
+        let t = p.pk()
+        if isTok(t, "==")     { p.skip("=="); l = mkBinop(Op::OEq(), l, p.parseAdd()) }
+        elif isTok(t, "!=")   { p.skip("!="); l = mkBinop(Op::ONe(), l, p.parseAdd()) }
+        elif isTok(t, "<")    { p.skip("<");  l = mkBinop(Op::OLt(), l, p.parseAdd()) }
+        elif isTok(t, ">")    { p.skip(">");  l = mkBinop(Op::OGt(), l, p.parseAdd()) }
+        elif isTok(t, "<=")   { p.skip("<="); l = mkBinop(Op::OLe(), l, p.parseAdd()) }
+        elif isTok(t, ">=")   { p.skip(">="); l = mkBinop(Op::OGe(), l, p.parseAdd()) }
+        else { break }
+    }
+    return l
+}
+
+fn extends parseAnd(p: Par) -> Int {
+    let l = p.parseCmp()
+    while isTok(p.pk(), "&&") { p.skip("&&"); l = mkBinop(Op::OAnd(), l, p.parseCmp()) }
+    return l
+}
+
+fn extends parseExpr(p: Par) -> Int {
+    let l = p.parseAnd()
+    while isTok(p.pk(), "||") { p.skip("||"); l = mkBinop(Op::OOr(), l, p.parseAnd()) }
+    return l
+}
+
+// ── Statement / Block parsing ──
+
+fn extends parseBlock(p: Par) -> Int
+fn extends parseStmt(p: Par) -> Int
+
+fn extends parseBlock(p: Par) -> Int {
+    p.skip("{")
+    let stmts = []: Int
+    while !isTok(p.pk(), "}") && !isTok(p.pk(), "eof") {
+        stmts.push(p.parseStmt())
+    }
+    p.skip("}")
+    return mkBlock(stmts)
+}
+
+fn extends parseStmt(p: Par) -> Int {
+    let t = p.pk()
+
+    // let x = expr;
+    if isTok(t, "let") {
+        p.skip("let")
+        let name = ""
+        match p.eat() { TId(s) => { name = s } _ => {} }
+        p.skip("=")
+        let val = p.parseExpr()
+        if isTok(p.pk(), ";") { p.skip(";") }
+        return mkLet(name, val)
+    }
+
+    // if cond { ... } else { ... }
+    if isTok(t, "if") {
+        p.skip("if")
+        let c = p.parseExpr()
+        let th = p.parseBlock()
+        let el = -1
+        if isTok(p.pk(), "else") { p.skip("else"); el = p.parseBlock() }
+        return mkIf(c, th, el)
+    }
+
+    // while cond { ... }
+    if isTok(t, "while") {
+        p.skip("while")
+        let c = p.parseExpr()
+        let b = p.parseBlock()
+        return mkWhile(c, b)
+    }
+
+    // fn name(params) { ... }
+    if isTok(t, "fn") {
+        p.skip("fn")
+        let fnName = ""
+        match p.eat() { TId(s) => { fnName = s } _ => {} }
+        p.skip("(")
+        let params = []: String
+        if !isTok(p.pk(), ")") {
+            match p.eat() { TId(s) => { params.push(s) } _ => {} }
+            while isTok(p.pk(), ",") {
+                p.skip(",")
+                match p.eat() { TId(s) => { params.push(s) } _ => {} }
+            }
+        }
+        p.skip(")")
+        let fnBody = p.parseBlock()
+        return mkFnDef(fnName, params, fnBody)
+    }
+
+    // return expr;
+    if isTok(t, "return") {
+        p.skip("return")
+        let val = p.parseExpr()
+        if isTok(p.pk(), ";") { p.skip(";") }
+        return mkReturn(val)
+    }
+
+    // print expr;
+    if isTok(t, "print") {
+        p.skip("print")
+        let val = p.parseExpr()
+        if isTok(p.pk(), ";") { p.skip(";") }
+        return mkPrint(val)
+    }
+
+    // assignment: x = expr;  or  call: f(args);  or bare id
+    match t {
+        TId(name) => {
+            let _ = p.eat()
+            if isTok(p.pk(), "=") {
+                p.skip("=")
+                let val = p.parseExpr()
+                if isTok(p.pk(), ";") { p.skip(";") }
+                return mkAssign(name, val)
+            }
+            if isTok(p.pk(), "(") {
+                p.skip("(")
+                let args = []: Int
+                if !isTok(p.pk(), ")") {
+                    args.push(p.parseExpr())
+                    while isTok(p.pk(), ",") { p.skip(","); args.push(p.parseExpr()) }
+                }
+                p.skip(")")
+                if isTok(p.pk(), ";") { p.skip(";") }
+                return mkCall(name, args)
+            }
+            if isTok(p.pk(), ";") { p.skip(";") }
+            return mkVar(name)
+        }
+        _ => { let _ = p.eat(); return mkNum(0) }
+    }
+    return mkNum(0)
+}
+
+fn parseProgram(src: String) -> Int {
+    let toks = tokenize(src)
+    let p = Par::new(toks)
+    let stmts = []: Int
+    while !isTok(p.pk(), "eof") {
+        stmts.push(p.parseStmt())
+    }
+    return mkBlock(stmts)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  4. Code Generator  — AST → C source
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn pad(d: Int) -> String {
+    let s = ""
+    for i in 0..d { s = s + "    " }
+    return s
+}
+
+fn emitExpr(idx: Int) -> String {
+    let n = arena[idx]
+    match n.kind {
+        NNum()   => { return Cast::string(n.num) }
+        NVar()   => { return n.name }
+        NBinop() => {
+            return format("({} {} {})", emitExpr(n.left), n.op.toC(), emitExpr(n.right))
+        }
+        NUnary() => {
+            match n.op {
+                ONot() => { return format("(!{})", emitExpr(n.left)) }
+                _      => { return format("(-{})", emitExpr(n.left)) }
+            }
+            return ""
+        }
+        NCall() => {
+            let a = []: String
+            for c in n.kids { a.push(emitExpr(c)) }
+            return format("{}({})", n.name, join(a, ", "))
+        }
+        _ => { return "0" }
+    }
+    return "0"
+}
+
+fn emitStmt(idx: Int, d: Int) -> String   // forward
+
+fn emitBlock(idx: Int, d: Int) -> String {
+    let n = arena[idx]
+    let lines = []: String
+    for c in n.kids { lines.push(emitStmt(c, d)) }
+    return join(lines, "\n")
+}
+
+fn emitStmt(idx: Int, d: Int) -> String {
+    let n = arena[idx]
+    let p = pad(d)
+    match n.kind {
+        NLet()    => { return format("{}int {} = {};", p, n.name, emitExpr(n.left)) }
+        NAssign() => { return format("{}{} = {};", p, n.name, emitExpr(n.left)) }
+        NPrint()  => { return format("{}printf(\"%d\\n\", {});", p, emitExpr(n.left)) }
+        NReturn() => { return format("{}return {};", p, emitExpr(n.left)) }
+        NIf() => {
+            let o = []: String
+            o.push(format("{}if ({}) {{", p, emitExpr(n.condIdx)))
+            o.push(emitBlock(n.bodyIdx, d + 1))
+            if n.elseIdx >= 0 {
+                o.push(format("{}}} else {{", p))
+                o.push(emitBlock(n.elseIdx, d + 1))
+            }
+            o.push(format("{}}}", p))
+            return join(o, "\n")
+        }
+        NWhile() => {
+            let o = []: String
+            o.push(format("{}while ({}) {{", p, emitExpr(n.condIdx)))
+            o.push(emitBlock(n.bodyIdx, d + 1))
+            o.push(format("{}}}", p))
+            return join(o, "\n")
+        }
+        NFnDef() => {
+            let pl = []: String
+            for param in n.params { pl.push("int " + param) }
+            let o = []: String
+            o.push(format("{}int {}({}) {{", p, n.name, join(pl, ", ")))
+            o.push(emitBlock(n.bodyIdx, d + 1))
+            o.push(format("{}}}", p))
+            return join(o, "\n")
+        }
+        NBlock() => { return emitBlock(idx, d) }
+        NCall() => {
+            let a = []: String
+            for c in n.kids { a.push(emitExpr(c)) }
+            return format("{}{}({});", p, n.name, join(a, ", "))
+        }
+        _ => { return format("{}/* ? */", p) }
+    }
+    return ""
+}
+
+// Main entry: source string → complete C program string
+fn compile(src: String) -> String {
+    arena.clear()
+    let root = parseProgram(src)
+    let rootN = arena[root]
+
+    // Separate top-level function defs from main-body statements
+    let fns   = []: Int
+    let stmts = []: Int
+    for c in rootN.kids {
+        match arena[c].kind {
+            NFnDef() => { fns.push(c) }
+            _        => { stmts.push(c) }
+        }
+    }
+
+    let out = []: String
+    out.push("/* Generated by Nova mini-compiler */")
+    out.push("#include <stdio.h>")
+    out.push("")
+
+    // Emit forward declarations for all functions
+    for f in fns {
+        let fn_ = arena[f]
+        let pl = []: String
+        for param in fn_.params { pl.push("int " + param) }
+        out.push(format("int {}({});", fn_.name, join(pl, ", ")))
+    }
+    if fns.len() > 0 { out.push("") }
+
+    // Emit function definitions
+    for f in fns {
+        out.push(emitStmt(f, 0))
+        out.push("")
+    }
+
+    // Emit main
+    out.push("int main(void) {")
+    let mainBlk = mkBlock(stmts)
+    out.push(emitBlock(mainBlk, 1))
+    out.push("    return 0;")
+    out.push("}")
+    return join(out, "\n")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  5. Demo — compile several programs, print the C, write to /tmp
+// ═════════════════════════════════════════════════════════════════════════════
+
+println("═══ Mini Compiler: Nova → C  ═══")
+println("")
+
+// ── Helper: compile, print, and write to /tmp ──
+
+fn demo(label: String, fileName: String, src: String) {
+    println(format("── {} ──", label))
+    println("")
+    let csrc = compile(src)
+    println(csrc)
+    println("")
+    let path = "/tmp/nova_" + fileName + ".c"
+    let ok = writeFile(path, csrc)
+    if ok {
+        println(format("  → wrote {}", path))
+    } else {
+        println(format("  → FAILED to write {}", path))
+    }
+    println("")
+}
+
+// ── 1. Variables & Arithmetic ───────────────────────────────────────────────
+
+demo("1. Variables & Arithmetic", "prog1_vars", "
+let x = 10;
+let y = 20;
+let z = x + y * 2;
+print z;
+")
+
+// ── 2. If / Else ────────────────────────────────────────────────────────────
+
+demo("2. If / Else", "prog2_ifelse", "
+let a = 42;
+if a > 100 {
+    print 1;
+} else {
+    print 0;
+}
+let b = 7;
+if b % 2 == 0 {
+    print b;
+} else {
+    let odd = b + 1;
+    print odd;
+}
+")
+
+// ── 3. While Loop ───────────────────────────────────────────────────────────
+
+demo("3. While Loop", "prog3_loop", "
+let i = 0;
+let sum = 0;
+while i < 10 {
+    i = i + 1;
+    sum = sum + i;
+}
+print sum;
+")
+
+// ── 4. Functions ────────────────────────────────────────────────────────────
+
+demo("4. Functions", "prog4_funcs", "
+fn square(x) {
+    return x * x;
+}
+fn add(a, b) {
+    return a + b;
+}
+let r = add(square(3), square(4));
+print r;
+")
+
+// ── 5. FizzBuzz ─────────────────────────────────────────────────────────────
+
+demo("5. FizzBuzz (0=fizzbuzz, 3=fizz, 5=buzz, else n)", "prog5_fizzbuzz", "
+let i = 1;
+while i <= 20 {
+    if i % 15 == 0 {
+        print 0;
+    } else {
+        if i % 3 == 0 {
+            print 3;
+        } else {
+            if i % 5 == 0 {
+                print 5;
+            } else {
+                print i;
+            }
+        }
+    }
+    i = i + 1;
+}
+")
+
+// ── 6. Primes ───────────────────────────────────────────────────────────────
+
+demo("6. Primes up to 30", "prog6_primes", "
+fn isPrime(n) {
+    if n < 2 { return 0; }
+    let d = 2;
+    while d * d <= n {
+        if n % d == 0 { return 0; }
+        d = d + 1;
+    }
+    return 1;
+}
+let i = 2;
+while i <= 30 {
+    if isPrime(i) == 1 { print i; }
+    i = i + 1;
+}
+")
+
+// ── 7. Recursive Factorial ──────────────────────────────────────────────────
+
+demo("7. Recursive Factorial", "prog7_factorial", "
+fn factorial(n) {
+    if n <= 1 { return 1; }
+    return n * factorial(n - 1);
+}
+print factorial(10);
+")
+
+// ── 8. Fibonacci ────────────────────────────────────────────────────────────
+
+demo("8. Fibonacci", "prog8_fib", "
+fn fib(n) {
+    if n <= 1 { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+let i = 0;
+while i < 15 {
+    print fib(i);
+    i = i + 1;
+}
+")
+
+// ── 9. GCD (Euclidean) ─────────────────────────────────────────────────────
+
+demo("9. GCD (Euclidean)", "prog9_gcd", "
+fn gcd(a, b) {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
+print gcd(48, 18);
+print gcd(100, 75);
+print gcd(17, 13);
+")
+
+// ── 10. Power function & nested calls ───────────────────────────────────────
+
+demo("10. Power & Nested Calls", "prog10_power", "
+fn power(base, exp) {
+    let result = 1;
+    let i = 0;
+    while i < exp {
+        result = result * base;
+        i = i + 1;
+    }
+    return result;
+}
+fn abs(x) {
+    if x < 0 { return 0 - x; }
+    return x;
+}
+print power(2, 10);
+print power(3, 5);
+print abs(-42);
+print abs(7);
+")
+
+println("═══════════════════════════════════════════════════════════")
+println("  All C files written to /tmp/nova_prog*.c")
+println("  Compile & run them with:")
+println("    for f in /tmp/nova_prog*.c; do")
+println("      gcc -o \"${f%.c}\" \"$f\" && echo \"--- $(basename $f) ---\" && \"${f%.c}\";")
+println("    done")
+println("═══════════════════════════════════════════════════════════")
+println("")
+println("Done!")

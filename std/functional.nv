@@ -58,6 +58,18 @@ fn flip(f: fn($A, $B) -> $C) -> fn($B, $A) -> $C {
     return fn(b: $B, a: $A) -> $C { return f(a, b) }
 }
 
+// curry -- turn a two-argument function into a chain of single-argument functions
+//   let add = curry(|a: Int, b: Int| a + b)
+//   let add3 = add(3)
+//   add3(4)  // 7
+fn curry(f: fn($A, $B) -> $C) -> fn($A) -> fn($B) -> $C {
+    return fn(a: $A) -> fn($B) -> $C {
+        return fn(b: $B) -> $C {
+            return f(a, b)
+        }
+    }
+}
+
 // const_ -- return a function that always returns v, ignoring its argument
 //   let always5 = const_(5)
 //   always5("anything")  // 5

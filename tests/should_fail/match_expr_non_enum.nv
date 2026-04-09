@@ -1,7 +1,0 @@
-module main
-
-// SHOULD FAIL: match expression on non-enum type
-let x = 42
-let y = match x {
-    _ => "hello"
-}

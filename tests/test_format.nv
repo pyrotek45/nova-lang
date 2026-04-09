@@ -26,6 +26,19 @@ assert(s5 == "abc", "format concatenation")
 let s6 = format("The {} {} fox {} over the {} dog", ["quick", "brown", "jumps", "lazy"])
 assert(s6 == "The quick brown fox jumps over the lazy dog", "format sentence")
 
+// Escaped braces: {{ → {  and  }} → }
+let s7 = format("literal {{ and }}", []: String)
+assert(s7 == "literal { and }", "escaped braces no args")
+
+let s8 = format("{{ {} }}", ["x"])
+assert(s8 == "{ x }", "escaped braces with arg")
+
+let s9 = format("{{{}}}", ["hello"])
+assert(s9 == "{hello}", "escaped braces wrapping placeholder")
+
+let s10 = format("a {{}} b", []: String)
+assert(s10 == "a {} b", "escaped pair looks like placeholder")
+
 // Cast::string on various types
 assert(Cast::string(42) == "42", "cast int")
 assert(Cast::string(true) == "true", "cast true")

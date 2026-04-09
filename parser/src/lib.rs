@@ -10,7 +10,7 @@ use std::{
 use common::{
     error::{NovaError, NovaResult},
     fileposition::FilePosition,
-    nodes::{Arg, Ast, Atom, Expr, Field, Statement, Symbol, SymbolKind},
+    nodes::{Arg, Ast, Atom, Expr, Field, Pattern, Statement, Symbol, SymbolKind},
     table::{self, Table},
     tokens::{
         KeyWord, Operator,
@@ -1545,9 +1545,24 @@ impl Parser {
                 ttype.clone(),
             )
         } else {
+            let note = if self.typechecker.environment.is_known_function(&identifier) {
+                format!(
+                    "`{}` is a function, not a variable.\n  \
+                     To pass a named function as a value, use the @(Type) syntax:\n    \
+                     {}@(ParamType)\n  \
+                     For example: {}@(Int) or {}@(Int, String)",
+                    identifier, identifier, identifier, identifier,
+                )
+            } else {
+                format!(
+                    "The identifier `{}` is not defined.\n  \
+                     Check spelling, or make sure it is declared before this point.",
+                    identifier,
+                )
+            };
             Err(self.generate_error_with_pos(
                 format!("Undefined symbol `{}`", identifier),
-                format!("The identifier `{}` is not defined.\n  Check spelling, or make sure it is declared before this point.", identifier),
+                note,
                 position,
             ))
         }
@@ -1588,9 +1603,24 @@ impl Parser {
             );
             Ok(self.create_literal_expr(identifier.clone(), ttype.clone()))
         } else {
+            let note = if self.typechecker.environment.is_known_function(&identifier) {
+                format!(
+                    "`{}` is a function, not a variable.\n  \
+                     To pass a named function as a value, use the @(Type) syntax:\n    \
+                     {}@(ParamType)\n  \
+                     For example: {}@(Int) or {}@(Int, String)",
+                    identifier, identifier, identifier, identifier,
+                )
+            } else {
+                format!(
+                    "The identifier `{}` is not defined in the current or enclosing scope.\n  \
+                     Check spelling, or make sure it is declared before this point.",
+                    identifier,
+                )
+            };
             Err(self.generate_error_with_pos(
                 format!("Undefined symbol `{}`", identifier),
-                format!("The identifier `{}` is not defined in the current or enclosing scope.\n  Check spelling, or make sure it is declared before this point.", identifier),
+                note,
                 position,
             ))
         }
@@ -4631,6 +4661,818 @@ impl Parser {
         }))
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    //  Generalized pattern parsing for non-enum match
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Check if a pattern is irrefutable (always matches).
+    fn is_irrefutable(pat: &Pattern) -> bool {
+        match pat {
+            Pattern::Wildcard | Pattern::Variable(_) => true,
+            Pattern::Tuple(pats) | Pattern::List(pats) => pats.iter().all(Self::is_irrefutable),
+            Pattern::OptionSome(_) => {
+                // Some(x) only matches Some, not None – not irrefutable
+                false
+            }
+            Pattern::Or(alts) => alts.iter().any(Self::is_irrefutable),
+            _ => false,
+        }
+    }
+
+    /// Check if a pattern (or any of its Or alternatives) satisfies a predicate.
+    fn arm_contains(pat: &Pattern, pred: &dyn Fn(&Pattern) -> bool) -> bool {
+        match pat {
+            Pattern::Or(alts) => alts.iter().any(|a| pred(a)),
+            other => pred(other),
+        }
+    }
+
+    /// Validate that a pattern is compatible with the match type.
+    /// Returns an error if, e.g., an IntLiteral pattern is used on a String match.
+    fn validate_pattern_type(&self, pattern: &Pattern, match_type: &TType, pos: &FilePosition) -> NovaResult<()> {
+        match pattern {
+            Pattern::Wildcard | Pattern::Variable(_) => Ok(()),
+            Pattern::IntLiteral(_) => {
+                if *match_type != TType::Int && *match_type != TType::Any {
+                    return Err(self.generate_error_with_pos(
+                        format!("Int literal pattern cannot match `{}`", match_type),
+                        "This arm uses an integer pattern, but the match subject is not an Int.",
+                        pos.clone(),
+                    ));
+                }
+                Ok(())
+            }
+            Pattern::FloatLiteral(_) => {
+                if *match_type != TType::Float && *match_type != TType::Any {
+                    return Err(self.generate_error_with_pos(
+                        format!("Float literal pattern cannot match `{}`", match_type),
+                        "This arm uses a float pattern, but the match subject is not a Float.",
+                        pos.clone(),
+                    ));
+                }
+                Ok(())
+            }
+            Pattern::StringLiteral(_) => {
+                if *match_type != TType::String && *match_type != TType::Any {
+                    return Err(self.generate_error_with_pos(
+                        format!("String literal pattern cannot match `{}`", match_type),
+                        "This arm uses a string pattern, but the match subject is not a String.",
+                        pos.clone(),
+                    ));
+                }
+                Ok(())
+            }
+            Pattern::BoolLiteral(_) => {
+                if *match_type != TType::Bool && *match_type != TType::Any {
+                    return Err(self.generate_error_with_pos(
+                        format!("Bool literal pattern cannot match `{}`", match_type),
+                        "This arm uses a bool pattern, but the match subject is not a Bool.",
+                        pos.clone(),
+                    ));
+                }
+                Ok(())
+            }
+            Pattern::CharLiteral(_) => {
+                if *match_type != TType::Char && *match_type != TType::Any {
+                    return Err(self.generate_error_with_pos(
+                        format!("Char literal pattern cannot match `{}`", match_type),
+                        "This arm uses a char pattern, but the match subject is not a Char.",
+                        pos.clone(),
+                    ));
+                }
+                Ok(())
+            }
+            Pattern::EmptyList | Pattern::List(_) | Pattern::ListCons(_, _) => {
+                match match_type {
+                    TType::List { .. } | TType::Any => Ok(()),
+                    _ => Err(self.generate_error_with_pos(
+                        format!("List pattern cannot match `{}`", match_type),
+                        "This arm uses a list pattern, but the match subject is not a List.",
+                        pos.clone(),
+                    )),
+                }
+            }
+            Pattern::Tuple(pats) => {
+                match match_type {
+                    TType::Tuple { elements } => {
+                        if pats.len() != elements.len() {
+                            return Err(self.generate_error_with_pos(
+                                format!(
+                                    "Tuple pattern has {} elements but the match type has {}",
+                                    pats.len(), elements.len()
+                                ),
+                                "The number of elements in the tuple pattern must match the tuple type.",
+                                pos.clone(),
+                            ));
+                        }
+                        for (i, pat) in pats.iter().enumerate() {
+                            self.validate_pattern_type(pat, &elements[i], pos)?;
+                        }
+                        Ok(())
+                    }
+                    TType::Any => Ok(()),
+                    _ => Err(self.generate_error_with_pos(
+                        format!("Tuple pattern cannot match `{}`", match_type),
+                        "This arm uses a tuple pattern, but the match subject is not a Tuple.",
+                        pos.clone(),
+                    )),
+                }
+            }
+            Pattern::Or(alternatives) => {
+                for alt in alternatives {
+                    self.validate_pattern_type(alt, match_type, pos)?;
+                }
+                Ok(())
+            }
+            Pattern::Enum { variant, .. } => {
+                match match_type {
+                    TType::Option { .. } => {
+                        // Only Some and None are valid
+                        if variant.as_ref() != "Some" && variant.as_ref() != "None" {
+                            return Err(self.generate_error_with_pos(
+                                format!("Unknown Option variant `{}`", variant),
+                                "Option only has `Some(x)` and `None()` variants.",
+                                pos.clone(),
+                            ));
+                        }
+                        Ok(())
+                    }
+                    TType::Custom { name, .. } => {
+                        // Check that the variant exists in the enum definition
+                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                            let found = fields.iter().any(|(n, _)| n.as_ref() == variant.as_ref());
+                            if !found {
+                                let available: Vec<String> = fields.iter()
+                                    .filter(|(n, _)| n.as_ref() != "type")
+                                    .map(|(n, _)| format!("`{}`", n))
+                                    .collect();
+                                return Err(self.generate_error_with_pos(
+                                    format!("Variant `{}` not found in `{}`", variant, name),
+                                    format!("Available variants: {}", available.join(", ")),
+                                    pos.clone(),
+                                ));
+                            }
+                        }
+                        Ok(())
+                    }
+                    TType::Any => Ok(()),
+                    _ => Err(self.generate_error_with_pos(
+                        format!("Enum pattern `{}(...)` cannot match `{}`", variant, match_type),
+                        "Enum/variant patterns require the match subject to be an enum or Option type.",
+                        pos.clone(),
+                    )),
+                }
+            }
+            Pattern::Struct { name, .. } => {
+                match match_type {
+                    TType::Custom { name: type_name, .. } => {
+                        if name != type_name {
+                            return Err(self.generate_error_with_pos(
+                                format!("Struct pattern `{}` does not match type `{}`", name, type_name),
+                                "The struct name in the pattern must match the match subject type.",
+                                pos.clone(),
+                            ));
+                        }
+                        Ok(())
+                    }
+                    TType::Any => Ok(()),
+                    _ => Err(self.generate_error_with_pos(
+                        format!("Struct pattern cannot match `{}`", match_type),
+                        "Struct patterns require the match subject to be a struct type.",
+                        pos.clone(),
+                    )),
+                }
+            }
+            Pattern::OptionSome(_) | Pattern::OptionNone => {
+                match match_type {
+                    TType::Option { .. } | TType::Any => Ok(()),
+                    _ => Err(self.generate_error_with_pos(
+                        format!("Option pattern cannot match `{}`", match_type),
+                        "Some/None patterns require the match subject to be an Option type.",
+                        pos.clone(),
+                    )),
+                }
+            }
+        }
+    }
+
+    /// Parse a single pattern.
+    ///
+    /// Patterns:
+    ///   _                     → Wildcard
+    ///   42 / -3               → IntLiteral
+    ///   3.14 / -1.0           → FloatLiteral
+    ///   "hello"               → StringLiteral
+    ///   'a'                   → CharLiteral
+    ///   true / false          → BoolLiteral
+    ///   []                    → EmptyList
+    ///   [p1, p2, ..]          → List(pats)
+    ///   [p1, p2, ..rest]      → ListCons(heads, rest)
+    ///   (p1, p2, ..)          → Tuple(pats)
+    ///   identifier            → Variable(name)
+    ///   Variant(pat)          → Enum { variant, binding }
+    ///   Struct { f1: p, f2 }  → Struct { name, fields }
+    ///   pat1 | pat2           → Or([pat1, pat2])
+    fn parse_pattern(&mut self) -> NovaResult<Pattern> {
+        let pat = self.parse_single_pattern()?;
+        // Check for | (OR patterns)
+        if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Pipe)) {
+            let mut alternatives = vec![pat];
+            while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Pipe)) {
+                self.advance(); // consume |
+                alternatives.push(self.parse_single_pattern()?);
+            }
+            return Ok(Pattern::Or(alternatives));
+        }
+        Ok(pat)
+    }
+
+    /// When matching on Option, transform `Enum { variant: "Some", binding }` → OptionSome(binding)
+    /// and `Enum { variant: "None", binding: None }` → OptionNone.
+    fn resolve_option_patterns(pat: Pattern, match_type: &TType) -> Pattern {
+        if !matches!(match_type, TType::Option { .. }) {
+            return pat;
+        }
+        match pat {
+            Pattern::Enum { ref variant, ref binding } if variant.as_ref() == "Some" => {
+                Pattern::OptionSome(binding.clone())
+            }
+            Pattern::Enum { ref variant, ref binding } if variant.as_ref() == "None" && binding.is_none() => {
+                Pattern::OptionNone
+            }
+            Pattern::Or(alternatives) => {
+                Pattern::Or(alternatives.into_iter()
+                    .map(|a| Self::resolve_option_patterns(a, match_type))
+                    .collect())
+            }
+            other => other,
+        }
+    }
+
+    /// Parse a single pattern (without OR).
+    fn parse_single_pattern(&mut self) -> NovaResult<Pattern> {
+        let pos = self.get_current_token_position();
+        match self.current_token_value().cloned() {
+            // wildcard _
+            Some(TokenValue::Identifier(id)) if id.as_ref() == "_" => {
+                self.advance();
+                Ok(Pattern::Wildcard)
+            }
+            // bool literals
+            Some(TokenValue::Bool(b)) => {
+                self.advance();
+                Ok(Pattern::BoolLiteral(b))
+            }
+            // string literal
+            Some(TokenValue::StringLiteral(s)) => {
+                self.advance();
+                Ok(Pattern::StringLiteral(s))
+            }
+            // char literal
+            Some(TokenValue::Char(c)) => {
+                self.advance();
+                Ok(Pattern::CharLiteral(c))
+            }
+            // integer literal
+            Some(TokenValue::Integer(n)) => {
+                self.advance();
+                Ok(Pattern::IntLiteral(n))
+            }
+            // float literal
+            Some(TokenValue::Float(f)) => {
+                self.advance();
+                Ok(Pattern::FloatLiteral(f))
+            }
+            // negative number: -42 or -3.14
+            Some(TokenValue::Operator(Operator::Subtraction)) => {
+                self.advance();
+                match self.current_token_value().cloned() {
+                    Some(TokenValue::Integer(n)) => {
+                        self.advance();
+                        Ok(Pattern::IntLiteral(-n))
+                    }
+                    Some(TokenValue::Float(f)) => {
+                        self.advance();
+                        Ok(Pattern::FloatLiteral(-f))
+                    }
+                    _ => Err(self.generate_error_with_pos(
+                        "Expected a number after `-` in pattern",
+                        "Negative patterns must be followed by an Int or Float literal.",
+                        pos,
+                    )),
+                }
+            }
+            // list pattern: [p1, p2, ...] or [p1, ..rest] or []
+            Some(TokenValue::StructuralSymbol(StructuralSymbol::LeftSquareBracket)) => {
+                self.advance(); // consume [
+                // empty list
+                if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightSquareBracket)) {
+                    self.advance(); // consume ]
+                    return Ok(Pattern::EmptyList);
+                }
+                let mut pats = vec![];
+                loop {
+                    // check for ..rest (spread/cons pattern)
+                    if self.current_token().is_some_and(|t| t.is_op(Operator::ExclusiveRange)) {
+                        self.advance(); // consume ..
+                        let (rest_name, _) = self.get_identifier()?;
+                        self.consume_symbol(StructuralSymbol::RightSquareBracket)?;
+                        return Ok(Pattern::ListCons(pats, rest_name));
+                    }
+                    pats.push(self.parse_pattern()?);
+                    if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                        self.advance(); // consume ,
+                        // allow trailing comma before ]
+                        if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightSquareBracket)) {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                self.consume_symbol(StructuralSymbol::RightSquareBracket)?;
+                Ok(Pattern::List(pats))
+            }
+            // tuple pattern: (p1, p2, ...)
+            Some(TokenValue::StructuralSymbol(StructuralSymbol::LeftParen)) => {
+                self.advance(); // consume (
+                let mut pats = vec![];
+                if !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightParen)) {
+                    pats.push(self.parse_pattern()?);
+                    while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                        self.advance(); // consume ,
+                        if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightParen)) {
+                            break; // trailing comma
+                        }
+                        pats.push(self.parse_pattern()?);
+                    }
+                }
+                self.consume_symbol(StructuralSymbol::RightParen)?;
+                Ok(Pattern::Tuple(pats))
+            }
+            // identifier → could be: variable, enum variant Foo(), struct Foo { ... }
+            Some(TokenValue::Identifier(id)) => {
+                self.advance();
+                // Check if followed by ( → Enum variant pattern
+                if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftParen)) {
+                    self.advance(); // consume (
+                    let binding = if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightParen)) {
+                        // No binding: None() or Red()
+                        None
+                    } else {
+                        Some(Box::new(self.parse_pattern()?))
+                    };
+                    self.consume_symbol(StructuralSymbol::RightParen)?;
+                    return Ok(Pattern::Enum { variant: id, binding });
+                }
+                // Check if followed by { → Struct pattern
+                if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
+                    self.advance(); // consume {
+                    let mut fields = vec![];
+                    while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+                        let (field_name, _) = self.get_identifier()?;
+                        if self.current_token().is_some_and(|t| t.is_op(Operator::Colon)) {
+                            self.advance(); // consume :
+                            let pat = self.parse_pattern()?;
+                            fields.push((field_name, pat));
+                        } else {
+                            // shorthand: `x` means `x: x` (bind to variable with same name)
+                            fields.push((field_name.clone(), Pattern::Variable(field_name)));
+                        }
+                        if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                            self.advance();
+                        }
+                    }
+                    self.consume_symbol(StructuralSymbol::RightBrace)?;
+                    return Ok(Pattern::Struct { name: id, fields });
+                }
+                // Plain variable binding
+                Ok(Pattern::Variable(id))
+            }
+            _ => Err(self.generate_error_with_pos(
+                "Invalid pattern in match arm",
+                "Expected one of: literal (Int, Float, String, Char, Bool),\n  \
+                 `_` (wildcard), a variable name, `[...]` (list pattern), `(...)` (tuple pattern),\n  \
+                 `Variant(...)` (enum pattern), `Struct { ... }` (struct pattern), or `pat1 | pat2` (OR pattern).",
+                pos,
+            )),
+        }
+    }
+
+    /// Parse a value-match expression (non-enum).
+    fn value_match_expr(&mut self, expr: Expr) -> NovaResult<Expr> {
+        let pos = self.get_current_token_position();
+        let match_type = expr.get_type();
+        let mut arms: Vec<(Pattern, Vec<Statement>)> = vec![];
+        self.consume_symbol(StructuralSymbol::LeftBrace)?;
+        let mut default_branch: Option<Vec<Statement>> = None;
+
+        while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+            let pat = self.parse_pattern()?;
+            let pat = Self::resolve_option_patterns(pat, &match_type);
+
+            // Validate pattern type compatibility
+            self.validate_pattern_type(&pat, &match_type, &pos)?;
+
+            // check if this is a default wildcard
+            if pat == Pattern::Wildcard {
+                if default_branch.is_some() {
+                    return Err(self.generate_error_with_pos(
+                        "Default branch `_` is already defined",
+                        "A match expression can only have one default `_` branch.",
+                        pos.clone(),
+                    ));
+                }
+                self.consume_operator(Operator::FatArrow)?;
+                if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
+                    default_branch = Some(self.block()?);
+                } else {
+                    let body = self.expr()?;
+                    default_branch = Some(vec![Statement::Expression {
+                        ttype: body.get_type(),
+                        expr: body,
+                    }]);
+                };
+                while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                    self.advance();
+                }
+                continue;
+            }
+
+            self.consume_operator(Operator::FatArrow)?;
+
+            // type-check: register bindings from the pattern
+            self.typechecker.environment.push_block();
+            self.register_pattern_bindings(&pat, &match_type)?;
+
+            let body = if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
+                self.block()?
+            } else {
+                let body_expr = self.expr()?;
+                vec![Statement::Expression {
+                    ttype: body_expr.get_type(),
+                    expr: body_expr,
+                }]
+            };
+
+            self.typechecker.environment.pop_block();
+            arms.push((pat, body));
+
+            while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                self.advance();
+            }
+        }
+        self.consume_symbol(StructuralSymbol::RightBrace)?;
+
+        // ── Exhaustiveness check ──
+        let has_catchall = default_branch.is_some()
+            || arms.iter().any(|(p, _)| Self::is_irrefutable(p));
+        if !has_catchall {
+            // Bool exhaustiveness: true + false
+            let is_bool_exhaustive = match_type == TType::Bool && {
+                let has_true = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                has_true && has_false
+            };
+            // Option exhaustiveness: Some + None
+            let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
+                let has_some = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                has_some && has_none
+            };
+            // User enum exhaustiveness: all variants present
+            let is_enum_exhaustive = match &match_type {
+                TType::Custom { name, .. } => {
+                    if self.typechecker.environment.enums.has(name) {
+                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                            let variant_names: Vec<&str> = fields.iter()
+                                .filter(|(n, _)| n.as_ref() != "type")
+                                .map(|(n, _)| n.as_ref())
+                                .collect();
+                            variant_names.iter().all(|vname| {
+                                arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                            })
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if !is_bool_exhaustive && !is_option_exhaustive && !is_enum_exhaustive {
+                return Err(self.generate_error_with_pos(
+                    "Non-exhaustive match",
+                    format!(
+                        "When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`",
+                        match_type
+                    ),
+                    pos,
+                ));
+            }
+        }
+
+        // type-check: all arms produce the same type
+        let mut result_type: Option<TType> = None;
+        for (_, arm_body) in arms.iter() {
+            if let Some(arm_ty) = Self::tail_type(arm_body) {
+                if let Some(ref prev) = result_type {
+                    if *prev != arm_ty {
+                        return Err(self.generate_error_with_pos(
+                            "All arms of a match expression must return the same type",
+                            format!(
+                                "One arm returns `{}` but another returns `{}`.",
+                                prev, arm_ty
+                            ),
+                            pos.clone(),
+                        ));
+                    }
+                } else {
+                    result_type = Some(arm_ty);
+                }
+            }
+        }
+        if let Some(ref def) = default_branch {
+            if let Some(def_ty) = Self::tail_type(def) {
+                if let Some(ref prev) = result_type {
+                    if *prev != def_ty {
+                        return Err(self.generate_error_with_pos(
+                            "All arms of a match expression must return the same type",
+                            format!(
+                                "The default `_` arm returns `{}` but other arms return `{}`.",
+                                def_ty, prev
+                            ),
+                            pos.clone(),
+                        ));
+                    }
+                } else {
+                    result_type = Some(def_ty);
+                }
+            }
+        }
+
+        let ttype = result_type.unwrap_or(TType::Void);
+
+        Ok(Expr::ValueMatchExpr {
+            ttype,
+            expr: Box::new(expr),
+            arms,
+            default: default_branch,
+            position: pos,
+        })
+    }
+
+    /// Parse a value-match statement (non-enum).
+    fn value_match_statement(&mut self, expr: Expr) -> NovaResult<Option<Statement>> {
+        let pos = self.get_current_token_position();
+        let match_type = expr.get_type();
+        let mut arms: Vec<(Pattern, Vec<Statement>)> = vec![];
+        self.consume_symbol(StructuralSymbol::LeftBrace)?;
+        let mut default_branch: Option<Vec<Statement>> = None;
+
+        while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+            let pat = self.parse_pattern()?;
+            let pat = Self::resolve_option_patterns(pat, &match_type);
+
+            // Validate pattern type compatibility
+            self.validate_pattern_type(&pat, &match_type, &pos)?;
+
+            if pat == Pattern::Wildcard {
+                if default_branch.is_some() {
+                    return Err(self.generate_error_with_pos(
+                        "Default branch `_` is already defined",
+                        "A match statement can only have one default `_` branch.",
+                        pos.clone(),
+                    ));
+                }
+                self.consume_operator(Operator::FatArrow)?;
+                if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
+                    default_branch = Some(self.block()?);
+                } else {
+                    let body = self.expr()?;
+                    default_branch = Some(vec![Statement::Expression {
+                        ttype: body.get_type(),
+                        expr: body,
+                    }]);
+                };
+                while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                    self.advance();
+                }
+                continue;
+            }
+
+            self.consume_operator(Operator::FatArrow)?;
+
+            self.typechecker.environment.push_block();
+            self.register_pattern_bindings(&pat, &match_type)?;
+
+            let body = if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
+                self.block()?
+            } else {
+                let body_expr = self.expr()?;
+                vec![Statement::Expression {
+                    ttype: body_expr.get_type(),
+                    expr: body_expr,
+                }]
+            };
+
+            self.typechecker.environment.pop_block();
+            arms.push((pat, body));
+
+            while self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                self.advance();
+            }
+        }
+        self.consume_symbol(StructuralSymbol::RightBrace)?;
+
+        // ── Exhaustiveness check ──
+        let has_catchall = default_branch.is_some()
+            || arms.iter().any(|(p, _)| Self::is_irrefutable(p));
+        if !has_catchall {
+            let is_bool_exhaustive = match_type == TType::Bool && {
+                let has_true = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                has_true && has_false
+            };
+            let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
+                let has_some = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                has_some && has_none
+            };
+            let is_enum_exhaustive = match &match_type {
+                TType::Custom { name, .. } => {
+                    if self.typechecker.environment.enums.has(name) {
+                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                            let variant_names: Vec<&str> = fields.iter()
+                                .filter(|(n, _)| n.as_ref() != "type")
+                                .map(|(n, _)| n.as_ref())
+                                .collect();
+                            variant_names.iter().all(|vname| {
+                                arms.iter().any(|(p, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                            })
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if !is_bool_exhaustive && !is_option_exhaustive && !is_enum_exhaustive {
+                return Err(self.generate_error_with_pos(
+                    "Non-exhaustive match",
+                    format!(
+                        "When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`",
+                        match_type
+                    ),
+                    pos,
+                ));
+            }
+        }
+
+        Ok(Some(Statement::ValueMatch {
+            ttype: TType::Void,
+            expr,
+            arms,
+            default: default_branch,
+            position: pos,
+        }))
+    }
+
+    /// Register variable bindings from a pattern into the typechecker environment.
+    fn register_pattern_bindings(&mut self, pattern: &Pattern, match_type: &TType) -> NovaResult<()> {
+        match pattern {
+            Pattern::Wildcard => {}
+            Pattern::Variable(name) => {
+                self.typechecker.environment.insert_symbol(
+                    name,
+                    match_type.clone(),
+                    None,
+                    SymbolKind::Variable,
+                );
+            }
+            Pattern::IntLiteral(_) | Pattern::FloatLiteral(_) | Pattern::StringLiteral(_)
+            | Pattern::BoolLiteral(_) | Pattern::CharLiteral(_) | Pattern::EmptyList => {}
+            Pattern::List(pats) => {
+                let inner = match match_type {
+                    TType::List { inner } => inner.as_ref().clone(),
+                    TType::Tuple { elements } => {
+                        // for tuples matched as list
+                        for (i, pat) in pats.iter().enumerate() {
+                            let elem_ty = elements.get(i).cloned().unwrap_or(TType::Any);
+                            self.register_pattern_bindings(pat, &elem_ty)?;
+                        }
+                        return Ok(());
+                    }
+                    _ => TType::Any,
+                };
+                for pat in pats {
+                    self.register_pattern_bindings(pat, &inner)?;
+                }
+            }
+            Pattern::ListCons(head_pats, tail_name) => {
+                let inner = match match_type {
+                    TType::List { inner } => inner.as_ref().clone(),
+                    _ => TType::Any,
+                };
+                for pat in head_pats {
+                    self.register_pattern_bindings(pat, &inner)?;
+                }
+                // tail is the same list type
+                self.typechecker.environment.insert_symbol(
+                    tail_name,
+                    match_type.clone(),
+                    None,
+                    SymbolKind::Variable,
+                );
+            }
+            Pattern::Tuple(pats) => {
+                let elements = match match_type {
+                    TType::Tuple { elements } => elements.clone(),
+                    _ => vec![TType::Any; pats.len()],
+                };
+                for (i, pat) in pats.iter().enumerate() {
+                    let elem_ty = elements.get(i).cloned().unwrap_or(TType::Any);
+                    self.register_pattern_bindings(pat, &elem_ty)?;
+                }
+            }
+            Pattern::Or(alternatives) => {
+                // Or patterns must not bind variables (enforced elsewhere),
+                // but we register from the first alternative for type checking.
+                if let Some(first) = alternatives.first() {
+                    self.register_pattern_bindings(first, match_type)?;
+                }
+            }
+            Pattern::Enum { variant, binding } => {
+                // The binding gets the inner type of the enum variant
+                if let Some(sub_pat) = binding {
+                    // Determine the inner type of the matched variant
+                    let inner_type = match match_type {
+                        TType::Option { inner } => {
+                            // Some(x) → x gets the inner type; None() has no binding
+                            inner.as_ref().clone()
+                        }
+                        TType::Custom { name, type_params } => {
+                            // Look up the variant in custom_types
+                            let fields = self.typechecker.environment.custom_types
+                                .get(name.as_ref())
+                                .cloned()
+                                .unwrap_or_default();
+                            // Resolve generic params if needed
+                            let generic_params = self.typechecker.environment.generic_type_struct
+                                .get(name.as_ref())
+                                .cloned();
+                            let mut vtype = TType::Any;
+                            for (fname, ftype) in &fields {
+                                if fname.as_ref() == variant.as_ref() {
+                                    vtype = if let Some(ref gp) = generic_params {
+                                        TypeChecker::replace_generic_types(&ftype, gp, type_params)
+                                    } else {
+                                        ftype.clone()
+                                    };
+                                    break;
+                                }
+                            }
+                            vtype
+                        }
+                        _ => TType::Any,
+                    };
+                    self.register_pattern_bindings(sub_pat, &inner_type)?;
+                }
+            }
+            Pattern::Struct { name, fields } => {
+                // Look up the struct fields and register bindings
+                let struct_fields: Vec<(Rc<str>, TType)> = self.typechecker.environment
+                    .custom_types
+                    .get(name.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+                for (field_name, pat) in fields {
+                    let field_ty = struct_fields.iter()
+                        .find(|(n, _)| n == field_name)
+                        .map(|(_, t)| t.clone())
+                        .unwrap_or(TType::Any);
+                    self.register_pattern_bindings(pat, &field_ty)?;
+                }
+            }
+            Pattern::OptionSome(binding) => {
+                if let Some(sub_pat) = binding {
+                    let inner_type = match match_type {
+                        TType::Option { inner } => inner.as_ref().clone(),
+                        _ => TType::Any,
+                    };
+                    self.register_pattern_bindings(sub_pat, &inner_type)?;
+                }
+            }
+            Pattern::OptionNone => {
+                // No bindings for None
+            }
+        }
+        Ok(())
+    }
+
     fn match_expr(&mut self) -> NovaResult<Expr> {
         self.consume_identifier(Some("match"))?;
         let expr = self.expr()?;
@@ -4641,24 +5483,8 @@ impl Parser {
             .is_some_and(|n| self.typechecker.environment.custom_types.contains_key(n));
 
         if !is_enum {
-            return Err(self.generate_error_with_pos(
-                format!(
-                    "Match expression expects an enum type, found `{}`",
-                    expr.get_type()
-                ),
-                format!(
-                    "The `match` keyword only works with enum types, but got `{}`.\n  \
-                     Example:\n    \
-                     enum Color {{ Red, Green, Blue }}\n    \
-                     let c = match my_color {{\n      \
-                     Red()       => \"red\"\n      \
-                     Green()     => \"green\"\n      \
-                     Blue()      => \"blue\"\n    \
-                     }}",
-                    expr.get_type()
-                ),
-                self.get_current_token_position(),
-            ));
+            // Dispatch to generalized (value) pattern matching
+            return self.value_match_expr(expr);
         }
 
         let pos = self.get_current_token_position();
@@ -4967,25 +5793,14 @@ impl Parser {
         self.consume_identifier(Some("match"))?;
         let expr = self.expr()?;
 
-        if expr.get_type().custom_to_string().is_some() {
-        } else {
-            return Err(self.generate_error_with_pos(
-                format!("Match statement expects an enum type, found `{}`", expr.get_type()),
-                format!(
-                    "The `match` keyword only works with enum types, but got `{}`.\n  \
-                     Example:\n    \
-                     enum Color {{ Red, Green, Blue }}\n    \
-                     match my_color {{\n      \
-                     Red()       => {{ ... }}\n      \
-                     Green()     => {{ ... }}\n      \
-                     Blue()      => {{ ... }}\n    \
-                     }}\n  \
-                     Variants with data: `Leaf(val) => {{ ... }}`\n  \
-                     Default branch:     `_ => {{ ... }}`",
-                    expr.get_type()
-                ),
-                self.get_current_token_position(),
-            ));
+        let type_name = expr.get_type().custom_to_string().map(|s| s.to_string());
+        let is_enum = type_name
+            .as_deref()
+            .is_some_and(|n| self.typechecker.environment.custom_types.contains_key(n));
+
+        if !is_enum {
+            // Dispatch to generalized (value) pattern matching
+            return self.value_match_statement(expr);
         }
 
         let pos = self.get_current_token_position();

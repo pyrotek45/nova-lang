@@ -131,34 +131,45 @@ pub fn temp_dir(state: &mut state::State) -> NovaResult<()> {
 // ---------------------------------------------------------------------------
 
 fn printf_with_array(format_string: &str, args: Vec<String>) {
-    let mut arg_iter = args.iter();
-    let mut formatted = String::new();
-    let mut segments = format_string.split("{}").peekable();
-    while let Some(segment) = segments.next() {
-        formatted.push_str(segment);
-        if segments.peek().is_some() {
-            if let Some(arg) = arg_iter.next() {
-                formatted.push_str(arg);
-            } else {
-                formatted.push_str("{}");
-            }
-        }
-    }
-    print!("{}", formatted);
+    print!("{}", format_with_array(format_string, args));
 }
 
 fn format_with_array(format_string: &str, args: Vec<String>) -> String {
     let mut arg_iter = args.iter();
     let mut formatted = String::new();
-    let mut segments = format_string.split("{}").peekable();
-    while let Some(segment) = segments.next() {
-        formatted.push_str(segment);
-        if segments.peek().is_some() {
-            if let Some(arg) = arg_iter.next() {
-                formatted.push_str(arg);
+    let chars: Vec<char> = format_string.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        if chars[i] == '{' {
+            if i + 1 < len && chars[i + 1] == '{' {
+                // Escaped opening brace: {{ → {
+                formatted.push('{');
+                i += 2;
+            } else if i + 1 < len && chars[i + 1] == '}' {
+                // Placeholder: {} → substitute next arg
+                if let Some(arg) = arg_iter.next() {
+                    formatted.push_str(arg);
+                } else {
+                    formatted.push_str("{}");
+                }
+                i += 2;
             } else {
-                formatted.push_str("{}");
+                formatted.push('{');
+                i += 1;
             }
+        } else if chars[i] == '}' {
+            if i + 1 < len && chars[i + 1] == '}' {
+                // Escaped closing brace: }} → }
+                formatted.push('}');
+                i += 2;
+            } else {
+                formatted.push('}');
+                i += 1;
+            }
+        } else {
+            formatted.push(chars[i]);
+            i += 1;
         }
     }
     formatted
