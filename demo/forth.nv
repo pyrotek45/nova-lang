@@ -1,5 +1,20 @@
 module forth
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Forth Interpreter — A Stack-Based Language in Nova
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: HashMap, closures, enums (Maybe), pattern matching, string ops,
+//         list-as-stack, recursive interpretation, file I/O, REPL loop
+//
+//  A mini Forth interpreter supporting: arithmetic (+, -, *, /), stack ops
+//  (dup, drop, swap, over, rot), word definitions (: name ... ;),
+//  quotations ([ ... ]), and the call operator.
+//
+//  Run interactively:  nova run demo/forth.nv
+//  Run a file:         nova run demo/forth.nv -- program.fth
+// ═══════════════════════════════════════════════════════════════════════════════
+
 import super.std.string
 import super.std.hashmap
 

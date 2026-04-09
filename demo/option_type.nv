@@ -1,14 +1,91 @@
 module option_typeDemo
 
-// optional types are created with Some(Value) and None(Type)
-let option  : Option(Int) = Some(10)
-let option2 : Option(Int) = None(Int) // this is a nil value. 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Option Type — Safe Handling of Absent Values
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: Some/None, if-let, while-let, ? operator, unwrap, orDefault,
+//         isSome/isNone, map/flatMap, option chaining
+//
+//  Run:  nova run demo/option_type.nv
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// checking if it exist
-if option.isSome() {
-    option.unwrap() |> println()
+import super.std.core
+import super.std.option
+
+// ── Creating options ────────────────────────────────────────────────────────
+
+let some_val: Option(Int) = Some(42)
+let no_val: Option(Int) = None(Int)
+
+println(format("some_val = {}", Cast::string(some_val)))
+println(format("no_val   = {}", Cast::string(no_val)))
+
+// ── Checking & unwrapping ───────────────────────────────────────────────────
+
+println(format("isSome? {}", Cast::string(some_val.isSome())))
+println(format("isNone? {}", Cast::string(no_val.isNone())))
+println(format("unwrap  = {}", Cast::string(some_val.unwrap())))
+
+// ── if-let — safe unwrap with pattern ───────────────────────────────────────
+
+if let val = some_val {
+    println(format("if-let unwrapped: {}", Cast::string(val)))
 }
 
-if option2.isSome() {
-    option2.unwrap() |> println()
+if let val = no_val {
+    println("this won't print")
+} else {
+    println("if-let else: None handled gracefully")
+}
+
+// ── ? operator — quick unwrap ───────────────────────────────────────────────
+// Panics if None. Use when you're sure it's Some.
+
+let quick = Some(99)?
+println(format("? unwrap = {}", Cast::string(quick)))
+
+// ── orDefault — provide a fallback ──────────────────────────────────────────
+
+let fallback = None(Int).orDefault(0)
+println(format("orDefault(0) = {}", Cast::string(fallback)))
+
+let kept = Some(42).orDefault(0)
+println(format("Some(42).orDefault(0) = {}", Cast::string(kept)))
+
+// ── while-let — drain a stack ───────────────────────────────────────────────
+
+let stack = [10, 20, 30, 40, 50]
+print("Draining stack: ")
+while let item = stack.pop() {
+    print(Cast::string(item) + " ")
+}
+println("")
+
+// ── Options from operations ─────────────────────────────────────────────────
+// Many built-in operations return Option.
+
+let nums = [10, 20, 30]
+println(format("pop from [10,20,30] = {}", Cast::string(nums.pop())))
+println(format("pop from empty      = {}", Cast::string(nums.pop())))
+
+// ── Practical example: safe dictionary lookup ───────────────────────────────
+
+fn find_score(name: String, names: [String], scores: [Int]) -> Option(Int) {
+    for i in 0..names.len() {
+        if names[i] == name { return Some(scores[i]) }
+    }
+    return None(Int)
+}
+
+let names = ["Alice", "Bob", "Charlie"]
+let scores = [95, 82, 91]
+
+if let s = find_score("Bob", names, scores) {
+    println(format("Bob's score: {}", Cast::string(s)))
+}
+if let s = find_score("Dave", names, scores) {
+    println("won't print")
+} else {
+    println("Dave not found")
 }

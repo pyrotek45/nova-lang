@@ -1,32 +1,61 @@
 module main
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Math — Numeric Functions & Operations
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: sqrt, abs, clamp, factorial, gcd, lcm, exp, trig, UFCS chaining
+//
+//  Run:  nova run demo/math.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
 import super.std.math
 
-let x = 6.sqrt()
-println(x) // 2.44948...
+// ── Float functions ─────────────────────────────────────────────────────────
 
-let y = 6.9.sqrt()
-println(y) // 2.62678...
+println("── Float Functions ──")
+println(format("sqrt(144) = {}",   Cast::string(144.0.sqrt())))
+println(format("sqrt(2)   = {}",   Cast::string(2.0.sqrt())))
+println(format("exp(1)    = {}",   Cast::string(1.0.exp())))
 
+// ── Integer functions ───────────────────────────────────────────────────────
 
-let z = 1.clamp(2, 3);
-println(z) // 2
+println("")
+println("── Integer Functions ──")
+println(format("abs(-42)      = {}", Cast::string((-42).abs())))
+println(format("clamp(10,0,5) = {}", Cast::string(10.clamp(0, 5))))
+println(format("clamp(3,0,5)  = {}", Cast::string(3.clamp(0, 5))))
+println(format("10!           = {}", Cast::string(10.factorial())))
+println(format("gcd(48,18)    = {}", Cast::string(48.gcd(18))))
+println(format("lcm(4,6)      = {}", Cast::string(4.lcm(6))))
+println(format("min(3,7)      = {}", Cast::string(3.min(7))))
+println(format("max(3,7)      = {}", Cast::string(3.max(7))))
 
-z = 5.clamp(2, 3);
-println(z) // 3
+// ── Arithmetic ──────────────────────────────────────────────────────────────
 
+println("")
+println("── Arithmetic ──")
+println(format("17 / 5  = {} (integer division)", Cast::string(17 / 5)))
+println(format("17 %% 5  = {} (modulo)", Cast::string(17 % 5)))
+println(format("2 ** 10 = {} (power via loop)", Cast::string({
+    let r = 1
+    for i in 0..10 { r *= 2 }
+    r
+})))
 
-let fac = 10.factorial()
-println(fac) // 3628800
+// ── Building a simple calculator ────────────────────────────────────────────
 
-
-let gcd = 60.gcd(7)
-println(gcd) // 1
-
-
-let lcm = 69.lcm(5)
-println(lcm) // 345
-
-
-let exp = 6.9.exp()
-println(exp) // 992.23844...
+println("")
+println("── Simple Calculator ──")
+fn calc(a: Float, op: String, b: Float) -> Float {
+    if op == "+" { return a + b }
+    if op == "-" { return a - b }
+    if op == "*" { return a * b }
+    if op == "/" { return a / b }
+    return 0.0
+}
+println(format("10 + 3 = {}", Cast::string(calc(10.0, "+", 3.0))))
+println(format("10 - 3 = {}", Cast::string(calc(10.0, "-", 3.0))))
+println(format("10 * 3 = {}", Cast::string(calc(10.0, "*", 3.0))))
+println(format("10 / 3 = {}", Cast::string(calc(10.0, "/", 3.0))))

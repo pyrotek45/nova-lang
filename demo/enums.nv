@@ -1,0 +1,118 @@
+module enumsDemo
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Enums & Pattern Matching
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: enum definition, variants with/without data, match statement,
+//         match expression, methods on enums, generic enums, exhaustive matching
+//
+//  Run:  nova run demo/enums.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+
+// ── Basic enum with data variants ───────────────────────────────────────────
+
+enum Shape {
+    ShapeCircle: Float,
+    ShapeRect: (Float, Float),
+    ShapeTriangle: (Float, Float),
+}
+
+fn extends area(s: Shape) -> Float {
+    match s {
+        ShapeCircle(r) => { return 3.14159 * r * r }
+        ShapeRect(dims) => { return dims[0] * dims[1] }
+        ShapeTriangle(dims) => { return 0.5 * dims[0] * dims[1] }
+    }
+    return 0.0
+}
+
+fn extends toString(s: Shape) -> String {
+    match s {
+        ShapeCircle(r) => { return format("Circle(r={})", Cast::string(r)) }
+        ShapeRect(d) => { return format("Rect({}x{})", Cast::string(d[0]), Cast::string(d[1])) }
+        ShapeTriangle(d) => { return format("Triangle(b={},h={})", Cast::string(d[0]), Cast::string(d[1])) }
+    }
+    return ""
+}
+
+println("── Shapes ──")
+let shapes = [
+    Shape::ShapeCircle(5.0),
+    Shape::ShapeRect((10.0, 3.0)),
+    Shape::ShapeTriangle((8.0, 4.0)),
+]
+for s in shapes {
+    println(format("  {} → area = {}", Cast::string(s), Cast::string(s.area())))
+}
+
+// ── Match as expression ─────────────────────────────────────────────────────
+
+println("")
+println("── Match Expression ──")
+let label = match Shape::ShapeCircle(1.0) {
+    ShapeCircle(r) => "round"
+    ShapeRect(d) => "boxy"
+    ShapeTriangle(d) => "pointy"
+}
+println(format("A circle is: {}", label))
+
+// ── Enum for state machines ─────────────────────────────────────────────────
+
+println("")
+println("── State Machine ──")
+enum TrafficLight {
+    LightRed,
+    LightYellow,
+    LightGreen,
+}
+
+fn extends next(light: TrafficLight) -> TrafficLight {
+    match light {
+        LightRed() => { return TrafficLight::LightGreen() }
+        LightGreen() => { return TrafficLight::LightYellow() }
+        LightYellow() => { return TrafficLight::LightRed() }
+    }
+    return TrafficLight::LightRed()
+}
+
+fn extends toString(light: TrafficLight) -> String {
+    match light {
+        LightRed() => { return "🔴 Red" }
+        LightYellow() => { return "🟡 Yellow" }
+        LightGreen() => { return "🟢 Green" }
+    }
+    return ""
+}
+
+let light = TrafficLight::LightRed()
+for i in 0..6 {
+    println(format("  {}", Cast::string(light)))
+    light = light.next()
+}
+
+// ── Enum with complex data ──────────────────────────────────────────────────
+
+println("")
+println("── Complex Variants ──")
+enum Expr {
+    ExprNum: Int,
+    ExprAdd: (Int, Int),
+    ExprMul: (Int, Int),
+}
+
+fn eval(e: Expr) -> Int {
+    match e {
+        ExprNum(n) => { return n }
+        ExprAdd(pair) => { return pair[0] + pair[1] }
+        ExprMul(pair) => { return pair[0] * pair[1] }
+    }
+    return 0
+}
+
+let exprs = [Expr::ExprNum(42), Expr::ExprAdd((10, 20)), Expr::ExprMul((6, 7))]
+for e in exprs {
+    println(format("  eval = {}", Cast::string(eval(e))))
+}

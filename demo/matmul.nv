@@ -1,5 +1,19 @@
 module main
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Matrix Multiplication — Linear Algebra in Nova
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: structs, fn extends, operator overloading (__mul__, __eq__),
+//         static constructors, list comprehensions, higher-order functions,
+//         dot product, transpose, toString
+//
+//  Builds a Matrix type from scratch with Vector dot products, transpose,
+//  and full matrix multiplication — then verifies the result.
+//
+//  Run:  nova run demo/matmul.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
 import super.std.list
 
 struct Vector {

@@ -1,0 +1,109 @@
+module iteratorsDemo
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Iterators & List Comprehensions — Lazy and Eager Data Processing
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: list comprehensions (map, filter, cross), Iter::fromVec,
+//         lazy map/filter/collect, chaining, bind operator (~>),
+//         string manipulation with chars/filter/string
+//
+//  Run:  nova run demo/iterators.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.iter
+import super.std.string
+
+// ── List comprehensions ─────────────────────────────────────────────────────
+// [var in list | transform]
+// [var in list | transform | filter]
+// [a in list1, b in list2 | transform]  (cross product)
+
+println("── List Comprehensions ──")
+
+let squares = [x in [1, 2, 3, 4, 5] | x * x]
+println(format("  squares:     {}", Cast::string(squares)))
+
+let evens = [x in [1, 2, 3, 4, 5, 6, 7, 8] | x | x % 2 == 0]
+println(format("  evens:       {}", Cast::string(evens)))
+
+let big_sq = [x in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] | x * x | x > 5]
+println(format("  big squares: {}", Cast::string(big_sq)))
+
+let cross = [a in ["x", "y"], b in ["1", "2", "3"] | a + b]
+println(format("  cross:       {}", Cast::string(cross)))
+
+let grid = [r in [0, 1, 2], c in [0, 1, 2] | r * 3 + c]
+println(format("  3x3 grid:    {}", Cast::string(grid)))
+
+// ── Eager list methods (map/filter/reduce) ──────────────────────────────────
+
+println("")
+println("── Eager Methods ──")
+
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+let tripled = data.map(|x: Int| x * 3)
+println(format("  map(*3):    {}", Cast::string(tripled)))
+
+let odds = data.filter(|x: Int| x % 2 != 0)
+println(format("  filter(odd): {}", Cast::string(odds)))
+
+let product = data.reduce(|acc: Int, x: Int, idx: Int| acc * x, 1)
+println(format("  reduce(*):   {}", Cast::string(product)))
+
+// ── Method chaining ─────────────────────────────────────────────────────────
+
+println("")
+println("── Method Chaining ──")
+
+let result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    .filter(|x: Int| x % 3 == 0)
+    .map(|x: Int| x * x)
+println(format("  multiples of 3, squared: {}", Cast::string(result)))
+
+// ── Lazy iterators (Iter) ───────────────────────────────────────────────────
+
+println("")
+println("── Lazy Iterators ──")
+
+let lazy = Iter::fromVec([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    .filter(|x: Int| x % 2 == 0)
+    .map(|x: Int| x * 10)
+    .collect()
+println(format("  lazy even*10: {}", Cast::string(lazy)))
+
+// Chain more operations
+let lazy2 = Iter::fromVec([10, 20, 30, 40, 50])
+    .map(|x: Int| x + 1)
+    .filter(|x: Int| x > 25)
+    .collect()
+println(format("  lazy >25:     {}", Cast::string(lazy2)))
+
+// ── Bind operator (~>) ──────────────────────────────────────────────────────
+
+println("")
+println("── Bind Operator (~>) ──")
+
+let size = [1, 2, 3, 4, 5].len() ~> n { n * n }
+println(format("  [1..5].len() ~> n {{ n*n }} = {}", Cast::string(size)))
+
+let trimmed = "  hello  ".trim() ~> s { s + "!" }
+println(format("  trimmed + ! = {}", trimmed))
+
+// ── String as char iterator ─────────────────────────────────────────────────
+
+println("")
+println("── String Processing ──")
+
+let vowels_only = "Hello World".chars()
+    .filter(|c: Char| c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
+                    || c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U')
+    .string()
+println(format("  vowels of 'Hello World': '{}'", vowels_only))
+
+let reversed_words = "nova is great".split(" ")
+    .map(|w: String| w.reverse())
+println(format("  reversed words: {}", Cast::string(reversed_words)))

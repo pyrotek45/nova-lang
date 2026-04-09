@@ -1,6 +1,74 @@
 module letDemo
 
-// let identifier : optional type = expression
-let t : Int = 10 + 10
-let v = 50
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Variables — let, Types, Reassignment & Type Annotations
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: let bindings, type annotations, reassignment, all primitive types,
+//         wildcard _, number literal formats
+//
+//  Run:  nova run demo/let.nv
+// ═══════════════════════════════════════════════════════════════════════════════
 
+import super.std.core
+
+// ── Basic bindings ──────────────────────────────────────────────────────────
+// let name = value      — type is inferred
+// let name: Type = value — explicit annotation
+
+let age = 25
+let name: String = "Nova"
+let pi: Float = 3.14159
+let flag: Bool = true
+let ch: Char = 'N'
+
+println(format("name={} age={} pi={} flag={} ch={}",
+    name, Cast::string(age), Cast::string(pi),
+    Cast::string(flag), Cast::string(ch)))
+
+// ── Reassignment ────────────────────────────────────────────────────────────
+// Variables in Nova are mutable by default
+
+let score = 0
+score += 10
+score += 20
+println(format("score = {}", Cast::string(score)))
+
+// Compound assignment operators: +=  -=  *=  /=  %=
+let n = 100
+n -= 30
+n *= 2
+println(format("n = {}", Cast::string(n)))
+
+// ── Number literal formats ──────────────────────────────────────────────────
+
+let decimal    = 1_000_000      // underscores for readability
+let binary     = 0b1111_0000    // binary
+let octal      = 0o755          // octal
+let hex        = 0xDEAD_BEEF    // hexadecimal
+let float_num  = 2.718          // float
+
+println(format("dec={} bin={} oct={} hex={} float={}",
+    Cast::string(decimal), Cast::string(binary), Cast::string(octal),
+    Cast::string(hex), Cast::string(float_num)))
+
+// ── Wildcard _ ──────────────────────────────────────────────────────────────
+// Use _ to discard a value (useful for unused results)
+
+let _ = "discarded"
+let _ = 42 + 58
+
+// ── Block expressions ───────────────────────────────────────────────────────
+// The last expression in a block becomes the block's value
+
+let result = {
+    let a = 10
+    let b = 20
+    a * b + 5
+}
+println(format("block result = {}", Cast::string(result)))
+
+// ── if-expression ───────────────────────────────────────────────────────────
+
+let label = if score > 20 { "high" } else { "low" }
+println(format("label = {}", label))

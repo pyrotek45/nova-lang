@@ -1,6 +1,19 @@
 module vtable
 
-// Struct definitions
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Dyn Types & Virtual Dispatch — Structural Typing in Nova
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: Dyn types, structural subtyping, fn(Self) fields, type aliases,
+//         heterogeneous lists, -> arrow call syntax, field assignment through Dyn
+//
+//  Any struct that structurally matches a Dyn constraint can be passed where
+//  that Dyn is expected — no explicit interface declaration needed.
+//
+//  Run:  nova run demo/vtable.nv
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Struct definitions ──────────────────────────────────────────────────────
 struct Person {
     age: Int,
     name: String
