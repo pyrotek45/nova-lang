@@ -1,0 +1,7 @@
+module fail
+// SHOULD FAIL: wildcard with guard is not exhaustive
+fn bad(x: Int) -> String {
+    return match x {
+        _ if x > 0 => "positive"
+    }
+}

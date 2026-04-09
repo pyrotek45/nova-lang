@@ -1,0 +1,211 @@
+// Tests for pattern matching edge cases: struct wildcards, guards, exhaustiveness, etc.
+module test_pattern_edge_cases
+
+import super.std.core
+
+// ── Struct wildcard `_` in match ──
+struct Point { x: Int, y: Int }
+let p = Point(10, 20)
+let r1 = match p {
+    Point { x, _ } => x,
+}
+assert(r1 == 10, "struct wildcard discards y")
+
+let r2 = match p {
+    Point { _, y } => y,
+}
+assert(r2 == 20, "struct wildcard discards x, binds y")
+
+// ── Struct field reorder in match ──
+let p2 = Point(5, 15)
+let r3 = match p2 {
+    Point { y, x } => x + y,
+}
+assert(r3 == 20, "struct field reorder y,x")
+
+// ── Nested struct match ──
+struct Rect { origin: Point, size: Point }
+let rect = Rect(Point(1, 2), Point(10, 20))
+let rect_area = match rect {
+    Rect { origin: Point { x, y }, size: Point { x: w, y: h } } => w * h,
+}
+assert(rect_area == 200, "nested struct match")
+
+// ── Guard on wildcard ──
+let n = 42
+let msg1 = match n {
+    _ if n < 0 => "negative",
+    _ if n == 0 => "zero",
+    _ => "positive"
+}
+assert(msg1 == "positive", "guard on wildcard with fallthrough")
+
+// ── Guard on struct pattern ──
+let p3 = Point(0, 5)
+let axis = match p3 {
+    Point { x: 0, y } if y > 0 => "y-pos",
+    Point { x: 0, y } if y < 0 => "y-neg",
+    Point { x: 0, y: 0 }       => "origin",
+    _                            => "other"
+}
+assert(axis == "y-pos", "struct literal + guard combo")
+
+// ── Guard on option ──
+let opt: Option(Int) = Some(5)
+let omsg = match opt {
+    Some(n) if n > 10 => "big",
+    Some(n) => "small",
+    None() => "none"
+}
+assert(omsg == "small", "option guard + exhaustive fallthrough")
+
+// ── Guard uses bound variables from struct ──
+let p4 = Point(3, 4)
+let dist = match p4 {
+    Point { x, y } if x * x + y * y == 25 => "unit circle boundary",
+    Point { x, y } => "other"
+}
+assert(dist == "unit circle boundary", "guard uses struct bindings")
+
+// ── Nested tuple match ──
+let t = (1, (2, 3))
+let r4 = match t {
+    (1, (2, 3)) => "exact",
+    (1, (_, _)) => "partial",
+    _ => "other"
+}
+assert(r4 == "exact", "nested tuple literal match")
+
+// ── Deeply nested tuple ──
+let deep = ((1, 2), (3, (4, 5)))
+let dv = match deep {
+    ((a, b), (c, (d, e))) => a + b + c + d + e
+}
+assert(dv == 15, "deeply nested tuple match")
+
+// ── Single-element tuple ──
+let single = (42,)
+let sv = match single {
+    (v,) => v
+}
+assert(sv == 42, "single-element tuple match")
+
+// ── Exact list match ──
+let xs: [Int] = [1, 2, 3]
+let lmsg = match xs {
+    [1, 2, 3] => "exact",
+    _ => "other"
+}
+assert(lmsg == "exact", "exact list match")
+
+// ── List cons pattern ──
+let nums: [Int] = [10, 20, 30]
+let head_val = match nums {
+    [h, ..rest] => h,
+    [] => 0
+}
+assert(head_val == 10, "list cons head")
+
+// ── Bool exhaustive match ──
+let b = true
+let bstr = match b {
+    true => "yes",
+    false => "no"
+}
+assert(bstr == "yes", "bool exhaustive match")
+
+// ── Variable pattern shadows ──
+let x = 100
+let shadowed = match x {
+    n => n + 1
+}
+assert(shadowed == 101, "variable pattern shadows")
+
+// ── Tuple destructure with wildcard ──
+let (a, _, c) = (1, 2, 3)
+assert(a == 1, "tuple destr with _ a")
+assert(c == 3, "tuple destr with _ c")
+
+// ── For destructure with wildcard ──
+let pairs: [(Int, String)] = [(1, "a"), (2, "b"), (3, "c")]
+let sum = 0
+for (n, _) in pairs {
+    sum = sum + n
+}
+assert(sum == 6, "for tuple destr with _")
+
+// ── Tuple of structs match ──
+let line = (Point(0, 0), Point(10, 10))
+let lmsg2 = match line {
+    (Point { x: 0, y: 0 }, Point { x, y }) => "from origin to " + Cast::string(x),
+    _ => "other"
+}
+assert(lmsg2 == "from origin to 10", "tuple of structs match")
+
+// ── Or pattern with struct fields as literal ──
+let q = Point(1, 0)
+let qmsg = match q {
+    Point { x: 0, y: 0 } | Point { x: 1, y: 0 } => "special",
+    _ => "other"
+}
+assert(qmsg == "special", "or struct literal patterns")
+
+// ── Match returning from function with struct pattern ──
+fn point_label(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x, y } if x == y => "diagonal",
+        Point { x, y } => "general"
+    }
+}
+assert(point_label(Point(0, 0)) == "origin", "fn struct match origin")
+assert(point_label(Point(5, 5)) == "diagonal", "fn struct match diagonal")
+assert(point_label(Point(1, 2)) == "general", "fn struct match general")
+
+// ── Multiple guard arms with overlapping patterns ──
+let items: [Int] = [1, 2, 3, 4, 5]
+let even_count = 0
+for item in items {
+    match item {
+        n if n % 2 == 0 => { even_count = even_count + 1 }
+        n => {}
+    }
+}
+assert(even_count == 2, "guard in for loop body")
+
+// ── Match expression type consistency with guards ──
+fn classify(n: Int) -> String {
+    return match n {
+        x if x > 0 => "pos",
+        x if x < 0 => "neg",
+        _ => "zero"
+    }
+}
+assert(classify(5) == "pos", "classify pos")
+assert(classify(-3) == "neg", "classify neg")
+assert(classify(0) == "zero", "classify zero")
+
+// ── Enum match ──
+enum Shape {
+    Circle: Float,
+    Rectangle: (Int, Int)
+}
+
+fn area(s: Shape) -> String {
+    match s {
+        Circle(r) => { return "circle" }
+        Rectangle(dims) => { return "rect" }
+    }
+    return "?"
+}
+assert(area(Shape::Circle(3.14)) == "circle", "enum struct")
+
+// ── Option string match ──
+let o2: Option(String) = Some("hello")
+let len = match o2 {
+    Some(s) => s,
+    None() => "empty"
+}
+assert(len == "hello", "option string match expr")
+
+println("PASS: test_pattern_edge_cases")

@@ -1,0 +1,8 @@
+module fail
+// SHOULD FAIL: Some arm has guard so Option match is not exhaustive
+fn bad(o: Option(Int)) -> String {
+    return match o {
+        Some(v) if v > 0 => "positive",
+        None() => "none"
+    }
+}

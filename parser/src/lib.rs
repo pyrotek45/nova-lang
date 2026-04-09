@@ -4905,17 +4905,35 @@ impl Parser {
                             let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
                                 .filter(|(n, _)| n.as_ref() != "type")
                                 .collect();
-                            if fields.len() != real_fields.len() {
+                            // Check for `_` wildcard sentinel (discards remaining fields)
+                            let has_wildcard = fields.iter().any(|(n, p)| n.as_ref() == "_" && *p == Pattern::Wildcard);
+                            let explicit_fields: Vec<&(Rc<str>, Pattern)> = fields.iter()
+                                .filter(|(n, p)| !(n.as_ref() == "_" && *p == Pattern::Wildcard))
+                                .collect();
+                            if has_wildcard {
+                                // With `_`, explicit fields must be fewer than struct fields
+                                if explicit_fields.len() >= real_fields.len() {
+                                    return Err(self.generate_error_with_pos(
+                                        format!(
+                                            "Struct pattern `{}` uses `_` but already names all {} fields",
+                                            name, real_fields.len()
+                                        ),
+                                        "`_` discards the remaining fields, but all fields are already named.",
+                                        pos.clone(),
+                                    ));
+                                }
+                            } else if fields.len() != real_fields.len() {
                                 return Err(self.generate_error_with_pos(
                                     format!(
                                         "Struct pattern `{}` has {} fields but the struct has {}",
                                         name, fields.len(), real_fields.len()
                                     ),
-                                    "The number of fields in the pattern must match the struct definition.",
+                                    "The number of fields in the pattern must match the struct definition.\n  \
+                                     Use `_` to discard unnamed fields: `Struct { field1, _ }`",
                                     pos.clone(),
                                 ));
                             }
-                            for (field_name, sub_pat) in fields {
+                            for (field_name, sub_pat) in &explicit_fields {
                                 let found = real_fields.iter().find(|(n, _)| n == field_name);
                                 if found.is_none() {
                                     let available: Vec<String> = real_fields.iter()
@@ -5085,16 +5103,29 @@ impl Parser {
                 let real_struct_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
                     .filter(|(n, _)| n.as_ref() != "type")
                     .collect();
+                // Check for `_` wildcard sentinel (discards remaining fields)
+                let has_wildcard = fields.iter().any(|(n, p)| n.as_ref() == "_" && *p == Pattern::Wildcard);
+                let explicit_fields: Vec<&(Rc<str>, Pattern)> = fields.iter()
+                    .filter(|(n, p)| !(n.as_ref() == "_" && *p == Pattern::Wildcard))
+                    .collect();
                 // Reorder pattern fields to match struct definition order
-                let mut ordered_fields = Vec::with_capacity(fields.len());
+                // If `_` wildcard is present, fill unmentioned fields with Wildcard
+                let mut ordered_fields = Vec::with_capacity(real_struct_fields.len());
                 for (sf_name, sf_type) in &real_struct_fields {
-                    if let Some((_, pat)) = fields.iter().find(|(fn_, _)| fn_ == sf_name) {
+                    if let Some((_, pat)) = explicit_fields.iter().find(|(fn_, _)| fn_ == sf_name) {
                         ordered_fields.push(((*sf_name).clone(), self.resolve_option_patterns(pat.clone(), sf_type)));
+                    } else if has_wildcard {
+                        // Field not mentioned but `_` covers it
+                        ordered_fields.push(((*sf_name).clone(), Pattern::Wildcard));
                     }
                 }
-                // If reordering failed (e.g. wrong field names), fall back to original order
-                if ordered_fields.len() != fields.len() {
+                // If reordering succeeded (all fields accounted for), use ordered
+                if ordered_fields.len() == real_struct_fields.len() {
+                    Pattern::Struct { name, fields: ordered_fields }
+                } else {
+                    // Fallback: original order (for error reporting or edge cases)
                     let fallback: Vec<(Rc<str>, Pattern)> = fields.into_iter()
+                        .filter(|(n, p)| !(n.as_ref() == "_" && *p == Pattern::Wildcard))
                         .map(|(fname, p)| {
                             let field_ty = struct_fields.iter()
                                 .find(|(n, _)| n == &fname)
@@ -5104,8 +5135,6 @@ impl Parser {
                         })
                         .collect();
                     Pattern::Struct { name, fields: fallback }
-                } else {
-                    Pattern::Struct { name, fields: ordered_fields }
                 }
             }
             other => other,
@@ -5232,7 +5261,17 @@ impl Parser {
                 if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
                     self.advance(); // consume {
                     let mut fields = vec![];
+                    let mut has_wildcard = false;
                     while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+                        // Check for `_` wildcard (discard remaining fields)
+                        if self.current_token().is_some_and(|t| t.is_id("_")) {
+                            self.advance(); // consume `_`
+                            has_wildcard = true;
+                            if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::Comma)) {
+                                self.advance();
+                            }
+                            continue;
+                        }
                         let (field_name, _) = self.get_identifier()?;
                         if self.current_token().is_some_and(|t| t.is_op(Operator::Colon)) {
                             self.advance(); // consume :
@@ -5247,6 +5286,12 @@ impl Parser {
                         }
                     }
                     self.consume_symbol(StructuralSymbol::RightBrace)?;
+                    // If `_` was used, fill in the remaining fields with wildcards
+                    if has_wildcard {
+                        // We store a sentinel: the field name "_" maps to Wildcard
+                        // validate_pattern_type and resolve_option_patterns will expand this
+                        fields.push((Rc::from("_"), Pattern::Wildcard));
+                    }
                     return Ok(Pattern::Struct { name: id, fields });
                 }
                 // Plain variable binding
@@ -5271,19 +5316,21 @@ impl Parser {
         let mut default_branch: Option<Vec<Statement>> = None;
 
         while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+            let pat_pos = self.get_current_token_position();
             let pat = self.parse_pattern()?;
+
+            // Validate pattern type compatibility (BEFORE reordering, to catch field count/name errors)
+            self.validate_pattern_type(&pat, &match_type, &pat_pos)?;
+
             let pat = self.resolve_option_patterns(pat, &match_type);
 
-            // Validate pattern type compatibility
-            self.validate_pattern_type(&pat, &match_type, &pos)?;
-
-            // check if this is a default wildcard
-            if pat == Pattern::Wildcard {
+            // check if this is a default wildcard (only if NOT followed by `if` guard)
+            if pat == Pattern::Wildcard && !self.current_token().is_some_and(|t| t.is_id("if")) {
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
                         "Default branch `_` is already defined",
                         "A match expression can only have one default `_` branch.",
-                        pos.clone(),
+                        pat_pos,
                     ));
                 }
                 self.consume_operator(Operator::FatArrow)?;
@@ -5313,7 +5360,7 @@ impl Parser {
                     return Err(self.generate_error_with_pos(
                         format!("Match guard must be a Bool, found `{}`", guard_expr.get_type()),
                         "The `if` guard in a match arm must evaluate to a Bool.\n  Example: `pattern if x > 0 => { ... }`",
-                        pos.clone(),
+                        pat_pos.clone(),
                     ));
                 }
                 self.typechecker.environment.pop_block();
@@ -5363,21 +5410,21 @@ impl Parser {
 
         // ── Exhaustiveness check ──
         let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, _, _)| Self::is_irrefutable(p));
+            || arms.iter().any(|(p, guard, _)| guard.is_none() && Self::is_irrefutable(p));
         if !has_catchall {
-            // Bool exhaustiveness: true + false
+            // Bool exhaustiveness: true + false (only unguarded arms count)
             let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                let has_true = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
                 has_true && has_false
             };
-            // Option exhaustiveness: Some + None
+            // Option exhaustiveness: Some + None (only unguarded arms count)
             let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                let has_some = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
                 has_some && has_none
             };
-            // User enum exhaustiveness: all variants present
+            // User enum exhaustiveness: all variants present (only unguarded arms count)
             let is_enum_exhaustive = match &match_type {
                 TType::Custom { name, .. } => {
                     if self.typechecker.environment.enums.has(name) {
@@ -5387,7 +5434,7 @@ impl Parser {
                                 .map(|(n, _)| n.as_ref())
                                 .collect();
                             variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                                arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
                             })
                         } else {
                             false
@@ -5469,18 +5516,20 @@ impl Parser {
         let mut default_branch: Option<Vec<Statement>> = None;
 
         while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
+            let pat_pos = self.get_current_token_position();
             let pat = self.parse_pattern()?;
+
+            // Validate pattern type compatibility (BEFORE reordering, to catch field count/name errors)
+            self.validate_pattern_type(&pat, &match_type, &pat_pos)?;
+
             let pat = self.resolve_option_patterns(pat, &match_type);
 
-            // Validate pattern type compatibility
-            self.validate_pattern_type(&pat, &match_type, &pos)?;
-
-            if pat == Pattern::Wildcard {
+            if pat == Pattern::Wildcard && !self.current_token().is_some_and(|t| t.is_id("if")) {
                 if default_branch.is_some() {
                     return Err(self.generate_error_with_pos(
                         "Default branch `_` is already defined",
                         "A match statement can only have one default `_` branch.",
-                        pos.clone(),
+                        pat_pos.clone(),
                     ));
                 }
                 self.consume_operator(Operator::FatArrow)?;
@@ -5509,7 +5558,7 @@ impl Parser {
                     return Err(self.generate_error_with_pos(
                         format!("Match guard must be a Bool, found `{}`", guard_expr.get_type()),
                         "The `if` guard in a match arm must evaluate to a Bool.\n  Example: `pattern if x > 0 => { ... }`",
-                        pos.clone(),
+                        pat_pos.clone(),
                     ));
                 }
                 self.typechecker.environment.pop_block();
@@ -5558,16 +5607,16 @@ impl Parser {
 
         // ── Exhaustiveness check ──
         let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, _, _)| Self::is_irrefutable(p));
+            || arms.iter().any(|(p, guard, _)| guard.is_none() && Self::is_irrefutable(p));
         if !has_catchall {
             let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
+                let has_true = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
+                let has_false = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
                 has_true && has_false
             };
             let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
+                let has_some = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
+                let has_none = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
                 has_some && has_none
             };
             let is_enum_exhaustive = match &match_type {
@@ -5579,7 +5628,7 @@ impl Parser {
                                 .map(|(n, _)| n.as_ref())
                                 .collect();
                             variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, _, _)| Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
+                                arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
                             })
                         } else {
                             false
@@ -7177,7 +7226,23 @@ impl Parser {
                         let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
                             .filter(|(n, _)| n.as_ref() != "type")
                             .collect();
-                        if fields.len() != real_fields.len() {
+                        // Check for `_` wildcard sentinel (discards remaining fields)
+                        let has_wildcard = fields.iter().any(|(n, p)| n.as_ref() == "_" && *p == Pattern::Wildcard);
+                        let explicit_fields: Vec<&(Rc<str>, Pattern)> = fields.iter()
+                            .filter(|(n, p)| !(n.as_ref() == "_" && *p == Pattern::Wildcard))
+                            .collect();
+                        if has_wildcard {
+                            if explicit_fields.len() >= real_fields.len() {
+                                return Err(self.generate_error_with_pos(
+                                    format!(
+                                        "Struct pattern `{}` uses `_` but already names all {} fields",
+                                        name, real_fields.len()
+                                    ),
+                                    "`_` discards the remaining fields, but all fields are already named.",
+                                    arraypos.clone(),
+                                ));
+                            }
+                        } else if fields.len() != real_fields.len() {
                             let field_names: Vec<String> = real_fields.iter()
                                 .map(|(n, _)| n.to_string())
                                 .collect();
@@ -7194,7 +7259,7 @@ impl Parser {
                                 arraypos.clone(),
                             ));
                         }
-                        for (field_name, _) in fields {
+                        for (field_name, _) in &explicit_fields {
                             if !real_fields.iter().any(|(n, _)| n == field_name) {
                                 let available: Vec<String> = real_fields.iter()
                                     .map(|(n, _)| format!("`{}`", n))
@@ -7673,7 +7738,23 @@ impl Parser {
                         let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
                             .filter(|(n, _)| n.as_ref() != "type")
                             .collect();
-                        if fields.len() != real_fields.len() {
+                        // Check for `_` wildcard sentinel (discards remaining fields)
+                        let has_wildcard = fields.iter().any(|(n, p)| n.as_ref() == "_" && *p == Pattern::Wildcard);
+                        let explicit_fields: Vec<&(Rc<str>, Pattern)> = fields.iter()
+                            .filter(|(n, p)| !(n.as_ref() == "_" && *p == Pattern::Wildcard))
+                            .collect();
+                        if has_wildcard {
+                            if explicit_fields.len() >= real_fields.len() {
+                                return Err(self.generate_error_with_pos(
+                                    format!(
+                                        "Struct pattern `{}` uses `_` but already names all {} fields",
+                                        name, real_fields.len()
+                                    ),
+                                    "`_` discards the remaining fields, but all fields are already named.",
+                                    pos.clone(),
+                                ));
+                            }
+                        } else if fields.len() != real_fields.len() {
                             let field_names: Vec<String> = real_fields.iter()
                                 .map(|(n, _)| n.to_string())
                                 .collect();
@@ -7690,7 +7771,7 @@ impl Parser {
                                 pos.clone(),
                             ));
                         }
-                        for (field_name, sub_pat) in fields {
+                        for (field_name, sub_pat) in &explicit_fields {
                             let found = real_fields.iter().find(|(n, _)| n == field_name);
                             if found.is_none() {
                                 let available: Vec<String> = real_fields.iter()
