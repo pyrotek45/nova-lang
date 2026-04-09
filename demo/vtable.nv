@@ -30,19 +30,19 @@ struct H(T) {
 
 struct Button {
     text: String,
-    draw: fn(Button)
+    draw: fn(Self)
 }
 
 struct Text {
     text: String,
     age: Int,
-    draw: fn(Text),
+    draw: fn(Self),
     name: String
 }
 
 struct Image {
     content: String,
-    draw: fn(Image)
+    draw: fn(Self)
 }
 
 // Type definitions
