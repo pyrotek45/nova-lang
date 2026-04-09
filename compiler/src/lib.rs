@@ -2491,10 +2491,9 @@ impl Compiler {
                 self.asm.push(Asm::BOOL(true));
                 self.asm.push(Asm::LABEL(fail));
             }
-            Enum { variant, binding } => {
+            Enum { variant, binding, tag } => {
                 // Enums are stored as [value, tag, type_name] with LIST(3).
-                // Tag is a string matching the variant name.
-                // Test: tag == variant_name
+                // Tag is an integer index matching the variant's position in the enum definition.
                 let fail = self.gen.generate();
                 let ok = self.gen.generate();
 
@@ -2503,9 +2502,14 @@ impl Compiler {
                 self.asm.push(Asm::GET(temp as u32));
                 self.asm.push(Asm::LIN(position.clone()));
 
-                // Compare with the variant name
-                let idx = self.insert_string_global(variant.clone());
-                self.asm.push(Asm::GETGLOBAL(idx as u32));
+                // Compare with the variant's tag index (integer)
+                if let Some(tag_idx) = tag {
+                    self.asm.push(Asm::INTEGER(*tag_idx as i64));
+                } else {
+                    // Fallback: compare by string name (shouldn't happen after resolve)
+                    let idx = self.insert_string_global(variant.clone());
+                    self.asm.push(Asm::GETGLOBAL(idx as u32));
+                }
                 self.asm.push(Asm::EQUALS);
                 self.asm.push(Asm::JUMPIFFALSE(fail));
 
@@ -2747,7 +2751,7 @@ impl Compiler {
                     self.compile_pattern_bindings(first, temp, position)?;
                 }
             }
-            Enum { variant: _, binding } => {
+            Enum { variant: _, binding, .. } => {
                 // Bind the payload (index 0 of the enum list [value, tag, type_name])
                 if let Some(sub_pat) = binding {
                     self.asm.push(Asm::INTEGER(0));

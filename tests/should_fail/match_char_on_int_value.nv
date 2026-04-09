@@ -1,0 +1,7 @@
+module fail
+// Char literal on int match — type mismatch
+let n = 42
+let r = match n {
+    'x' => "bad",
+    _ => "ok",
+}

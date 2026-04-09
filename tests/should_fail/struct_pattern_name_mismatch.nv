@@ -1,0 +1,8 @@
+module fail_struct_pat_name_mismatch
+struct Point { x: Int, y: Int }
+struct Rect { w: Int, h: Int }
+let p = Point(1, 2)
+match p {
+    Rect { w, h } => println(w),
+    _ => println("miss")
+}

@@ -1,0 +1,4 @@
+module fail
+// Let destructure: enum pattern not allowed
+enum Color { Red, Green, Blue }
+let Red() = Color::Red()

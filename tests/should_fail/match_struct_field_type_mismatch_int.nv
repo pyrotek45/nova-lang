@@ -1,0 +1,8 @@
+module fail
+struct Config { name: String, count: Int }
+// Int literal in String field — type mismatch
+let c = Config("test", 5)
+let r = match c {
+    Config { name: 42, count } => "bad",
+    _ => "ok",
+}

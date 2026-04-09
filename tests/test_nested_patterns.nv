@@ -1,0 +1,270 @@
+module test_nested_patterns
+
+// ═══════════════════════════════════════════════════════════════
+//  Nested pattern matching – deep combinations
+// ═══════════════════════════════════════════════════════════════
+
+struct Point  { x: Int, y: Int }
+struct Rect   { origin: Point, size: Point }
+struct Named  { name: String, value: Int }
+struct Wrapper { inner: Option(Int) }
+
+enum Shape {
+    Circle: Int,
+    Square: Int,
+    None,
+}
+
+// ─── §1 Struct inside struct ────────────────────────────────
+
+fn n1(r: Rect) -> Int {
+    return match r {
+        Rect { origin: Point { x, y }, size: Point { x: w, y: h } } => x + y + w + h,
+    }
+}
+assert(n1(Rect(Point(1, 2), Point(10, 20))) == 33, "n1")
+println("PASS: §1 struct-in-struct nested match")
+
+// ─── §2 Struct inside struct with literals ──────────────────
+
+fn n2(r: Rect) -> String {
+    return match r {
+        Rect { origin: Point { x: 0, y: 0 }, size } => "from-origin",
+        Rect { origin, size } => "other",
+    }
+}
+assert(n2(Rect(Point(0, 0), Point(5, 5))) == "from-origin", "n2a")
+assert(n2(Rect(Point(1, 1), Point(5, 5))) == "other",       "n2b")
+println("PASS: §2 struct-in-struct with literals")
+
+// ─── §3 Option inside struct (Some) ────────────────────────
+// Note: exhaustiveness check is top-level, so nested Option
+// coverage needs a wildcard or single irrefutable arm.
+
+fn n3(w: Wrapper) -> Int {
+    return match w {
+        Wrapper { inner: Some(v) } => v,
+        Wrapper { inner: None() }  => -1,
+        _ => -99,
+    }
+}
+assert(n3(Wrapper(Some(42)))    == 42, "n3a")
+assert(n3(Wrapper(None(Int))) == -1, "n3b")
+println("PASS: §3 Option inside struct")
+
+// ─── §4 Tuple of Options: needs wildcard for exhaustiveness ─
+
+fn n4(t: (Option(Int), Option(Int))) -> Int {
+    return match t {
+        (Some(a), Some(b)) => a + b,
+        (Some(a), None())  => a,
+        (None(), Some(b))  => b,
+        (None(), None())   => 0,
+        _ => -1,
+    }
+}
+assert(n4((Some(3), Some(4))) == 7, "n4a")
+assert(n4((Some(3), None(Int))) == 3, "n4b")
+assert(n4((None(Int), Some(4))) == 4, "n4c")
+assert(n4((None(Int), None(Int))) == 0, "n4d")
+println("PASS: §4 tuple of Options exhaustive")
+
+// ─── §5 Tuple inside struct ────────────────────────────────
+
+struct TupleHolder { pair: (Int, Int), tag: String }
+
+fn n5(th: TupleHolder) -> Int {
+    return match th {
+        TupleHolder { pair: (a, b), tag } => a + b,
+    }
+}
+assert(n5(TupleHolder((3, 4), "test")) == 7, "n5")
+println("PASS: §5 tuple inside struct")
+
+// ─── §6 Enum inside tuple ──────────────────────────────────
+
+fn n6(t: (Shape, Int)) -> String {
+    return match t {
+        (Circle(r), _) => "circle",
+        (Square(s), _) => "square",
+        (None(), _)     => "none",
+        _ => "unknown",
+    }
+}
+assert(n6((Shape::Circle(5), 1))  == "circle", "n6a")
+assert(n6((Shape::Square(10), 2)) == "square", "n6b")
+assert(n6((Shape::None(), 3))     == "none",   "n6c")
+println("PASS: §6 enum inside tuple")
+
+// ─── §7 Struct match inside function, multiple calls ───────
+
+fn classify_point(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, y }    => "y-axis",
+        Point { x, y: 0 }    => "x-axis",
+        Point { x, y }       => "general",
+    }
+}
+assert(classify_point(Point(0, 0)) == "origin",  "n7a")
+assert(classify_point(Point(0, 5)) == "y-axis",  "n7b")
+assert(classify_point(Point(5, 0)) == "x-axis",  "n7c")
+assert(classify_point(Point(3, 4)) == "general", "n7d")
+println("PASS: §7 struct match classification")
+
+// ─── §8 Match on nested: struct with bool field ────────────
+
+struct Flag { active: Bool, count: Int }
+
+fn n8(f: Flag) -> String {
+    return match f {
+        Flag { active: true, count: 0 }  => "active-zero",
+        Flag { active: true, count }     => "active",
+        Flag { active, count }           => "inactive",
+    }
+}
+assert(n8(Flag(true, 0))  == "active-zero", "n8a")
+assert(n8(Flag(true, 5))  == "active",      "n8b")
+assert(n8(Flag(false, 3)) == "inactive",    "n8c")
+println("PASS: §8 struct with bool literal field patterns")
+
+// ─── §9 Tuple with bool – needs wildcard ───────────────────
+
+fn n9(t: (Bool, Int)) -> String {
+    return match t {
+        (true, n)  => "yes",
+        (false, n) => "no",
+        _ => "unreachable",
+    }
+}
+assert(n9((true, 1))  == "yes", "n9a")
+assert(n9((false, 2)) == "no",  "n9b")
+println("PASS: §9 tuple with bool exhaustive")
+
+// ─── §10 Match statement with struct pattern ───────────────
+
+fn n10() -> Int {
+    let r = Rect(Point(1, 2), Point(3, 4))
+    let total = 0
+    match r {
+        Rect { origin: Point { x, y }, size: Point { x: w, y: h } } => {
+            total = x * w + y * h
+        }
+    }
+    return total
+}
+assert(n10() == 11, "n10")
+println("PASS: §10 match statement nested struct")
+
+// ─── §11 Deeply nested tuple ───────────────────────────────
+
+fn n11(t: (Int, (Int, (Int, Int)))) -> Int {
+    return match t {
+        (a, (b, (c, d))) => a + b + c + d,
+    }
+}
+assert(n11((1, (2, (3, 4)))) == 10, "n11")
+println("PASS: §11 deeply nested tuple")
+
+// ─── §12 Option with nested variable binding ───────────────
+
+fn n12(o: Option(Int)) -> Int {
+    return match o {
+        Some(x) => x * 2,
+        None()  => 0,
+    }
+}
+assert(n12(Some(5))    == 10, "n12a")
+assert(n12(None(Int)) == 0,  "n12b")
+println("PASS: §12 Option with binding")
+
+// ─── §13 Match with block bodies and nested patterns ───────
+
+fn n13(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => {
+            let s = "origin"
+            s
+        }
+        Point { x, y } => {
+            let sx = Cast::string(x)
+            let sy = Cast::string(y)
+            sx + "," + sy
+        }
+    }
+}
+assert(n13(Point(0, 0)) == "origin", "n13a")
+assert(n13(Point(3, 4)) == "3,4",    "n13b")
+println("PASS: §13 block bodies with nested patterns")
+
+// ─── §14 Struct match with string field ────────────────────
+
+fn n14(n: Named) -> String {
+    return match n {
+        Named { name: "hello", value } => "greeting",
+        Named { name, value: 0 }       => "zero-" + name,
+        Named { name, value }           => "other",
+    }
+}
+assert(n14(Named("hello", 42)) == "greeting",    "n14a")
+assert(n14(Named("test", 0))   == "zero-test",   "n14b")
+assert(n14(Named("abc", 99))   == "other",        "n14c")
+println("PASS: §14 struct with string literal field")
+
+// ─── §15 Chained matches ───────────────────────────────────
+
+fn n15(p: Point) -> String {
+    let quad = match p {
+        Point { x, y } => {
+            if x >= 0 && y >= 0 { "I" }
+            elif x < 0 && y >= 0 { "II" }
+            elif x < 0 && y < 0 { "III" }
+            else { "IV" }
+        }
+    }
+    return quad
+}
+assert(n15(Point(1, 1))   == "I",   "n15a")
+assert(n15(Point(-1, 1))  == "II",  "n15b")
+assert(n15(Point(-1, -1)) == "III", "n15c")
+assert(n15(Point(1, -1))  == "IV",  "n15d")
+println("PASS: §15 chained match with struct")
+
+// ─── §16 Struct with char field literal ────────────────────
+
+struct CharBox { ch: Char, code: Int }
+
+fn n16(cb: CharBox) -> String {
+    return match cb {
+        CharBox { ch: 'a', code } => "letter-a",
+        CharBox { ch, code }      => "other",
+    }
+}
+assert(n16(CharBox('a', 97)) == "letter-a", "n16a")
+assert(n16(CharBox('z', 122)) == "other",   "n16b")
+println("PASS: §16 struct with char literal field")
+
+// ─── §17 Struct field is a list, matched by variable ───────
+
+struct ListHolder { items: [Int], label: String }
+
+fn n17(lh: ListHolder) -> String {
+    return match lh {
+        ListHolder { items, label } => label,
+    }
+}
+assert(n17(ListHolder([1, 2, 3], "test")) == "test", "n17")
+println("PASS: §17 struct with list field, var binding")
+
+// ─── §18 Match expr returning struct ───────────────────────
+
+fn n18(flag: Bool) -> Point {
+    return match flag {
+        true  => Point(1, 1),
+        false => Point(0, 0),
+    }
+}
+let p18 = n18(true)
+assert(p18.x == 1, "n18a")
+assert(p18.y == 1, "n18b")
+println("PASS: §18 match expr returning struct")

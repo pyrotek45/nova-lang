@@ -1,0 +1,7 @@
+module fail
+// String pattern on an int match — type mismatch
+let n = 42
+let r = match n {
+    "hello" => "bad",
+    _ => "ok",
+}

@@ -1,0 +1,234 @@
+module test_exhaustiveness_struct
+
+// ═══════════════════════════════════════════════════════════════
+//  Exhaustiveness & irrefutability for structs, tuples, lists
+// ═══════════════════════════════════════════════════════════════
+
+struct Point  { x: Int, y: Int }
+struct Color  { r: Int, g: Int, b: Int }
+struct Pair   { first: Int, second: String }
+struct Nested { point: Point, label: String }
+
+// ─── §1 Struct with all variables is irrefutable ────────────
+
+fn s1(p: Point) -> Int {
+    return match p {
+        Point { x, y } => x + y,
+    }
+}
+assert(s1(Point(3, 4)) == 7, "s1")
+println("PASS: §1 struct all-variable irrefutable")
+
+// ─── §2 Struct with all wildcards is irrefutable ────────────
+
+fn s2(p: Point) -> Int {
+    return match p {
+        Point { x: _, y: _ } => 42,
+    }
+}
+assert(s2(Point(0, 0)) == 42, "s2")
+println("PASS: §2 struct all-wildcard irrefutable")
+
+// ─── §3 Struct mix of variable and wildcard ─────────────────
+
+fn s3(p: Point) -> Int {
+    return match p {
+        Point { x, y: _ } => x,
+    }
+}
+assert(s3(Point(7, 99)) == 7, "s3")
+println("PASS: §3 struct mixed var/wildcard irrefutable")
+
+// ─── §4 3-field struct all variables ────────────────────────
+
+fn s4(c: Color) -> Int {
+    return match c {
+        Color { r, g, b } => r + g + b,
+    }
+}
+assert(s4(Color(10, 20, 30)) == 60, "s4")
+println("PASS: §4 3-field struct irrefutable")
+
+// ─── §5 Struct with literal still needs wildcard ────────────
+
+fn s5(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x, y }       => "other",
+    }
+}
+assert(s5(Point(0, 0)) == "origin", "s5a")
+assert(s5(Point(1, 2)) == "other",  "s5b")
+println("PASS: §5 struct literal + catchall")
+
+// ─── §6 OR pattern: one irrefutable alt is enough ───────────
+
+fn s6(p: Point) -> Int {
+    return match p {
+        Point { x: 0, y: 0 } | Point { x, y } => 1,
+    }
+}
+assert(s6(Point(0, 0)) == 1, "s6a")
+assert(s6(Point(5, 5)) == 1, "s6b")
+println("PASS: §6 struct OR irrefutable branch")
+
+// ─── §7 Nested struct: outer irrefutable ────────────────────
+
+fn s7(n: Nested) -> String {
+    return match n {
+        Nested { point, label } => label,
+    }
+}
+assert(s7(Nested(Point(1, 2), "hi")) == "hi", "s7")
+println("PASS: §7 nested struct irrefutable")
+
+// ─── §8 Tuple all variables ────────────────────────────────
+
+fn t1(t: (Int, String)) -> String {
+    return match t {
+        (n, s) => Cast::string(n) + s,
+    }
+}
+assert(t1((5, "x")) == "5x", "t1")
+println("PASS: §8 tuple all-variable irrefutable")
+
+// ─── §9 Nested tuple all variables ──────────────────────────
+
+fn t2(t: (Int, (Bool, String))) -> String {
+    return match t {
+        (_, (_, s)) => s,
+    }
+}
+assert(t2((1, (true, "ok"))) == "ok", "t2")
+println("PASS: §9 nested tuple all-var/wildcard irrefutable")
+
+// ─── §10 Triple tuple ──────────────────────────────────────
+
+fn t3(t: (Int, Int, Int)) -> Int {
+    return match t {
+        (a, b, c) => a + b + c,
+    }
+}
+assert(t3((1, 2, 3)) == 6, "t3")
+println("PASS: §10 triple tuple irrefutable")
+
+// ─── §11 Tuple with struct inside ──────────────────────────
+
+fn t4(t: (Point, Int)) -> Int {
+    return match t {
+        (Point { x, y }, z) => x + y + z,
+    }
+}
+assert(t4((Point(1, 2), 3)) == 6, "t4")
+println("PASS: §11 tuple-with-struct irrefutable")
+
+// ─── §12 Struct with tuple field ───────────────────────────
+
+struct WithTuple { data: (Int, Int), name: String }
+
+fn s8(w: WithTuple) -> Int {
+    return match w {
+        WithTuple { data, name } => 1,
+    }
+}
+assert(s8(WithTuple((1, 2), "x")) == 1, "s8")
+println("PASS: §12 struct-with-tuple-field irrefutable")
+
+// ─── §13 Match statement: struct irrefutable ───────────────
+
+fn s9() -> Int {
+    let p = Point(10, 20)
+    let result = 0
+    match p {
+        Point { x, y } => { result = x + y }
+    }
+    return result
+}
+assert(s9() == 30, "s9")
+println("PASS: §13 match statement struct irrefutable")
+
+// ─── §14 Match statement: tuple irrefutable ────────────────
+
+fn t5() -> Int {
+    let t = (3, 4)
+    let result = 0
+    match t {
+        (a, b) => { result = a * b }
+    }
+    return result
+}
+assert(t5() == 12, "t5")
+println("PASS: §14 match statement tuple irrefutable")
+
+// ─── §15 Multiple struct arms, last irrefutable ────────────
+
+fn s10(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, y }    => "y-axis",
+        Point { x, y: 0 }    => "x-axis",
+        Point { x, y }       => "general",
+    }
+}
+assert(s10(Point(0, 0)) == "origin",  "s10a")
+assert(s10(Point(0, 5)) == "y-axis",  "s10b")
+assert(s10(Point(5, 0)) == "x-axis",  "s10c")
+assert(s10(Point(3, 4)) == "general", "s10d")
+println("PASS: §15 multi-arm struct last irrefutable")
+
+// ─── §16 Tuple with literal + catchall ─────────────────────
+
+fn t6(t: (Int, Int)) -> String {
+    return match t {
+        (0, 0) => "zero",
+        (a, b) => "other",
+    }
+}
+assert(t6((0, 0)) == "zero",  "t6a")
+assert(t6((1, 2)) == "other", "t6b")
+println("PASS: §16 tuple literal + catchall irrefutable")
+
+// ─── §17 Deeply nested: struct in tuple in match expr ──────
+
+fn deep1(t: (Point, Bool)) -> Int {
+    return match t {
+        (Point { x, y }, flag) => {
+            if flag { x + y } else { x - y }
+        }
+    }
+}
+assert(deep1((Point(3, 4), true))  == 7,  "deep1a")
+assert(deep1((Point(3, 4), false)) == -1, "deep1b")
+println("PASS: §17 deep nested struct-in-tuple irrefutable")
+
+// ─── §18 Variable pattern is always exhaustive ─────────────
+
+fn var1(n: Int) -> Int {
+    return match n {
+        x => x * 3,
+    }
+}
+assert(var1(7) == 21, "var1")
+println("PASS: §18 variable pattern exhaustive")
+
+// ─── §19 Wildcard pattern is always exhaustive ─────────────
+
+fn wild1(n: Int) -> Int {
+    return match n {
+        _ => 0,
+    }
+}
+assert(wild1(999) == 0, "wild1")
+println("PASS: §19 wildcard pattern exhaustive")
+
+// ─── §20 Struct with Option field, all variables ───────────
+
+struct MaybePoint { pos: Option(Int), name: String }
+
+fn s11(mp: MaybePoint) -> String {
+    return match mp {
+        MaybePoint { pos, name } => name,
+    }
+}
+assert(s11(MaybePoint(Some(1), "a")) == "a", "s11")
+println("PASS: §20 struct with Option field, all vars irrefutable")

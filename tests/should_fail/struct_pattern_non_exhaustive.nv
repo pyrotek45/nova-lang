@@ -1,0 +1,6 @@
+module fail_struct_pat_no_default
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+let r = match p {
+    Point { x: 0, y: 0 } => "origin",
+}

@@ -1,0 +1,7 @@
+module fail_struct_pat_count
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+match p {
+    Point { x } => println(x),
+    _ => println("miss")
+}

@@ -1,0 +1,6 @@
+module fail
+// Tuple pattern on a string — type mismatch
+let s = "hello"
+let r = match s {
+    (a, b) => "bad",
+}

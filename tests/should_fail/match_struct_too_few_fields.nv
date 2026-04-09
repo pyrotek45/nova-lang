@@ -1,0 +1,7 @@
+module fail
+struct Point { x: Int, y: Int }
+// Struct with only 1 field in pattern but struct has 2
+let p = Point(1, 2)
+let r = match p {
+    Point { x } => x,
+}

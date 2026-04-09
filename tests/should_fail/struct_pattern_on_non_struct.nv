@@ -1,0 +1,7 @@
+module fail_struct_pat_wrong_type
+struct Point { x: Int, y: Int }
+let n = 42
+match n {
+    Point { x, y } => println(x),
+    _ => println("miss")
+}

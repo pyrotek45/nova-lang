@@ -1,0 +1,7 @@
+module fail
+// Non-exhaustive: single string literal, no wildcard
+let s = "hello"
+let r = match s {
+    "hello" => 1,
+    "world" => 2,
+}

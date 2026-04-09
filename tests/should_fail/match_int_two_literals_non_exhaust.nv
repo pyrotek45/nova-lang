@@ -1,0 +1,7 @@
+module fail
+// Non-exhaustive: single int literal, no wildcard
+let n = 42
+let r = match n {
+    0 => "zero",
+    1 => "one",
+}

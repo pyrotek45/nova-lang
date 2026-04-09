@@ -1,0 +1,8 @@
+module fail
+struct Point { x: Int, y: Int }
+// Match arms return different types
+let p = Point(1, 2)
+let r = match p {
+    Point { x: 0, y: 0 } => "origin",
+    Point { x, y } => 42,
+}

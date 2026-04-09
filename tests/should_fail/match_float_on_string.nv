@@ -1,0 +1,7 @@
+module fail
+// Float pattern on string — type mismatch
+let s = "hello"
+let r = match s {
+    3.14 => "pi",
+    _ => "other",
+}

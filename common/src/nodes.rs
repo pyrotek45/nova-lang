@@ -37,6 +37,8 @@ pub enum Pattern {
     Enum {
         variant: Rc<str>,
         binding: Option<Box<Pattern>>,
+        /// Resolved tag index (position in enum definition). Set by `resolve_option_patterns`.
+        tag: Option<usize>,
     },
     /// Match Option::Some with an inner pattern: `Some(x)`
     OptionSome(Option<Box<Pattern>>),

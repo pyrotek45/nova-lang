@@ -1,0 +1,7 @@
+module fail
+// List pattern on a bool — type mismatch
+let b = true
+let r = match b {
+    [] => "empty",
+    _ => "ok",
+}

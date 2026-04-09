@@ -1,0 +1,7 @@
+module fail
+struct Point { x: Int, y: Int }
+// Struct pattern on int — type mismatch
+let n = 42
+let r = match n {
+    Point { x, y } => x + y,
+}
