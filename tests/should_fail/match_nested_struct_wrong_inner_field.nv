@@ -1,0 +1,9 @@
+module fail
+// Match: nested struct wrong inner field name
+struct Point { x: Int, y: Int }
+struct Nested { point: Point, label: String }
+let n = Nested(Point(1, 2), "test")
+let result = match n {
+    Nested { point: Point { a, b }, label } => "bad",
+    _ => "ok",
+}

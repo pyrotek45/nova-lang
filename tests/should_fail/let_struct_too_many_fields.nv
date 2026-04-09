@@ -1,0 +1,4 @@
+module fail
+// Let destructure: struct with too many fields
+struct Point { x: Int, y: Int }
+let Point { x, y, z } = Point(1, 2)

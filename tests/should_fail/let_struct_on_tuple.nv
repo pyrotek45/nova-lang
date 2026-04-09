@@ -1,0 +1,4 @@
+module fail
+// Let destructure: struct on tuple value
+struct Point { x: Int, y: Int }
+let Point { x, y } = (1, 2)

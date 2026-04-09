@@ -1047,6 +1047,37 @@ fn extends __eq__(a: Point, b: Point) -> Bool {
 Available dunders: `__add__`, `__sub__`, `__mul__`, `__div__`, `__mod__`,
 `__eq__`, `__ne__`, `__lt__`, `__gt__`, `__le__`, `__ge__`.
 
+### Pattern Matching and Destructuring
+
+Structs support pattern matching in `match`, `let`, and `for`:
+
+```rust
+struct Point { x: Int, y: Int }
+
+// Match expression
+fn classify(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x, y }       => "general",
+    }
+}
+
+// Let destructuring
+let p = Point(3, 4)
+let Point { x, y } = p
+// x == 3, y == 4
+
+// For-loop destructuring
+let points: [Point] = [Point(1, 2), Point(3, 4)]
+for Point { x, y } in points {
+    println(Cast::string(x + y))
+}
+```
+
+Use `field` as shorthand for `field: field`, or `field: pattern` for
+nested patterns.  Fields can appear in any order. See §16 for full
+pattern matching details.
+
 ### Saving and Loading Structs
 
 Structs are one of the most common things you'll serialize.
@@ -1876,6 +1907,7 @@ Supported patterns:
 | Option Some      | `Some(v)`                | Match Option with value             |
 | Option None      | `None()`                 | Match absent Option                 |
 | Enum variant     | `Red()`, `Leaf(v)`       | Match enum variant (use `Red() \| Blue()` for OR) |
+| Struct           | `Point { x, y }`        | Destructure a struct by field name  |
 
 ```rust
 // Option matching
@@ -1894,11 +1926,55 @@ match point {
     (0, y)  => { println("on y-axis") }
     (x, y)  => { println("general point") }
 }
+
+// Struct matching
+struct Point { x: Int, y: Int }
+
+fn classify(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, y }    => "y-axis",
+        Point { x, y: 0 }    => "x-axis",
+        Point { x, y }       => "general",
+    }
+}
+```
+
+Struct patterns use `StructName { field1, field2 }` syntax.  Write
+`field` as shorthand for `field: field` (bind to a variable with the
+same name), or `field: pattern` to match a nested pattern.
+Fields can be listed in any order — the compiler reorders them
+automatically.
+
+A single arm with all-variable fields (like `Point { x, y }`) is
+**irrefutable** — it covers every possible value, so no wildcard `_`
+arm is needed:
+
+```rust
+// Single-arm match: all-variable struct is exhaustive
+fn sum(p: Point) -> Int {
+    return match p {
+        Point { x, y } => x + y,
+    }
+}
+```
+
+Nested struct patterns work too:
+
+```rust
+struct Rect { origin: Point, size: Point }
+
+fn area(r: Rect) -> Int {
+    return match r {
+        Rect { origin: Point { x, y }, size: Point { x: w, y: h } } => w * h,
+    }
+}
 ```
 
 ### Let Destructuring
 
-You can use patterns on the left side of `let` to unpack tuples and lists:
+You can use patterns on the left side of `let` to unpack tuples, lists,
+and structs:
 
 ```rust
 // Tuple destructuring
@@ -1920,11 +1996,35 @@ let [first, second] = [100, 200]
 // List cons (head + tail)
 let [head, ..tail] = [1, 2, 3, 4]
 // head == 1, tail == [2, 3, 4]
+
+// Struct destructuring
+struct Point { x: Int, y: Int }
+let p = Point(3, 4)
+let Point { x, y } = p
+// x == 3, y == 4
+
+// Struct with field renaming
+let Point { x: px, y: py } = Point(10, 20)
+// px == 10, py == 20
+
+// Fields in any order (compiler reorders automatically)
+let Point { y, x } = Point(1, 2)
+// x == 1, y == 2
+
+// Nested struct destructuring
+struct Rect { origin: Point, size: Point }
+let r = Rect(Point(1, 2), Point(10, 20))
+let Rect { origin: Point { x: ox, y: oy }, size: Point { x: w, y: h } } = r
+// ox == 1, oy == 2, w == 10, h == 20
+
+// Struct inside tuple
+let (Point { x: a, y: b }, z) = (Point(5, 6), 7)
+// a == 5, b == 6, z == 7
 ```
 
 Let destructuring requires **irrefutable** patterns — patterns that always
-match.  This means you can use tuples, lists, cons, variables, and wildcards,
-but not literal values or Or patterns.
+match.  This means you can use tuples, lists, cons, structs, variables,
+and wildcards, but not literal values or Or patterns.
 
 ```rust
 // Function returning a tuple
@@ -1944,8 +2044,8 @@ let (lo, hi) = min_max([3, 1, 4, 1, 5])
 
 ### For-Loop Destructuring
 
-When iterating over a list of tuples (or nested lists), you can destructure
-each element directly in the `for` header:
+When iterating over a list of tuples, structs, or nested lists, you can
+destructure each element directly in the `for` header:
 
 ```rust
 let pairs: [(String, Int)] = [("Alice", 90), ("Bob", 85), ("Carol", 92)]
@@ -1971,8 +2071,36 @@ for (a, (b, c)) in data {
 //   15
 ```
 
+Struct destructuring in for-loops:
+
+```rust
+struct Point { x: Int, y: Int }
+
+let points: [Point] = [Point(1, 2), Point(3, 4), Point(5, 6)]
+for Point { x, y } in points {
+    println(Cast::string(x + y))
+}
+// prints:
+//   3
+//   7
+//   11
+```
+
+You can also combine structs with tuples:
+
+```rust
+let data: [(Point, String)] = [(Point(1, 2), "a"), (Point(3, 4), "b")]
+for (Point { x, y }, label) in data {
+    println(label + ": " + Cast::string(x + y))
+}
+// prints:
+//   a: 3
+//   b: 7
+```
+
 > **Tip:** For-loop destructuring is especially useful with hashmaps, key-value
-> pairs, coordinate lists, and any collection where each element is a tuple.
+> pairs, coordinate lists, and any collection where each element is a tuple
+> or struct.
 
 ---
 
@@ -2570,7 +2698,9 @@ Dyn types, and extends + UFCS.
 | Match expr arm | `A() => expr` | Single-expression arm, no braces |
 | Let destructure | `let (a, b) = expr` | Unpack tuple into variables |
 | Let list destr. | `let [h, ..t] = xs` | Unpack list head + tail |
+| Let struct destr.| `let Point { x, y } = p` | Unpack struct by field name |
 | For destructure | `for (k, v) in pairs { }` | Unpack each tuple in loop |
+| For struct destr.| `for Point { x, y } in pts` | Unpack each struct in loop |
 | Varargs | `f(1, 2, 3)` where `f(xs: [Int])` | Trailing args auto-wrapped into list |
 | Forward decl | `fn f(x: Int) -> Int` | Signature only, no body |
 | Single-elem tuple | `(42,)` | One-element tuple |
@@ -2622,6 +2752,8 @@ Dyn types, and extends + UFCS.
 - The must-use check fires **between** statements — a trailing Option at end-of-block is exempt (it's a tail expression)
 - Named functions need `@(Type)` to be passed as first-class values: `square@(Int)` (see [§13 Closures](#passing-named-functions-as-values--type))
 - `let`-bound closures are already first-class values — no `@` needed
+- Struct destructuring works in `let`, `for`, and `match` — fields can appear in any order: `let Point { y, x } = p`
+- Use `_` inside struct destructuring to discard a field: `let Point { x, _ } = p`
 
 ---
 
@@ -2654,6 +2786,9 @@ Dyn types, and extends + UFCS.
 | `_ = expr` or reading `_` | `_` is a discard, not a variable — use `let _ = expr` |
 | `Regex::captures("text", "pattern")` | Args are **(pattern, text)**: `Regex::captures("\\d+", text)` |
 | Bare `readFile(...)` as statement | Must-use: wrap with `?`, `let`, or `if let` |
+| `let Point { a, b } = p` | Field names must match struct definition — use `let Point { x, y } = p` |
+| `let Point { x } = p` with 2 fields | All fields must be listed — use `let Point { x, _ } = p` for discard |
+| `let Point { x, y } = 42` | Can only destructure a value whose type is that struct |
 
 ---
 

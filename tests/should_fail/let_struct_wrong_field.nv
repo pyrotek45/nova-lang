@@ -1,0 +1,4 @@
+module fail
+// Let destructure: struct with wrong field name
+struct Point { x: Int, y: Int }
+let Point { x, z } = Point(1, 2)

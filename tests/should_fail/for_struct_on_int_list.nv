@@ -1,0 +1,6 @@
+module fail
+// For destructure: struct on non-struct list
+struct Point { x: Int, y: Int }
+for Point { x, y } in [1, 2, 3] {
+    println(Cast::string(x))
+}

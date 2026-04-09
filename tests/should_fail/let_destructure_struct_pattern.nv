@@ -1,4 +1,0 @@
-module fail
-// Let destructure: struct pattern not allowed
-struct Point { x: Int, y: Int }
-let Point { x, y } = Point(1, 2)

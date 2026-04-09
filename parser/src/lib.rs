@@ -6813,6 +6813,16 @@ impl Parser {
         }) {
             return self.for_destructure();
         }
+        // Check for struct destructuring: `for Ident { ... } in list { … }`
+        if let Some(TokenValue::Identifier(id)) = self.current_token_value().cloned() {
+            if self.peek_offset_value(1) == Some(&TokenValue::StructuralSymbol(LeftBrace)) {
+                if self.typechecker.environment.custom_types.contains_key(id.as_ref())
+                    && !self.typechecker.environment.enums.has(&id)
+                {
+                    return self.for_destructure();
+                }
+            }
+        }
 
         if let Some(Keyword(KeyWord::In)) = self.peek_offset_value(1) {
             // Handle foreach statement
@@ -6929,18 +6939,20 @@ impl Parser {
         }
     }
 
-    /// Parse `for (a, b) in list { … }` or `for [h, ..t] in list { … }`.
+    /// Parse `for (a, b) in list { … }`, `for [h, ..t] in list { … }`,
+    /// or `for StructName { fields } in list { … }`.
     fn for_destructure(&mut self) -> NovaResult<Option<Statement>> {
         let pattern = self.parse_single_pattern()?;
 
         // Only allow irrefutable patterns
         match &pattern {
             Pattern::Tuple(_) | Pattern::List(_) | Pattern::ListCons(_, _)
-            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList => {}
+            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList
+            | Pattern::Struct { .. } => {}
             _ => {
                 return Err(self.generate_error_with_pos(
                     "Invalid pattern in for destructuring".to_string(),
-                    "Only tuple `(a, b)`, list `[a, b]`, and cons `[h, ..t]` patterns are allowed in for loops.",
+                    "Only tuple `(a, b)`, list `[a, b]`, cons `[h, ..t]`, and struct `Name { f1, f2 }` patterns are allowed in for loops.",
                     self.get_current_token_position(),
                 ));
             }
@@ -6972,6 +6984,56 @@ impl Parser {
                             elements.len()
                         ),
                         "The number of pattern elements must match the tuple size.",
+                        arraypos.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Validate struct pattern against inner type
+        if let Pattern::Struct { name, fields } = &pattern {
+            match &inner_type {
+                TType::Custom { name: type_name, .. } => {
+                    if name != type_name {
+                        return Err(self.generate_error_with_pos(
+                            format!("Struct pattern `{}` does not match list element type `{}`", name, type_name),
+                            "The struct name in the pattern must match the list element type.",
+                            arraypos.clone(),
+                        ));
+                    }
+                    if let Some(struct_fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                        let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
+                            .filter(|(n, _)| n.as_ref() != "type")
+                            .collect();
+                        if fields.len() != real_fields.len() {
+                            return Err(self.generate_error_with_pos(
+                                format!(
+                                    "Struct pattern `{}` has {} fields but the struct has {}",
+                                    name, fields.len(), real_fields.len()
+                                ),
+                                "The number of fields in the pattern must match the struct definition.",
+                                arraypos.clone(),
+                            ));
+                        }
+                        for (field_name, _) in fields {
+                            if !real_fields.iter().any(|(n, _)| n == field_name) {
+                                let available: Vec<String> = real_fields.iter()
+                                    .map(|(n, _)| format!("`{}`", n))
+                                    .collect();
+                                return Err(self.generate_error_with_pos(
+                                    format!("Field `{}` not found in struct `{}`", field_name, name),
+                                    format!("Available fields: {}", available.join(", ")),
+                                    arraypos.clone(),
+                                ));
+                            }
+                        }
+                    }
+                }
+                TType::Any => {}
+                _ => {
+                    return Err(self.generate_error_with_pos(
+                        format!("Cannot destructure `{}` with a struct pattern", inner_type),
+                        "Struct patterns can only destructure struct types.",
                         arraypos.clone(),
                     ));
                 }
@@ -7174,11 +7236,23 @@ impl Parser {
         self.consume_identifier(Some("let"))?;
         let pos = self.get_current_token_position();
 
-        // ── Destructuring let: `let (a, b) = expr`, `let [h, ..t] = expr` ──
+        // ── Destructuring let: `let (a, b) = expr`, `let [h, ..t] = expr`,
+        //    `let StructName { fields } = expr` ──
         if self.current_token().is_some_and(|t| {
             t.is_symbol(LeftParen) || t.is_symbol(LeftSquareBracket)
         }) {
             return self.let_destructure(pos);
+        }
+        // Check for struct destructuring: `let Ident { ... } = expr`
+        if let Some(TokenValue::Identifier(id)) = self.current_token_value().cloned() {
+            if self.peek_offset_value(1) == Some(&TokenValue::StructuralSymbol(LeftBrace)) {
+                // Only dispatch if the identifier is a known struct (not an enum)
+                if self.typechecker.environment.custom_types.contains_key(id.as_ref())
+                    && !self.typechecker.environment.enums.has(&id)
+                {
+                    return self.let_destructure(pos);
+                }
+            }
         }
 
         let mut global = false;
@@ -7321,14 +7395,15 @@ impl Parser {
     fn let_destructure(&mut self, pos: FilePosition) -> NovaResult<Expr> {
         let pattern = self.parse_single_pattern()?;
 
-        // Only allow irrefutable patterns (tuple, list, variable, wildcard, listcons)
+        // Only allow irrefutable patterns (tuple, list, variable, wildcard, listcons, struct)
         match &pattern {
             Pattern::Tuple(_) | Pattern::List(_) | Pattern::ListCons(_, _)
-            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList => {}
+            | Pattern::Variable(_) | Pattern::Wildcard | Pattern::EmptyList
+            | Pattern::Struct { .. } => {}
             _ => {
                 return Err(self.generate_error_with_pos(
                     "Invalid pattern in let destructuring".to_string(),
-                    "Only tuple `(a, b)`, list `[a, b]`, and cons `[h, ..t]` patterns are allowed in let destructuring.",
+                    "Only tuple `(a, b)`, list `[a, b]`, cons `[h, ..t]`, and struct `Name { f1, f2 }` patterns are allowed in let destructuring.",
                     pos.clone(),
                 ));
             }
@@ -7389,6 +7464,63 @@ impl Parser {
                 ));
             }
         }
+
+        // Validate struct pattern: type, field count, field names, sub-pattern types
+        if let Pattern::Struct { name, fields } = &pattern {
+            match &expr_type {
+                TType::Custom { name: type_name, .. } => {
+                    if name != type_name {
+                        return Err(self.generate_error_with_pos(
+                            format!("Struct pattern `{}` does not match type `{}`", name, type_name),
+                            "The struct name in the pattern must match the expression type.",
+                            pos.clone(),
+                        ));
+                    }
+                    if let Some(struct_fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                        let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
+                            .filter(|(n, _)| n.as_ref() != "type")
+                            .collect();
+                        if fields.len() != real_fields.len() {
+                            return Err(self.generate_error_with_pos(
+                                format!(
+                                    "Struct pattern `{}` has {} fields but the struct has {}",
+                                    name, fields.len(), real_fields.len()
+                                ),
+                                "The number of fields in the pattern must match the struct definition.",
+                                pos.clone(),
+                            ));
+                        }
+                        for (field_name, sub_pat) in fields {
+                            let found = real_fields.iter().find(|(n, _)| n == field_name);
+                            if found.is_none() {
+                                let available: Vec<String> = real_fields.iter()
+                                    .map(|(n, _)| format!("`{}`", n))
+                                    .collect();
+                                return Err(self.generate_error_with_pos(
+                                    format!("Field `{}` not found in struct `{}`", field_name, name),
+                                    format!("Available fields: {}", available.join(", ")),
+                                    pos.clone(),
+                                ));
+                            }
+                            let field_ty = found.map(|(_, t)| t.clone()).unwrap_or(TType::Any);
+                            self.validate_pattern_type(sub_pat, &field_ty, &pos)?;
+                        }
+                    }
+                }
+                TType::Any => {}
+                _ => {
+                    return Err(self.generate_error_with_pos(
+                        format!("Cannot destructure `{}` with a struct pattern", expr_type),
+                        "Struct patterns can only destructure struct types.",
+                        pos.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Reorder struct pattern fields to match definition order (compiler uses positional indexing)
+        // Also resolve nested option patterns
+        let pattern = self.resolve_option_patterns(pattern, &expr_type);
 
         // Register pattern bindings in scope
         self.register_pattern_bindings(&pattern, &expr_type)?;
