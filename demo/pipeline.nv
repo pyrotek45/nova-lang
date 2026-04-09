@@ -1,0 +1,174 @@
+module main
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Nova — Functional Data Pipeline
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: closures, pipe operator (|>), bind operator (~>), block
+//  expressions, higher-order functions, method chaining, UFCS extends.
+//
+//  Run:  nova run demo/pipeline.nv
+// ═════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.iter
+import super.std.string
+import super.std.math
+import super.std.functional
+
+// ── 1. The Pipe Operator (|>) ───────────────────────────────────────────────
+
+println("── Pipe Operator ──")
+
+fn inc(x: Int) -> Int { return x + 1 }
+fn triple(x: Int) -> Int { return x * 3 }
+fn flip_sign(x: Int) -> Int { return 0 - x }
+
+// read left-to-right: start at 10, add 1, triple, flip sign
+let result = 10 |> inc() |> triple() |> flip_sign()
+println(format("  10 |> inc() |> triple() |> flip_sign() = {}", Cast::string(result)))
+
+println("")
+
+// ── 2. The Bind Operator (~>) ───────────────────────────────────────────────
+
+println("── Bind Operator ──")
+
+// ~> names an intermediate result and feeds it into a block
+let answer = 6 ~> x { x * 7 }
+println(format("  6 ~> x {{ x * 7 }} = {}", Cast::string(answer)))
+
+// chained binds
+let chain = 100 ~> x {
+    let half = x / 2
+    half
+} ~> y {
+    y + 17
+}
+println(format("  100 -> halve -> +17 = {}", Cast::string(chain)))
+
+// bind with a list length
+let count = [10, 20, 30, 40, 50].len() ~> n { n * n }
+println(format("  len([10..50])^2 = {}", Cast::string(count)))
+println("")
+
+// ── 3. Block Expressions ────────────────────────────────────────────────────
+
+println("── Block Expressions ──")
+
+let category = {
+    let temp = 72
+    if temp < 32 {
+        "freezing"
+    } elif temp < 60 {
+        "cold"
+    } elif temp < 80 {
+        "nice"
+    } else {
+        "hot"
+    }
+}
+println(format("  72°F is: {}", category))
+
+// nested block in a function call
+let msg = format("doubled = {}", Cast::string({
+    let n = 21
+    n * 2
+}))
+println(format("  {}", msg))
+println("")
+
+// ── 4. Higher-Order Transforms ──────────────────────────────────────────────
+
+println("── Higher-Order Transforms ──")
+
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// map + filter + reduce  via method chaining
+let evens = data.filter(): |x: Int| x % 2 == 0
+let squares = evens.map(): |x: Int| x * x
+let sum_of_even_squares = squares.reduce(|a: Int, b: Int, i: Int| a + b, 0)
+println(format("  sum of even squares (1..10) = {}", Cast::string(sum_of_even_squares)))
+
+// build a string from a list
+let words = ["Nova", "is", "a", "cool", "language"]
+let sentence = words.reduce(|acc: String, w: String, i: Int| {
+    if acc == "" { w } else { acc + " " + w }
+}, "")
+println(format("  joined: \"{}\"", sentence))
+println("")
+
+// ── 5. Compose & Apply ──────────────────────────────────────────────────────
+
+println("── Compose ──")
+
+// compose two functions into one
+fn extends compose(f: fn(Int) -> Int, g: fn(Int) -> Int) -> fn(Int) -> Int {
+    return fn(x: Int) -> Int { return f(g(x)) }
+}
+
+let double = fn(x: Int) -> Int { return x * 2 }
+let add5   = fn(x: Int) -> Int { return x + 5 }
+
+// (double . add5)(3) = double(add5(3)) = double(8) = 16
+let double_after_add5 = double.compose(add5)
+println(format("  (double . add5)(3) = {}", Cast::string(double_after_add5(3))))
+
+// chain three
+let square = fn(x: Int) -> Int { return x * x }
+let pipeline = square.compose(double).compose(add5)
+println(format("  (square . double . add5)(2) = {}", Cast::string(pipeline(2))))
+println("")
+
+// ── 6. Custom Fold / Scan ───────────────────────────────────────────────────
+
+println("── Running Totals (scan) ──")
+
+fn extends scan(list: [Int], init: Int, f: fn(Int, Int) -> Int) -> [Int] {
+    let acc = init
+    let result = []: Int
+    for x in list {
+        acc = f(acc, x)
+        result.push(acc)
+    }
+    return result
+}
+
+let running = [1, 2, 3, 4, 5].scan(0): |a: Int, b: Int| a + b
+print("  running sum: ")
+for i in 0..running.len() {
+    print(Cast::string(running[i]))
+    if i < running.len() - 1 { print(", ") }
+}
+println("")
+println("")
+
+// ── 7. Full Pipeline ────────────────────────────────────────────────────────
+
+println("── Full Pipeline ──")
+
+// Generate, filter, transform, aggregate — all chained
+let scores = [85, 92, 78, 95, 61, 88, 73, 97, 84, 90]
+
+let high_count = scores.filter(): |s: Int| s >= 85
+
+let top_avg = {
+    let total = high_count.reduce(|a: Int, b: Int, i: Int| a + b, 0)
+    total / high_count.len()
+}
+
+println(format("  scores above 85: {}", Cast::string(high_count.len())))
+println(format("  average of those: {}", Cast::string(top_avg)))
+
+// combine pipe + bind + block
+let final_result = scores.len() ~> n {
+    n * 10
+} ~> scaled {
+    let bonus = if scaled > 50 { 100 } else { 0 }
+    scaled + bonus
+}
+println(format("  scaled score + bonus = {}", Cast::string(final_result)))
+println("")
+
+println("Done!")

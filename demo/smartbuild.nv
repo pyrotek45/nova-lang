@@ -1,0 +1,275 @@
+module main
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Nova — Currying, Closures & Smart Constructors
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: currying (fn returning fn), closures capturing state, Box for
+//  shared mutable state, extends methods, block expressions, match,
+//  Option types, and generic structs.
+//
+//  Run:  nova run demo/smartbuild.nv
+// ═════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.math
+import super.std.option
+
+// ── 1. Currying ─────────────────────────────────────────────────────────────
+
+println("── Currying ──")
+
+// a curried adder: add(a) returns a function that adds a to its argument
+fn add(a: Int) -> fn(Int) -> Int {
+    return fn(b: Int) -> Int { return a + b }
+}
+
+let add10 = add(10)
+let add99 = add(99)
+println(format("  add(10)(5)  = {}", Cast::string(add10(5))))
+println(format("  add(99)(1)  = {}", Cast::string(add99(1))))
+
+// curried multiplier
+fn mul(a: Int) -> fn(Int) -> Int {
+    return fn(b: Int) -> Int { return a * b }
+}
+
+let double  = mul(2)
+let triple  = mul(3)
+println(format("  mul(2)(7)   = {}", Cast::string(double(7))))
+println(format("  mul(3)(7)   = {}", Cast::string(triple(7))))
+println("")
+
+// ── 2. Closure Factory (Shared Mutable State) ───────────────────────────────
+
+println("── Closure Factory ──")
+
+// Box wraps a value on the heap so closures can share mutations
+fn make_accumulator(start: Int) -> (fn(Int) -> Int, fn() -> Int) {
+    let state = Box(start)
+    let add = fn(n: Int) -> Int {
+        state.value += n
+        return state.value
+    }
+    let get = fn() -> Int {
+        return state.value
+    }
+    return (add, get)
+}
+
+let acc = make_accumulator(0)
+let acc_add = acc[0]
+let acc_get = acc[1]
+
+acc_add(10)
+acc_add(20)
+acc_add(5)
+println(format("  accumulated: {}", Cast::string(acc_get())))
+
+acc_add(100)
+println(format("  after +100:  {}", Cast::string(acc_get())))
+println("")
+
+// ── 3. Builder Pattern with Fluent API ──────────────────────────────────────
+
+println("── Builder Pattern ──")
+
+struct Config {
+    width: Int,
+    height: Int,
+    title: String,
+    fullscreen: Bool,
+    fps: Int,
+}
+
+fn extends with_size(c: Config, w: Int, h: Int) -> Config {
+    return Config {
+        width: w, height: h,
+        title: c.title, fullscreen: c.fullscreen, fps: c.fps,
+    }
+}
+
+fn extends with_title(c: Config, t: String) -> Config {
+    return Config {
+        width: c.width, height: c.height,
+        title: t, fullscreen: c.fullscreen, fps: c.fps,
+    }
+}
+
+fn extends with_fullscreen(c: Config, f: Bool) -> Config {
+    return Config {
+        width: c.width, height: c.height,
+        title: c.title, fullscreen: f, fps: c.fps,
+    }
+}
+
+fn extends with_fps(c: Config, f: Int) -> Config {
+    return Config {
+        width: c.width, height: c.height,
+        title: c.title, fullscreen: c.fullscreen, fps: f,
+    }
+}
+
+fn extends show(c: Config) -> String {
+    return format("{}x{} \"{}\" fs={} fps={}",
+        Cast::string(c.width), Cast::string(c.height),
+        c.title, Cast::string(c.fullscreen), Cast::string(c.fps))
+}
+
+let defaults = Config {
+    width: 800, height: 600, title: "Untitled",
+    fullscreen: false, fps: 60,
+}
+
+let cfg = defaults
+    .with_size(1920, 1080)
+    .with_title("My Game")
+    .with_fullscreen(true)
+    .with_fps(144)
+
+println(format("  {}", cfg.show()))
+println("")
+
+// ── 4. Option Chaining ──────────────────────────────────────────────────────
+
+println("── Option Chaining ──")
+
+fn safe_div(a: Int, b: Int) -> Option(Int) {
+    if b == 0 { return None(Int) }
+    return Some(a / b)
+}
+
+fn safe_sqrt(n: Int) -> Option(Int) {
+    if n < 0 { return None(Int) }
+    let f = Cast::float(n)?
+    let r = Cast::int(Float::sqrt(f))?
+    return Some(r)
+}
+
+// chain: 100 / 4 = 25, sqrt(25) = 5
+let r1 = safe_div(100, 4)
+if let v = r1 {
+    let r2 = safe_sqrt(v)
+    if let s = r2 {
+        println(format("  100 / 4 -> sqrt = {}", Cast::string(s)))
+    }
+}
+
+// chain: 100 / 0 = None
+let r3 = safe_div(100, 0)
+let label = if r3.isSome() { "got value" } else { "None (div by zero)" }
+println(format("  100 / 0 -> {}", label))
+
+// using ? unwrap
+let quick = safe_div(42, 6)?
+println(format("  42 / 6 = {} (via ?)", Cast::string(quick)))
+println("")
+
+// ── 5. Generic Stack ────────────────────────────────────────────────────────
+
+println("── Generic Stack ──")
+
+struct GStack(T) { items: [$T] }
+
+fn extends(GStack) gpush(self: GStack($T), val: $T) {
+    self.items.push(val)
+}
+
+fn extends(GStack) gpop(self: GStack($T)) -> Option($T) {
+    return self.items.pop()
+}
+
+fn extends(GStack) gpeek(self: GStack($T)) -> Option($T) {
+    if self.items.len() == 0 { return None($T) }
+    return Some(self.items[self.items.len() - 1])
+}
+
+fn extends(GStack) gsize(self: GStack($T)) -> Int {
+    return self.items.len()
+}
+
+let stk = GStack { items: []: Int }
+stk.gpush(10)
+stk.gpush(20)
+stk.gpush(30)
+println(format("  size = {}", Cast::string(stk.gsize())))
+println(format("  peek = {}", Cast::string(stk.gpeek()?)))
+
+let popped = stk.gpop()?
+println(format("  pop  = {}", Cast::string(popped)))
+println(format("  size = {}", Cast::string(stk.gsize())))
+
+// string stack
+let names = GStack { items: []: String }
+names.gpush("Alice")
+names.gpush("Bob")
+names.gpush("Charlie")
+println(format("  top name = {}", names.gpeek()?))
+println("")
+
+// ── 6. Match as Expression ──────────────────────────────────────────────────
+
+println("── Match Expressions ──")
+
+enum Dir {
+    North,
+    South,
+    East,
+    West,
+}
+
+fn dir_name(d: Dir) -> String {
+    match d {
+        North() => { return "North" }
+        South() => { return "South" }
+        East()  => { return "East" }
+        West()  => { return "West" }
+    }
+    return ""
+}
+
+fn opposite(d: Dir) -> Dir {
+    match d {
+        North() => { return Dir::South() }
+        South() => { return Dir::North() }
+        East()  => { return Dir::West() }
+        West()  => { return Dir::East() }
+    }
+    return Dir::North()
+}
+
+let dirs = [Dir::North(), Dir::East(), Dir::South(), Dir::West()]
+for d in dirs {
+    println(format("  {} <-> {}", dir_name(d), dir_name(opposite(d))))
+}
+println("")
+
+// ── 7. Putting It Together ──────────────────────────────────────────────────
+
+println("── Combined: curried filter ──")
+
+// a curried predicate builder
+fn greater_than(threshold: Int) -> fn(Int) -> Bool {
+    return fn(x: Int) -> Bool { return x > threshold }
+}
+
+fn less_than(threshold: Int) -> fn(Int) -> Bool {
+    return fn(x: Int) -> Bool { return x < threshold }
+}
+
+let data = [3, 17, 8, 25, 42, 11, 6, 99, 14, 2]
+let gt10 = greater_than(10)
+let lt50 = less_than(50)
+
+let filtered = data.filter(): |x: Int| gt10(x) && lt50(x)
+print("  10 < x < 50: ")
+for i in 0..filtered.len() {
+    print(Cast::string(filtered[i]))
+    if i < filtered.len() - 1 { print(", ") }
+}
+println("")
+println("")
+
+println("Done!")

@@ -1,0 +1,186 @@
+module main
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Nova — Entity-Component System with Dyn Types
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: Dyn (structural typing / duck typing), -> dispatch, type aliases,
+//         fn extends, closures as struct fields, polymorphic collections.
+//
+//  This builds a mini "entity system" where different component types
+//  satisfy the same Dyn contract, enabling polymorphic dispatch.
+//
+//  Run:  nova run demo/ecs.nv
+// ═════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.math
+
+// ── Contract: anything with an `update` and `describe` method ───────────────
+
+type component = Dyn(T = update: fn($T, Int) -> $T + describe: fn($T) -> String)
+
+// ── Position component ──────────────────────────────────────────────────────
+
+struct Position {
+    x: Int,
+    y: Int,
+    update: fn(Self, Int) -> Self,
+    describe: fn(Self) -> String,
+}
+
+fn new_position(x: Int, y: Int) -> Position {
+    return Position {
+        x: x,
+        y: y,
+        update: fn(self: Position, dt: Int) -> Position {
+            return Position {
+                x: self.x + dt,
+                y: self.y + dt,
+                update: self.update,
+                describe: self.describe,
+            }
+        },
+        describe: fn(self: Position) -> String {
+            return format("Pos({}, {})", Cast::string(self.x), Cast::string(self.y))
+        },
+    }
+}
+
+// ── Health component ────────────────────────────────────────────────────────
+
+struct Health {
+    hp: Int,
+    max_hp: Int,
+    update: fn(Self, Int) -> Self,
+    describe: fn(Self) -> String,
+}
+
+fn new_health(hp: Int, max_hp: Int) -> Health {
+    return Health {
+        hp: hp,
+        max_hp: max_hp,
+        update: fn(self: Health, dt: Int) -> Health {
+            // regenerate 1 hp per tick, capped at max
+            let new_hp = self.hp + 1
+            if new_hp > self.max_hp { new_hp = self.max_hp }
+            return Health {
+                hp: new_hp,
+                max_hp: self.max_hp,
+                update: self.update,
+                describe: self.describe,
+            }
+        },
+        describe: fn(self: Health) -> String {
+            return format("HP({}/{})", Cast::string(self.hp), Cast::string(self.max_hp))
+        },
+    }
+}
+
+// ── Velocity component ──────────────────────────────────────────────────────
+
+struct Velocity {
+    dx: Int,
+    dy: Int,
+    update: fn(Self, Int) -> Self,
+    describe: fn(Self) -> String,
+}
+
+fn new_velocity(dx: Int, dy: Int) -> Velocity {
+    return Velocity {
+        dx: dx,
+        dy: dy,
+        update: fn(self: Velocity, dt: Int) -> Velocity {
+            return Velocity {
+                dx: self.dx,
+                dy: self.dy,
+                update: self.update,
+                describe: self.describe,
+            }
+        },
+        describe: fn(self: Velocity) -> String {
+            return format("Vel({}, {})", Cast::string(self.dx), Cast::string(self.dy))
+        },
+    }
+}
+
+// ── Score component ─────────────────────────────────────────────────────────
+
+struct Score {
+    points: Int,
+    combo: Int,
+    update: fn(Self, Int) -> Self,
+    describe: fn(Self) -> String,
+}
+
+fn new_score(pts: Int) -> Score {
+    return Score {
+        points: pts,
+        combo: 1,
+        update: fn(self: Score, dt: Int) -> Score {
+            return Score {
+                points: self.points + 10 * self.combo,
+                combo: self.combo + 1,
+                update: self.update,
+                describe: self.describe,
+            }
+        },
+        describe: fn(self: Score) -> String {
+            return format("Score({} x{})", Cast::string(self.points), Cast::string(self.combo))
+        },
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+
+println("── Initial Components ──")
+
+let components = []: component
+components.push(new_position(0, 0))
+components.push(new_health(8, 10))
+components.push(new_velocity(3, -1))
+components.push(new_score(0))
+
+for i in 0..components.len() {
+    println(format("  [{}] {}", Cast::string(i), components[i]->describe()))
+}
+
+// ── Tick: update all components ─────────────────────────────────────────────
+
+println("")
+println("── After 3 ticks ──")
+
+for tick in 0..3 {
+    for i in 0..components.len() {
+        components[i] = components[i]->update(1)
+    }
+}
+
+for i in 0..components.len() {
+    println(format("  [{}] {}", Cast::string(i), components[i]->describe()))
+}
+
+// ── Add more components dynamically ─────────────────────────────────────────
+
+println("")
+println("── Added two more ──")
+components.push(new_position(100, 200))
+components.push(new_health(1, 5))
+
+for i in 0..components.len() {
+    println(format("  [{}] {}", Cast::string(i), components[i]->describe()))
+}
+
+// ── Describe all at once ────────────────────────────────────────────────────
+
+println("")
+println("── Describe all ──")
+let descriptions = components.map(): |c: component| c->describe()
+for d in descriptions {
+    println(format("  > {}", d))
+}
+
+println("")
+println("Done!")
