@@ -1,0 +1,6 @@
+module fail
+// Match statement: tuple with literal, no catchall
+let t = (1, 2)
+match t {
+    (0, 0) => { println("origin") }
+}

@@ -1,0 +1,8 @@
+module fail
+struct Point { x: Int, y: Int }
+struct Color { r: Int, g: Int, b: Int }
+// Match Color but use Point pattern
+let c = Color(1, 2, 3)
+let r = match c {
+    Point { x, y } => "bad",
+}

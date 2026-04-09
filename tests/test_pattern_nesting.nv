@@ -1,0 +1,203 @@
+module test_pattern_nesting
+
+// ═══════════════════════════════════════════════════════════
+//  Nested & Compound Pattern Matching  –  positive tests
+// ═══════════════════════════════════════════════════════════
+//  Covers edge cases across pattern nesting:
+//    §1  Option inside tuple
+//    §2  Option inside list
+//    §3  Tuple inside list (cons pattern)
+//    §4  List inside tuple
+//    §5  Deep nesting: tuple of lists of tuples
+//    §6  OR inside list head
+//    §7  Wildcard at every nesting level
+//    §8  Multi-head cons pattern
+//    §9  Cons with 0 heads
+//    §10 Single-element tuple patterns
+//    §11 Empty list in various positions
+//    §12 Char literal patterns
+//    §13 Float literal patterns
+//    §14 Negative literal patterns
+// ═══════════════════════════════════════════════════════════
+
+// ─── §1 Option inside tuple ─────────────────────────────
+let t1: (Option(Int), String) = (Some(42), "hello")
+let r1 = match t1 {
+    (Some(n), s) => n,
+    (None, s)    => -1,
+    _            => -2
+}
+assert(r1 == 42, "opt in tuple: Some")
+println("PASS: §1a option in tuple Some")
+
+let t2: (Option(Int), String) = (None(Int), "bye")
+let r2 = match t2 {
+    (Some(n), s) => n,
+    (None, s)    => -1,
+    _            => -2
+}
+assert(r2 == -1, "opt in tuple: None")
+println("PASS: §1b option in tuple None")
+
+// ─── §2 Option inside list ──────────────────────────────
+let ls1: List(Option(Int)) = [Some(1), None(Int), Some(3)]
+let r3 = match ls1 {
+    [Some(x), ..rest] => x,
+    _ => -1
+}
+assert(r3 == 1, "opt in list head")
+println("PASS: §2 option in list head")
+
+// ─── §3 Tuple inside list ───────────────────────────────
+let ls2 = [(1, "a"), (2, "b"), (3, "c")]
+let r4 = match ls2 {
+    [(x, s), ..rest] => s,
+    _ => "empty"
+}
+assert(r4 == "a", "tuple in list: first element")
+println("PASS: §3 tuple inside list cons")
+
+// ─── §4 List inside tuple ───────────────────────────────
+let t3 = ([1, 2, 3], "data")
+let r5 = match t3 {
+    ([h, ..rest], label) => h,
+    _ => 0
+}
+assert(r5 == 1, "list in tuple")
+println("PASS: §4 list inside tuple")
+
+// ─── §5 Deep nesting ────────────────────────────────────
+let deep = ([(1, 2), (3, 4)], true)
+let r6 = match deep {
+    ([(a, b), ..rest], true) => a + b,
+    _ => 0
+}
+assert(r6 == 3, "deep nesting: tuple of list of tuples")
+println("PASS: §5 deep nesting")
+
+// ─── §6 OR inside list head ─────────────────────────────
+let ls3 = [1, 2, 3]
+let r7 = match ls3 {
+    [1 | 2, ..rest] => "starts with 1 or 2",
+    _ => "other"
+}
+assert(r7 == "starts with 1 or 2", "OR in list head")
+
+let ls4 = [2, 5, 6]
+let r8 = match ls4 {
+    [1 | 2, ..rest] => "starts with 1 or 2",
+    _ => "other"
+}
+assert(r8 == "starts with 1 or 2", "OR in list head: 2")
+
+let ls5 = [3, 5, 6]
+let r9 = match ls5 {
+    [1 | 2, ..rest] => "starts with 1 or 2",
+    _ => "other"
+}
+assert(r9 == "other", "OR in list head: no match")
+println("PASS: §6 OR inside list head")
+
+// ─── §7 Wildcard at every nesting level ─────────────────
+let nested = ((1, 2), [3, 4])
+let r10 = match nested {
+    ((_, _), [_, _]) => "matched",
+    _ => "miss"
+}
+assert(r10 == "matched", "wildcards everywhere")
+println("PASS: §7 wildcards at every level")
+
+// ─── §8 Multi-head cons pattern ─────────────────────────
+let ls6 = [10, 20, 30, 40, 50]
+let r11 = match ls6 {
+    [a, b, c, ..rest] => a + b + c,
+    _ => 0
+}
+assert(r11 == 60, "3-head cons")
+println("PASS: §8a 3-head cons pattern")
+
+let ls7 = [1, 2]
+let r12 = match ls7 {
+    [a, b, c, ..rest] => a + b + c,
+    [a, b] => a * b,
+    _ => 0
+}
+assert(r12 == 2, "2-element list falls to 2-element pattern")
+println("PASS: §8b cons pattern length mismatch falls through")
+
+// ─── §9 Cons with 0 heads ──────────────────────────────
+let ls8 = [1, 2, 3]
+let r13 = match ls8 {
+    [..all] => all,
+    _ => []: Int
+}
+assert(r13 == [1, 2, 3], "cons 0 heads captures all")
+println("PASS: §9 cons with 0 heads")
+
+// ─── §10 Single-element tuple patterns ──────────────────
+let t4 = (42,)
+let r14 = match t4 {
+    (x,) => x,
+    _ => 0
+}
+assert(r14 == 42, "single-element tuple")
+println("PASS: §10 single-element tuple pattern")
+
+// ─── §11 Empty list in various positions ────────────────
+let empty: List(Int) = []: Int
+let r15 = match empty {
+    [] => "empty",
+    [x, ..rest] => "nonempty",
+    _ => "other"
+}
+assert(r15 == "empty", "empty list match")
+println("PASS: §11a empty list match")
+
+let t5 = ([]: Int, "hello")
+let r16 = match t5 {
+    ([], s)         => "empty-" + s,
+    ([h, ..rest], s) => "nonempty",
+    _               => "other"
+}
+assert(r16 == "empty-hello", "empty list in tuple")
+println("PASS: §11b empty list in tuple")
+
+// ─── §12 Char literal patterns ──────────────────────────
+let c = 'x'
+let r17 = match c {
+    'a' => "alpha",
+    'x' => "found x",
+    _   => "other"
+}
+assert(r17 == "found x", "char literal")
+println("PASS: §12 char literal patterns")
+
+// ─── §13 Float literal patterns ─────────────────────────
+let f = 3.14
+let r18 = match f {
+    0.0  => "zero",
+    3.14 => "pi",
+    _    => "other"
+}
+assert(r18 == "pi", "float literal")
+println("PASS: §13 float literal patterns")
+
+// ─── §14 Negative literal patterns ──────────────────────
+let n = -5
+let r19 = match n {
+    -5 => "neg five",
+    0  => "zero",
+    5  => "five",
+    _  => "other"
+}
+assert(r19 == "neg five", "negative int literal")
+println("PASS: §14a negative int literal")
+
+let nf = -2.5
+let r20 = match nf {
+    -2.5 => "neg 2.5",
+    0.0  => "zero",
+    _    => "other"
+}
+assert(r20 == "neg 2.5", "negative float literal")
+println("PASS: §14b negative float literal")

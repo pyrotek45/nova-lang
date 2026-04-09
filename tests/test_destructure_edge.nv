@@ -1,0 +1,124 @@
+module test_destructure_edge
+
+// ═══════════════════════════════════════════════════════════════
+//  Let & For Destructuring Edge Cases
+// ═══════════════════════════════════════════════════════════════
+
+// ─── §1 Basic tuple let destructure ────────────────────────
+
+let (a, b) = (10, 20)
+assert(a == 10, "§1a")
+assert(b == 20, "§1b")
+println("PASS: §1 basic tuple let destructure")
+
+// ─── §2 Nested tuple let destructure ───────────────────────
+
+let (c, (d, e)) = (1, (2, 3))
+assert(c == 1, "§2a")
+assert(d == 2, "§2b")
+assert(e == 3, "§2c")
+println("PASS: §2 nested tuple let destructure")
+
+// ─── §3 Triple tuple let destructure ───────────────────────
+
+let (x, y, z) = (10, 20, 30)
+assert(x == 10, "§3a")
+assert(y == 20, "§3b")
+assert(z == 30, "§3c")
+println("PASS: §3 triple tuple let destructure")
+
+// ─── §4 Cons pattern let destructure ───────────────────────
+
+let [h, ..t] = [1, 2, 3, 4]
+assert(h == 1, "§4a")
+println("PASS: §4 cons pattern let destructure")
+
+// ─── §5 Single-element tuple destructure ───────────────────
+
+let (only,) = (42,)
+assert(only == 42, "§5")
+println("PASS: §5 single-element tuple destructure")
+
+// ─── §6 For-loop tuple destructure ─────────────────────────
+
+let sum = 0
+for (k, v) in [(1, 10), (2, 20), (3, 30)] {
+    sum = sum + k * v
+}
+assert(sum == 140, "§6")
+println("PASS: §6 for-loop tuple destructure")
+
+// ─── §7 For-loop nested tuple ──────────────────────────────
+
+let total = 0
+for (a, (b, c)) in [(1, (2, 3)), (4, (5, 6))] {
+    total = total + a + b + c
+}
+assert(total == 21, "§7")
+println("PASS: §7 for-loop nested tuple destructure")
+
+// ─── §8 Tuple destructure with different types ─────────────
+
+let (name, age) = ("Alice", 30)
+assert(name == "Alice", "§8a")
+assert(age == 30, "§8b")
+println("PASS: §8 tuple with different types")
+
+// ─── §9 Tuple in match then destructure ────────────────────
+
+fn swap(t: (Int, Int)) -> (Int, Int) {
+    let (a, b) = t
+    return (b, a)
+}
+let (r1, r2) = swap((3, 4))
+assert(r1 == 4, "§9a")
+assert(r2 == 3, "§9b")
+println("PASS: §9 tuple in match then destructure")
+
+// ─── §10 Multiple let destructures in sequence ─────────────
+
+let (p, q) = (100, 200)
+let (r, s) = (300, 400)
+assert(p + q + r + s == 1000, "§10")
+println("PASS: §10 multiple let destructures")
+
+// ─── §11 Destructure return value ──────────────────────────
+
+fn make_pair() -> (Int, String) {
+    return (42, "hello")
+}
+let (num, txt) = make_pair()
+assert(num == 42, "§11a")
+assert(txt == "hello", "§11b")
+println("PASS: §11 destructure return value")
+
+// ─── §12 Wildcard in tuple destructure ─────────────────────
+
+let (_, important) = (999, 42)
+assert(important == 42, "§12")
+println("PASS: §12 wildcard in tuple destructure")
+
+// ─── §13 Mixed wildcard and binding ────────────────────────
+
+let (first, _, third) = (1, 2, 3)
+assert(first == 1, "§13a")
+assert(third == 3, "§13b")
+println("PASS: §13 mixed wildcard and binding")
+
+// ─── §14 Deeply nested tuple destructure ───────────────────
+
+let (a14, (b14, (c14, d14))) = (1, (2, (3, 4)))
+assert(a14 == 1, "§14a")
+assert(b14 == 2, "§14b")
+assert(c14 == 3, "§14c")
+assert(d14 == 4, "§14d")
+println("PASS: §14 deeply nested tuple destructure")
+
+// ─── §15 For with wildcard ─────────────────────────────────
+
+let vals = 0
+for (_, v) in [(1, 10), (2, 20)] {
+    vals = vals + v
+}
+assert(vals == 30, "§15")
+println("PASS: §15 for with wildcard")

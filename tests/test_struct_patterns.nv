@@ -1,0 +1,261 @@
+module test_struct_patterns
+
+// ═══════════════════════════════════════════════════════════
+//  Struct Pattern Matching  –  positive tests
+// ═══════════════════════════════════════════════════════════
+//  Covers:
+//    §1  Basic struct match (expression & statement)
+//    §2  Shorthand field binding
+//    §3  Literal field patterns
+//    §4  Wildcard in struct fields
+//    §5  Multiple struct arms
+//    §6  Struct with nested tuple pattern
+//    §7  Struct with nested Option pattern
+//    §8  OR patterns with structs
+//    §9  Field order independence
+//    §10 Struct with 3+ fields
+//    §11 Struct match in function
+//    §12 Struct with nested bool/string/char literals
+//    §13 Struct with nested list pattern
+// ═══════════════════════════════════════════════════════════
+
+struct Point { x: Int, y: Int }
+
+// ─── §1 Basic struct match ──────────────────────────────
+let p = Point(10, 20)
+
+// As expression
+let sum = match p {
+    Point { x, y } => x + y,
+    _ => 0
+}
+assert(sum == 30, "struct match expr: sum")
+println("PASS: §1a struct match as expression")
+
+// As statement
+match p {
+    Point { x, y } => {
+        assert(x == 10, "struct match stmt: x")
+        assert(y == 20, "struct match stmt: y")
+        println("PASS: §1b struct match as statement")
+    }
+    _ => assert(false, "should not reach _")
+}
+
+// ─── §2 Shorthand field binding ─────────────────────────
+let p2 = Point(3, 7)
+let r = match p2 {
+    Point { x, y } => x * y,
+    _ => 0
+}
+assert(r == 21, "shorthand binding product")
+println("PASS: §2 shorthand field binding")
+
+// ─── §3 Literal field patterns ──────────────────────────
+let origin = Point(0, 0)
+let label = match origin {
+    Point { x: 0, y: 0 } => "origin",
+    _ => "not origin"
+}
+assert(label == "origin", "literal fields: origin")
+println("PASS: §3a literal fields match origin")
+
+let p3 = Point(0, 5)
+let label2 = match p3 {
+    Point { x: 0, y: 0 } => "origin",
+    Point { x: 0, y }    => "y-axis",
+    _ => "other"
+}
+assert(label2 == "y-axis", "literal fields: y-axis")
+println("PASS: §3b literal fields y-axis")
+
+let p4 = Point(5, 0)
+let label3 = match p4 {
+    Point { x: 0, y: 0 } => "origin",
+    Point { x: 0, y }    => "y-axis",
+    Point { x, y: 0 }    => "x-axis",
+    _ => "general"
+}
+assert(label3 == "x-axis", "literal fields: x-axis")
+println("PASS: §3c literal fields x-axis")
+
+// ─── §4 Wildcard in struct fields ───────────────────────
+let p5 = Point(42, 99)
+let r2 = match p5 {
+    Point { x: _, y: _ } => "any point",
+    _ => "miss"
+}
+assert(r2 == "any point", "all wildcards")
+println("PASS: §4a all wildcards")
+
+let r3 = match p5 {
+    Point { x, y: _ } => x,
+    _ => 0
+}
+assert(r3 == 42, "wildcard y, bind x")
+println("PASS: §4b wildcard y, bind x")
+
+let r4 = match p5 {
+    Point { x: _, y } => y,
+    _ => 0
+}
+assert(r4 == 99, "wildcard x, bind y")
+println("PASS: §4c wildcard x, bind y")
+
+// ─── §5 Multiple struct arms ────────────────────────────
+fn classify(p: Point) -> String {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, y }    => "y-axis",
+        Point { x, y: 0 }    => "x-axis",
+        _                     => "general"
+    }
+}
+assert(classify(Point(0, 0)) == "origin",  "classify origin")
+assert(classify(Point(0, 5)) == "y-axis",  "classify y-axis")
+assert(classify(Point(3, 0)) == "x-axis",  "classify x-axis")
+assert(classify(Point(1, 1)) == "general", "classify general")
+println("PASS: §5 multiple struct arms")
+
+// ─── §6 Struct with nested tuple pattern ────────────────
+struct Pair { a: (Int, Int), b: String }
+let pair = Pair((1, 2), "hi")
+match pair {
+    Pair { a: (x, y), b } => {
+        assert(x == 1, "nested tuple x")
+        assert(y == 2, "nested tuple y")
+        assert(b == "hi", "nested tuple b")
+        println("PASS: §6 nested tuple in struct")
+    }
+    _ => assert(false, "should not reach _")
+}
+
+// ─── §7 Struct with nested Option pattern ───────────────
+struct Container { value: Option(Int) }
+let c1 = Container(Some(42))
+let c2 = Container(None(Int))
+
+let v1 = match c1 {
+    Container { value: Some(n) } => n,
+    _ => -1
+}
+assert(v1 == 42, "nested option Some")
+println("PASS: §7a nested Option Some in struct")
+
+let v2 = match c2 {
+    Container { value: Some(n) } => n,
+    Container { value: None }    => -1,
+    _ => -2
+}
+assert(v2 == -1, "nested option None")
+println("PASS: §7b nested Option None in struct")
+
+// ─── §8 OR patterns with structs ────────────────────────
+let p6 = Point(0, 0)
+let p7 = Point(1, 1)
+let p8 = Point(2, 3)
+
+let r5 = match p6 {
+    Point { x: 0, y: 0 } | Point { x: 1, y: 1 } => "special",
+    _ => "normal"
+}
+assert(r5 == "special", "OR struct: origin")
+
+let r6 = match p7 {
+    Point { x: 0, y: 0 } | Point { x: 1, y: 1 } => "special",
+    _ => "normal"
+}
+assert(r6 == "special", "OR struct: unit")
+
+let r7 = match p8 {
+    Point { x: 0, y: 0 } | Point { x: 1, y: 1 } => "special",
+    _ => "normal"
+}
+assert(r7 == "normal", "OR struct: general")
+println("PASS: §8 OR patterns with structs")
+
+// ─── §9 Field order independence ────────────────────────
+let p9 = Point(100, 200)
+
+// Write fields in reverse order
+let r8 = match p9 {
+    Point { y, x } => x + y,
+    _ => 0
+}
+assert(r8 == 300, "reversed field order: sum")
+
+// Verify individual values are correct
+let r9 = match p9 {
+    Point { y, x } => x,
+    _ => 0
+}
+assert(r9 == 100, "reversed field order: x == 100")
+
+let r10 = match p9 {
+    Point { y, x } => y,
+    _ => 0
+}
+assert(r10 == 200, "reversed field order: y == 200")
+println("PASS: §9 field order independence")
+
+// ─── §10 Struct with 3+ fields ─────────────────────────
+struct Vec3 { x: Float, y: Float, z: Float }
+let v = Vec3(1.0, 2.0, 3.0)
+let sum3 = match v {
+    Vec3 { x, y, z } => x + y + z,
+    _ => 0.0
+}
+assert(sum3 == 6.0, "3-field struct sum")
+println("PASS: §10a struct with 3 fields")
+
+struct Color { r: Int, g: Int, b: Int }
+let red = Color(255, 0, 0)
+match red {
+    Color { r: 255, g: 0, b: 0 } => println("PASS: §10b 3-field struct with all literals"),
+    _ => assert(false, "should match red")
+}
+
+// ─── §11 Struct match in function ───────────────────────
+struct Rect { w: Int, h: Int }
+
+fn area(r: Rect) -> Int {
+    return match r {
+        Rect { w, h } => w * h,
+        _ => 0
+    }
+}
+assert(area(Rect(3, 4)) == 12, "struct match in fn")
+assert(area(Rect(0, 100)) == 0, "struct match in fn zero")
+println("PASS: §11 struct match in function")
+
+// ─── §12 Struct with nested bool/string/char literals ───
+struct Config { debug: Bool, name: String }
+let cfg = Config(true, "prod")
+let r11 = match cfg {
+    Config { debug: true, name: "prod" }  => "debug-prod",
+    Config { debug: true, name }          => "debug-" + name,
+    Config { debug: false, name: "prod" } => "release-prod",
+    _ => "other"
+}
+assert(r11 == "debug-prod", "nested literals in struct")
+println("PASS: §12 nested bool/string literals in struct")
+
+// ─── §13 Struct with nested list pattern ────────────────
+struct Data { items: List(Int) }
+let d1 = Data([1, 2, 3])
+let d2 = Data([]: Int)
+
+let r12 = match d1 {
+    Data { items: [h, ..rest] } => h,
+    Data { items: [] } => -1,
+    _ => -2
+}
+assert(r12 == 1, "struct with list cons pattern")
+
+let r13 = match d2 {
+    Data { items: [h, ..rest] } => h,
+    Data { items: [] } => -1,
+    _ => -2
+}
+assert(r13 == -1, "struct with empty list pattern")
+println("PASS: §13 struct with nested list patterns")

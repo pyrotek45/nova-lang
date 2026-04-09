@@ -1,0 +1,7 @@
+module fail
+// Float pattern on a bool match — type mismatch
+let b = true
+let r = match b {
+    3.14 => "bad",
+    _ => "ok",
+}

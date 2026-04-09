@@ -4670,6 +4670,16 @@ impl Parser {
         match pat {
             Pattern::Wildcard | Pattern::Variable(_) => true,
             Pattern::Tuple(pats) | Pattern::List(pats) => pats.iter().all(Self::is_irrefutable),
+            Pattern::Struct { fields, .. } => {
+                // A struct pattern with all irrefutable field sub-patterns
+                // covers every possible instance of that struct.
+                fields.iter().all(|(_, p)| Self::is_irrefutable(p))
+            }
+            Pattern::ListCons(heads, _tail) => {
+                // [h1, h2, ..rest] is irrefutable if all head elements are
+                // irrefutable — the tail variable always binds.
+                heads.iter().all(Self::is_irrefutable)
+            }
             Pattern::OptionSome(_) => {
                 // Some(x) only matches Some, not None – not irrefutable
                 false
@@ -4823,7 +4833,7 @@ impl Parser {
                     )),
                 }
             }
-            Pattern::Struct { name, .. } => {
+            Pattern::Struct { name, fields } => {
                 match match_type {
                     TType::Custom { name: type_name, .. } => {
                         if name != type_name {
@@ -4832,6 +4842,39 @@ impl Parser {
                                 "The struct name in the pattern must match the match subject type.",
                                 pos.clone(),
                             ));
+                        }
+                        // Validate field names and count
+                        if let Some(struct_fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                            // Filter out the auto-added "type" field
+                            let real_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
+                                .filter(|(n, _)| n.as_ref() != "type")
+                                .collect();
+                            if fields.len() != real_fields.len() {
+                                return Err(self.generate_error_with_pos(
+                                    format!(
+                                        "Struct pattern `{}` has {} fields but the struct has {}",
+                                        name, fields.len(), real_fields.len()
+                                    ),
+                                    "The number of fields in the pattern must match the struct definition.",
+                                    pos.clone(),
+                                ));
+                            }
+                            for (field_name, sub_pat) in fields {
+                                let found = real_fields.iter().find(|(n, _)| n == field_name);
+                                if found.is_none() {
+                                    let available: Vec<String> = real_fields.iter()
+                                        .map(|(n, _)| format!("`{}`", n))
+                                        .collect();
+                                    return Err(self.generate_error_with_pos(
+                                        format!("Field `{}` not found in struct `{}`", field_name, name),
+                                        format!("Available fields: {}", available.join(", ")),
+                                        pos.clone(),
+                                    ));
+                                }
+                                // Validate sub-pattern type
+                                let field_ty = found.map(|(_, t)| t.clone()).unwrap_or(TType::Any);
+                                self.validate_pattern_type(sub_pat, &field_ty, pos)?;
+                            }
                         }
                         Ok(())
                     }
@@ -4889,21 +4932,125 @@ impl Parser {
 
     /// When matching on Option, transform `Enum { variant: "Some", binding }` → OptionSome(binding)
     /// and `Enum { variant: "None", binding: None }` → OptionNone.
-    fn resolve_option_patterns(pat: Pattern, match_type: &TType) -> Pattern {
-        if !matches!(match_type, TType::Option { .. }) {
-            return pat;
-        }
+    fn resolve_option_patterns(&self, pat: Pattern, match_type: &TType) -> Pattern {
         match pat {
-            Pattern::Enum { ref variant, ref binding } if variant.as_ref() == "Some" => {
-                Pattern::OptionSome(binding.clone())
+            // Top-level Option resolution
+            Pattern::Enum { ref variant, ref binding, .. } if variant.as_ref() == "Some" && matches!(match_type, TType::Option { .. }) => {
+                // Recursively resolve the binding sub-pattern with the inner Option type
+                let inner_type = match match_type {
+                    TType::Option { inner } => inner.as_ref().clone(),
+                    _ => TType::Any,
+                };
+                let resolved_binding = binding.as_ref().map(|b| {
+                    Box::new(self.resolve_option_patterns(b.as_ref().clone(), &inner_type))
+                });
+                Pattern::OptionSome(resolved_binding)
             }
-            Pattern::Enum { ref variant, ref binding } if variant.as_ref() == "None" && binding.is_none() => {
+            Pattern::Enum { ref variant, ref binding, .. } if variant.as_ref() == "None" && binding.is_none() && matches!(match_type, TType::Option { .. }) => {
                 Pattern::OptionNone
+            }
+            // Resolve tag index for enum variants inside nested patterns
+            Pattern::Enum { variant, binding, tag: _ } => {
+                // Look up the tag index from the enum definition
+                let resolved_tag = match match_type {
+                    TType::Custom { name, .. } => {
+                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
+                            fields.iter().enumerate()
+                                .find(|(_, (n, _))| *n == variant)
+                                .map(|(i, _)| i)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                let resolved_binding = binding.map(|b| {
+                    // Resolve the binding's type from the enum field definition
+                    let binding_type = match match_type {
+                        TType::Custom { name, .. } => {
+                            self.typechecker.environment.custom_types.get(name.as_ref())
+                                .and_then(|fields| fields.iter().find(|(n, _)| *n == variant))
+                                .map(|(_, t)| t.clone())
+                                .unwrap_or(TType::Any)
+                        }
+                        _ => TType::Any,
+                    };
+                    Box::new(self.resolve_option_patterns(*b, &binding_type))
+                });
+                Pattern::Enum { variant, binding: resolved_binding, tag: resolved_tag }
             }
             Pattern::Or(alternatives) => {
                 Pattern::Or(alternatives.into_iter()
-                    .map(|a| Self::resolve_option_patterns(a, match_type))
+                    .map(|a| self.resolve_option_patterns(a, match_type))
                     .collect())
+            }
+            Pattern::Tuple(pats) => {
+                let elements = match match_type {
+                    TType::Tuple { elements } => elements.clone(),
+                    _ => vec![TType::Any; pats.len()],
+                };
+                Pattern::Tuple(pats.into_iter().enumerate()
+                    .map(|(i, p)| {
+                        let ty = elements.get(i).cloned().unwrap_or(TType::Any);
+                        self.resolve_option_patterns(p, &ty)
+                    })
+                    .collect())
+            }
+            Pattern::List(pats) => {
+                let inner = match match_type {
+                    TType::List { inner } => inner.as_ref().clone(),
+                    _ => TType::Any,
+                };
+                Pattern::List(pats.into_iter()
+                    .map(|p| self.resolve_option_patterns(p, &inner))
+                    .collect())
+            }
+            Pattern::ListCons(heads, tail) => {
+                let inner = match match_type {
+                    TType::List { inner } => inner.as_ref().clone(),
+                    _ => TType::Any,
+                };
+                Pattern::ListCons(
+                    heads.into_iter()
+                        .map(|p| self.resolve_option_patterns(p, &inner))
+                        .collect(),
+                    tail,
+                )
+            }
+            Pattern::Struct { name, fields } => {
+                // Look up struct field types from environment to resolve nested Option patterns
+                // AND reorder fields to match struct definition order (compiler uses positional indexing)
+                let struct_fields: Vec<(Rc<str>, TType)> = self.typechecker.environment
+                    .custom_types
+                    .get(name.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+                // Filter out the auto-added "type" field
+                let real_struct_fields: Vec<&(Rc<str>, TType)> = struct_fields.iter()
+                    .filter(|(n, _)| n.as_ref() != "type")
+                    .collect();
+                // Reorder pattern fields to match struct definition order
+                let mut ordered_fields = Vec::with_capacity(fields.len());
+                for (sf_name, sf_type) in &real_struct_fields {
+                    if let Some((_, pat)) = fields.iter().find(|(fn_, _)| fn_ == sf_name) {
+                        ordered_fields.push(((*sf_name).clone(), self.resolve_option_patterns(pat.clone(), sf_type)));
+                    }
+                }
+                // If reordering failed (e.g. wrong field names), fall back to original order
+                if ordered_fields.len() != fields.len() {
+                    let fallback: Vec<(Rc<str>, Pattern)> = fields.into_iter()
+                        .map(|(fname, p)| {
+                            let field_ty = struct_fields.iter()
+                                .find(|(n, _)| n == &fname)
+                                .map(|(_, t)| t.clone())
+                                .unwrap_or(TType::Any);
+                            (fname, self.resolve_option_patterns(p, &field_ty))
+                        })
+                        .collect();
+                    Pattern::Struct { name, fields: fallback }
+                } else {
+                    Pattern::Struct { name, fields: ordered_fields }
+                }
             }
             other => other,
         }
@@ -5023,7 +5170,7 @@ impl Parser {
                         Some(Box::new(self.parse_pattern()?))
                     };
                     self.consume_symbol(StructuralSymbol::RightParen)?;
-                    return Ok(Pattern::Enum { variant: id, binding });
+                    return Ok(Pattern::Enum { variant: id, binding, tag: None });
                 }
                 // Check if followed by { → Struct pattern
                 if self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::LeftBrace)) {
@@ -5069,7 +5216,7 @@ impl Parser {
 
         while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
             let pat = self.parse_pattern()?;
-            let pat = Self::resolve_option_patterns(pat, &match_type);
+            let pat = self.resolve_option_patterns(pat, &match_type);
 
             // Validate pattern type compatibility
             self.validate_pattern_type(&pat, &match_type, &pos)?;
@@ -5233,7 +5380,7 @@ impl Parser {
 
         while !self.current_token().is_some_and(|t| t.is_symbol(StructuralSymbol::RightBrace)) {
             let pat = self.parse_pattern()?;
-            let pat = Self::resolve_option_patterns(pat, &match_type);
+            let pat = self.resolve_option_patterns(pat, &match_type);
 
             // Validate pattern type compatibility
             self.validate_pattern_type(&pat, &match_type, &pos)?;
@@ -5405,7 +5552,7 @@ impl Parser {
                     self.register_pattern_bindings(first, match_type)?;
                 }
             }
-            Pattern::Enum { variant, binding } => {
+            Pattern::Enum { variant, binding, .. } => {
                 // The binding gets the inner type of the enum variant
                 if let Some(sub_pat) = binding {
                     // Determine the inner type of the matched variant
@@ -5480,7 +5627,7 @@ impl Parser {
         let type_name = expr.get_type().custom_to_string().map(|s| s.to_string());
         let is_enum = type_name
             .as_deref()
-            .is_some_and(|n| self.typechecker.environment.custom_types.contains_key(n));
+            .is_some_and(|n| self.typechecker.environment.enums.has(&Rc::from(n)));
 
         if !is_enum {
             // Dispatch to generalized (value) pattern matching
@@ -5856,7 +6003,7 @@ impl Parser {
         let type_name = expr.get_type().custom_to_string().map(|s| s.to_string());
         let is_enum = type_name
             .as_deref()
-            .is_some_and(|n| self.typechecker.environment.custom_types.contains_key(n));
+            .is_some_and(|n| self.typechecker.environment.enums.has(&Rc::from(n)));
 
         if !is_enum {
             // Dispatch to generalized (value) pattern matching
@@ -7185,6 +7332,15 @@ impl Parser {
                     pos.clone(),
                 ));
             }
+        }
+
+        // Let destructuring requires irrefutable patterns — no literals allowed
+        if !Self::is_irrefutable(&pattern) {
+            return Err(self.generate_error_with_pos(
+                "Refutable pattern in let destructuring".to_string(),
+                "Let destructuring requires patterns that always match.\n  Literal values (like `0`, `\"hello\"`, `true`) are not allowed in let patterns.\n  Use `match` instead if you need to match specific values.",
+                pos.clone(),
+            ));
         }
 
         self.consume_operator(Operator::Assignment)?;

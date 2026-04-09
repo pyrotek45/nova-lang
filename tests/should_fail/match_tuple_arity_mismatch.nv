@@ -1,0 +1,7 @@
+module fail
+struct Point { x: Int, y: Int }
+// Tuple arity mismatch in match: pattern is 3 but type is 2
+let t = (1, 2)
+let r = match t {
+    (a, b, c) => a + b + c,
+}

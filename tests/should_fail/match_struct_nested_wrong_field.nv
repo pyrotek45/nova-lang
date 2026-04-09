@@ -1,0 +1,7 @@
+module fail
+struct Nested { inner: (Int, Int), label: String }
+// Wrong field name in nested struct pattern
+let n = Nested((1, 2), "test")
+let r = match n {
+    Nested { bogus: (a, b), label } => "bad",
+}

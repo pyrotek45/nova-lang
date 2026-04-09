@@ -1,0 +1,7 @@
+module fail
+struct Point { x: Int, y: Int }
+// Only one literal arm — not exhaustive
+let p = Point(1, 2)
+let r = match p {
+    Point { x: 1, y } => "one",
+}

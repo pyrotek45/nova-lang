@@ -1,0 +1,7 @@
+module fail
+// Tuple with only literals, no wildcard
+let t = (1, 2)
+let r = match t {
+    (0, 0) => "origin",
+    (1, 0) => "x-axis",
+}

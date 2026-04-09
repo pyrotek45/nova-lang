@@ -1,0 +1,5 @@
+module fail
+// For destructure: arity mismatch (3 patterns, 2 elements)
+for (a, b, c) in [(1, 2), (3, 4)] {
+    println(Cast::string(a))
+}

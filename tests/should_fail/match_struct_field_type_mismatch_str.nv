@@ -1,0 +1,8 @@
+module fail
+struct Point { x: Int, y: Int }
+// String literal in Int field — type mismatch
+let p = Point(1, 2)
+let r = match p {
+    Point { x: "hello", y } => "bad",
+    _ => "ok",
+}

@@ -1,0 +1,7 @@
+module fail
+struct Point { x: Int, y: Int }
+// Match statement: struct with literal, no catchall
+let p = Point(5, 10)
+match p {
+    Point { x: 0, y: 0 } => { println("origin") }
+}
