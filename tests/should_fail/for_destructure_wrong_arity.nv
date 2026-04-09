@@ -1,0 +1,6 @@
+module test
+// for destructure with wrong tuple arity
+let pairs: [(Int, Int)] = [(1, 2), (3, 4)]
+for (a, b, c) in pairs {
+    println(Cast::string(a))
+}

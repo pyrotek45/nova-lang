@@ -1,0 +1,3 @@
+module test
+// let tuple destructure on non-tuple type
+let (a, b) = 42

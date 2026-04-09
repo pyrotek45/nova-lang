@@ -192,6 +192,13 @@ pub enum Statement {
     ForwardDec {
         identifier: Rc<str>,
     },
+    /// `for (a, b) in list { … }` – destructuring foreach
+    ForeachDestructure {
+        pattern: Pattern,
+        expr: Expr,
+        body: Vec<Statement>,
+        position: FilePosition,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -229,6 +236,13 @@ pub enum Expr {
         identifier: Rc<str>,
         expr: Box<Expr>,
         global: bool,
+    },
+    /// `let (a, b) = expr` – pattern destructuring in let
+    LetDestructure {
+        ttype: TType,
+        pattern: Pattern,
+        expr: Box<Expr>,
+        position: FilePosition,
     },
     Closure {
         ttype: TType,
@@ -355,6 +369,7 @@ impl Expr {
             Expr::IfExpr { ttype, .. } => ttype.clone(),
             Expr::Block { ttype, .. } => ttype.clone(),
             Expr::Let { ttype, .. } => ttype.clone(),
+            Expr::LetDestructure { ttype, .. } => ttype.clone(),
             Expr::DynField { ttype, .. } => ttype.clone(),
             Expr::MatchExpr { ttype, .. } => ttype.clone(),
             Expr::ValueMatchExpr { ttype, .. } => ttype.clone(),

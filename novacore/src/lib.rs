@@ -794,6 +794,22 @@ impl NovaCore {
             native::list::len,
         );
         self.add_function(
+            "List::__tail_slice",
+            TType::Function {
+                parameters: vec![
+                    TType::Int,
+                    TType::List {
+                        inner: Box::new(TType::Generic { name: "T".into() }),
+                    },
+                ],
+                return_type: Box::new(TType::List {
+                    inner: Box::new(TType::Generic { name: "T".into() }),
+                }),
+            },
+            common::nodes::SymbolKind::GenericFunction,
+            native::list::slice,
+        );
+        self.add_function(
             "sleep",
             TType::Function {
                 parameters: vec![TType::Int],

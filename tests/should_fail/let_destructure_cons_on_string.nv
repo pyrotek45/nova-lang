@@ -1,0 +1,3 @@
+module test
+// let cons destructure on non-list type (string)
+let [h, ..t] = "hello"

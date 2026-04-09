@@ -1,0 +1,151 @@
+module test_destructuring
+
+// ============================================================
+// Test: let destructuring and for-loop destructuring
+// ============================================================
+
+// ── Let destructuring: tuples ──────────────────────────────
+
+// basic 2-tuple
+let (a, b) = (10, 20)
+assert(a == 10)
+assert(b == 20)
+
+// basic 3-tuple
+let (x, y, z) = (1, 2, 3)
+assert(x == 1)
+assert(y == 2)
+assert(z == 3)
+
+// mixed types in tuple
+let (name, age) = ("Alice", 30)
+assert(name == "Alice")
+assert(age == 30)
+
+// nested tuple
+let (p, (q, r)) = (1, (2, 3))
+assert(p == 1)
+assert(q == 2)
+assert(r == 3)
+
+// wildcard in tuple
+let (first, _) = (42, 99)
+assert(first == 42)
+
+// all wildcards (just evaluates and discards)
+let (_, _) = (1, 2)
+
+// ── Let destructuring: lists ───────────────────────────────
+
+// exact list match
+let [h1, h2] = [100, 200]
+assert(h1 == 100)
+assert(h2 == 200)
+
+// list with cons pattern (head..tail)
+let [head, ..tail] = [1, 2, 3, 4]
+assert(head == 1)
+assert(tail.len() == 3)
+assert(tail[0] == 2)
+assert(tail[1] == 3)
+assert(tail[2] == 4)
+
+// single element + rest
+let [first_elem, ..rest] = [10, 20, 30]
+assert(first_elem == 10)
+assert(rest.len() == 2)
+
+// ── For-loop destructuring: tuples ─────────────────────────
+
+let pairs: [(Int, Int)] = [(1, 10), (2, 20), (3, 30)]
+let sum_keys = 0
+let sum_vals = 0
+for (k, v) in pairs {
+    sum_keys = sum_keys + k
+    sum_vals = sum_vals + v
+}
+assert(sum_keys == 6)
+assert(sum_vals == 60)
+
+// for-loop with mixed-type tuples
+let entries: [(String, Int)] = [("a", 1), ("b", 2), ("c", 3)]
+let total = 0
+for (_, val) in entries {
+    total = total + val
+}
+assert(total == 6)
+
+// for-loop with 3-element tuples
+let triples: [(Int, Int, Int)] = [(1, 2, 3), (4, 5, 6)]
+let s1 = 0
+let s2 = 0
+let s3 = 0
+for (a1, b1, c1) in triples {
+    s1 = s1 + a1
+    s2 = s2 + b1
+    s3 = s3 + c1
+}
+assert(s1 == 5)
+assert(s2 == 7)
+assert(s3 == 9)
+
+// for-loop with nested tuple destructuring
+let nested_pairs: [(Int, (Int, Int))] = [(1, (2, 3)), (4, (5, 6))]
+let na = 0
+let nb = 0
+let nc = 0
+for (aa, (bb, cc)) in nested_pairs {
+    na = na + aa
+    nb = nb + bb
+    nc = nc + cc
+}
+assert(na == 5)
+assert(nb == 7)
+assert(nc == 9)
+
+// ── Edge cases ─────────────────────────────────────────────
+
+// let destructure with function call result
+fn make_pair() -> (Int, String) {
+    return (42, "hello")
+}
+let (num, txt) = make_pair()
+assert(num == 42)
+assert(txt == "hello")
+
+// let destructure inside a block
+{
+    let (inner_a, inner_b) = (100, 200)
+    assert(inner_a == 100)
+    assert(inner_b == 200)
+}
+
+// for destructure with empty list (loop body should not execute)
+let empty_pairs = []: [(Int, Int)]
+let ran = false
+for (_, _) in empty_pairs {
+    ran = true
+}
+assert(ran == false)
+
+// single-element list cons
+let [only, ..remainder] = [42]
+assert(only == 42)
+assert(remainder.len() == 0)
+
+// let with bool tuple
+let (flag1, flag2) = (true, false)
+assert(flag1 == true)
+assert(flag2 == false)
+
+// let with char tuple
+let (c1, c2) = ('a', 'z')
+assert(c1 == 'a')
+assert(c2 == 'z')
+
+// let with float tuple
+let (f1, f2) = (1.5, 2.5)
+assert(f1 == 1.5)
+assert(f2 == 2.5)
+
+println("PASS: All destructuring tests passed!")

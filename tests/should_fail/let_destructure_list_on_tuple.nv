@@ -1,0 +1,3 @@
+module test
+// let list destructure on non-list type
+let [a, b] = (1, 2)
