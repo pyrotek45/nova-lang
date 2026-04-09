@@ -1,0 +1,8 @@
+module fail
+// SHOULD FAIL: struct pattern names all fields AND uses wildcard _
+// The wildcard would have nothing to match, and the count is wrong (3 explicit > 2 real)
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+let r = match p {
+    Point { x, y, z, _ } => x,
+}

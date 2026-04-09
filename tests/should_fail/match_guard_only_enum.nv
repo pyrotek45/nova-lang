@@ -1,0 +1,10 @@
+module fail
+// SHOULD FAIL: all enum variants have guards, not exhaustive
+enum Color { Red, Green, Blue }
+fn bad(c: Color) -> String {
+    return match c {
+        Color::Red if true => "r",
+        Color::Green if true => "g",
+        Color::Blue if true => "b"
+    }
+}

@@ -1,0 +1,8 @@
+module fail
+// SHOULD FAIL: true arm has guard so bool match is not exhaustive
+fn bad(b: Bool) -> String {
+    return match b {
+        true if b => "guarded",
+        false => "no"
+    }
+}

@@ -1,0 +1,7 @@
+module fail
+// SHOULD FAIL: struct wildcard `_` but all fields already named
+struct Point { x: Int, y: Int }
+let p = Point(1, 2)
+let r = match p {
+    Point { x, y, _ } => x + y,
+}
