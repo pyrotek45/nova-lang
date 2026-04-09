@@ -1,0 +1,151 @@
+module main
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Nova — Conway's Game of Life (terminal)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+//  Shows: 2D grid via nested lists, block expressions, extends methods,
+//  modular code structure, string building, clone.
+//
+//  Runs a small (20x10) Game of Life grid for a few generations and
+//  prints each frame.
+//
+//  Run:  nova run demo/gameoflife.nv
+// ═════════════════════════════════════════════════════════════════════════════
+
+import super.std.core
+import super.std.list
+import super.std.string
+import super.std.math
+
+// ── Grid helpers ────────────────────────────────────────────────────────────
+
+fn make_grid(w: Int, h: Int) -> [[Int]] {
+    let grid = []: [Int]
+    for let y = 0; y < h; y += 1 {
+        let row = []: Int
+        for let x = 0; x < w; x += 1 {
+            row.push(0)
+        }
+        grid.push(row)
+    }
+    return grid
+}
+
+fn set_cell(grid: [[Int]], x: Int, y: Int, val: Int) {
+    grid[y][x] = val
+}
+
+fn get_cell(grid: [[Int]], x: Int, y: Int, w: Int, h: Int) -> Int {
+    if x < 0 || x >= w || y < 0 || y >= h {
+        return 0
+    }
+    return grid[y][x]
+}
+
+fn count_neighbors(grid: [[Int]], x: Int, y: Int, w: Int, h: Int) -> Int {
+    let count = 0
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            if dx == 0 && dy == 0 { /* skip self */ } else {
+                count += get_cell(grid, x + dx, y + dy, w, h)
+            }
+        }
+    }
+    return count
+}
+
+fn next_generation(grid: [[Int]], w: Int, h: Int) -> [[Int]] {
+    let new_grid = make_grid(w, h)
+    for let y = 0; y < h; y += 1 {
+        for let x = 0; x < w; x += 1 {
+            let alive = grid[y][x]
+            let n = count_neighbors(grid, x, y, w, h)
+            if alive == 1 {
+                // survive if 2 or 3 neighbors
+                if n == 2 || n == 3 {
+                    set_cell(new_grid, x, y, 1)
+                }
+            } else {
+                // birth if exactly 3 neighbors
+                if n == 3 {
+                    set_cell(new_grid, x, y, 1)
+                }
+            }
+        }
+    }
+    return new_grid
+}
+
+fn print_grid(grid: [[Int]], w: Int, h: Int, gen: Int) {
+    println(format("  Generation {}", Cast::string(gen)))
+    print("  +")
+    for let x = 0; x < w; x += 1 { print("-") }
+    println("+")
+    for let y = 0; y < h; y += 1 {
+        print("  |")
+        for let x = 0; x < w; x += 1 {
+            if grid[y][x] == 1 {
+                print("#")
+            } else {
+                print(" ")
+            }
+        }
+        println("|")
+    }
+    print("  +")
+    for let x = 0; x < w; x += 1 { print("-") }
+    println("+")
+}
+
+fn count_alive(grid: [[Int]], w: Int, h: Int) -> Int {
+    let total = 0
+    for let y = 0; y < h; y += 1 {
+        for let x = 0; x < w; x += 1 {
+            total += grid[y][x]
+        }
+    }
+    return total
+}
+
+// ── Setup ───────────────────────────────────────────────────────────────────
+
+let W = 30
+let H = 12
+let GENERATIONS = 8
+
+let grid = make_grid(W, H)
+
+// Glider
+set_cell(grid, 1, 0, 1)
+set_cell(grid, 2, 1, 1)
+set_cell(grid, 0, 2, 1)
+set_cell(grid, 1, 2, 1)
+set_cell(grid, 2, 2, 1)
+
+// Blinker (oscillator)
+set_cell(grid, 15, 5, 1)
+set_cell(grid, 16, 5, 1)
+set_cell(grid, 17, 5, 1)
+
+// Block (still life)
+set_cell(grid, 25, 1, 1)
+set_cell(grid, 26, 1, 1)
+set_cell(grid, 25, 2, 1)
+set_cell(grid, 26, 2, 1)
+
+// ── Run ─────────────────────────────────────────────────────────────────────
+
+println("Conway's Game of Life")
+println(format("  {}x{} grid, {} generations", Cast::string(W), Cast::string(H), Cast::string(GENERATIONS)))
+println("")
+
+for gen in 0..GENERATIONS {
+    print_grid(grid, W, H, gen)
+    let alive = count_alive(grid, W, H)
+    println(format("  alive: {}", Cast::string(alive)))
+    println("")
+    grid = next_generation(grid, W, H)
+}
+
+println("Done!")

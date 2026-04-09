@@ -297,8 +297,21 @@ impl TypeChecker {
                     .map(|(_, t)| t)
                     .unwrap();
 
+                // Replace the Dyn's own type variable (e.g. Generic("T")) with the
+                // prefixed key (e.g. Generic("__dyn_T")) so it resolves against the
+                // dyn-scoped mapping instead of any outer function-level generic
+                // with the same name.  This prevents infinite recursion when, e.g.,
+                // List::push's generic T is mapped to a Dyn(T = draw: fn($T)).
+                let scoped_field_type = Self::replace_generic_types(
+                    field_type,
+                    &[own.clone()],
+                    &[TType::Generic {
+                        name: dyn_key.clone(),
+                    }],
+                );
+
                 self.check_and_map_types(
-                    std::slice::from_ref(field_type),
+                    std::slice::from_ref(&scoped_field_type),
                     std::slice::from_ref(new_field),
                     type_map,
                     pos.clone(),
