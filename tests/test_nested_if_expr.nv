@@ -1,0 +1,69 @@
+module test_nested_if_expr
+import super.std.core
+
+// ── Test: if expr inside if expr ──────────────────────
+// Nested if-expressions used as values
+
+// 1. Simple nested if expr
+let a = if true { if false { 1 } else { 2 } } else { 3 }
+assert(a == 2, "nested if expr: true->false->else")
+
+// 2. Nested if expr other branch
+let b = if false { 1 } else { if true { 42 } else { 0 } }
+assert(b == 42, "nested if expr: false->else->true")
+
+// 3. Both branches are if exprs
+let x = 10
+let c = if x > 5 {
+    if x > 20 { "huge" } else { "big" }
+} else {
+    if x > 0 { "small" } else { "zero" }
+}
+assert(c == "big", "nested if expr both branches")
+
+// 4. Triple nested if expr
+let d = if true { if true { if true { "deep" } else { "n1" } } else { "n2" } } else { "n3" }
+assert(d == "deep", "triple nested if expr")
+
+// 5. If expr inside match arm
+let val = 7
+let e = match val {
+    x if x > 5 => if x > 10 { "big" } else { "medium" },
+    _ => "small"
+}
+assert(e == "medium", "if expr inside match arm")
+
+// 6. Match expr inside if expr
+let flag = true
+let f = if flag {
+    match 3 {
+        3 => "three",
+        _ => "other"
+    }
+} else {
+    "nope"
+}
+assert(f == "three", "match expr inside if expr")
+
+// 7. If expr in let binding
+let g: Int = if 1 > 0 { if 2 > 1 { 99 } else { 0 } } else { -1 }
+assert(g == 99, "if expr nested in let")
+
+// 8. If expr as function argument
+fn double(n: Int) -> Int { return n * 2 }
+let h = double(if true { 5 } else { 10 })
+assert(h == 10, "if expr as fn arg")
+
+// 9. Nested if expr with different types per nesting level
+let i = if true {
+    if false { "a" } else { "b" }
+} else {
+    "c"
+}
+assert(i == "b", "nested if expr string result")
+
+// 10. If expr as condition of outer if
+let j = if (if true { true } else { false }) { "yes" } else { "no" }
+assert(j == "yes", "if expr as condition of outer if")
+
+println("PASS: sweep_nested_if all clear")

@@ -1,0 +1,168 @@
+module test_final_sweep
+import super.std.core
+
+// ── IMPLICIT RETURN EDGE CASES ─────────────────────────
+// Functions and closures can now use match as the last statement
+// without explicit return.
+
+// 1. Regular function, value match
+fn grade(n: Int) -> String {
+    match n {
+        x if x >= 90 => "A",
+        x if x >= 80 => "B",
+        x if x >= 70 => "C",
+        _ => "F"
+    }
+}
+assert(grade(95) == "A", "fn implicit return value match")
+assert(grade(85) == "B", "fn implicit return B")
+assert(grade(60) == "F", "fn implicit return F")
+
+// 2. Regular function, enum match
+enum Dir { N, S, E, W }
+fn dir_name(d: Dir) -> String {
+    match d {
+        N() => "north",
+        S() => "south",
+        E() => "east",
+        W() => "west"
+    }
+}
+assert(dir_name(Dir::N()) == "north", "fn implicit return enum match")
+
+// 3. Closure, value match
+let describe = fn(x: Int) -> String {
+    match x {
+        0 => "zero",
+        _ => "nonzero"
+    }
+}
+assert(describe(0) == "zero", "closure implicit return value match")
+assert(describe(5) == "nonzero", "closure implicit return _")
+
+// 4. Nested match in function
+fn nested(x: Int, y: Bool) -> String {
+    match x {
+        0 => "zero",
+        _ => {
+            match y {
+                true => "pos-true",
+                false => "pos-false"
+            }
+        }
+    }
+}
+assert(nested(0, true) == "zero", "nested match fn 1")
+assert(nested(1, true) == "pos-true", "nested match fn 2")
+assert(nested(1, false) == "pos-false", "nested match fn 3")
+
+// 5. Mix: explicit return in some arms, implicit in others via nesting
+fn mixed(x: Int) -> String {
+    match x {
+        0 => {
+            return "explicit-zero"
+        },
+        _ => {
+            match x {
+                1 => "one",
+                _ => "other"
+            }
+        }
+    }
+}
+assert(mixed(0) == "explicit-zero", "mixed return 0")
+assert(mixed(1) == "one", "mixed return 1")
+assert(mixed(99) == "other", "mixed return 99")
+
+// 6. Match in block expression (let = match { match { ... } })
+let val = match 42 {
+    42 => {
+        match true {
+            true => "deep-yes",
+            false => "deep-no"
+        }
+    },
+    _ => "outer"
+}
+assert(val == "deep-yes", "nested match in block expr")
+
+// 7. Struct match implicit return
+struct Point { x: Int, y: Int }
+fn quadrant(p: Point) -> String {
+    match p {
+        Point { x, y } if x > 0 && y > 0 => "Q1",
+        Point { x, y } if x < 0 && y > 0 => "Q2",
+        Point { x, y } if x < 0 && y < 0 => "Q3",
+        Point { x, y } if x > 0 && y < 0 => "Q4",
+        _ => "axis"
+    }
+}
+assert(quadrant(Point(3, 4)) == "Q1", "struct match implicit Q1")
+assert(quadrant(Point(0, 0)) == "axis", "struct match implicit axis")
+
+// 8. Option match implicit return
+fn safe_div(a: Int, b: Int) -> Option(Int) {
+    match b {
+        0 => None(Int),
+        _ => Some(a / b)
+    }
+}
+assert(safe_div(10, 2) == Some(5), "option implicit return Some")
+assert(safe_div(10, 0) == None(Int), "option implicit return None")
+
+// 9. Function with match that has multi-statement arms
+fn with_block_arms(x: Int) -> Int {
+    match x {
+        0 => {
+            let a = 10
+            let b = 20
+            a + b
+        },
+        _ => {
+            let c = x * 2
+            c + 1
+        }
+    }
+}
+assert(with_block_arms(0) == 30, "block arms 0")
+assert(with_block_arms(5) == 11, "block arms 5")
+
+// 10. Ensure match statements (no assignment) still work as void
+let side_effect = 0
+match 1 {
+    1 => { side_effect = 100 },
+    _ => { side_effect = 200 }
+}
+assert(side_effect == 100, "match statement still works")
+
+// 11. Match in for loop body
+let results: [String] = []: String
+for i in [1, 2, 3] {
+    let s = match i {
+        1 => "a",
+        2 => "b",
+        _ => "c"
+    }
+    results.push(s)
+}
+assert(results == ["a", "b", "c"], "match in for loop")
+
+// 12. Match as fn argument
+fn echo(s: String) -> String { return s }
+assert(echo(match 1 { 1 => "yes", _ => "no" }) == "yes", "match as fn arg")
+
+// 13. Higher-order function with match-returning closure
+fn apply(f: fn(Int) -> String, x: Int) -> String {
+    return f(x)
+}
+let mapper = fn(n: Int) -> String {
+    match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many"
+    }
+}
+assert(apply(mapper, 0) == "zero", "HOF with match closure")
+assert(apply(mapper, 99) == "many", "HOF with match closure _")
+
+println("PASS: final sweep all clear")

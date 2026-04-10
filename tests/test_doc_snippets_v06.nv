@@ -1,0 +1,90 @@
+module test_doc_snippets_v06
+import super.std.core
+
+// ── Verify all new doc snippets compile and run correctly ──
+
+// Snippet 1: Match as implicit return
+fn classify(n: Int) -> String {
+    match n {
+        x if x >= 90 => "A",
+        x if x >= 80 => "B",
+        x if x >= 70 => "C",
+        _             => "F"
+    }
+}
+assert(classify(95) == "A", "doc: classify A")
+assert(classify(85) == "B", "doc: classify B")
+assert(classify(65) == "F", "doc: classify F")
+
+// Snippet 2: Closure implicit return
+let describe = fn(x: Int) -> String {
+    match x {
+        0 => "zero",
+        _ => "nonzero"
+    }
+}
+assert(describe(0) == "zero", "doc: describe zero")
+assert(describe(5) == "nonzero", "doc: describe nonzero")
+
+// Snippet 3: Nested match implicit return
+fn nested(x: Int, y: Bool) -> String {
+    match x {
+        0 => "zero",
+        _ => {
+            match y {
+                true  => "pos-true",
+                false => "pos-false"
+            }
+        }
+    }
+}
+assert(nested(0, true) == "zero", "doc: nested zero")
+assert(nested(1, true) == "pos-true", "doc: nested pos-true")
+assert(nested(1, false) == "pos-false", "doc: nested pos-false")
+
+// Snippet 4: Mixed explicit/implicit
+fn mixed(x: Int) -> String {
+    match x {
+        0 => { return "explicit-zero" },
+        _ => {
+            match x {
+                1 => "one",
+                _ => "other"
+            }
+        }
+    }
+}
+assert(mixed(0) == "explicit-zero", "doc: mixed 0")
+assert(mixed(1) == "one", "doc: mixed 1")
+assert(mixed(99) == "other", "doc: mixed 99")
+
+// Snippet 5: If inside match arm
+let val = 7
+let label = match val {
+    x if x > 5 => if x > 10 { "big" } else { "medium" },
+    _           => "small"
+}
+assert(label == "medium", "doc: if inside match arm")
+
+// Snippet 6: Match inside if branch
+let flag = true
+let result = if flag {
+    match 3 {
+        3 => "three",
+        _ => "other"
+    }
+} else {
+    "nope"
+}
+assert(result == "three", "doc: match inside if")
+
+// Snippet 7: Deeply nested if
+let x = 10
+let tag = if x > 5 {
+    if x > 20 { "huge" } else { "big" }
+} else {
+    if x > 0 { "small" } else { "zero" }
+}
+assert(tag == "big", "doc: deeply nested if")
+
+println("PASS: doc_verify all clear")
