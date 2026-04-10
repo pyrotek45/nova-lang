@@ -304,7 +304,7 @@ impl TypeChecker {
                 // List::push's generic T is mapped to a Dyn(T = draw: fn($T)).
                 let scoped_field_type = Self::replace_generic_types(
                     field_type,
-                    &[own.clone()],
+                    std::slice::from_ref(own),
                     &[TType::Generic {
                         name: dyn_key.clone(),
                     }],

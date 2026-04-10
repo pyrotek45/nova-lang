@@ -18,7 +18,7 @@ let
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "nova";
-  version = "0.5.0-alpha";
+  version = "0.6.0";
 
   src = nova-src;
 
