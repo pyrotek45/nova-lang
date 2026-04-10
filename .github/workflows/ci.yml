@@ -71,4 +71,4 @@ jobs:
         run: |
           VERSION=$(./target/release/nova version 2>&1 || ./target/release/nova.exe version 2>&1)
           echo "Nova reports: $VERSION"
-          echo "$VERSION" | grep -q "0.5.0-alpha" || { echo "ERROR: version mismatch"; exit 1; }
+          echo "$VERSION" | grep -q "0.6.0" || { echo "ERROR: version mismatch"; exit 1; }
