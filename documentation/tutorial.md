@@ -2034,7 +2034,7 @@ let msg = match opt {
     Some(n) if n > 100 => "big",
     Some(n) if n > 0   => "small",
     Some(n)             => "non-positive",
-    None                => "empty"
+    None()              => "empty"
 }
 ```
 
@@ -2052,6 +2052,108 @@ match score {
 
 > **Type rule:** the guard expression must be `Bool`.  A non-Bool guard
 > (like `n if n + 1 => ...`) is a compile-time error.
+
+### Match as Implicit Return
+
+Functions and closures can use a `match` as their last statement without
+an explicit `return`.  When the match is the final statement in the
+function body, the result of the matched arm becomes the return value:
+
+```rust
+fn classify(n: Int) -> String {
+    match n {
+        x if x >= 90 => "A",
+        x if x >= 80 => "B",
+        x if x >= 70 => "C",
+        _             => "F"
+    }
+}
+// classify(95) == "A"
+```
+
+This works for closures too:
+
+```rust
+let describe = fn(x: Int) -> String {
+    match x {
+        0 => "zero",
+        _ => "nonzero"
+    }
+}
+// describe(0) == "zero"
+```
+
+Nested matches also work as implicit returns — the innermost match
+result flows outward:
+
+```rust
+fn nested(x: Int, y: Bool) -> String {
+    match x {
+        0 => "zero",
+        _ => {
+            match y {
+                true  => "pos-true",
+                false => "pos-false"
+            }
+        }
+    }
+}
+```
+
+Arms can freely mix explicit `return` statements and implicit returns:
+
+```rust
+fn mixed(x: Int) -> String {
+    match x {
+        0 => { return "explicit-zero" },
+        _ => {
+            match x {
+                1 => "one",
+                _ => "other"
+            }
+        }
+    }
+}
+```
+
+> **Note:** All arms must still produce the same type.  Match as
+> implicit return also works with enum match, struct patterns, and
+> option patterns.
+
+### Nested Match and If Expressions
+
+Match and if expressions can be nested inside each other freely:
+
+```rust
+// If expression inside a match arm
+let val = 7
+let label = match val {
+    x if x > 5 => if x > 10 { "big" } else { "medium" },
+    _           => "small"
+}
+// label == "medium"
+
+// Match expression inside an if branch
+let flag = true
+let result = if flag {
+    match 3 {
+        3 => "three",
+        _ => "other"
+    }
+} else {
+    "nope"
+}
+// result == "three"
+
+// Deeply nested
+let x = 10
+let tag = if x > 5 {
+    if x > 20 { "huge" } else { "big" }
+} else {
+    if x > 0 { "small" } else { "zero" }
+}
+// tag == "big"
+```
 
 ### Duplicate Arm Detection
 
@@ -2880,7 +2982,6 @@ Dyn types, and extends + UFCS.
 | `fn extends f(x)` called as `f(x)` | Use `x.f()` (UFCS only) |
 | `5 \|> println` | Pipe needs `()` — write `5 \|> println()` |
 | `5 \|> myExtendsFn()` | Pipe only works with non-extends |
-| `match x { 0 => ... }` | Literals not in match — use `if/elif` |
 | `-10 % 3 == -1` | Nova uses Euclidean: `-10 % 3 == 2` |
 | `Cast::int(x)` used as `Int` | Returns `Option(Int)` — must unwrap |
 | `else if x > 0 { }` | Use `elif` |
@@ -2889,7 +2990,7 @@ Dyn types, and extends + UFCS.
 | `memoize(myNamedFn)` | Named fns need `@`: `memoize(myNamedFn@(Int))` |
 | `typeof((1,"a")) == "(Int, String)"` | No space in typeof output: `"(Int,String)"` |
 | Lambda with control flow | Use `fn(params) -> Type { }` |
-| `fn f(x: Int) -> Int { x * x }` | Must have explicit `return` |
+| `fn f(x: Int) -> Int { x * x }` | Must have explicit `return` (except match as last statement — see §16) |
 | `let b = a` (a is a list) | Creates alias! Use `clone(a)` for copy |
 | `Color::Red` (no parens) | Must write `Color::Red()` |
 | `\|\| true && false` precedence | `&&` binds tighter than `\|\|` (standard) |
@@ -2905,6 +3006,8 @@ Dyn types, and extends + UFCS.
 | `let Point { x, y } = 42` | Can only destructure a value whose type is that struct |
 | Duplicate match arms `1 => ..., 1 => ...` | Nova detects duplicate arms — remove the repeated arm or add an if-guard |
 | `n if n + 1 => ...` in match guard | Guard must be `Bool` — write `n if n > 0 => ...` |
+| `None => ...` in match pattern | Bare `None` becomes a variable binding (catch-all)! Always write `None() => ...` |
+| `fn f(x: Int) -> String { match x { ... } }` doesn't return | Match as implicit return works! No `return` needed when match is the last statement |
 
 ---
 

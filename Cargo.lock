@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "assembler"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
 ]
@@ -171,14 +171,14 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "colored",
 ]
 
 [[package]]
 name = "compiler"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
 ]
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "debugger"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
  "crossterm 0.28.1",
@@ -257,7 +257,7 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "disassembler"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
 ]
@@ -506,7 +506,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lexer"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
  "phf",
@@ -611,7 +611,7 @@ checksum = "53db447cac1df8402bef9a2ccacb0ea0dd1061b935e9e9ab9e5082c516aaada8"
 
 [[package]]
 name = "native"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
  "crossterm 0.27.0",
@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "nova"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "assembler",
  "bincode",
@@ -656,7 +656,7 @@ dependencies = [
 
 [[package]]
 name = "novacore"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "assembler",
  "common",
@@ -697,7 +697,7 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "optimizer"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
 ]
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "parser"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
  "lexer",
@@ -1236,7 +1236,7 @@ dependencies = [
 
 [[package]]
 name = "typechecker"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
 ]
@@ -1307,7 +1307,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "vm"
-version = "0.5.0-alpha"
+version = "0.6.0"
 dependencies = [
  "common",
  "modulo",

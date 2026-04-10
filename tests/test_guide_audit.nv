@@ -1,4 +1,4 @@
-module guide_audit
+module test_guide_audit
 import super.std.core
 import super.std.list
 
