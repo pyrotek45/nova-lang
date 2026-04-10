@@ -4696,7 +4696,7 @@ impl Parser {
     /// Check if a pattern (or any of its Or alternatives) satisfies a predicate.
     fn arm_contains(pat: &Pattern, pred: &dyn Fn(&Pattern) -> bool) -> bool {
         match pat {
-            Pattern::Or(alts) => alts.iter().any(|a| pred(a)),
+            Pattern::Or(alts) => alts.iter().any(pred),
             other => pred(other),
         }
     }
@@ -5751,7 +5751,7 @@ impl Parser {
                             for (fname, ftype) in &fields {
                                 if fname.as_ref() == variant.as_ref() {
                                     vtype = if let Some(ref gp) = generic_params {
-                                        TypeChecker::replace_generic_types(&ftype, gp, type_params)
+                                        TypeChecker::replace_generic_types(ftype, gp, type_params)
                                     } else {
                                         ftype.clone()
                                     };
@@ -7035,12 +7035,11 @@ impl Parser {
         }
         // Check for struct destructuring: `for Ident { ... } in list { … }`
         if let Some(TokenValue::Identifier(id)) = self.current_token_value().cloned() {
-            if self.peek_offset_value(1) == Some(&TokenValue::StructuralSymbol(LeftBrace)) {
-                if self.typechecker.environment.custom_types.contains_key(id.as_ref())
-                    && !self.typechecker.environment.enums.has(&id)
-                {
-                    return self.for_destructure();
-                }
+            if self.peek_offset_value(1) == Some(&TokenValue::StructuralSymbol(LeftBrace))
+                && self.typechecker.environment.custom_types.contains_key(id.as_ref())
+                && !self.typechecker.environment.enums.has(&id)
+            {
+                return self.for_destructure();
             }
         }
 
@@ -7712,14 +7711,14 @@ impl Parser {
         }
 
         // Validate list pattern against list type
-        if matches!(&pattern, Pattern::List(_) | Pattern::ListCons(_, _) | Pattern::EmptyList) {
-            if !matches!(expr_type, TType::List { .. } | TType::Any) {
-                return Err(self.generate_error_with_pos(
-                    format!("Cannot destructure `{}` with a list pattern", expr_type),
-                    "List patterns can only destructure list types.",
-                    pos.clone(),
-                ));
-            }
+        if matches!(&pattern, Pattern::List(_) | Pattern::ListCons(_, _) | Pattern::EmptyList)
+            && !matches!(expr_type, TType::List { .. } | TType::Any)
+        {
+            return Err(self.generate_error_with_pos(
+                format!("Cannot destructure `{}` with a list pattern", expr_type),
+                "List patterns can only destructure list types.",
+                pos.clone(),
+            ));
         }
 
         // Validate struct pattern: type, field count, field names, sub-pattern types
@@ -8264,7 +8263,7 @@ impl Parser {
     /// (ValueMatch or Match), rewrite the arm bodies so that each arm's last
     /// expression is wrapped in `Statement::Return`.  This ensures the compiler
     /// emits a proper RET instruction for every arm.
-    fn inject_returns_into_tail_match(body: &mut Vec<Statement>, return_type: &TType) {
+    fn inject_returns_into_tail_match(body: &mut [Statement], return_type: &TType) {
         if *return_type == TType::Void {
             return;
         }
@@ -8294,7 +8293,7 @@ impl Parser {
     /// Helper: if the last statement of an arm body is a bare expression (not a
     /// Return), replace it with a Return wrapping that expression.  Recurse for
     /// nested match-as-last-statement.
-    fn inject_return_in_arm_body(stmts: &mut Vec<Statement>, return_type: &TType) {
+    fn inject_return_in_arm_body(stmts: &mut [Statement], return_type: &TType) {
         if let Some(last) = stmts.last_mut() {
             match last {
                 Statement::Expression { ttype, expr } if *ttype != TType::Void => {
