@@ -4670,6 +4670,69 @@ impl Parser {
     // ─────────────────────────────────────────────────────────────────
 
     /// Check if a pattern is irrefutable (always matches).
+    fn finite_match_shapes(&self, ty: &TType, budget: usize) -> Option<Vec<Pattern>> {
+        if budget == 0 { return None; }
+        match ty {
+            TType::Bool => Some(vec![Pattern::BoolLiteral(true), Pattern::BoolLiteral(false)]),
+            TType::Option { .. } => Some(vec![Pattern::OptionNone, Pattern::OptionSome(Some(Box::new(Pattern::Wildcard)))]),
+            TType::Tuple { elements } => {
+                let mut combinations: Vec<Vec<Pattern>> = vec![vec![]];
+                for element in elements {
+                    let shapes = self.finite_match_shapes(element, budget)?;
+                    if combinations.len().checked_mul(shapes.len())? > budget { return None; }
+                    let mut next = Vec::new();
+                    for prefix in &combinations {
+                        for shape in &shapes {
+                            let mut item = prefix.clone();
+                            item.push(shape.clone());
+                            next.push(item);
+                        }
+                    }
+                    combinations = next;
+                }
+                Some(combinations.into_iter().map(Pattern::Tuple).collect())
+            }
+            TType::Custom { name, .. } if self.typechecker.environment.enums.has(name) => {
+                let fields = self.typechecker.environment.custom_types.get(name.as_ref())?;
+                let variants: Vec<_> = fields.iter().filter(|(n, _)| n.as_ref() != "type")
+                    .map(|(n, _)| Pattern::Enum { variant: n.clone(), binding: Some(Box::new(Pattern::Wildcard)), tag: None }).collect();
+                if variants.len() > budget { None } else { Some(variants) }
+            }
+            _ => None,
+        }
+    }
+
+    fn covers_match_shape(pat: &Pattern, shape: &Pattern) -> bool {
+        match pat {
+            Pattern::Wildcard | Pattern::Variable(_) => true,
+            Pattern::Or(alts) => alts.iter().any(|p| Self::covers_match_shape(p, shape)),
+            Pattern::BoolLiteral(a) => matches!(shape, Pattern::BoolLiteral(b) if a == b),
+            Pattern::OptionNone => matches!(shape, Pattern::OptionNone),
+            Pattern::OptionSome(inner) => matches!(shape, Pattern::OptionSome(_))
+                && inner.as_ref().is_none_or(|p| Self::is_irrefutable(p)),
+            Pattern::Enum { variant, binding, .. } => match shape {
+                Pattern::Enum { variant: expected, .. } if variant == expected =>
+                    binding.as_ref().is_none_or(|p| Self::is_irrefutable(p)),
+                _ => false,
+            },
+            Pattern::Tuple(parts) => match shape {
+                Pattern::Tuple(shapes) if parts.len() == shapes.len() =>
+                    parts.iter().zip(shapes).all(|(p, s)| Self::covers_match_shape(p, s)),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn patterns_exhaustive<T>(&self, ty: &TType, arms: &[(Pattern, Option<Expr>, T)], has_default: bool) -> bool {
+        if has_default || arms.iter().any(|(p, guard, _)| guard.is_none() && Self::is_irrefutable(p)) {
+            return true;
+        }
+        let Some(shapes) = self.finite_match_shapes(ty, 4096) else { return false; };
+        shapes.iter().all(|shape| arms.iter().any(|(pat, guard, _)|
+            guard.is_none() && Self::covers_match_shape(pat, shape)))
+    }
+
     fn is_irrefutable(pat: &Pattern) -> bool {
         match pat {
             Pattern::Wildcard | Pattern::Variable(_) => true,
@@ -5412,53 +5475,12 @@ impl Parser {
             }
         }
 
-        // ── Exhaustiveness check ──
-        let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, guard, _)| guard.is_none() && Self::is_irrefutable(p));
-        if !has_catchall {
-            // Bool exhaustiveness: true + false (only unguarded arms count)
-            let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
-                has_true && has_false
-            };
-            // Option exhaustiveness: Some + None (only unguarded arms count)
-            let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
-                has_some && has_none
-            };
-            // User enum exhaustiveness: all variants present (only unguarded arms count)
-            let is_enum_exhaustive = match &match_type {
-                TType::Custom { name, .. } => {
-                    if self.typechecker.environment.enums.has(name) {
-                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
-                            let variant_names: Vec<&str> = fields.iter()
-                                .filter(|(n, _)| n.as_ref() != "type")
-                                .map(|(n, _)| n.as_ref())
-                                .collect();
-                            variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
-                            })
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
-            if !is_bool_exhaustive && !is_option_exhaustive && !is_enum_exhaustive {
-                return Err(self.generate_error_with_pos(
-                    "Non-exhaustive match",
-                    format!(
-                        "When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`",
-                        match_type
-                    ),
-                    pos,
-                ));
-            }
+        if !self.patterns_exhaustive(&match_type, &arms, default_branch.is_some()) {
+            return Err(self.generate_error_with_pos(
+                "Non-exhaustive match",
+                format!("When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`", match_type),
+                pos,
+            ));
         }
 
         // type-check: all arms produce the same type
@@ -5609,50 +5631,12 @@ impl Parser {
             }
         }
 
-        // ── Exhaustiveness check ──
-        let has_catchall = default_branch.is_some()
-            || arms.iter().any(|(p, guard, _)| guard.is_none() && Self::is_irrefutable(p));
-        if !has_catchall {
-            let is_bool_exhaustive = match_type == TType::Bool && {
-                let has_true = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(true)));
-                let has_false = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| *q == Pattern::BoolLiteral(false)));
-                has_true && has_false
-            };
-            let is_option_exhaustive = matches!(match_type, TType::Option { .. }) && {
-                let has_some = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionSome(_))));
-                let has_none = arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::OptionNone)));
-                has_some && has_none
-            };
-            let is_enum_exhaustive = match &match_type {
-                TType::Custom { name, .. } => {
-                    if self.typechecker.environment.enums.has(name) {
-                        if let Some(fields) = self.typechecker.environment.custom_types.get(name.as_ref()) {
-                            let variant_names: Vec<&str> = fields.iter()
-                                .filter(|(n, _)| n.as_ref() != "type")
-                                .map(|(n, _)| n.as_ref())
-                                .collect();
-                            variant_names.iter().all(|vname| {
-                                arms.iter().any(|(p, guard, _)| guard.is_none() && Self::arm_contains(p, &|q| matches!(q, Pattern::Enum { variant, .. } if variant.as_ref() == *vname)))
-                            })
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
-            if !is_bool_exhaustive && !is_option_exhaustive && !is_enum_exhaustive {
-                return Err(self.generate_error_with_pos(
-                    "Non-exhaustive match",
-                    format!(
-                        "When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`",
-                        match_type
-                    ),
-                    pos,
-                ));
-            }
+        if !self.patterns_exhaustive(&match_type, &arms, default_branch.is_some()) {
+            return Err(self.generate_error_with_pos(
+                "Non-exhaustive match",
+                format!("When matching on `{}`, not all values can be covered.\n  Add a default: `_ => ...`", match_type),
+                pos,
+            ));
         }
 
         Ok(Some(Statement::ValueMatch {
