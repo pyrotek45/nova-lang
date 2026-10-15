@@ -1,0 +1,28 @@
+module test_tuple_exhaustiveness_regression
+
+fn bool_pair(pair: (Bool, Bool)) -> Int {
+    return match pair {
+        (true, true) => 1,
+        (true, false) => 2,
+        (false, true) => 3,
+        (false, false) => 4,
+    }
+}
+assert(bool_pair((true, true)) == 1, "tt")
+assert(bool_pair((true, false)) == 2, "tf")
+assert(bool_pair((false, true)) == 3, "ft")
+assert(bool_pair((false, false)) == 4, "ff")
+
+fn option_pair(pair: (Option(Int), Option(Int))) -> Int {
+    return match pair {
+        (Some(a), Some(b)) => a + b,
+        (Some(a), None()) => a,
+        (None(), Some(b)) => b,
+        (None(), None()) => 0,
+    }
+}
+assert(option_pair((Some(2), Some(3))) == 5, "ss")
+assert(option_pair((Some(2), None(Int))) == 2, "sn")
+assert(option_pair((None(Int), Some(3))) == 3, "ns")
+assert(option_pair((None(Int), None(Int))) == 0, "nn")
+println("PASS: tuple exhaustiveness regression")
